@@ -2,7 +2,7 @@
 
 ## 一、結論
 
-StudyNova 的前端與後端 API 已內建於 Next.js，不需要另外新增一組獨立的 REST API 伺服器。正式部署時，主要需要準備一個 PostgreSQL 資料庫；Redis、S3 相容物件儲存、AI Provider、Web Push 與 SMTP 都是依功能選用的外部服務。
+StudyNova 的前端與後端 API 已內建於 Next.js，不需要另外新增一組獨立的 REST API 伺服器。你的部署方案使用 Neon 作為遠端 PostgreSQL；不需要在 Windows 或部署平台上另外執行本機 PostgreSQL。Redis、S3 相容物件儲存、AI Provider、Web Push 與 SMTP 都是依功能選用的外部服務。
 
 ## 二、API 與外部服務
 
@@ -159,14 +159,25 @@ npx drizzle-kit migrate
 | 後台與維運 | `platform_settings`、`feature_permissions`、`feature_usage`、`admin_logs`、`system_logs`、`job_queue` |
 | 通知與推播 | `notifications`、`push_subscriptions` |
 
-## 五、最低可啟動配置
+## 五、Neon + 部署平台配置
+
+從 Neon Console 複製連線字串，建議使用 Pooled connection string，並保留 Neon 提供的 `sslmode=require`。不要把實際連線字串提交到 GitHub。
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/studynova
-SESSION_SECRET=replace-with-a-long-random-secret
-APP_URL=http://localhost:3000
-NODE_ENV=development
+DATABASE_URL=postgresql://<neon-user>:<password>@<neon-host>/<database>?sslmode=require
+SESSION_SECRET=<用 PowerShell 產生的長隨機密鑰>
+APP_URL=https://你的正式網域
+NODE_ENV=production
 ```
+
+如果只是從 Windows 連到 Neon 執行 migration，PowerShell 可直接設定當次指令的環境變數：
+
+```powershell
+$env:DATABASE_URL = "postgresql://<neon-user>:<password>@<neon-host>/<database>?sslmode=require"
+npx drizzle-kit push
+```
+
+若使用 Vercel、Render、Railway 或其他部署平台，請在該平台的 Environment Variables 設定 `DATABASE_URL`，不需要在 Windows 常駐設定它。
 
 ## 六、建議正式環境配置
 
@@ -201,9 +212,9 @@ CRON_SECRET=<cron-secret>
 SMTP_URL=smtps://user:password@smtp.example.com:465
 ```
 
-## 七、Docker Compose 內建服務
+## 七、可選的 Docker Compose 方案
 
-執行 `docker compose up -d --build` 會提供：
+你目前使用 Neon，**不需要啟動 Docker Compose 的 `db` 服務**。若只部署到 Vercel 或其他雲端平台，也不需要本機 Redis、MinIO 或 PostgreSQL。原始 Compose 仍可供日後完全離線開發使用，執行 `docker compose up -d --build` 會提供：
 
 | Service | 預設位置 | 用途 |
 |---|---|---|
@@ -212,4 +223,4 @@ SMTP_URL=smtps://user:password@smtp.example.com:465
 | `minio` | `http://localhost:9000`、Console `http://localhost:9001` | S3 相容物件儲存 |
 | `app` | `http://localhost:3000` | StudyNova Next.js app |
 
-Compose 範例中的帳密是開發用預設值，正式環境必須替換 `POSTGRES_PASSWORD`、MinIO root password、`SESSION_SECRET` 與 `CRON_SECRET`，並限制資料庫、Redis、MinIO 管理介面只允許內網或管理網段存取。
+如果採用 Neon 部署，Compose 中的 `db`、`redis`、`minio` 都可以不啟動；只需把 `DATABASE_URL` 指向 Neon。若未設定 `REDIS_URL`，StudyNova 會使用 PostgreSQL queue adapter。若未設定 S3 組合，檔案會暫存於 Neon PostgreSQL 的 bytea 欄位，正式環境仍建議另接 R2 或其他 S3 相容儲存。
