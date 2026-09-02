@@ -3,6 +3,7 @@
 -- Run this file once in Neon SQL Editor. Do not commit secrets here.
 -- After schema creation, deploy the app with ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME and call /api/health to run idempotent seed and create the initial owner.
 -- This file creates tables, indexes, unique constraints and foreign keys only.
+-- The weekly exam answer/question foreign key uses the explicit short name week_answers_question_fk.
 
 CREATE TABLE "achievements" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -1054,7 +1055,7 @@ ALTER TABLE "voice_records" ADD CONSTRAINT "voice_records_user_id_users_id_fk" F
 ALTER TABLE "voice_records" ADD CONSTRAINT "voice_records_object_id_storage_objects_id_fk" FOREIGN KEY ("object_id") REFERENCES "public"."storage_objects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "voice_transcripts" ADD CONSTRAINT "voice_transcripts_record_id_voice_records_id_fk" FOREIGN KEY ("record_id") REFERENCES "public"."voice_records"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "weekly_exam_answers" ADD CONSTRAINT "weekly_exam_answers_week_id_weekly_exam_weeks_id_fk" FOREIGN KEY ("week_id") REFERENCES "public"."weekly_exam_weeks"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "weekly_exam_answers" ADD CONSTRAINT "weekly_exam_answers_matched_question_id_weekly_exam_questions_id_fk" FOREIGN KEY ("matched_question_id") REFERENCES "public"."weekly_exam_questions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "weekly_exam_answers" ADD CONSTRAINT "week_answers_question_fk" FOREIGN KEY ("matched_question_id") REFERENCES "public"."weekly_exam_questions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "weekly_exam_attempts" ADD CONSTRAINT "weekly_exam_attempts_week_id_weekly_exam_weeks_id_fk" FOREIGN KEY ("week_id") REFERENCES "public"."weekly_exam_weeks"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "weekly_exam_attempts" ADD CONSTRAINT "weekly_exam_attempts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "weekly_exam_drafts" ADD CONSTRAINT "weekly_exam_drafts_week_id_weekly_exam_weeks_id_fk" FOREIGN KEY ("week_id") REFERENCES "public"."weekly_exam_weeks"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

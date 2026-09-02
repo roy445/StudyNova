@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   customType,
   primaryKey,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -1069,10 +1070,17 @@ export const weeklyExamAnswers = pgTable(
     weekId: uuid("week_id").notNull().references(() => weeklyExamWeeks.id, { onDelete: "cascade" }),
     questionNumber: integer("question_number").notNull(),
     answerText: text("answer_text").notNull(),
-    matchedQuestionId: uuid("matched_question_id").references(() => weeklyExamQuestions.id, { onDelete: "set null" }),
+    matchedQuestionId: uuid("matched_question_id"),
     confidence: real("confidence").notNull().default(0),
   },
-  (t) => [index("week_ans_idx").on(t.weekId, t.questionNumber)],
+  (t) => [
+    index("week_ans_idx").on(t.weekId, t.questionNumber),
+    foreignKey({
+      columns: [t.matchedQuestionId],
+      foreignColumns: [weeklyExamQuestions.id],
+      name: "week_answers_question_fk",
+    }).onDelete("set null"),
+  ],
 );
 
 export const weeklyExamWords = pgTable(
