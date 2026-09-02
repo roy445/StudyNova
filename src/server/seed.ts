@@ -118,7 +118,10 @@ const BANK = [
 export async function runSeed(force = false) {
   const existing = (await db.select().from(platformSettings).where(eq(platformSettings.key, "seed")).limit(1))[0];
   const version = Number((existing?.value as { version?: number } | undefined)?.version ?? 0);
-  if (!force && version >= SEED_VERSION) return { seeded: false, version };
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const needsOwnerBootstrap = Boolean(adminEmail && adminPassword && adminPassword.length >= 8);
+  if (!force && version >= SEED_VERSION && !needsOwnerBootstrap) return { seeded: false, version };
 
   for (const l of LEVELS) {
     await db.insert(assistantLevels).values(l).onConflictDoUpdate({ target: assistantLevels.level, set: l });
@@ -174,8 +177,6 @@ export async function runSeed(force = false) {
   }
 
   // Optional bootstrap owner account (only when explicitly configured).
-  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
-  const adminPassword = process.env.ADMIN_PASSWORD;
   if (adminEmail && adminPassword && adminPassword.length >= 8) {
     const found = (await db.select().from(users).where(eq(users.email, adminEmail)).limit(1))[0];
     if (!found) {
