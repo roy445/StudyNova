@@ -1,0 +1,286 @@
+@import "tailwindcss";
+
+@theme {
+  --color-nova-bg: #060915;
+  --color-nova-surface: #0b1226;
+  --color-nova-card: #101a33;
+  --color-nova-line: #1f2b4d;
+  --color-nova-violet: #7c5cff;
+  --color-nova-cyan: #37d3ff;
+  --color-nova-gold: #ffc857;
+  --color-nova-text: #e8edff;
+  --color-nova-muted: #9aa8cc;
+  --font-sans: "Inter", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #060915;
+  --surface: rgba(16, 26, 51, 0.72);
+  --surface-solid: #101a33;
+  --line: rgba(124, 92, 255, 0.18);
+  --text: #e8edff;
+  --muted: #9aa8cc;
+  --shadow: 0 18px 50px -24px rgba(6, 10, 30, 0.9);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f6ff;
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-solid: #ffffff;
+  --line: rgba(80, 70, 160, 0.16);
+  --text: #14183a;
+  --muted: #5a6488;
+  --shadow: 0 18px 40px -28px rgba(30, 40, 90, 0.5);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.65;
+  min-height: 100dvh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(1000px 620px at 12% -12%, rgba(124, 92, 255, 0.22), transparent 62%),
+    radial-gradient(900px 560px at 88% 4%, rgba(55, 211, 255, 0.16), transparent 60%),
+    radial-gradient(700px 500px at 50% 110%, rgba(255, 200, 87, 0.08), transparent 65%);
+  pointer-events: none;
+}
+
+html[data-theme="light"] body::before {
+  background:
+    radial-gradient(900px 560px at 10% -10%, rgba(124, 92, 255, 0.16), transparent 60%),
+    radial-gradient(800px 520px at 90% 0%, rgba(55, 211, 255, 0.14), transparent 58%);
+}
+
+/* ------------------------------------------------------- primitives */
+
+.glass {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.glass-soft {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.hairline {
+  border: 1px solid var(--line);
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.neon-text {
+  background: linear-gradient(96deg, #9d8cff 0%, #37d3ff 52%, #ffc857 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gold-ring {
+  box-shadow: 0 0 0 1px rgba(255, 200, 87, 0.55), 0 0 26px -6px rgba(255, 200, 87, 0.5);
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-nova-cyan);
+  outline-offset: 2px;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px; /* prevents iOS zoom */
+}
+
+/* ---------------------------------------------------------- scroll */
+
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 255, 0.35);
+  border-radius: 99px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ------------------------------------------------------- animation */
+
+@keyframes nova-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nova-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes nova-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes nova-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes nova-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes nova-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes nova-shimmer {
+  from {
+    background-position: -400px 0;
+  }
+  to {
+    background-position: 400px 0;
+  }
+}
+
+.anim-in {
+  animation: nova-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-pop {
+  animation: nova-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-float {
+  animation: nova-float 4.5s ease-in-out infinite;
+}
+.anim-orbit {
+  animation: nova-orbit 14s linear infinite;
+  transform-origin: center;
+}
+.anim-pulse {
+  animation: nova-pulse 2.4s ease-in-out infinite;
+}
+.marquee-track {
+  animation: nova-marquee 26s linear infinite;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(124, 92, 255, 0.08), rgba(124, 92, 255, 0.2), rgba(124, 92, 255, 0.08));
+  background-size: 800px 100%;
+  animation: nova-shimmer 1.4s linear infinite;
+  border-radius: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ----------------------------------------------------- app layout */
+
+.app-main {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .app-main {
+    padding-bottom: 32px;
+  }
+}
+
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.novi-dock {
+  bottom: calc(84px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .novi-dock {
+    bottom: 26px;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}

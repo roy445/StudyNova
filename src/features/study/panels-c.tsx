@@ -1,0 +1,658 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
+import { apiDelete, apiPost, errorMessage, useApi } from "@/lib/api";
+
+const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
+
+function speak(text: string, lang = "en-US") {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+  return true;
+}
+
+type Word = { id: string; word: string; meaning: string; part_of_speech: string; example: string; example_zh: string; familiarity: number; memory_tip: string | null };
+
+export function WordsPanel() {
+  const toast = useToast();
+  const { data, loading, error, reload } = useApi<{ words: Word[]; level: string; count: number }>("/words/daily");
+  const [index, setIndex] = useState(0);
+  const [mode, setMode] = useState<"card" | "zh2en" | "en2zh" | "spell" | "timed">("card");
+  const [flipped, setFlipped] = useState(false);
+  const [input, setInput] = useState("");
+  const [stats, setStats] = useState({ correct: 0, total: 0 });
+  const [startedAt] = useState(Date.now());
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [tip, setTip] = useState<string | null>(null);
+  const [tipLoading, setTipLoading] = useState(false);
+
+  const words = data?.words ?? [];
+  const current = words[index];
+
+  useEffect(() => {
+    if (mode !== "timed") return;
+    setTimeLeft(60);
+    const t = setInterval(() => setTimeLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [mode]);
+
+  const answer = useCallback(
+    async (correct: boolean) => {
+      if (!current) return;
+      setStats((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
+      try {
+        await apiPost("/words/answer", { wordId: current.id, correct, mode });
+      } catch (err) {
+        toast.push("error", errorMessage(err));
+      }
+      setFlipped(false);
+      setInput("");
+      setTip(null);
+      if (index + 1 < words.length) setIndex(index + 1);
+      else {
+        try {
+          const res = await apiPost<{ reward: { nova: number; xp: number } }>("/words/session-complete", {
+            correct: stats.correct + (correct ? 1 : 0),
+            total: stats.total + 1,
+            seconds: Math.round((Date.now() - startedAt) / 1000),
+          });
+          toast.push("success", `完成今日單字！+${res.reward.nova} Nova / +${res.reward.xp} XP`);
+        } catch (err) {
+          toast.push("error", errorMessage(err));
+        }
+        setIndex(0);
+        setStats({ correct: 0, total: 0 });
+        await reload();
+      }
+    },
+    [current, index, mode, reload, startedAt, stats, toast, words.length],
+  );
+
+  if (loading) return <Card title="🔤 快速背單字"><Skeleton lines={4} /></Card>;
+  if (error) return <Card title="🔤 快速背單字"><ErrorState message={error} onRetry={reload} /></Card>;
+  if (!current) return <Card title="🔤 快速背單字"><EmptyState icon="📖" title="今天的單字都完成了！" hint="到「我的設定」調整每日單字量，或明天再來。" /></Card>;
+
+  return (
+    <Card
+      title="🔤 快速背單字"
+      subtitle={`程度 ${data?.level}・第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
+      action={
+        <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !py-1.5 text-xs">
+          <option value="card">單字卡</option>
+          <option value="en2zh">英 → 中</option>
+          <option value="zh2en">中 → 英</option>
+          <option value="spell">拼寫</option>
+          <option value="timed">限時挑戰</option>
+        </Select>
+      }
+    >
+      {mode === "timed" && (
+        <div className="mb-2 flex items-center gap-2 text-xs">
+          <Badge tone={timeLeft < 15 ? "rose" : "cyan"}>⏱ {timeLeft}s</Badge>
+          <Progress value={timeLeft} max={60} tone={timeLeft < 15 ? "gold" : "cyan"} />
+        </div>
+      )}
+
+      <div className="glass-soft flex min-h-[190px] flex-col items-center justify-center gap-2 p-5 text-center">
+        {mode === "zh2en" ? (
+          <>
+            <p className="text-lg font-semibold">{current.meaning}</p>
+            {flipped && <p className="text-2xl font-bold text-[#37d3ff]">{current.word}</p>}
+          </>
+        ) : (
+          <>
+            <p className="text-3xl font-extrabold tracking-tight">{current.word}</p>
+            <p className="text-xs text-muted">{current.part_of_speech}</p>
+            {(flipped || mode === "card") && mode !== "spell" && <p className="text-lg text-[#37d3ff]">{flipped ? current.meaning : "　"}</p>}
+          </>
+        )}
+        {flipped && current.example && (
+          <div className="mt-1 text-xs text-muted">
+            <p>{current.example}</p>
+            <p>{current.example_zh}</p>
+          </div>
+        )}
+        {tip && <p className="mt-2 whitespace-pre-wrap rounded-xl bg-black/30 p-2 text-left text-xs text-muted">{tip}</p>}
+        <div className="mt-1 flex items-center gap-1.5">
+          <Progress value={current.familiarity} tone="green" />
+          <span className="shrink-0 text-[11px] text-muted">熟悉度 {current.familiarity}%</span>
+        </div>
+      </div>
+
+      {mode === "spell" || mode === "zh2en" ? (
+        <div className="mt-3 flex gap-2">
+          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="輸入英文單字" onKeyDown={(e) => e.key === "Enter" && answer(input.trim().toLowerCase() === current.word.toLowerCase())} />
+          <Button onClick={() => answer(input.trim().toLowerCase() === current.word.toLowerCase())}>送出</Button>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={() => setFlipped((f) => !f)}>
+            {flipped ? "隱藏答案" : "顯示答案"}
+          </Button>
+          <Button variant="ghost" onClick={() => { if (!speak(current.word)) toast.push("error", "此瀏覽器不支援語音"); }}>
+            🔊 聽發音
+          </Button>
+          <Button onClick={() => answer(true)}>我記得 ✅</Button>
+          <Button variant="outline" onClick={() => answer(false)}>
+            不熟 🔁
+          </Button>
+        </div>
+      )}
+
+      <div className="mt-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          loading={tipLoading}
+          onClick={async () => {
+            setTipLoading(true);
+            try {
+              const res = await apiPost<{ tip: string }>("/words/memory-tip", { wordId: current.id });
+              setTip(res.tip);
+            } catch (err) {
+              toast.push("error", errorMessage(err));
+            } finally {
+              setTipLoading(false);
+            }
+          }}
+        >
+          🧠 AI 記憶方法
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+type Sentence = { id: string; en: string; zh: string; level: string; familiarity: number };
+
+export function SentencesPanel() {
+  const toast = useToast();
+  const { data, loading, error, reload } = useApi<{ sentences: Sentence[] }>("/sentences");
+  const [i, setI] = useState(0);
+  const [mode, setMode] = useState<"zh2en" | "en2zh" | "fill">("zh2en");
+  const [input, setInput] = useState("");
+  const [show, setShow] = useState(false);
+
+  const s = data?.sentences[i];
+  if (loading) return <Card title="💬 快速背句子"><Skeleton lines={3} /></Card>;
+  if (error) return <Card title="💬 快速背句子"><ErrorState message={error} onRetry={reload} /></Card>;
+  if (!s) return <Card title="💬 快速背句子"><EmptyState icon="💬" title="目前沒有句子" /></Card>;
+
+  const blanked = s.en
+    .split(" ")
+    .map((w, idx) => (idx % 4 === 2 ? "____" : w))
+    .join(" ");
+
+  async function grade(correct: boolean) {
+    if (!s) return;
+    await apiPost("/sentences/answer", { sentenceId: s.id, correct });
+    toast.push(correct ? "success" : "info", correct ? "很好！" : "沒關係，等一下會再出現");
+    setShow(false);
+    setInput("");
+    setI((v) => (v + 1) % (data?.sentences.length ?? 1));
+  }
+
+  return (
+    <Card
+      title="💬 快速背句子"
+      subtitle={`第 ${i + 1}/${data?.sentences.length} 句・熟悉度 ${s.familiarity}%`}
+      action={
+        <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !py-1.5 text-xs">
+          <option value="zh2en">中 → 英</option>
+          <option value="en2zh">英 → 中</option>
+          <option value="fill">關鍵字填空</option>
+        </Select>
+      }
+    >
+      <div className="glass-soft min-h-[130px] p-4 text-center">
+        <p className="text-lg font-medium">{mode === "en2zh" ? s.en : mode === "fill" ? blanked : s.zh}</p>
+        {show && <p className="mt-2 text-[#37d3ff]">{mode === "en2zh" ? s.zh : s.en}</p>}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="輸入你的答案（選填）" className="min-w-[180px] flex-1" />
+        <Button variant="ghost" onClick={() => setShow((v) => !v)}>
+          {show ? "隱藏" : "看答案"}
+        </Button>
+        <Button variant="ghost" onClick={() => { speak(s.en); }}>
+          🔊 朗讀
+        </Button>
+        <Button onClick={() => grade(true)}>我會了</Button>
+        <Button variant="outline" onClick={() => grade(false)}>
+          再練習
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+type VoiceRecord = {
+  id: string;
+  mode: string;
+  subject: string;
+  referenceText: string;
+  durationSec: number;
+  status: string;
+  audioUrl: string | null;
+  transcript: { transcript: string } | null;
+  analysis: { score: number; fluency: number; accuracy: number; completeness: number; pace: number; missingWords: string[]; advice: string } | null;
+};
+
+export function VoicePanel() {
+  const toast = useToast();
+  const { data, loading, error, reload } = useApi<{ records: VoiceRecord[] }>("/voice");
+  const [recording, setRecording] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [mode, setMode] = useState("reading");
+  const [subject, setSubject] = useState("英文");
+  const [reference, setReference] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => {
+    if (timer.current) clearInterval(timer.current);
+    recorder.current?.stream.getTracks().forEach((t) => t.stop());
+  }, []);
+
+  async function start() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunks.current = [];
+      rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
+      rec.onstop = () => {
+        const b = new Blob(chunks.current, { type: rec.mimeType || "audio/webm" });
+        setBlob(b);
+        setPreviewUrl(URL.createObjectURL(b));
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      rec.start();
+      recorder.current = rec;
+      setRecording(true);
+      setPaused(false);
+      setSeconds(0);
+      timer.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+    } catch {
+      toast.push("error", "無法存取麥克風，請確認瀏覽器權限");
+    }
+  }
+
+  function stop() {
+    recorder.current?.stop();
+    if (timer.current) clearInterval(timer.current);
+    setRecording(false);
+    setPaused(false);
+  }
+
+  async function upload() {
+    if (!blob) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("audio", blob, "record.webm");
+      fd.append("mode", mode);
+      fd.append("subject", subject);
+      fd.append("referenceText", reference);
+      fd.append("durationSec", String(seconds));
+      await apiPost("/voice", fd);
+      toast.push("success", "AI 分析完成！");
+      setBlob(null);
+      setPreviewUrl(null);
+      setSeconds(0);
+      await reload();
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <Card title="🎤 錄音分析・背誦測試・AI 口說" subtitle="英文朗讀、國文背課文、口說練習，AI 會比對逐字稿並評分">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="模式">
+          <Select value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="reading">朗讀評分</option>
+            <option value="recite">背誦測試</option>
+            <option value="speaking">AI 口說對話</option>
+          </Select>
+        </Field>
+        <Field label="科目">
+          <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
+            {SUBJECTS.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      <Field label="參考文本（背誦／朗讀時提供，AI 會比對漏字與順序）">
+        <Textarea value={reference} onChange={(e) => setReference(e.target.value)} placeholder="貼上課文或句子…" className="!min-h-[80px]" />
+      </Field>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {!recording && !blob && <Button onClick={start}>● 開始錄音</Button>}
+        {recording && (
+          <>
+            <Badge tone="rose">錄音中 {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</Badge>
+            {!paused ? (
+              <Button variant="ghost" onClick={() => { recorder.current?.pause(); setPaused(true); if (timer.current) clearInterval(timer.current); }}>
+                ⏸ 暫停
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={() => { recorder.current?.resume(); setPaused(false); timer.current = setInterval(() => setSeconds((s) => s + 1), 1000); }}>
+                ▶ 繼續
+              </Button>
+            )}
+            <Button variant="danger" onClick={stop}>
+              ■ 結束
+            </Button>
+          </>
+        )}
+        {blob && !recording && (
+          <>
+            {previewUrl && <audio src={previewUrl} controls className="h-9" />}
+            <Button loading={uploading} onClick={upload}>
+              ✨ 送出 AI 分析
+            </Button>
+            <Button variant="ghost" onClick={() => { setBlob(null); setPreviewUrl(null); setSeconds(0); }}>
+              重錄
+            </Button>
+          </>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {loading && <Skeleton lines={3} />}
+        {error && <ErrorState message={error} onRetry={reload} />}
+        {!loading && !data?.records.length && <EmptyState icon="🎙️" title="還沒有錄音紀錄" hint="錄一段英文朗讀，AI 會給你 0-100 分與改善建議。" />}
+        {data?.records.map((r) => (
+          <div key={r.id} className="glass-soft p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Badge tone="cyan">{r.mode === "reading" ? "朗讀" : r.mode === "recite" ? "背誦" : "口說"}</Badge>
+                <span className="text-xs text-muted">{r.durationSec}s・{r.subject}</span>
+              </div>
+              {r.analysis && <span className="text-lg font-bold text-[#37d3ff]">{r.analysis.score} / 100</span>}
+            </div>
+            {r.audioUrl && <audio src={r.audioUrl} controls className="mt-2 h-9 w-full" />}
+            {r.transcript?.transcript && (
+              <p className="mt-2 rounded-lg bg-black/25 p-2 text-xs text-muted">
+                <span className="font-medium text-[var(--text)]">逐字稿：</span>
+                {r.transcript.transcript}
+              </p>
+            )}
+            {r.analysis && (
+              <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+                <div>流暢度 {r.analysis.fluency}</div>
+                <div>正確度 {r.analysis.accuracy}</div>
+                <div>完整度 {r.analysis.completeness}</div>
+                <div>語速 {r.analysis.pace}</div>
+              </div>
+            )}
+            {r.analysis?.missingWords?.length ? <p className="mt-1 text-[11px] text-rose-300">漏讀：{r.analysis.missingWords.join("、")}</p> : null}
+            {r.analysis?.advice && <p className="mt-1 text-xs text-muted">💡 {r.analysis.advice}</p>}
+            <div className="mt-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  await apiDelete(`/voice/${r.id}`);
+                  toast.push("success", "已刪除錄音");
+                  await reload();
+                }}
+              >
+                刪除
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+export function FocusPanel() {
+  const toast = useToast();
+  const history = useApi<{ sessions: Array<{ id: string; subject: string; minutes: number; reflection: string; completedAt: string }> }>("/focus/history");
+  const [target, setTarget] = useState(25);
+  const [left, setLeft] = useState(25 * 60);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [subject, setSubject] = useState("英文");
+  const [reflection, setReflection] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => {
+      setLeft((v) => {
+        if (v <= 1) {
+          clearInterval(t);
+          setRunning(false);
+          setDone(true);
+          return 0;
+        }
+        return v - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [running]);
+
+  const pct = ((target * 60 - left) / (target * 60)) * 100;
+
+  async function complete() {
+    setSaving(true);
+    try {
+      const res = await apiPost<{ reward: { nova: number; xp: number }; streak: number }>("/focus/complete", {
+        minutes: target,
+        subject,
+        reflection,
+      });
+      toast.push("success", `專注完成！+${res.reward.nova} Nova / +${res.reward.xp} XP・連續 ${res.streak} 天`);
+      setDone(false);
+      setReflection("");
+      setLeft(target * 60);
+      await history.reload();
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card title="⏱️ 專注計時器" subtitle="完成後選科目並寫下反思，資料寫入成功才算完成">
+      <div className="flex flex-col items-center gap-3 py-2">
+        <div className="relative grid h-40 w-40 place-items-center">
+          <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
+            <circle cx="50" cy="50" r="45" fill="none" stroke="#37d3ff" strokeWidth="7" strokeLinecap="round" strokeDasharray={`${(pct / 100) * 283} 283`} />
+          </svg>
+          <div className="text-center">
+            <p className="text-3xl font-bold tabular-nums">
+              {String(Math.floor(left / 60)).padStart(2, "0")}:{String(left % 60).padStart(2, "0")}
+            </p>
+            <p className="text-[11px] text-muted">{target} 分鐘</p>
+          </div>
+        </div>
+
+        {!done && (
+          <>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {[15, 25, 45, 60].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { setTarget(m); setLeft(m * 60); setRunning(false); }}
+                  className={`focus-ring rounded-xl border px-3 py-1.5 text-xs ${target === m ? "border-[#37d3ff] bg-[#37d3ff]/15" : "border-[var(--line)]"}`}
+                >
+                  {m} 分
+                </button>
+              ))}
+              <Input
+                type="number"
+                min={1}
+                max={300}
+                value={target}
+                onChange={(e) => {
+                  const v = Math.max(1, Math.min(300, Number(e.target.value) || 1));
+                  setTarget(v);
+                  setLeft(v * 60);
+                }}
+                className="!w-20 !py-1.5 text-xs"
+              />
+            </div>
+            <div className="flex gap-2">
+              {!running ? <Button onClick={() => setRunning(true)}>▶ 開始</Button> : <Button variant="ghost" onClick={() => setRunning(false)}>⏸ 暫停</Button>}
+              <Button variant="outline" onClick={() => { setRunning(false); setLeft(target * 60); }}>
+                重設
+              </Button>
+              <Button variant="ghost" onClick={() => { setRunning(false); setDone(true); }}>
+                提前完成
+              </Button>
+            </div>
+          </>
+        )}
+
+        {done && (
+          <div className="w-full max-w-sm space-y-2">
+            <Field label="這段時間讀了什麼科目？">
+              <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                {SUBJECTS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="簡短反思">
+              <Textarea value={reflection} onChange={(e) => setReflection(e.target.value)} placeholder="今天掌握了什麼？哪裡還卡住？" className="!min-h-[70px]" />
+            </Field>
+            <Button full loading={saving} onClick={complete}>
+              完成並記錄
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        {history.data?.sessions.slice(0, 5).map((s) => (
+          <div key={s.id} className="glass-soft flex items-center justify-between px-3 py-2 text-xs">
+            <span>
+              {s.subject}・{s.minutes} 分鐘
+            </span>
+            <span className="text-muted">{new Date(s.completedAt).toLocaleString("zh-TW")}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+export function PlanPanel() {
+  const toast = useToast();
+  const plan = useApi<{ plan: { planDate: string; totalMinutes: number; rationale: string; blocks: Array<{ subject: string; minutes: number; focus: string; done: boolean }> } }>("/plan");
+  const tasks = useApi<{ tasks: Array<{ id: string; title: string; done: boolean }>; assignments: Array<{ id: string; title: string; subject: string; dueDate: string; done: boolean }> }>("/tasks");
+  const [newTask, setNewTask] = useState("");
+
+  return (
+    <div className="space-y-4">
+      <Card
+        title="🗓️ 今日讀書計畫"
+        subtitle={plan.data?.plan.rationale}
+        action={
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              await apiPost("/plan/regenerate");
+              toast.push("success", "已依最新資料重新計算");
+              await plan.reload();
+            }}
+          >
+            重新計算
+          </Button>
+        }
+      >
+        {plan.loading && <Skeleton lines={3} />}
+        {plan.error && <ErrorState message={plan.error} onRetry={plan.reload} />}
+        <div className="space-y-2">
+          {plan.data?.plan.blocks.map((b, i) => (
+            <label key={`${b.subject}-${i}`} className="glass-soft flex cursor-pointer items-center gap-3 px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={b.done}
+                onChange={async (e) => {
+                  await apiPost("/plan/block-done", { index: i, done: e.target.checked });
+                  await plan.reload();
+                }}
+                className="h-4 w-4 accent-[#7c5cff]"
+              />
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-medium ${b.done ? "line-through opacity-60" : ""}`}>
+                  {b.subject}・{b.minutes} 分鐘
+                </p>
+                <p className="truncate text-xs text-muted">{b.focus}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </Card>
+
+      <Card title="📋 待辦與作業">
+        <div className="flex gap-2">
+          <Input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="新增待辦事項…" onKeyDown={async (e) => {
+            if (e.key === "Enter" && newTask.trim()) {
+              await apiPost("/tasks", { title: newTask.trim() });
+              setNewTask("");
+              await tasks.reload();
+            }
+          }} />
+          <Button
+            onClick={async () => {
+              if (!newTask.trim()) return;
+              await apiPost("/tasks", { title: newTask.trim() });
+              setNewTask("");
+              await tasks.reload();
+            }}
+          >
+            新增
+          </Button>
+        </div>
+        <div className="mt-3 space-y-1.5">
+          {tasks.data?.tasks.map((t) => (
+            <div key={t.id} className="glass-soft flex items-center gap-2 px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={t.done}
+                onChange={async (e) => {
+                  await apiPost(`/tasks/${t.id}`, { done: e.target.checked }).catch(async () => {
+                    await fetch(`/api/v1/tasks/${t.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ done: e.target.checked }) });
+                  });
+                  await tasks.reload();
+                }}
+                className="accent-[#7c5cff]"
+              />
+              <span className={`flex-1 ${t.done ? "line-through opacity-60" : ""}`}>{t.title}</span>
+              <button
+                onClick={async () => {
+                  await apiDelete(`/tasks/${t.id}`);
+                  await tasks.reload();
+                }}
+                className="text-xs text-muted hover:text-rose-300"
+              >
+                刪除
+              </button>
+            </div>
+          ))}
+          {!tasks.data?.tasks.length && <EmptyState icon="✅" title="沒有待辦事項" hint="Novi 建議的任務經你確認後也會出現在這裡。" />}
+        </div>
+      </Card>
+    </div>
+  );
+}
