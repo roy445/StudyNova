@@ -30,7 +30,7 @@ export default function RegisterPage() {
     try {
       const res = await apiPost<{ novaId: string; displayName: string }>("/auth/register", { email, password, displayName });
       setCreated(res);
-      toast.push("success", "🎉 歡迎加入 StudyNova！");
+      toast.push("success", "已建立 StudyNova 帳號");
       try {
         setQr(await apiGet<{ svg: string; link: string }>("/account/nova-id-qr"));
       } catch {
@@ -51,7 +51,7 @@ export default function RegisterPage() {
           <div className="flex justify-center">
             <NoviAvatar size={92} state="cheer" />
           </div>
-          <h1 className="mt-3 text-xl font-bold">🎉 歡迎加入 StudyNova！</h1>
+          <h1 className="mt-3 text-xl font-bold">歡迎加入 StudyNova</h1>
           <p className="mt-1 text-sm text-muted">{created.displayName}，你的專屬身分已建立</p>
 
           <div className="mt-4 rounded-2xl border border-[#37d3ff]/40 bg-[#37d3ff]/10 px-4 py-3">

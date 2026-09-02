@@ -94,7 +94,7 @@ export default function AdminSystemPage() {
       )}
 
       {tab === "health" && (
-        <Card title="❤️ 系統健康" subtitle={health.data ? `檢查於 ${new Date(health.data.checkedAt).toLocaleString("zh-TW")}` : ""} action={<Button size="sm" variant="ghost" onClick={health.reload}>重新檢查</Button>}>
+        <Card title="● 系統健康" subtitle={health.data ? `檢查於 ${new Date(health.data.checkedAt).toLocaleString("zh-TW")}` : ""} action={<Button size="sm" variant="ghost" onClick={health.reload}>重新檢查</Button>}>
           {health.loading && <Skeleton lines={5} />}
           {health.error && <ErrorState message={health.error} onRetry={health.reload} />}
           <div className="grid gap-2 sm:grid-cols-2">
@@ -112,7 +112,7 @@ export default function AdminSystemPage() {
       )}
 
       {tab === "cron" && (
-        <Card title="⏰ Cron / Queue" subtitle={cron.data ? `Adapter：${cron.data.adapter}・待處理 ${cron.data.health.pending}・CRON_SECRET ${cron.data.secretConfigured ? "已設定" : "未設定"}` : ""}>
+        <Card title="◷ Cron / Queue" subtitle={cron.data ? `Adapter：${cron.data.adapter}・待處理 ${cron.data.health.pending}・CRON_SECRET ${cron.data.secretConfigured ? "已設定" : "未設定"}` : ""}>
           {cron.loading && <Skeleton lines={4} />}
           <div className="grid gap-2 sm:grid-cols-2">
             {cron.data?.tasks.map((t) => (
@@ -160,7 +160,7 @@ export default function AdminSystemPage() {
       )}
 
       {tab === "export" && (
-        <Card title="📤 CSV 匯出" subtitle="所有 CSV 皆為 UTF-8 with BOM，Excel 可直接開啟">
+        <Card title="↥ CSV 匯出" subtitle="所有 CSV 皆為 UTF-8 with BOM，Excel 可直接開啟">
           <div className="grid gap-2 sm:grid-cols-3">
             {EXPORTS.map(([kind, label]) => (
               <a
@@ -177,7 +177,7 @@ export default function AdminSystemPage() {
       )}
 
       {tab === "logs" && (
-        <Card title="📜 System Log">
+        <Card title="▤ System Log">
           {logs.loading && <Skeleton lines={5} />}
           <div className="max-h-[70vh] space-y-1 overflow-y-auto scroll-thin text-xs">
             {logs.data?.logs.map((l) => (
@@ -191,7 +191,7 @@ export default function AdminSystemPage() {
                 </p>
               </div>
             ))}
-            {!logs.loading && !logs.data?.logs.length && <EmptyState icon="✅" title="沒有系統錯誤紀錄" />}
+            {!logs.loading && !logs.data?.logs.length && <EmptyState icon="✓" title="沒有系統錯誤紀錄" />}
           </div>
         </Card>
       )}

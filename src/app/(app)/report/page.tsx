@@ -32,7 +32,7 @@ export default function ReportPage() {
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold sm:text-2xl">📊 學習報告</h1>
+          <h1 className="text-xl font-bold sm:text-2xl">◒ 學習報告</h1>
           <p className="text-xs text-muted sm:text-sm">
             {data ? `${data.from} ~ ${data.to}` : "統計你的專注時間、科目分布、錯題改善與任務完成"}
           </p>
@@ -82,7 +82,7 @@ export default function ReportPage() {
               <BarChart series={data.dailySeries.map((d) => ({ label: d.date.slice(5), value: d.minutes }))} suffix="" />
             </Card>
             <Card title="科目時間分布">
-              {data.subjectSplit.length ? <DonutChart data={data.subjectSplit.map((s) => ({ label: s.subject, value: s.minutes }))} /> : <EmptyState icon="🥧" title="這段期間沒有學習紀錄" />}
+              {data.subjectSplit.length ? <DonutChart data={data.subjectSplit.map((s) => ({ label: s.subject, value: s.minutes }))} /> : <EmptyState icon="◒" title="這段期間沒有學習紀錄" />}
             </Card>
           </div>
 
@@ -106,7 +106,7 @@ export default function ReportPage() {
                   color="#ffc857"
                 />
               ) : (
-                <EmptyState icon="📝" title="這段期間沒有測驗紀錄" />
+                <EmptyState icon="▤" title="這段期間沒有測驗紀錄" />
               )}
             </Card>
           </div>

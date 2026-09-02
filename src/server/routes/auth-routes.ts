@@ -51,9 +51,6 @@ export const routes: RouteDef[] = [
       if (existing[0]) throw fail("AUTH_EMAIL_TAKEN");
 
       const novaId = await createUniqueNovaId();
-      const totalUsers = await db.select({ count: sql<number>`count(*)::int` }).from(users);
-      const isFirst = (totalUsers[0]?.count ?? 0) === 0;
-
       const inserted = await db
         .insert(users)
         .values({
@@ -61,7 +58,7 @@ export const routes: RouteDef[] = [
           email,
           passwordHash: hashPassword(body.password),
           displayName: body.displayName.trim(),
-          role: isFirst ? "owner" : "student",
+          role: "student",
         })
         .returning({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, role: users.role });
 

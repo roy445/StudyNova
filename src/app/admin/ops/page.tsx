@@ -47,7 +47,7 @@ export default function AdminOpsPage() {
   const [actForm, setActForm] = useState({
     title: "",
     description: "",
-    cover: "🎉",
+    cover: "✦",
     kind: "weekend_double",
     goalMetric: "minutes",
     goalValue: 60,
@@ -71,12 +71,12 @@ export default function AdminOpsPage() {
     <div className="space-y-4">
       <Tabs
         tabs={[
-          { key: "ai", label: "AI Health", icon: "🤖" },
-          { key: "features", label: "功能權限", icon: "🎛️" },
-          { key: "ann", label: "公告", icon: "📢" },
-          { key: "act", label: "活動", icon: "🎉" },
-          { key: "coupon", label: "優惠碼", icon: "🎫" },
-          { key: "bank", label: "題庫匯入", icon: "🗃️" },
+          { key: "ai", label: "AI Health", icon: "✦" },
+          { key: "features", label: "功能權限", icon: "⌁" },
+          { key: "ann", label: "公告", icon: "▤" },
+          { key: "act", label: "活動", icon: "◇" },
+          { key: "coupon", label: "優惠碼", icon: "▧" },
+          { key: "bank", label: "題庫匯入", icon: "▦" },
         ]}
         active={tab}
         onChange={setTab}
@@ -84,7 +84,7 @@ export default function AdminOpsPage() {
 
       {tab === "ai" && (
         <>
-          <Card title="🤖 Gemini API Health" subtitle="每 15 秒自動更新・各 API slot 的用量、成功率、fallback 與冷卻狀態；成本為本地估算">
+          <Card title="✦ Gemini API Health" subtitle="每 15 秒自動更新・各 API slot 的用量、成功率、fallback 與冷卻狀態；成本為本地估算">
             {ai.loading && <Skeleton lines={4} />}
             {ai.error && <ErrorState message={ai.error} onRetry={ai.reload} />}
             {!ai.data?.configured && <p className="mb-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">尚未設定任何 AI API Key，AI 功能將回傳明確錯誤。</p>}
@@ -125,8 +125,8 @@ export default function AdminOpsPage() {
                       <td className="py-2 text-right tabular-nums">{p.avgLatencyMs}ms</td>
                       <td className="py-2 text-right tabular-nums">{p.fallbacks}</td>
                       <td className="py-2 text-[11px] text-muted">
-                        {p.lastSuccessAt && <div>✅ {new Date(p.lastSuccessAt).toLocaleString("zh-TW")}</div>}
-                        {p.lastFailureAt && <div>❌ {p.lastFailureCategory}</div>}
+                        {p.lastSuccessAt && <div><span className="text-[#37d3ff]">●</span> {new Date(p.lastSuccessAt).toLocaleString("zh-TW")}</div>}
+                        {p.lastFailureAt && <div><span className="text-rose-300">●</span> {p.lastFailureCategory}</div>}
                         {p.cooldownUntil && <div className="text-rose-300">冷卻至 {new Date(p.cooldownUntil).toLocaleDateString("zh-TW")}</div>}
                       </td>
                       <td className="py-2 text-right tabular-nums">${p.estimatedCostUsd}</td>
@@ -185,7 +185,7 @@ export default function AdminOpsPage() {
                     </span>
                   </div>
                 ))}
-                {!ai.data?.byFeature.length && <EmptyState icon="📉" title="本月尚無 AI 使用紀錄" />}
+                {!ai.data?.byFeature.length && <EmptyState icon="⌁" title="本月尚無 AI 使用紀錄" />}
               </div>
             </Card>
             <Card title="最近失敗紀錄">
@@ -198,7 +198,7 @@ export default function AdminOpsPage() {
                     <span className="text-rose-300">{f.failureCategory}</span>
                   </div>
                 ))}
-                {!ai.data?.failures.length && <EmptyState icon="✅" title="沒有失敗紀錄" />}
+                {!ai.data?.failures.length && <EmptyState icon="✓" title="沒有失敗紀錄" />}
               </div>
             </Card>
           </div>
@@ -206,7 +206,7 @@ export default function AdminOpsPage() {
       )}
 
       {tab === "features" && (
-        <Card title="🎛️ 功能權限與額度" subtitle="所有免費／Nova Pro 額度都可在此調整，立即生效">
+        <Card title="⌁ 功能權限與額度" subtitle="所有免費／Nova Pro 額度都可在此調整，立即生效">
           {features.loading && <Skeleton lines={5} />}
           <div className="overflow-x-auto scroll-thin">
             <table className="w-full min-w-[760px] text-xs">
@@ -293,14 +293,14 @@ export default function AdminOpsPage() {
       )}
 
       {tab === "ann" && (
-        <Card title="📢 公告" action={<Button size="sm" onClick={() => setAnnOpen(true)}>＋ 發布公告</Button>}>
+        <Card title="▤ 公告" action={<Button size="sm" onClick={() => setAnnOpen(true)}>＋ 發布公告</Button>}>
           {anns.loading && <Skeleton lines={3} />}
           <div className="space-y-2">
             {anns.data?.announcements.map((a) => (
               <div key={a.id} className="glass-soft p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium">
-                    {a.pinned && "📌 "}
+                    {a.pinned && "• "}
                     {a.title}
                   </span>
                   <div className="flex gap-1.5">
@@ -329,13 +329,13 @@ export default function AdminOpsPage() {
                 <p className="mt-0.5 text-xs text-muted">{a.body}</p>
               </div>
             ))}
-            {!anns.loading && !anns.data?.announcements.length && <EmptyState icon="📭" title="尚未發布公告" />}
+            {!anns.loading && !anns.data?.announcements.length && <EmptyState icon="▤" title="尚未發布公告" />}
           </div>
         </Card>
       )}
 
       {tab === "act" && (
-        <Card title="🎉 活動" action={<Button size="sm" onClick={() => setActOpen(true)}>＋ 建立活動</Button>}>
+        <Card title="◇ 活動" action={<Button size="sm" onClick={() => setActOpen(true)}>＋ 建立活動</Button>}>
           {acts.loading && <Skeleton lines={3} />}
           <div className="grid gap-2 sm:grid-cols-2">
             {acts.data?.activities.map((a) => (
@@ -384,13 +384,13 @@ export default function AdminOpsPage() {
                 </div>
               </div>
             ))}
-            {!acts.loading && !acts.data?.activities.length && <EmptyState icon="🎈" title="尚未建立活動" />}
+            {!acts.loading && !acts.data?.activities.length && <EmptyState icon="◇" title="尚未建立活動" />}
           </div>
         </Card>
       )}
 
       {tab === "coupon" && (
-        <Card title="🎫 優惠碼">
+        <Card title="▧ 優惠碼">
           <div className="grid gap-2 sm:grid-cols-4">
             <Field label="代碼">
               <Input value={couponForm.code} onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} />
@@ -443,13 +443,13 @@ export default function AdminOpsPage() {
                 </button>
               </div>
             ))}
-            {!coupons.data?.coupons.length && <EmptyState icon="🎫" title="尚未建立優惠碼" />}
+            {!coupons.data?.coupons.length && <EmptyState icon="▧" title="尚未建立優惠碼" />}
           </div>
         </Card>
       )}
 
       {tab === "bank" && (
-        <Card title={`🗃️ 題庫（目前 ${bank.data?.total ?? 0} 題）`} subtitle="JSON 陣列格式匯入，無效題目不會阻擋有效題目">
+        <Card title={`▦ 題庫（目前 ${bank.data?.total ?? 0} 題）`} subtitle="JSON 陣列格式匯入，無效題目不會阻擋有效題目">
           <Textarea
             value={importJson}
             onChange={(e) => setImportJson(e.target.value)}

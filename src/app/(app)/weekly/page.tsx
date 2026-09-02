@@ -81,7 +81,7 @@ export default function WeeklyPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-xl font-bold sm:text-2xl">📚 每週補習小考</h1>
+        <h1 className="text-xl font-bold sm:text-2xl">▦ 每週補習小考</h1>
         <p className="text-xs text-muted sm:text-sm">老師上傳的本週單字、句子、考卷與答案，經人工確認後才會發布給你。</p>
       </header>
 
@@ -109,7 +109,7 @@ export default function WeeklyPage() {
             </div>
           </button>
         ))}
-        {!list.loading && !list.data?.weeks.length && <EmptyState icon="🗓️" title="目前沒有已發布的週次" hint="老師建立並發布週次後就會顯示在這裡。" />}
+        {!list.loading && !list.data?.weeks.length && <EmptyState icon="▤" title="目前沒有已發布的週次" hint="老師建立並發布週次後就會顯示在這裡。" />}
       </div>
 
       {loading && <Card><Skeleton lines={5} /></Card>}
@@ -120,12 +120,12 @@ export default function WeeklyPage() {
           <Card title={detail.week.title} subtitle={detail.week.note || `${detail.week.weekCode}・單字 ${detail.words.length}・句子 ${detail.sentences.length}・題目 ${detail.questions.length}`}>
             <Tabs
               tabs={[
-                { key: "recite", label: "快速背誦", icon: "⚡" },
-                { key: "words", label: "本週單字", icon: "🔤" },
-                { key: "sentences", label: "本週句子", icon: "💬" },
-                { key: "exam", label: "模擬測驗", icon: "📝" },
-                { key: "paper", label: "考卷", icon: "📄" },
-                { key: "stats", label: "成績統計", icon: "📊" },
+                { key: "recite", label: "快速背誦", icon: "✦" },
+                { key: "words", label: "本週單字", icon: "⌁" },
+                { key: "sentences", label: "本週句子", icon: "◌" },
+                { key: "exam", label: "模擬測驗", icon: "▤" },
+                { key: "paper", label: "考卷", icon: "▧" },
+                { key: "stats", label: "成績統計", icon: "◒" },
               ]}
               active={tab}
               onChange={setTab}
@@ -135,7 +135,7 @@ export default function WeeklyPage() {
               {tab === "recite" && (
                 <div className="space-y-3">
                   <div className="glass-soft p-3">
-                    <p className="text-sm font-medium">⚡ 10 分鐘快速複習</p>
+                    <p className="text-sm font-medium">✦ 10 分鐘快速複習</p>
                     <p className="text-xs text-muted">依序完成 5 個階段，結束後可獲得 Nova 與 XP。</p>
                     <div className="mt-2 space-y-1.5">
                       {QUICK_STEPS.map((s, i) => (
@@ -223,7 +223,7 @@ export default function WeeklyPage() {
                       {w.example && <p className="mt-1 text-[11px] text-muted">{w.example}</p>}
                     </div>
                   ))}
-                  {!detail.words.length && <EmptyState icon="🔤" title="本週尚未發布單字" />}
+                  {!detail.words.length && <EmptyState icon="⌁" title="本週尚未發布單字" />}
                 </div>
               )}
 
@@ -235,7 +235,7 @@ export default function WeeklyPage() {
                       <p className="text-xs text-muted">{s.zh}</p>
                     </div>
                   ))}
-                  {!detail.sentences.length && <EmptyState icon="💬" title="本週尚未發布句子" />}
+                  {!detail.sentences.length && <EmptyState icon="◌" title="本週尚未發布句子" />}
                 </div>
               )}
 
@@ -351,7 +351,7 @@ export default function WeeklyPage() {
                       )}
                     </div>
                   ))}
-                  {!detail.papers.length && <EmptyState icon="📄" title="本週沒有上傳檔案" />}
+                  {!detail.papers.length && <EmptyState icon="▧" title="本週沒有上傳檔案" />}
                 </div>
               )}
 

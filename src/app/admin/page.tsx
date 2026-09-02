@@ -77,9 +77,9 @@ export default function AdminOverviewPage() {
     <div className="space-y-4">
       <Tabs
         tabs={[
-          { key: "overview", label: "總覽", icon: "📊" },
-          { key: "users", label: "使用者管理", icon: "👥" },
-          { key: "logs", label: "Audit Log", icon: "📋" },
+          { key: "overview", label: "總覽", icon: "◒" },
+          { key: "users", label: "使用者管理", icon: "◎" },
+          { key: "logs", label: "Audit Log", icon: "▤" },
         ]}
         active={tab}
         onChange={setTab}
@@ -103,7 +103,7 @@ export default function AdminOverviewPage() {
                 {overview.data.newUsers.length ? (
                   <BarChart series={overview.data.newUsers.map((d) => ({ label: d.day.slice(5), value: d.c }))} suffix=" 人" />
                 ) : (
-                  <EmptyState icon="📈" title="近期沒有新註冊" />
+                  <EmptyState icon="⌁" title="近期沒有新註冊" />
                 )}
               </Card>
             </>
@@ -113,7 +113,7 @@ export default function AdminOverviewPage() {
 
       {tab === "users" && (
         <Card
-          title="👥 使用者管理"
+          title="◎ 使用者管理"
           subtitle={`已選取 ${selected.length} 位・所有操作都會記錄 Audit Log`}
           action={
             <div className="flex flex-wrap gap-1.5">
@@ -192,7 +192,7 @@ export default function AdminOverviewPage() {
       )}
 
       {tab === "logs" && (
-        <Card title="📋 Audit Log">
+        <Card title="▤ Audit Log">
           {logs.loading && <Skeleton lines={5} />}
           <div className="max-h-[70vh] space-y-1 overflow-y-auto scroll-thin">
             {logs.data?.logs.map((l) => (
@@ -207,7 +207,7 @@ export default function AdminOverviewPage() {
                 </p>
               </div>
             ))}
-            {!logs.loading && !logs.data?.logs.length && <EmptyState icon="📋" title="尚無管理紀錄" />}
+            {!logs.loading && !logs.data?.logs.length && <EmptyState icon="▤" title="尚無管理紀錄" />}
           </div>
         </Card>
       )}

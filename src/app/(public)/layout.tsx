@@ -18,12 +18,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <Link href="/" className="focus-ring rounded-lg">
             <Wordmark size={18} />
           </Link>
-          <nav className="no-scrollbar -mx-1 flex flex-1 justify-end gap-1 overflow-x-auto px-1">
-            {LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className="focus-ring shrink-0 rounded-xl border border-[var(--line)] px-3 py-1.5 text-xs hover:bg-white/5">
-                {l.label}
-              </Link>
-            ))}
+          <nav className="ml-auto flex justify-end">
             <Link href="/dashboard" className="focus-ring shrink-0 rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-3 py-1.5 text-xs font-medium text-white">
               進入平台
             </Link>
@@ -31,7 +26,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6 pb-16">{children}</main>
-      <footer className="border-t border-[var(--line)] px-4 py-6 text-center text-xs text-muted">
+      <footer aria-label="網站資訊" className="border-t border-[var(--line)] px-4 py-6 text-center text-xs text-muted">
         <p>StudyNova AI · 讓學習更聰明，讓進步看得見</p>
         <p className="mt-1 flex flex-wrap justify-center gap-3">
           {LINKS.map((l) => (

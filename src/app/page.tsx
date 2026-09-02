@@ -6,14 +6,14 @@ import { LogoMark, NoviAvatar, StarField, Wordmark } from "@/components/brand";
 import { Badge, Button } from "@/components/ui";
 
 const FEATURES = [
-  { icon: "📈", title: "成績管理與 AI 分析", desc: "輸入每次段考、小考成績，自動計算平均、趨勢與弱科，AI 只根據真實數據給建議。" },
-  { icon: "🖼️", title: "拍照 OCR 轉學習內容", desc: "課本、講義、考卷、手寫筆記拍照即可辨識，一鍵變成筆記、題目、記憶卡或複習計畫。" },
-  { icon: "🤖", title: "Novi AI 學習助理", desc: "老師／解題／提示／考試／筆記／錯題／複習／快速八種模式，可讀取你授權的學習資料。" },
-  { icon: "📝", title: "AI 出題與錯題本", desc: "依教材與弱點自動出題，答錯自動進錯題本，間隔複習直到完全掌握。" },
-  { icon: "🎤", title: "錄音分析與背誦測試", desc: "英文朗讀、國文背課文即時評分：流暢度、漏字、速度與完整度，附改善建議。" },
-  { icon: "📚", title: "每週補習小考", desc: "老師上傳考卷與答案，AI 辨識整理後人工確認發布，週末開放快速背誦與模擬測驗。" },
-  { icon: "⚔️", title: "好友挑戰與讀書房", desc: "用 NOVA ID 加好友、單字 1v1、共享讀書房一起計時，排行榜即時更新。" },
-  { icon: "🌟", title: "Nova 點數與 Novi 養成", desc: "學習就有 Nova 與 XP，升級 Novi、購買外觀特效，Nova Pro 學習獎勵雙倍。" },
+  { icon: "⌁", title: "成績管理與 AI 分析", desc: "輸入每次段考、小考成績，自動計算平均、趨勢與弱科，AI 只根據真實數據給建議。" },
+  { icon: "▧", title: "拍照 OCR 轉學習內容", desc: "課本、講義、考卷、手寫筆記拍照即可辨識，一鍵變成筆記、題目、記憶卡或複習計畫。" },
+  { icon: "✦", title: "Novi AI 學習助理", desc: "老師／解題／提示／考試／筆記／錯題／複習／快速八種模式，可讀取你授權的學習資料。" },
+  { icon: "▤", title: "AI 出題與錯題本", desc: "依教材與弱點自動出題，答錯自動進錯題本，間隔複習直到完全掌握。" },
+  { icon: "◌", title: "錄音分析與背誦測試", desc: "英文朗讀、國文背課文即時評分：流暢度、漏字、速度與完整度，附改善建議。" },
+  { icon: "▦", title: "每週補習小考", desc: "老師上傳考卷與答案，AI 辨識整理後人工確認發布，週末開放快速背誦與模擬測驗。" },
+  { icon: "◇", title: "好友挑戰與讀書房", desc: "用 NOVA ID 加好友、單字 1v1、共享讀書房一起計時，排行榜即時更新。" },
+  { icon: "◎", title: "Nova 點數與 Novi 養成", desc: "學習就有 Nova 與 XP，升級 Novi、購買外觀特效，Nova Pro 學習獎勵雙倍。" },
 ];
 
 export default function LandingPage() {
@@ -88,9 +88,9 @@ export default function LandingPage() {
               </Link>
             </div>
             <ul className="grid gap-2 pt-2 text-xs text-muted sm:grid-cols-3">
-              <li>✅ 註冊即得專屬 NOVA ID</li>
-              <li>✅ 不需要 Email 驗證</li>
-              <li>✅ 資料預設完全私人</li>
+              <li><span className="mr-1 text-[#37d3ff]">✓</span>註冊即得專屬 NOVA ID</li>
+              <li><span className="mr-1 text-[#37d3ff]">✓</span>不需要 Email 驗證</li>
+              <li><span className="mr-1 text-[#37d3ff]">✓</span>資料預設完全私人</li>
             </ul>
           </div>
 

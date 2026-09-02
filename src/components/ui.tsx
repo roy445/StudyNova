@@ -214,7 +214,7 @@ export function Skeleton({ lines = 3, className = "" }: { lines?: number; classN
   );
 }
 
-export function EmptyState({ icon = "✨", title, hint, action }: { icon?: string; title: string; hint?: string; action?: ReactNode }) {
+export function EmptyState({ icon = "◇", title, hint, action }: { icon?: string; title: string; hint?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--line)] px-4 py-8 text-center">
       <span className="text-3xl">{icon}</span>
@@ -228,7 +228,7 @@ export function EmptyState({ icon = "✨", title, hint, action }: { icon?: strin
 export function ErrorState({ message, onRetry, code, requestId }: { message: string; onRetry?: () => void; code?: string | null; requestId?: string | null }) {
   return (
     <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100">
-      <p className="font-medium">😥 {message}</p>
+      <p className="font-medium"><span className="mr-1 text-rose-300">!</span>{message}</p>
       {(code || requestId) && (
         <p className="mt-1 font-mono text-[11px] opacity-80">
           {code ? `錯誤代碼：${code}` : ""}

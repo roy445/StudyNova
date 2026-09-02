@@ -12,12 +12,9 @@ import {
   questions,
   aiProviderHealth,
   platformSettings,
-  users,
-  userSettings,
 } from "@/db/schema";
-import { fingerprint, hashPassword, generateNovaId } from "./core";
+import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
-import { ensureUserEconomy } from "./economy";
 
 const SEED_VERSION = 5;
 
@@ -118,10 +115,7 @@ const BANK = [
 export async function runSeed(force = false) {
   const existing = (await db.select().from(platformSettings).where(eq(platformSettings.key, "seed")).limit(1))[0];
   const version = Number((existing?.value as { version?: number } | undefined)?.version ?? 0);
-  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const needsOwnerBootstrap = Boolean(adminEmail && adminPassword && adminPassword.length >= 8);
-  if (!force && version >= SEED_VERSION && !needsOwnerBootstrap) return { seeded: false, version };
+  if (!force && version >= SEED_VERSION) return { seeded: false, version };
 
   for (const l of LEVELS) {
     await db.insert(assistantLevels).values(l).onConflictDoUpdate({ target: assistantLevels.level, set: l });
@@ -176,27 +170,6 @@ export async function runSeed(force = false) {
       .onConflictDoUpdate({ target: legalDocuments.slug, set: { title: d.title, body: d.body, version: d.version, updatedAt: new Date() } });
   }
 
-  // Optional bootstrap owner account (only when explicitly configured).
-  if (adminEmail && adminPassword && adminPassword.length >= 8) {
-    const found = (await db.select().from(users).where(eq(users.email, adminEmail)).limit(1))[0];
-    if (!found) {
-      const created = await db
-        .insert(users)
-        .values({
-          novaId: generateNovaId(),
-          email: adminEmail,
-          passwordHash: hashPassword(adminPassword),
-          displayName: process.env.ADMIN_NAME || "StudyNova Owner",
-          role: "owner",
-          onboarded: true,
-        })
-        .returning({ userId: users.userId });
-      await db.insert(userSettings).values({ userId: created[0].userId }).onConflictDoNothing();
-      await ensureUserEconomy(created[0].userId);
-    } else if (found.role === "student") {
-      await db.update(users).set({ role: "owner" }).where(eq(users.userId, found.userId));
-    }
-  }
 
   await db
     .insert(platformSettings)

@@ -16,22 +16,22 @@ export type ShellUser = {
 };
 
 const NAV = [
-  { href: "/dashboard", label: "首頁", icon: "🏠" },
-  { href: "/study", label: "學習", icon: "📚" },
-  { href: "/ai", label: "AI", icon: "🤖" },
-  { href: "/challenge", label: "挑戰", icon: "⚔️" },
-  { href: "/profile", label: "我的", icon: "🌟" },
+  { href: "/dashboard", label: "首頁", icon: "⌂" },
+  { href: "/study", label: "學習", icon: "▦" },
+  { href: "/ai", label: "AI", icon: "✦" },
+  { href: "/challenge", label: "挑戰", icon: "◇" },
+  { href: "/profile", label: "我的", icon: "◎" },
 ];
 
 const SIDE_NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: "🏠" },
-  { href: "/study", label: "學習中心", icon: "📚" },
-  { href: "/ai", label: "Novi AI", icon: "🤖" },
-  { href: "/grades", label: "成績分析", icon: "📈" },
-  { href: "/weekly", label: "每週補習小考", icon: "📝" },
-  { href: "/challenge", label: "好友・活動", icon: "⚔️" },
-  { href: "/report", label: "學習報告", icon: "📊" },
-  { href: "/profile", label: "我的 Nova", icon: "🌟" },
+  { href: "/dashboard", label: "Dashboard", icon: "⌂" },
+  { href: "/study", label: "學習中心", icon: "▦" },
+  { href: "/ai", label: "Novi AI", icon: "✦" },
+  { href: "/grades", label: "成績分析", icon: "⌁" },
+  { href: "/weekly", label: "每週補習小考", icon: "▤" },
+  { href: "/challenge", label: "好友・活動", icon: "◇" },
+  { href: "/report", label: "學習報告", icon: "◒" },
+  { href: "/profile", label: "我的 Nova", icon: "◎" },
 ];
 
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
@@ -131,15 +131,9 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               </Link>
             );
           })}
-          <Link href="/faq" className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted hover:bg-white/5 hover:text-[var(--text)]">
-            <span>❓</span> 常見問題
-          </Link>
-          <Link href="/support" className="focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted hover:bg-white/5 hover:text-[var(--text)]">
-            <span>📮</span> 回報問題
-          </Link>
           {(user.role === "admin" || user.role === "owner") && (
             <Link href="/admin" className="focus-ring mt-2 flex items-center gap-3 rounded-xl border border-[#ffc857]/30 px-3 py-2.5 text-sm text-[#ffd98a] hover:bg-[#ffc857]/10">
-              <span>🛠️</span> 管理後台
+              <span>▣</span> 管理後台
             </Link>
           )}
         </nav>
@@ -166,13 +160,13 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
             </Link>
             <div className="flex-1" />
             <button onClick={() => setSearchOpen(true)} aria-label="搜尋" className="focus-ring rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
-              🔍
+              ⌕
             </button>
             <Link href="/profile?tab=nova" className="focus-ring hidden items-center gap-1 rounded-xl border border-[#ffc857]/30 px-2.5 py-2 text-xs text-[#ffd98a] sm:flex">
               ✦ {nova}
             </Link>
             <button onClick={() => setNotifOpen(true)} aria-label="通知" className="focus-ring relative rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
-              🔔
+              ◌
               {unread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
             </button>
             <Link href="/profile" className="focus-ring flex items-center gap-2 rounded-xl border border-[var(--line)] px-2 py-1.5 text-xs">
@@ -186,7 +180,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
         <main className="app-main mx-auto max-w-6xl px-3 py-4 sm:px-5 sm:py-6">
           {children}
-          <footer className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
+          <footer aria-label="網站資訊" className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
             <Link href="/faq" className="underline">常見問題</Link>
             <Link href="/support" className="underline">回報問題</Link>
             <Link href="/privacy" className="underline">隱私條款</Link>
@@ -246,12 +240,6 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               <Button size="sm" variant="ghost" onClick={() => router.push("/study?tab=wrong")}>
                 最近錯題{summary.data?.dueWrong ? `（${summary.data.dueWrong}）` : ""}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => router.push("/faq")}>
-                常見問題
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => router.push("/support")}>
-                回報問題
-              </Button>
             </div>
             {summary.data?.tasks?.length ? (
               <div className="mt-2 space-y-1 text-[11px]">
@@ -271,7 +259,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         <div className="flex items-center gap-1.5">
           {noviMinimized ? (
             <button onClick={() => setNoviMinimized(false)} className="focus-ring glass rounded-full px-3 py-2 text-xs" aria-label="展開 Novi">
-              🤖
+              ✦
             </button>
           ) : (
             <>

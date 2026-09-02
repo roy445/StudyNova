@@ -8,16 +8,16 @@ import { QuizPanel, WrongPanel } from "@/features/study/panels-b";
 import { FocusPanel, PlanPanel, SentencesPanel, VoicePanel, WordsPanel } from "@/features/study/panels-c";
 
 const TABS = [
-  { key: "plan", label: "今日計畫", icon: "🗓️" },
-  { key: "materials", label: "教材", icon: "📚" },
-  { key: "ocr", label: "圖片 OCR", icon: "🖼️" },
-  { key: "quiz", label: "測驗", icon: "📝" },
-  { key: "wrong", label: "錯題本", icon: "🎯" },
-  { key: "words", label: "單字", icon: "🔤" },
-  { key: "sentences", label: "句子", icon: "💬" },
-  { key: "voice", label: "錄音", icon: "🎤" },
-  { key: "focus", label: "計時", icon: "⏱️" },
-  { key: "notes", label: "筆記", icon: "🗒️" },
+  { key: "plan", label: "今日計畫", icon: "▤" },
+  { key: "materials", label: "教材", icon: "▦" },
+  { key: "ocr", label: "圖片 OCR", icon: "▧" },
+  { key: "quiz", label: "測驗", icon: "▤" },
+  { key: "wrong", label: "錯題本", icon: "◇" },
+  { key: "words", label: "單字", icon: "⌁" },
+  { key: "sentences", label: "句子", icon: "◌" },
+  { key: "voice", label: "錄音", icon: "◉" },
+  { key: "focus", label: "計時", icon: "◷" },
+  { key: "notes", label: "筆記", icon: "▤" },
 ];
 
 function StudyInner() {

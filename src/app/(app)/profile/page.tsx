@@ -98,12 +98,12 @@ function ProfileInner() {
 
       <Tabs
         tabs={[
-          { key: "profile", label: "個人資料", icon: "👤" },
-          { key: "novi", label: "Novi 養成", icon: "🤖" },
-          { key: "shop", label: "商店", icon: "🛍️" },
+          { key: "profile", label: "個人資料", icon: "◎" },
+          { key: "novi", label: "Novi 養成", icon: "✦" },
+          { key: "shop", label: "商店", icon: "▧" },
           { key: "nova", label: "Nova 紀錄", icon: "✦" },
-          { key: "achievements", label: "成就", icon: "🏅" },
-          { key: "pass", label: "我的通行證", icon: "🎫" },
+          { key: "achievements", label: "成就", icon: "◇" },
+          { key: "pass", label: "我的通行證", icon: "▤" },
         ]}
         active={tab}
         onChange={setTab}
@@ -111,7 +111,7 @@ function ProfileInner() {
 
       {tab === "profile" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card title="👤 個人資料">
+          <Card title="◎ 個人資料">
             <div className="space-y-3">
               <Field label="顯示名稱">
                 <Input value={displayName || (me.data?.user.displayName ?? "")} onChange={(e) => setDisplayName(e.target.value)} />
@@ -130,7 +130,7 @@ function ProfileInner() {
             </div>
           </Card>
 
-          <Card title="⚙️ 學習設定" subtitle="修改後會立即影響每日單字、AI 建議與讀書計畫">
+          <Card title="⌁ 學習設定" subtitle="修改後會立即影響每日單字、AI 建議與讀書計畫">
             {settings.loading && <Skeleton lines={4} />}
             {settings.data && (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -211,7 +211,7 @@ function ProfileInner() {
             )}
           </Card>
 
-          <Card title="🔐 安全與通知">
+          <Card title="▣ 安全與通知">
             <div className="space-y-3">
               <Field label="目前密碼">
                 <Input type="password" value={pwd.current} onChange={(e) => setPwd({ ...pwd, current: e.target.value })} />
@@ -257,7 +257,7 @@ function ProfileInner() {
       )}
 
       {tab === "novi" && (
-        <Card title="🤖 Novi 養成">
+        <Card title="✦ Novi 養成">
           {novi.loading && <Skeleton lines={4} />}
           {novi.error && <ErrorState message={novi.error} onRetry={novi.reload} />}
           {novi.data && (
@@ -340,7 +340,7 @@ function ProfileInner() {
       )}
 
       {tab === "shop" && (
-        <Card title="🛍️ Novi 商店" subtitle={`目前 Nova 餘額：${novi.data?.balance ?? 0}`}>
+        <Card title="▧ Novi 商店" subtitle={`目前 Nova 餘額：${novi.data?.balance ?? 0}`}>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {novi.data?.items.map((item) => (
               <div key={item.id} className="glass-soft p-3">
@@ -399,7 +399,7 @@ function ProfileInner() {
               {!nova.data?.ledger.length && <EmptyState icon="✦" title="還沒有交易紀錄" />}
             </div>
           </Card>
-          <Card title="✨ XP 紀錄">
+          <Card title="⌁ XP 紀錄">
             <div className="max-h-96 space-y-1 overflow-y-auto scroll-thin">
               {nova.data?.xp.map((t) => (
                 <div key={t.id} className="flex items-center justify-between gap-2 border-b border-[var(--line)] py-1.5 text-xs">
@@ -413,7 +413,7 @@ function ProfileInner() {
       )}
 
       {tab === "achievements" && (
-        <Card title="🏅 成就">
+        <Card title="◇ 成就">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {achievements.data?.achievements.map((a) => (
               <div key={a.id} className={`glass-soft p-3 ${a.unlockedAt ? "" : "opacity-70"}`}>
@@ -452,7 +452,7 @@ function ProfileInner() {
 
       {tab === "pass" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card title="🎫 我的通行證">
+          <Card title="▤ 我的通行證">
             <div className={`rounded-2xl p-4 ${membership.data?.isPro ? "gold-ring bg-gradient-to-br from-[#ffc857]/20 to-[#ff9f43]/5" : "border border-[var(--line)]"}`}>
               <p className="text-lg font-bold">{membership.data?.isPro ? "Nova Pro 會員" : "免費方案"}</p>
               <p className="text-xs text-muted">
@@ -460,9 +460,9 @@ function ProfileInner() {
               </p>
               {membership.data?.isPro && (
                 <ul className="mt-2 space-y-0.5 text-xs">
-                  <li>✅ 學習獎勵雙倍 Nova 與 XP</li>
-                  <li>✅ 金色身分與專屬徽章</li>
-                  <li>✅ 全部進階 AI 額度</li>
+                  <li><span className="mr-1 text-[#37d3ff]">✓</span>學習獎勵雙倍 Nova 與 XP</li>
+                  <li><span className="mr-1 text-[#37d3ff]">✓</span>金色身分與專屬徽章</li>
+                  <li><span className="mr-1 text-[#37d3ff]">✓</span>全部進階 AI 額度</li>
                 </ul>
               )}
             </div>
@@ -497,7 +497,7 @@ function ProfileInner() {
             </div>
           </Card>
 
-          <Card title="📊 今日額度使用">
+          <Card title="◒ 今日額度使用">
             <div className="space-y-2">
               {membership.data?.quotas.map((q) => (
                 <div key={q.feature}>

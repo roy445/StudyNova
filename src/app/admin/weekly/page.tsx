@@ -97,7 +97,7 @@ export default function AdminWeeklyPage() {
   return (
     <div className="space-y-4">
       <Card
-        title="📚 每週補習小考管理"
+        title="▦ 每週補習小考管理"
         subtitle={`目前週次代碼：${list.data?.currentWeekCode ?? "-"}・開放時間可自由設定，不寫死星期六`}
         action={
           <Button size="sm" onClick={() => { setCreateOpen(true); setForm({ weekCode: list.data?.currentWeekCode ?? "", title: "", note: "" }); }}>
@@ -120,7 +120,7 @@ export default function AdminWeeklyPage() {
               </p>
             </button>
           ))}
-          {!list.loading && !list.data?.weeks.length && <EmptyState icon="🗓️" title="尚未建立任何週次" />}
+          {!list.loading && !list.data?.weeks.length && <EmptyState icon="▤" title="尚未建立任何週次" />}
         </div>
       </Card>
 
@@ -130,11 +130,11 @@ export default function AdminWeeklyPage() {
         <Card title={`${detail.week.title}（${detail.week.weekCode}）`} subtitle={detail.week.note}>
           <Tabs
             tabs={[
-              { key: "files", label: "考卷／答案", icon: "📄" },
-              { key: "ai", label: "AI 辨識草稿", icon: "🤖" },
-              { key: "content", label: "題目・單字・句子", icon: "📝" },
-              { key: "settings", label: "開放設定", icon: "⚙️" },
-              { key: "stats", label: "統計", icon: "📊" },
+              { key: "files", label: "考卷／答案", icon: "▧" },
+              { key: "ai", label: "AI 辨識草稿", icon: "✦" },
+              { key: "content", label: "題目・單字・句子", icon: "▤" },
+              { key: "settings", label: "開放設定", icon: "⌁" },
+              { key: "stats", label: "統計", icon: "◒" },
             ]}
             active={tab}
             onChange={setTab}
@@ -151,7 +151,7 @@ export default function AdminWeeklyPage() {
                     ["extra", "補充檔案"],
                   ].map(([kind, label]) => (
                     <label key={kind} className="focus-ring cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-xs hover:bg-white/5">
-                      📤 {label}
+                      ↥ {label}
                       <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(e) => uploadFiles(kind, e.target.files)} />
                     </label>
                   ))}
@@ -186,7 +186,7 @@ export default function AdminWeeklyPage() {
                       {f.ocrText && <p className="mt-1 max-h-20 overflow-y-auto scroll-thin text-[10px] text-muted">{f.ocrText.slice(0, 400)}</p>}
                     </div>
                   ))}
-                  {!detail.files.length && <EmptyState icon="📄" title="尚未上傳檔案" hint="考卷與答案請分開上傳。" />}
+                  {!detail.files.length && <EmptyState icon="▧" title="尚未上傳檔案" hint="考卷與答案請分開上傳。" />}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -205,7 +205,7 @@ export default function AdminWeeklyPage() {
                       }
                     }}
                   >
-                    ✨ 執行 AI OCR + 整理
+                    ✦ 執行 AI OCR + 整理
                   </Button>
                   <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted">
                     螢光筆語意：
@@ -221,14 +221,14 @@ export default function AdminWeeklyPage() {
 
             {tab === "ai" && (
               <>
-                {!detail.drafts.length && <EmptyState icon="🤖" title="尚未有 AI 草稿" hint="上傳考卷後執行 AI OCR。" />}
+                {!detail.drafts.length && <EmptyState icon="✦" title="尚未有 AI 草稿" hint="上傳考卷後執行 AI OCR。" />}
                 {detail.drafts.map((d) => (
                   <div key={d.id} className="glass-soft p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge tone={d.status === "confirmed" ? "green" : d.status === "discarded" ? "muted" : "cyan"}>{d.status}</Badge>
                         <span className="text-xs text-muted">信心 {(d.confidence * 100).toFixed(0)}%</span>
-                        {d.confidence < 0.6 && <Badge tone="rose">⚠️ AI 不確定，請人工確認</Badge>}
+                        {d.confidence < 0.6 && <Badge tone="rose">! AI 不確定，請人工確認</Badge>}
                       </div>
                       <span className="text-[11px] text-muted">{new Date(d.createdAt).toLocaleString("zh-TW")}</span>
                     </div>
@@ -512,7 +512,7 @@ export default function AdminWeeklyPage() {
                           </span>
                         </div>
                       ))}
-                      {!stats.data?.results.length && <EmptyState icon="📊" title="尚無學生作答" />}
+                      {!stats.data?.results.length && <EmptyState icon="◒" title="尚無學生作答" />}
                     </div>
                   </div>
                   <div>

@@ -41,7 +41,7 @@ export default function GradesPage() {
         <div className="flex flex-wrap gap-1.5">
           <Button size="sm" onClick={() => setOpen(true)}>＋ 新增成績</Button>
           <Button size="sm" variant="ghost" onClick={() => setExamOpen(true)}>＋ 考試倒數</Button>
-          <Button size="sm" variant="ghost" onClick={() => setGoalOpen(true)}>🎯 目標分數</Button>
+          <Button size="sm" variant="ghost" onClick={() => setGoalOpen(true)}>◇ 目標分數</Button>
         </div>
       </header>
 
@@ -58,7 +58,7 @@ export default function GradesPage() {
       )}
 
       <Card
-        title="📈 科目趨勢"
+        title="⌁ 科目趨勢"
         action={
           <Button
             size="sm"
@@ -78,7 +78,7 @@ export default function GradesPage() {
           </Button>
         }
       >
-        {!grades.data?.stats.length && <EmptyState icon="📊" title="還沒有成績" hint="新增第一筆成績即可看到趨勢圖與 AI 分析。" />}
+        {!grades.data?.stats.length && <EmptyState icon="◒" title="還沒有成績" hint="新增第一筆成績即可看到趨勢圖與 AI 分析。" />}
         <div className="grid gap-4 sm:grid-cols-2">
           {grades.data?.stats.map((s) => {
             const goal = grades.data?.goals.find((g) => g.subject === s.subject);
@@ -99,7 +99,7 @@ export default function GradesPage() {
                 </div>
                 {goal?.targetScore && (
                   <p className="mt-1 text-[11px] text-[#ffd98a]">
-                    🎯 目標 {goal.targetScore} 分（目前 {s.latest}）{goal.achievedAt ? "・已達成！" : `・還差 ${Math.max(0, Math.round((goal.targetScore - s.latest) * 10) / 10)} 分`}
+                    ◇ 目標 {goal.targetScore} 分（目前 {s.latest}）{goal.achievedAt ? "・已達成！" : `・還差 ${Math.max(0, Math.round((goal.targetScore - s.latest) * 10) / 10)} 分`}
                   </p>
                 )}
               </div>
@@ -109,7 +109,7 @@ export default function GradesPage() {
 
         {analysis && (
           <div className="glass-soft mt-3 space-y-2 p-3 text-xs">
-            <p className="font-medium">{analysis.aiUsed ? "🤖 AI 分析" : "📐 系統統計分析"}</p>
+            <p className="font-medium">{analysis.aiUsed ? "✦ AI 分析" : "⌁ 系統統計分析"}</p>
             {analysis.facts.map((f, i) => (
               <p key={i} className="text-muted">
                 • {f}
@@ -127,15 +127,15 @@ export default function GradesPage() {
               </p>
             )}
             {analysis.suggestions?.map((s, i) => (
-              <p key={i}>💡 {s}</p>
+              <p key={i}><span className="mr-1 text-[#ffc857]">•</span>{s}</p>
             ))}
           </div>
         )}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="⏰ 考試倒數">
-          {!exams.data?.exams.length && <EmptyState icon="📅" title="尚未建立考試" />}
+        <Card title="⌁ 考試倒數">
+          {!exams.data?.exams.length && <EmptyState icon="⌁" title="尚未建立考試" />}
           <div className="space-y-2">
             {exams.data?.exams.map((e) => (
               <div key={e.id} className="glass-soft p-3">
@@ -165,7 +165,7 @@ export default function GradesPage() {
           </div>
         </Card>
 
-        <Card title="🧾 成績紀錄">
+        <Card title="▧ 成績紀錄">
           <div className="max-h-[420px] space-y-1.5 overflow-y-auto scroll-thin">
             {grades.data?.records.map((r) => (
               <div key={r.id} className="glass-soft flex items-center justify-between gap-2 px-3 py-2 text-sm">
@@ -195,7 +195,7 @@ export default function GradesPage() {
                 </div>
               </div>
             ))}
-            {!grades.data?.records.length && <EmptyState icon="🧾" title="還沒有成績紀錄" />}
+            {!grades.data?.records.length && <EmptyState icon="▧" title="還沒有成績紀錄" />}
           </div>
         </Card>
       </div>

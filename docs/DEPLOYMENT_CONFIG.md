@@ -108,9 +108,7 @@ Header: x-cron-secret: <CRON_SECRET>
 
 | 變數 | 必填性 | 說明 |
 |---|---|---|
-| `ADMIN_EMAIL` | 選填 | 首次 seed 時建立 owner |
-| `ADMIN_PASSWORD` | 使用 bootstrap owner 時需要 | 首次 seed 時設定密碼；不要使用預設弱密碼 |
-| `ADMIN_NAME` | 選填 | 預設 `StudyNova Owner` |
+| `ADMIN_EMAIL`／`ADMIN_PASSWORD`／`ADMIN_NAME` | 不使用 | 新註冊一律為 `student`；管理員角色請在 Neon 執行 `database/admin-role.sql` |
 | `SMTP_URL` | 密碼重設寄信需要 | 設定後忘記密碼 API 不會直接回傳 reset link，而是交由 SMTP 寄送 |
 
 如果沒有 SMTP，忘記密碼流程在開發或低風險部署情境可回傳 reset link；正式環境建議設定 SMTP，避免敏感連結出現在 API response 或 log。
@@ -132,7 +130,7 @@ $env:DATABASE_URL = "你的 Neon DATABASE_URL"
 npx drizzle-kit push
 ```
 
-若要建立第一個 owner 帳號，請在部署平台設定 `ADMIN_EMAIL`、`ADMIN_PASSWORD`、`ADMIN_NAME`，然後首次呼叫 `https://你的網域/api/health`。seed 會建立初始資料與 owner；不會覆蓋既有學生資料。若不設定 `ADMIN_*`，第一位註冊使用者會成為 owner。
+Seed 只建立平台初始資料，不會自動授予任何使用者管理員權限。所有新註冊帳號一律是 `student`。請在 Neon SQL Editor 執行 `database/admin-role.sql`：先查詢使用者，再明確將指定帳號更新為 `admin` 或 `owner`。
 
 ### 必要服務
 

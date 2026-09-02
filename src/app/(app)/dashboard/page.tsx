@@ -172,7 +172,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <Card title="✅ 今日任務" subtitle="完成後可領取 Nova 與 XP">
+        <Card title="✓ 今日任務" subtitle="完成後可領取 Nova 與 XP">
           <div className="space-y-2">
             {data.tasks.map((t) => {
               const done = t.progress >= t.target;
@@ -203,7 +203,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="⏰ 考試倒數" action={<Link href="/grades" className="text-xs underline text-muted">管理</Link>}>
+        <Card title="⌁ 考試倒數" action={<Link href="/grades" className="text-xs underline text-muted">管理</Link>}>
           {data.upcomingExams.length ? (
             <div className="space-y-2">
               {data.upcomingExams.map((e) => (
@@ -217,11 +217,11 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <EmptyState icon="📅" title="尚未設定考試" hint="到成績頁新增段考或模擬考，AI 會自動調整讀書計畫。" action={<Link href="/grades"><Button size="sm" variant="ghost">新增考試</Button></Link>} />
+            <EmptyState icon="⌁" title="尚未設定考試" hint="到成績頁新增段考或模擬考，AI 會自動調整讀書計畫。" action={<Link href="/grades"><Button size="sm" variant="ghost">新增考試</Button></Link>} />
           )}
         </Card>
 
-        <Card title="📈 成績趨勢" action={<Link href="/grades" className="text-xs underline text-muted">完整分析</Link>}>
+        <Card title="⌁ 成績趨勢" action={<Link href="/grades" className="text-xs underline text-muted">完整分析</Link>}>
           {data.stats.length ? (
             <div className="space-y-3">
               {data.stats.slice(0, 2).map((s) => (
@@ -238,13 +238,13 @@ export default function DashboardPage() {
               {data.weakest && <p className="text-xs text-muted">最需要補強：{data.weakest.subject}（平均 {data.weakest.average} 分）</p>}
             </div>
           ) : (
-            <EmptyState icon="📊" title="還沒有成績資料" hint="新增第一筆成績，AI 就能開始分析趨勢與弱科。" action={<Link href="/grades"><Button size="sm" variant="ghost">新增成績</Button></Link>} />
+            <EmptyState icon="◒" title="還沒有成績資料" hint="新增第一筆成績，AI 就能開始分析趨勢與弱科。" action={<Link href="/grades"><Button size="sm" variant="ghost">新增成績</Button></Link>} />
           )}
         </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="🎉 進行中的活動">
+        <Card title="◇ 進行中的活動">
           {data.activities.length ? (
             <div className="space-y-2">
               {data.activities.map((a) => (
@@ -265,14 +265,14 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <EmptyState icon="🎈" title="目前沒有進行中的活動" hint="管理員發布活動後會顯示在這裡。" />
+            <EmptyState icon="◇" title="目前沒有進行中的活動" hint="管理員發布活動後會顯示在這裡。" />
           )}
         </Card>
 
-        <Card title="📢 公告與每週小考">
+        <Card title="▤ 公告與每週小考">
           {data.openWeek && (
             <Link href="/weekly" className="glass-soft focus-ring mb-2 flex items-center justify-between px-3 py-2.5 text-sm hover:bg-white/5">
-              <span>📚 {data.openWeek.title} 開放中</span>
+              <span>▦ {data.openWeek.title} 開放中</span>
               <span className="text-[#37d3ff]">前往 →</span>
             </Link>
           )}
@@ -281,7 +281,7 @@ export default function DashboardPage() {
               {data.announcements.slice(0, 4).map((a) => (
                 <div key={a.id} className="glass-soft px-3 py-2.5">
                   <p className="text-sm font-medium">
-                    {a.pinned && "📌 "}
+                    {a.pinned && "• "}
                     {a.title}
                   </p>
                   {a.body && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{a.body}</p>}
@@ -289,13 +289,13 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <EmptyState icon="📭" title="目前沒有公告" />
+            <EmptyState icon="▤" title="目前沒有公告" />
           )}
         </Card>
       </div>
 
       {data.recentGrades.length > 0 && (
-        <Card title="🧾 最近成績">
+        <Card title="▧ 最近成績">
           <div className="overflow-x-auto scroll-thin">
             <table className="w-full min-w-[420px] text-sm">
               <thead>

@@ -94,7 +94,7 @@
 
 Novi 是漂浮式球形 AI（不是真人），固定在右下角，**不會遮住手機底部導覽列**，可以 `－` 縮小或 `✕` 收合。
 
-**快捷面板**：今日建議 / 弱點分析 / 問 AI / 最近錯題 / 常見問題 / 回報問題 / 今日任務進度。
+**快捷面板**：今日建議 / 弱點分析 / 問 AI / 最近錯題 / 今日任務進度。常見問題與回報問題固定放在網站 footer。
 
 **八種模式**（在 AI 頁切換）：
 
@@ -285,8 +285,8 @@ AI 會輸出逐字稿與 **總分 + 流暢度 / 正確度 / 完整度 / 語速**
 
 # B. 管理員手冊
 
-> 第一位註冊的使用者自動成為 `owner`；owner 可在後台把其他人設為 `admin`。
-> 入口：右上角帳號 → 或直接前往 `/admin`。
+> 所有新註冊使用者預設為 `student`。管理員資格請在 Neon SQL Editor 執行 `database/admin-role.sql`，由管理者明確授權。
+> 入口：只有 `admin`／`owner` 角色可進入 `/admin`。
 
 ## B1. 總覽・使用者
 
@@ -349,7 +349,7 @@ npm run build && npm start
 curl http://localhost:3000/api/health   # 觸發冪等 Seed
 ```
 
-第一位註冊者成為 owner；或設定 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 由系統建立。
+所有新註冊者預設為 student；管理員資格請在 Neon SQL Editor 執行 `database/admin-role.sql`。
 
 ## C2. Docker
 

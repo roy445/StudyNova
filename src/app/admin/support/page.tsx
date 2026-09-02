@@ -63,7 +63,7 @@ export default function AdminSupportPage() {
       </div>
 
       {list.data?.topCodes.length ? (
-        <Card title="🔥 最常被回報的錯誤代碼" subtitle="可依此優先修復">
+        <Card title="▤ 最常被回報的錯誤代碼" subtitle="可依此優先修復">
           <div className="flex flex-wrap gap-2">
             {list.data.topCodes.map((c) => (
               <span key={c.errorCode} className="rounded-full border border-[#ffc857]/40 bg-[#ffc857]/10 px-3 py-1 font-mono text-xs text-[#ffd98a]">
@@ -76,10 +76,10 @@ export default function AdminSupportPage() {
 
       <Tabs tabs={STATUS.map(([k, l]) => ({ key: k, label: l }))} active={status} onChange={setStatus} />
 
-      <Card title="📮 問題回報" subtitle="每筆回報都附帶錯誤代碼、追蹤編號與環境資訊">
+      <Card title="◇ 問題回報" subtitle="每筆回報都附帶錯誤代碼、追蹤編號與環境資訊">
         {list.loading && <Skeleton lines={5} />}
         {list.error && <ErrorState message={list.error} code={list.errorCode} onRetry={list.reload} />}
-        {!list.loading && !list.data?.issues.length && <EmptyState icon="🎉" title="這個狀態下沒有回報" />}
+        {!list.loading && !list.data?.issues.length && <EmptyState icon="◇" title="這個狀態下沒有回報" />}
         <div className="space-y-2">
           {list.data?.issues.map((i) => (
             <div key={i.id} className="glass-soft p-3">
