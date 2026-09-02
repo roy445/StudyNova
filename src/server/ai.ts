@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { aiProviderHealth, aiUsageLogs } from "@/db/schema";
 import { fail, monthStart, nextUtcMonthStart } from "./core";
 
-export type ProviderName = "gemini" | "openai" | "openrouter";
+export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "openai" | "openrouter";
 
 export type ProviderConfig = {
   name: ProviderName;
@@ -50,22 +50,25 @@ export type FailureCategory =
 const RETRYABLE: FailureCategory[] = ["rate_limited", "quota_exhausted", "server_error", "timeout", "network"];
 
 export function providerConfigs(): ProviderConfig[] {
+  const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   return [
     {
-      name: "gemini",
+      name: "gemini_1",
       priority: 1,
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      apiKey: process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY,
+      model: geminiModel,
+      apiKey: process.env.GEMINI_API_KEY_1 || process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY,
     },
+    { name: "gemini_2", priority: 2, model: geminiModel, apiKey: process.env.GEMINI_API_KEY_2 },
+    { name: "gemini_3", priority: 3, model: geminiModel, apiKey: process.env.GEMINI_API_KEY_3 },
     {
       name: "openai",
-      priority: 2,
+      priority: 4,
       model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
       apiKey: process.env.OPENAI_API_KEY,
     },
     {
       name: "openrouter",
-      priority: 3,
+      priority: 5,
       model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free",
       apiKey: process.env.OPENROUTER_API_KEY,
     },
@@ -144,7 +147,7 @@ async function callGemini(cfg: ProviderConfig, req: AiRequest): Promise<Omit<AiR
   if (!text) throw new ProviderError("server_error", "empty completion");
   return {
     text,
-    provider: "gemini",
+    provider: cfg.name,
     model: cfg.model,
     inputTokens: json.usageMetadata?.promptTokenCount ?? estimate(JSON.stringify(parts)),
     outputTokens: json.usageMetadata?.candidatesTokenCount ?? estimate(text),
@@ -262,7 +265,7 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     }
     try {
       const out =
-        cfg.name === "gemini"
+          cfg.name.startsWith("gemini_")
           ? await callGemini(cfg, req)
           : await callOpenAiCompatible(
               cfg,

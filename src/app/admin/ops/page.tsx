@@ -84,7 +84,7 @@ export default function AdminOpsPage() {
 
       {tab === "ai" && (
         <>
-          <Card title="🤖 AI Provider Health" subtitle="每 15 秒自動更新・成本為本地估算，不代表實際帳單">
+          <Card title="🤖 Gemini API Health" subtitle="每 15 秒自動更新・各 API slot 的用量、成功率、fallback 與冷卻狀態；成本為本地估算">
             {ai.loading && <Skeleton lines={4} />}
             {ai.error && <ErrorState message={ai.error} onRetry={ai.reload} />}
             {!ai.data?.configured && <p className="mb-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">尚未設定任何 AI API Key，AI 功能將回傳明確錯誤。</p>}
@@ -93,7 +93,7 @@ export default function AdminOpsPage() {
                 <thead>
                   <tr className="text-left text-muted">
                     <th className="pb-2">優先</th>
-                    <th className="pb-2">Provider / Model</th>
+                    <th className="pb-2">Provider / API Slot / Model</th>
                     <th className="pb-2 text-right">本月請求</th>
                     <th className="pb-2 text-right">成功/失敗</th>
                     <th className="pb-2 text-right">Token 進/出</th>
@@ -110,7 +110,7 @@ export default function AdminOpsPage() {
                       <td className="py-2">{p.priority}</td>
                       <td className="py-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-medium">{p.provider}</span>
+                          <span className="font-medium">{p.provider.startsWith("gemini_") ? `Gemini API ${p.provider.slice(-1)}` : p.provider}</span>
                           <Badge tone={p.configured ? (p.enabled ? "green" : "muted") : "rose"}>{p.configured ? (p.enabled ? "啟用" : "停用") : "未設定"}</Badge>
                         </div>
                         <span className="text-muted">{p.model}</span>

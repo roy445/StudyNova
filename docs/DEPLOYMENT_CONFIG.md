@@ -18,15 +18,17 @@ StudyNova 的前端與後端 API 已內建於 Next.js，不需要另外新增一
 
 ### 2. AI Provider API
 
-AI 服務依序使用 Gemini → OpenAI → OpenRouter fallback。至少設定一個 Provider 才能使用 Novi、AI 分析、OCR 轉換、AI 出題、錯題提示與語音分析等功能；未設定時平台仍可啟動，但 AI 功能會顯示未設定或不可用。
+AI 可設定為 Gemini-only 多 API key fallback。系統會依 `GEMINI_API_KEY_1` → `GEMINI_API_KEY_2` → `GEMINI_API_KEY_3` 順序嘗試；遇到 429、quota、5xx、timeout 或 network error 時會切換下一組 key。每組 key 都會獨立記錄請求數、成功／失敗、token、延遲、fallback 次數與冷卻狀態。未設定的 slot 不會被嘗試。
 
 | Provider | 環境變數 | 預設模型 | 建議用途 |
 |---|---|---|---|
-| Google Gemini | `GOOGLE_GEMINI_API_KEY` | `gemini-2.5-flash` | 建議作為第一順位 |
-| OpenAI | `OPENAI_API_KEY` | `gpt-4.1-mini` | 第二順位或替代 Provider |
-| OpenRouter | `OPENROUTER_API_KEY` | `meta-llama/llama-3.3-70b-instruct:free` | 第三順位 fallback |
+| Gemini API 1 | `GEMINI_API_KEY_1` | `gemini-2.5-flash` | 第一順位 |
+| Gemini API 2 | `GEMINI_API_KEY_2` | `gemini-2.5-flash` | API 1 可重試錯誤時切換 |
+| Gemini API 3 | `GEMINI_API_KEY_3` | `gemini-2.5-flash` | API 2 可重試錯誤時切換 |
+| Gemini 舊別名 | `GOOGLE_GEMINI_API_KEY`／`GEMINI_API_KEY` | `gemini-2.5-flash` | 相容舊設定，等同 API 1 |
+| OpenAI／OpenRouter | `OPENAI_API_KEY`／`OPENROUTER_API_KEY` | 各自預設模型 | 可選；Gemini-only 時留空 |
 
-可用 `GEMINI_MODEL`、`OPENAI_MODEL`、`OPENROUTER_MODEL` 覆寫模型。程式也相容 `GEMINI_API_KEY` 作為 Gemini key 的舊名稱，但建議統一使用 `GOOGLE_GEMINI_API_KEY`。
+可用 `GEMINI_MODEL` 覆寫 Gemini 模型。程式也相容 `GOOGLE_GEMINI_API_KEY` 或 `GEMINI_API_KEY` 作為 API 1 的舊名稱；新部署建議使用 `GEMINI_API_KEY_1`、`GEMINI_API_KEY_2`、`GEMINI_API_KEY_3`。
 
 ### 3. Web Push VAPID
 
@@ -56,20 +58,21 @@ Header: x-cron-secret: <CRON_SECRET>
 | 變數 | 說明 | 範例 |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL 連線字串；啟動時必須存在 | `postgresql://user:password@host:5432/studynova` |
-| `SESSION_SECRET` | HttpOnly session、簽名與部分私有資源所需的長隨機密鑰 | `openssl rand -base64 48` |
+| `SESSION_SECRET` | HttpOnly session、簽名與部分私有資源所需的長隨機密鑰 | PowerShell RNG 指令（見下方） |
 | `APP_URL` | 公開網站 URL；AI provider referer、重設密碼與分享連結使用 | `https://studynova.example.com` |
 | `NODE_ENV` | 正式環境設為 `production` | `production` |
 
-### AI（至少一組，建議設定兩組以上）
+### AI（Gemini-only 建議設定 1～3 組）
 
 | 變數 | 必填性 | 說明 |
 |---|---|---|
-| `GOOGLE_GEMINI_API_KEY` | AI 功能需要 | Gemini API key |
+| `GEMINI_API_KEY_1` | Gemini-only 必填 | 第一組 Gemini API key |
+| `GEMINI_API_KEY_2` | 選填 | 第二組 Gemini API key，API 1 可重試錯誤時切換 |
+| `GEMINI_API_KEY_3` | 選填 | 第三組 Gemini API key，API 2 可重試錯誤時切換 |
 | `GEMINI_MODEL` | 選填 | 預設 `gemini-2.5-flash` |
-| `OPENAI_API_KEY` | fallback 選填 | OpenAI API key |
-| `OPENAI_MODEL` | 選填 | 預設 `gpt-4.1-mini` |
-| `OPENROUTER_API_KEY` | fallback 選填 | OpenRouter API key |
-| `OPENROUTER_MODEL` | 選填 | 預設 `meta-llama/llama-3.3-70b-instruct:free` |
+| `GOOGLE_GEMINI_API_KEY`／`GEMINI_API_KEY` | 舊別名 | 若沒有 `GEMINI_API_KEY_1`，可作為 API 1 相容設定 |
+| `OPENAI_API_KEY`／`OPENROUTER_API_KEY` | 選填 | Gemini-only 時留空 |
+| `OPENAI_MODEL`／`OPENROUTER_MODEL` | 選填 | 只有啟用對應 provider 時才使用 |
 
 ### Queue / Cache
 
@@ -120,9 +123,20 @@ Header: x-cron-secret: <CRON_SECRET>
 
 ## 四、資料庫
 
+### Neon 雲端 SQL 初始化
+
+你不需要啟動本機 PostgreSQL。從 Neon Console 複製 `DATABASE_URL`，在 PowerShell 暫時設定後直接執行 schema 初始化：
+
+```powershell
+$env:DATABASE_URL = "你的 Neon DATABASE_URL"
+npx drizzle-kit push
+```
+
+若要建立第一個 owner 帳號，請在部署平台設定 `ADMIN_EMAIL`、`ADMIN_PASSWORD`、`ADMIN_NAME`，然後首次呼叫 `https://你的網域/api/health`。seed 會建立初始資料與 owner；不會覆蓋既有學生資料。若不設定 `ADMIN_*`，第一位註冊使用者會成為 owner。
+
 ### 必要服務
 
-- **PostgreSQL 14 以上**；Docker Compose 使用 PostgreSQL 16 Alpine。
+- **PostgreSQL 14 以上**；你的 Neon database 直接符合需求。
 - Drizzle ORM 連線透過 `DATABASE_URL` 建立 connection pool。
 - 必須先執行 schema 同步，再啟動正式服務。
 
@@ -179,7 +193,21 @@ npx drizzle-kit push
 
 若使用 Vercel、Render、Railway 或其他部署平台，請在該平台的 Environment Variables 設定 `DATABASE_URL`，不需要在 Windows 常駐設定它。
 
-## 六、建議正式環境配置
+## 六、PowerShell 產生 SESSION_SECRET
+
+Windows 沒有 `openssl` 時，使用 PowerShell 與 .NET 的密碼學亂數產生器：
+
+```powershell
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$bytes = New-Object byte[] 48
+$rng.GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+$rng.Dispose()
+```
+
+把輸出的完整字串放到部署平台的 `SESSION_SECRET`，不要提交到 GitHub。
+
+## 七、建議正式環境配置
 
 ```env
 DATABASE_URL=postgresql://studynova:<strong-password>@<private-db-host>:5432/studynova?sslmode=require
@@ -187,11 +215,14 @@ SESSION_SECRET=<long-random-secret>
 APP_URL=https://studynova.example.com
 NODE_ENV=production
 
-GOOGLE_GEMINI_API_KEY=<gemini-key>
+GEMINI_API_KEY_1=<gemini-key-1>
+GEMINI_API_KEY_2=<gemini-key-2>
+GEMINI_API_KEY_3=<gemini-key-3>
 GEMINI_MODEL=gemini-2.5-flash
-OPENAI_API_KEY=<openai-key>
+# Gemini-only 時以下留空
+OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
-OPENROUTER_API_KEY=<openrouter-key>
+OPENROUTER_API_KEY=
 OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
 
 REDIS_URL=redis://:<redis-password>@<redis-host>:6379/0
