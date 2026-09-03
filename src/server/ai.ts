@@ -49,17 +49,25 @@ export type FailureCategory =
 
 const RETRYABLE: FailureCategory[] = ["rate_limited", "quota_exhausted", "server_error", "timeout", "network"];
 
+function cleanEnv(value?: string) {
+  return value?.trim().replace(/^([\"']).*\1$/, (quoted) => quoted.slice(1, -1)).trim() || undefined;
+}
+
+function cleanModel(value?: string) {
+  return (cleanEnv(value) || "gemini-2.5-flash").replace(/^models\//, "");
+}
+
 export function providerConfigs(): ProviderConfig[] {
-  const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const geminiModel = cleanModel(process.env.GEMINI_MODEL);
   return [
     {
       name: "gemini_1",
       priority: 1,
       model: geminiModel,
-      apiKey: process.env.GEMINI_API_KEY_1 || process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY,
+      apiKey: cleanEnv(process.env.GEMINI_API_KEY_1 || process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY),
     },
-    { name: "gemini_2", priority: 2, model: geminiModel, apiKey: process.env.GEMINI_API_KEY_2 },
-    { name: "gemini_3", priority: 3, model: geminiModel, apiKey: process.env.GEMINI_API_KEY_3 },
+    { name: "gemini_2", priority: 2, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_2) },
+    { name: "gemini_3", priority: 3, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_3) },
     {
       name: "openai",
       priority: 4,
@@ -91,6 +99,8 @@ function categorize(status: number, body: string): FailureCategory {
   if (status === 429) return /quota|exceeded your current quota|billing/i.test(body) ? "quota_exhausted" : "rate_limited";
   if (status >= 500) return "server_error";
   if (status === 401 || status === 403) return "configuration";
+  if (status === 400 && /(api[ _-]?key|invalid.*key|key.*valid|model.*not found)/i.test(body)) return "configuration";
+  if (status === 404 && /model|not found/i.test(body)) return "configuration";
   if (status === 400 || status === 404 || status === 422) return "invalid_request";
   return "unknown";
 }
@@ -136,8 +146,8 @@ async function callGemini(cfg: ProviderConfig, req: AiRequest): Promise<Omit<AiR
   if (req.system) body.systemInstruction = { parts: [{ text: req.system }] };
 
   const json = (await fetchJson(
-    `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent?key=${encodeURIComponent(cfg.apiKey!)}`,
-    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+    `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent`,
+    { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": cfg.apiKey! }, body: JSON.stringify(body) },
   )) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
