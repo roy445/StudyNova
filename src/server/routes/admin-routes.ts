@@ -808,10 +808,30 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      if (!pushConfigured()) throw fail("ADMIN_PUSH_NOT_CONFIGURED");
-      const body = await ctx.json(z.object({ title: z.string().min(1).max(120).optional(), message: z.string().min(1).max(400).optional(), link: z.string().max(240).optional() }).optional());
-      const res = await sendPush(admin.userId, { title: body?.title ?? "StudyNova 測試推播", body: body?.message ?? "推播設定正常運作 ✅", link: body?.link ?? "/dashboard" });
-      return res;
+      const body = await ctx.json(
+        z.object({
+          title: z.string().min(1).max(120).optional(),
+          message: z.string().min(1).max(400).optional(),
+          link: z.string().max(240).optional(),
+          audience: z.enum(["all", "pro", "users", "admin"]).default("all"),
+          audienceIds: z.array(z.string().uuid()).max(500).default([]),
+        }).optional(),
+      );
+      const title = body?.title ?? "StudyNova 測試推播";
+      const message = body?.message ?? "推播設定正常運作 ✅";
+      const targets = await resolveAudience(body?.audience ?? "all", body?.audienceIds ?? []);
+      let notified = 0;
+      let pushSent = 0;
+      for (const userId of targets) {
+        const created = await notify({ userId, kind: "admin_push_test", title, body: message, link: body?.link ?? "/dashboard", push: false, dedupeKey: `push-test:${admin.userId}:${Date.now()}:${userId}` });
+        if (created) {
+          notified += 1;
+          const result = await sendPush(userId, { title, body: message, link: body?.link ?? "/dashboard", vibrate: [120, 60, 120] });
+          pushSent += result.sent;
+        }
+      }
+      await adminLog({ actorId: admin.userId, action: "push.test", targetType: "audience", targetId: body?.audience ?? "all", after: { title, message, targets: targets.length, notified, pushSent, configured: pushConfigured() }, ip: ctx.ip });
+      return { targets: targets.length, notified, pushSent, configured: pushConfigured() };
     },
   }),
 ];

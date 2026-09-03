@@ -24,6 +24,7 @@ self.addEventListener("push", (event) => {
       body: payload.body,
       icon: "/icon.svg",
       badge: "/icon.svg",
+      vibrate: payload.vibrate || [120, 60, 120],
       tag: payload.tag || payload.title,
       data: { link: payload.link || "/dashboard" },
     }),

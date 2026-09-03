@@ -17,7 +17,7 @@ import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
 import vocabulary from "@/data/vocabulary.json";
 
-const SEED_VERSION = 6;
+const SEED_VERSION = 7;
 
 const LEVELS = [
   { level: 1, name: "初始助手", requiredXp: 0, upgradeCostNova: 0, ability: "基本問答與今日建議", aura: "#38bdf8" },

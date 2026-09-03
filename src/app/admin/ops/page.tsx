@@ -43,7 +43,8 @@ export default function AdminOpsPage() {
 
   const [annOpen, setAnnOpen] = useState(false);
   const [annForm, setAnnForm] = useState({ title: "", body: "", audience: "all", pinned: false, marquee: false, notify: true, push: false });
-  const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard" });
+  const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard", audience: "all" });
+  const [pushResult, setPushResult] = useState<{ targets: number; notified: number; pushSent: number; configured: boolean } | null>(null);
   const [actOpen, setActOpen] = useState(false);
   const [actForm, setActForm] = useState({
     title: "",
@@ -295,27 +296,29 @@ export default function AdminOpsPage() {
 
       {tab === "ann" && (
         <>
-        <Card title="⌁ 推播測試" subtitle="只會送給目前登入的管理員，先確認瀏覽器通知與 VAPID 設定。">
+        <Card title="⌁ 推播測試" subtitle="可選擇全部使用者、PRO、一般使用者或管理員／後台權力擁有者；每位符合條件者都會建立站內通知並嘗試發送 Web Push。">
           <div className="grid gap-2 sm:grid-cols-3">
             <Field label="測試範例">
               <Select value="custom" onChange={(e) => {
                 const examples: Record<string, typeof pushForm> = {
                   custom: pushForm,
-                  welcome: { title: "🌟 Novi 歡迎你回來", message: "今天先完成 10 個單字，讓進步從一小步開始！", link: "/dashboard" },
-                  inactive: { title: "🐦 Novi 的小提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/study" },
-                  weekly: { title: "🏁 每週小考開放", message: "準備好和好友比一場了嗎？現在就來挑戰！", link: "/weekly" },
-                  reward: { title: "🎁 限定獎勵解鎖", message: "完成今日任務即可領取 Nova 與 XP，快來看看！", link: "/profile?tab=nova" },
+                  welcome: { title: "🌟 Novi 歡迎你回來", message: "今天先完成 10 個單字，讓進步從一小步開始！", link: "/dashboard", audience: "all" },
+                  inactive: { title: "🐦 Novi 的小提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/study", audience: "users" },
+                  weekly: { title: "🏁 每週小考開放", message: "準備好和好友比一場了嗎？現在就來挑戰！", link: "/weekly", audience: "all" },
+                  reward: { title: "🎁 限定獎勵解鎖", message: "完成今日任務即可領取 Nova 與 XP，快來看看！", link: "/profile?tab=nova", audience: "pro" },
                 };
                 setPushForm(examples[e.target.value] ?? examples.custom);
               }}>
                 <option value="custom">自訂內容</option><option value="welcome">歡迎回來</option><option value="inactive">久未登入</option><option value="weekly">每週小考</option><option value="reward">限定獎勵</option>
               </Select>
             </Field>
+            <Field label="收件身分組"><Select value={pushForm.audience} onChange={(e) => setPushForm({ ...pushForm, audience: e.target.value })}><option value="all">全部啟用帳號</option><option value="pro">PRO 使用者</option><option value="users">一般使用者</option><option value="admin">管理員／後台權力擁有者</option></Select></Field>
             <Field label="標題"><Input value={pushForm.title} onChange={(e) => setPushForm({ ...pushForm, title: e.target.value })} /></Field>
             <Field label="跳轉連結"><Input value={pushForm.link} onChange={(e) => setPushForm({ ...pushForm, link: e.target.value })} /></Field>
           </div>
           <Field label="通知內容"><Textarea value={pushForm.message} onChange={(e) => setPushForm({ ...pushForm, message: e.target.value })} /></Field>
-          <Button size="sm" className="mt-2" onClick={async () => { try { await apiPost("/admin/push/test", pushForm); toast.push("success", "測試推播已送出"); } catch (err) { toast.push("error", errorMessage(err)); } }}>立即測試推播</Button>
+          <Button size="sm" className="mt-2" onClick={async () => { try { const result = await apiPost<{ targets: number; notified: number; pushSent: number; configured: boolean }>("/admin/push/test", pushForm); setPushResult(result); toast.push("success", `已通知 ${result.notified} 人，Web Push 發送 ${result.pushSent} 台裝置`); } catch (err) { toast.push("error", errorMessage(err)); } }}>立即發送給選定身分組</Button>
+          {pushResult && <p className="mt-2 text-xs text-muted">最近一次：目標 {pushResult.targets} 人・站內通知 {pushResult.notified} 人・Web Push {pushResult.pushSent} 台・VAPID {pushResult.configured ? "已設定" : "未設定（僅站內通知）"}</p>}
         </Card>
         <Card title="▤ 公告" action={<Button size="sm" onClick={() => setAnnOpen(true)}>＋ 發布公告</Button>}>
           {anns.loading && <Skeleton lines={3} />}

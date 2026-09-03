@@ -154,7 +154,7 @@ export function Field({ label, children, hint, required }: { label: string; chil
 }
 
 const inputBase =
-  "focus-ring w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2.5 text-sm text-[var(--text)] placeholder:text-[color:var(--muted)] transition focus:border-[#37d3ff]";
+  "focus-ring w-full rounded-xl border border-[var(--line)] bg-[#0b1428] px-3 py-2.5 text-sm text-[var(--text)] placeholder:text-[color:var(--muted)] transition focus:border-[#37d3ff]";
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   const { className = "", ...rest } = props;
@@ -279,7 +279,7 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`glass anim-pop max-h-[92dvh] w-full overflow-y-auto scroll-thin rounded-b-none p-4 sm:rounded-3xl sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+        className={`glass anim-pop max-h-[92dvh] w-full overflow-y-auto overscroll-contain scroll-thin rounded-b-none bg-[var(--surface-solid)] p-4 touch-pan-y sm:rounded-3xl sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-base font-semibold">{title}</h3>

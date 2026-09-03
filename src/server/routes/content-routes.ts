@@ -11,9 +11,10 @@ import {
   voiceTranscripts,
   voiceAnalysis,
   tasks,
+  questions,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { badRequest, fail, forbidden, notFound, sanitizeText, slugToken, todayStr } from "../core";
+import { badRequest, fail, forbidden, notFound, sanitizeText, slugToken, todayStr, fingerprint } from "../core";
 import { putObject, readObject, deleteObject, signObjectUrl } from "../storage";
 import { consumeFeature, grantLearningReward, progressDailyTask, bumpAchievement } from "../economy";
 import { runAi, runAiJson, aiConfigured } from "../ai";
@@ -38,6 +39,18 @@ async function extractText(mime: string, data: Buffer, userId: string): Promise<
 }
 
 const visibility = z.enum(["private", "friends", "group", "link", "public"]);
+
+function parseQuickMemoryText(raw: string) {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !/^(題目|問題|question)\s*[,|\t：:>→-]?\s*(答案|answer)/i.test(line))
+    .map((line) => {
+      const parts = line.split(/\t+|\s*=>\s*|\s*→\s*|\s*\|\s*|\s*[：:]\s*|\s+-\s+/).map((part) => part.trim()).filter(Boolean);
+      return parts.length >= 2 ? { stem: parts[0].slice(0, 2000), answer: parts.slice(1).join("｜").slice(0, 1000) } : null;
+    })
+    .filter((item): item is { stem: string; answer: string } => Boolean(item?.stem && item.answer));
+}
 
 export const contentRoutes: RouteDef[] = [
   /* ------------------------------------------------------ materials */
@@ -211,6 +224,69 @@ export const contentRoutes: RouteDef[] = [
         await db.update(studyMaterials).set({ status: "ready" }).where(eq(studyMaterials.id, m.id));
         throw err;
       }
+    },
+  }),
+
+  /* -------------------------------------------------------- quick memory */
+  route({
+    method: "GET",
+    path: "/quick-memory",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const rows = await db.select().from(questions).where(and(eq(questions.ownerId, user.userId), eq(questions.origin, "quick_memory"))).orderBy(desc(questions.createdAt)).limit(100);
+      return { items: rows.map((row) => ({ id: row.id, question: row.stem, answer: row.answer[0] ?? "", explanation: row.explanation, createdAt: row.createdAt })) };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/quick-memory",
+    auth: "user",
+    rate: { limit: 20, windowSec: 3600 },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const form = await ctx.formData();
+      const title = String(form.get("title") ?? "快速背題目").slice(0, 120);
+      const pasted = String(form.get("content") ?? "");
+      const file = form.get("file");
+      if (!(file instanceof File) && pasted.trim().length < 3) throw badRequest("請貼上題目與答案，或上傳文字／PDF 檔案");
+      const raw = file instanceof File ? await extractText(file.type || "text/plain", Buffer.from(await file.arrayBuffer()), user.userId) : pasted;
+      const pairs = parseQuickMemoryText(raw).slice(0, 100);
+      if (!pairs.length) throw badRequest("找不到可辨識的題目／答案。請使用「題目 → 答案」或「題目\t答案」格式");
+      const created = [];
+      for (const pair of pairs) {
+        const rows = await db.insert(questions).values({ ownerId: user.userId, origin: "quick_memory", subject: "快速背", topic: title, level: "custom", difficulty: "normal", type: "short", stem: pair.stem, options: [], answer: [pair.answer], explanation: "", fingerprint: fingerprint("快速背", pair.stem, pair.answer) }).onConflictDoNothing().returning();
+        if (rows[0]) created.push(rows[0]);
+      }
+      return { created: created.length, items: created.map((row) => ({ id: row.id, question: row.stem, answer: row.answer[0] ?? "", explanation: row.explanation, createdAt: row.createdAt })) };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/quick-memory/:id",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ question: z.string().min(1).max(2000), answer: z.string().min(1).max(1000), explanation: z.string().max(4000).optional() }));
+      const current = (await db.select().from(questions).where(eq(questions.id, ctx.params.id)).limit(1))[0];
+      if (!current || current.origin !== "quick_memory") throw notFound("找不到快速背題目");
+      if (current.ownerId !== user.userId) throw forbidden();
+      const rows = await db.update(questions).set({ stem: body.question.trim(), answer: [body.answer.trim()], explanation: body.explanation?.trim() ?? current.explanation, fingerprint: fingerprint("快速背", body.question, body.answer) }).where(eq(questions.id, current.id)).returning();
+      const row = rows[0];
+      return { item: { id: row.id, question: row.stem, answer: row.answer[0] ?? "", explanation: row.explanation, createdAt: row.createdAt } };
+    },
+  }),
+  route({
+    method: "DELETE",
+    path: "/quick-memory/:id",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const current = (await db.select().from(questions).where(eq(questions.id, ctx.params.id)).limit(1))[0];
+      if (!current || current.origin !== "quick_memory") throw notFound("找不到快速背題目");
+      if (current.ownerId !== user.userId) throw forbidden();
+      await db.delete(questions).where(eq(questions.id, current.id));
+      return { deleted: true };
     },
   }),
 

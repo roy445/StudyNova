@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
-import { apiDelete, apiPost, errorMessage, useApi } from "@/lib/api";
+import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -75,7 +75,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
 
   if (loading) return <Card title="🔤 快速背單字"><Skeleton lines={4} /></Card>;
   if (error) return <Card title="🔤 快速背單字"><ErrorState message={error} onRetry={reload} /></Card>;
-  if (!current) return <Card title="🔤 每日 10 個單字"><EmptyState icon="📖" title="今日單字載入中" hint="請重新整理頁面；當日單字會持續保留 24 小時供你查看與練習。" /></Card>;
+  if (!current) return <Card title="🔤 每日 10 個單字"><EmptyState icon="📖" title="題庫正在準備中" hint="請稍後再試；如果持續沒有單字，請按瀏覽器重新載入或聯絡管理員。" action={<Button size="sm" onClick={() => reload()}>重新載入</Button>} /></Card>;
 
   return (
     <Card
@@ -655,5 +655,88 @@ export function PlanPanel() {
         </div>
       </Card>
     </div>
+  );
+}
+
+
+type QuickMemoryItem = { id: string; question: string; answer: string; explanation: string; createdAt: string };
+
+export function QuickMemoryPanel() {
+  const toast = useToast();
+  const list = useApi<{ items: QuickMemoryItem[] }>("/quick-memory");
+  const [title, setTitle] = useState("我的快速背題目");
+  const [content, setContent] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, QuickMemoryItem>>({});
+
+  async function createItems() {
+    if (!file && content.trim().length < 3) return toast.push("error", "請貼上題目與答案，或選擇檔案");
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("title", title.trim() || "我的快速背題目");
+      form.append("content", content);
+      if (file) form.append("file", file);
+      const res = await apiPost<{ created: number }>("/quick-memory", form);
+      toast.push("success", `已自動建立 ${res.created} 題快速背題目`);
+      setContent("");
+      setFile(null);
+      await list.reload();
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveItem(item: QuickMemoryItem) {
+    const draft = drafts[item.id] ?? item;
+    setBusy(true);
+    try {
+      await apiPatch(`/quick-memory/${item.id}`, { question: draft.question, answer: draft.answer, explanation: draft.explanation });
+      toast.push("success", "題目與答案已更新");
+      await list.reload();
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="✦ 快速背" subtitle="上傳或貼上「題目 → 答案」，系統會自動拆成可練習題目；每一題都能再手動修改。">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-[#0b1428] p-3 opacity-100 shadow-inner">
+          <Field label="這組題目的名稱"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：段考片語" /></Field>
+          <Field label="上傳題目／答案檔案" hint="支援 TXT、CSV、JSON、PDF；文字檔建議每行一題">
+            <Input type="file" accept=".txt,.csv,.json,.pdf,text/plain,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="bg-[#101d35]" />
+          </Field>
+          <Field label="或直接貼上內容" hint="格式：題目 → 答案，也支援題目 Tab 答案、題目：答案">
+            <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={7} placeholder={'例：\nWhat is the opposite of hot? → cold\n光合作用的原料 → 二氧化碳和水'} className="bg-[#101d35]" />
+          </Field>
+          <Button full loading={busy} onClick={createItems}>自動生成快速背題目</Button>
+        </div>
+        <div className="max-h-[620px] space-y-2 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[#0b1428] p-3 opacity-100 shadow-inner">
+          {list.loading && <Skeleton lines={5} />}
+          {list.error && <ErrorState message={list.error} onRetry={list.reload} />}
+          {!list.loading && !list.data?.items.length && <EmptyState icon="✦" title="還沒有快速背題目" hint="左側上傳或貼上題目與答案後，這裡會出現可編輯的題目卡。" />}
+          {list.data?.items.map((item) => {
+            const draft = drafts[item.id] ?? item;
+            return (
+              <div key={item.id} className="space-y-2 rounded-xl border border-[var(--line)] bg-[#111d35] p-3 opacity-100">
+                <Input value={draft.question} onChange={(e) => setDrafts((all) => ({ ...all, [item.id]: { ...draft, question: e.target.value } }))} aria-label="快速背題目" />
+                <Input value={draft.answer} onChange={(e) => setDrafts((all) => ({ ...all, [item.id]: { ...draft, answer: e.target.value } }))} aria-label="快速背答案" />
+                <Textarea value={draft.explanation} onChange={(e) => setDrafts((all) => ({ ...all, [item.id]: { ...draft, explanation: e.target.value } }))} rows={2} placeholder="詳解（選填）" aria-label="快速背詳解" />
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" loading={busy} onClick={() => saveItem(item)}>儲存修改</Button>
+                  <Button size="sm" variant="ghost" onClick={async () => { await apiDelete(`/quick-memory/${item.id}`); toast.push("success", "已刪除題目"); await list.reload(); }}>刪除</Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
   );
 }

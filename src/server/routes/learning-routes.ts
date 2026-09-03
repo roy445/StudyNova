@@ -40,6 +40,7 @@ import {
 import { isWeekOpen } from "../queue";
 import { unreadCount } from "../notify";
 import { runAiJson, aiConfigured } from "../ai";
+import { ensureSeeded } from "../seed";
 
 /* --------------------------------------------------------- analytics */
 
@@ -858,6 +859,7 @@ export const routes: RouteDef[] = [
     path: "/words/catalog",
     auth: "user",
     handler: async () => {
+      await ensureSeeded();
       const rows = await db.execute(sql`select level, count(*)::int as count from daily_words where level in ('junior', 'senior') group by level`);
       const counts = new Map(rows.rows.map((row) => [String(row.level), Number(row.count)]));
       return {
@@ -875,6 +877,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      await ensureSeeded();
       const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
       const count = Math.max(1, Math.min(10, settings?.dailyWordCount ?? 10));
       const requestedTrack = ctx.query.get("track");

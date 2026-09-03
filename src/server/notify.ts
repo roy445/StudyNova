@@ -28,6 +28,7 @@ export type NotifyInput = {
   link?: string;
   dedupeKey?: string;
   push?: boolean;
+  vibrate?: number[];
 };
 
 /** Idempotent notification insert (dedupeKey prevents duplicates). */
@@ -45,11 +46,11 @@ export async function notify(input: NotifyInput): Promise<boolean> {
     .onConflictDoNothing()
     .returning({ id: notifications.id });
   const created = Boolean(rows[0]);
-  if (created && input.push) await sendPush(input.userId, { title: input.title, body: input.body ?? "", link: input.link ?? "/" });
+  if (created && input.push) await sendPush(input.userId, { title: input.title, body: input.body ?? "", link: input.link ?? "/", vibrate: input.vibrate ?? [120, 60, 120] });
   return created;
 }
 
-export async function sendPush(userId: string, payload: { title: string; body: string; link: string }) {
+export async function sendPush(userId: string, payload: { title: string; body: string; link: string; vibrate?: number[] }) {
   if (!ensureVapid()) return { sent: 0, configured: false };
   const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
   let sent = 0;
@@ -70,6 +71,10 @@ export async function sendPush(userId: string, payload: { title: string; body: s
 
 export async function resolveAudience(audience: string, audienceIds: string[]): Promise<string[]> {
   if (audience === "users") return audienceIds;
+  if (audience === "admin") {
+    const rows = await db.select({ userId: users.userId }).from(users).where(and(eq(users.status, "active"), sql`${users.role} in ('admin', 'owner')`));
+    return rows.map((r) => r.userId);
+  }
   if (audience === "pro") {
     const rows = await db
       .select({ userId: memberships.userId })

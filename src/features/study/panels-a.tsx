@@ -72,9 +72,9 @@ export function MaterialsPanel() {
       {error && <ErrorState message={error} onRetry={reload} />}
       {!loading && !error && !data?.materials.length && <EmptyState icon="📁" title="還沒有教材" hint="上傳課本講義 PDF 或貼上文字，AI 就能幫你整理。" />}
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="max-h-[70vh] grid gap-2 overflow-y-auto overscroll-contain scroll-thin pr-1 touch-pan-y sm:grid-cols-2">
         {data?.materials.map((m) => (
-          <div key={m.id} className="glass-soft p-3">
+          <div key={m.id} className="glass-soft solid-data-surface p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{m.title}</p>
@@ -376,9 +376,9 @@ export function OcrPanel() {
           {detail.loading && <Skeleton lines={4} />}
           {detail.error && <ErrorState message={detail.error} onRetry={detail.reload} />}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="max-h-[70vh] grid gap-3 overflow-y-auto overscroll-contain scroll-thin pr-1 touch-pan-y sm:grid-cols-2">
             {detail.data?.pages.map((p, idx) => (
-              <div key={p.id} className="glass-soft p-2">
+              <div key={p.id} className="glass-soft solid-data-surface p-2">
                 <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted">
                   <span>
                     #{idx + 1}・{p.status}
