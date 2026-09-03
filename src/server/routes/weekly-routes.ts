@@ -313,6 +313,20 @@ export const routes: RouteDef[] = [
   }),
 
   route({
+    method: "DELETE",
+    path: "/admin/weekly/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const week = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
+      if (!week) throw notFound("找不到每週小考");
+      const rows = await db.update(weeklyExamWeeks).set({ status: "archived", updatedAt: new Date() }).where(eq(weeklyExamWeeks.id, week.id)).returning();
+      await adminLog({ actorId: admin.userId, action: "weekly.archive", targetType: "week", targetId: week.id, before: { status: week.status }, after: { status: "archived" }, ip: ctx.ip });
+      return { week: rows[0], preservedHistory: true };
+    },
+  }),
+
+  route({
     method: "PATCH",
     path: "/admin/weekly/:id",
     auth: "admin",
@@ -465,8 +479,8 @@ export const routes: RouteDef[] = [
           const obj = await readObject(f.objectId);
           if (!obj.mimeType.startsWith("image/") && obj.mimeType !== "application/pdf") continue;
           const hl = f.highlights.length
-            ? `螢光筆標記（相對座標 0-1，顏色語意 ${JSON.stringify(week.highlightMap)}）：${JSON.stringify(f.highlights)}。輸出時請在對應文字前加 [顏色]。`
-            : "";
+            ? `螢光筆標記（相對座標 0-1，管理員自訂顏色語意 ${JSON.stringify(week.highlightMap)}）：${JSON.stringify(f.highlights)}。輸出時請在對應文字前加 [顏色]。`
+            : "未指定螢光筆語意，請直接分析文字內容，依句子、單字、重要與注意等語意提出標記建議，但不要假設固定顏色。";
           const res = await runAi({
             feature: "weekly_ocr",
             userId: admin.userId,
