@@ -18,16 +18,16 @@ const STATE_COLOR: Record<NoviState, string> = {
 };
 
 const STATE_FACE: Record<NoviState, string> = {
-  idle: "◕ ◕",
+  idle: "● ●",
   thinking: "· ·",
-  happy: "^ ^",
-  cheer: "★ ★",
+  happy: "◡ ◡",
+  cheer: "✦ ✦",
   analyze: "◔ ◔",
-  speak: "◕ ◕",
-  success: "^ ^",
+  speak: "◉ ◉",
+  success: "◡ ◡",
   error: "× ×",
   remind: "! !",
-  levelup: "✦ ✦",
+  levelup: "★ ★",
 };
 
 /** StudyNova logo mark: planet + orbit + rising study spark. */
@@ -105,15 +105,18 @@ export function NoviAvatar({
         )}
         <ellipse cx="50" cy="106" rx="21" ry="5" fill={color} opacity="0.28" />
         <ellipse cx="50" cy="100" rx="13" ry="3" fill={color} opacity="0.5" />
+        <path d="M50 9V2" stroke={color} strokeWidth="2.4" strokeLinecap="round" />
+        <circle className="anim-pulse" cx="50" cy="2" r="3.2" fill={color} stroke="#eef3ff" strokeWidth="1.2" />
         <circle cx="50" cy="48" r="36" fill={`url(#novi-body-${state})`} />
         <circle cx="50" cy="48" r="36" stroke={color} strokeOpacity="0.75" strokeWidth="2.4" fill="none" />
+        <path d="M25 30C33 20 67 20 75 30" stroke="#ffffff" strokeOpacity="0.8" strokeWidth="2" strokeLinecap="round" />
         <ellipse cx="50" cy="46" rx="25" ry="19" fill="#0b1226" />
         <text x="50" y="52" textAnchor="middle" fontSize="15" fill={color} fontFamily="monospace" letterSpacing="1.5">
           {face}
         </text>
         <rect x="6" y="41" width="9" height="16" rx="4.5" fill={color} opacity="0.9" />
         <rect x="85" y="41" width="9" height="16" rx="4.5" fill={color} opacity="0.9" />
-        <circle className="anim-pulse" cx="50" cy="82" r="4.2" fill={color} />
+        <circle className="anim-pulse novi-core-glow" cx="50" cy="82" r="4.2" fill={color} />
         {(effect === "effect-sparkle" || state === "cheer" || state === "levelup") && (
           <>
             <circle className="anim-pulse" cx="18" cy="20" r="2.4" fill="#ffc857" />

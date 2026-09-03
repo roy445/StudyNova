@@ -23,6 +23,16 @@ const NAV = [
   { href: "/profile", label: "我的", icon: "◎" },
 ];
 
+const ENCOURAGEMENTS: Array<{ text: string; state: NoviState }> = [
+  { text: "慢慢來也沒關係，今天完成一小步，就是在變強。", state: "cheer" },
+  { text: "你不需要一次做到完美，只要比昨天多理解一點。", state: "happy" },
+  { text: "把現在的專注留給眼前這一題，答案會一步一步清楚。", state: "thinking" },
+  { text: "每一次回想，都是在替記憶鋪一條更穩的路。", state: "remind" },
+  { text: "相信累積的力量，你正在成為更好的自己。", state: "success" },
+  { text: "千里之行，始於足下。先完成眼前這一步，Novi 陪你一起走。", state: "cheer" },
+  { text: "學而不思則罔，思而不學則殆。今天也留一點時間動手練習吧。", state: "remind" },
+];
+
 const SIDE_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: "⌂" },
   { href: "/study", label: "學習中心", icon: "▦" },
@@ -50,6 +60,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [noviState, setNoviState] = useState<NoviState>("idle");
   const [advice, setAdvice] = useState<string>("");
   const [adviceLoading, setAdviceLoading] = useState(false);
+  const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
@@ -60,6 +71,30 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = (delay: number) => {
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        const next = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+        setEncouragement(next);
+        setNoviState(next.state);
+        timer = setTimeout(() => {
+          if (cancelled) return;
+          setEncouragement(null);
+          setNoviState("idle");
+          schedule(45_000 + Math.random() * 75_000);
+        }, 9_000);
+      }, delay);
+    };
+    schedule(25_000 + Math.random() * 45_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
 
   const runSearch = useCallback(async () => {
@@ -138,7 +173,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
           )}
         </nav>
         <div className="glass-soft p-3 text-xs">
-          <p className="truncate font-medium">{user.displayName}</p>
+          <p className={`truncate font-medium ${user.isPro ? "pro-name" : ""}`}>{user.displayName}</p>
           <p className="truncate text-muted">{user.novaId}</p>
           <div className="mt-2 flex items-center gap-1.5">
             {user.isPro && <Badge tone="gold">Nova Pro</Badge>}
@@ -169,11 +204,11 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               ◌
               {unread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
             </button>
-            <Link href="/profile" className="focus-ring flex items-center gap-2 rounded-xl border border-[var(--line)] px-2 py-1.5 text-xs">
+            <Link href="/profile" className={`focus-ring flex items-center gap-2 rounded-xl border px-2 py-1.5 text-xs ${user.isPro ? "pro-frame" : "border-[var(--line)]"}`}>
               <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold ${user.isPro ? "bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "bg-white/10"}`}>
                 {user.displayName.slice(0, 1)}
               </span>
-              <span className="hidden max-w-[90px] truncate sm:inline">{user.displayName}</span>
+              <span className={`hidden max-w-[90px] truncate sm:inline ${user.isPro ? "pro-name font-semibold" : ""}`}>{user.displayName}</span>
             </Link>
           </div>
         </header>
@@ -212,6 +247,12 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
       {/* Novi dock */}
       <div className="novi-dock fixed right-3 z-[60] flex flex-col items-end gap-2 sm:right-5">
+        {!noviOpen && encouragement && (
+          <button type="button" onClick={() => setNoviOpen(true)} className="glass anim-pop max-w-[min(82vw,300px)] p-3 text-left text-xs leading-relaxed text-[#e8edff] shadow-[0_0_28px_rgba(55,211,255,0.18)]">
+            <span className="mb-1 block text-[10px] font-semibold tracking-wider text-[#37d3ff]">Novi 給你的話</span>
+            {encouragement.text}
+          </button>
+        )}
         {noviOpen && (
           <div className="glass anim-pop w-[min(92vw,340px)] p-3">
             <div className="flex items-start gap-2">
@@ -225,7 +266,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               </button>
             </div>
             <div className="mt-2 max-h-40 overflow-y-auto scroll-thin rounded-xl bg-black/25 p-2.5 text-xs leading-relaxed">
-              {adviceLoading ? <Skeleton lines={2} /> : advice || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
+              {adviceLoading ? <Skeleton lines={2} /> : encouragement?.text || advice || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <Button size="sm" variant="ghost" onClick={() => askQuick("today_advice")}>
@@ -272,7 +313,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                 －
               </button>
               <button onClick={() => setNoviOpen((v) => !v)} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
-                <NoviAvatar size={58} state={noviOpen ? "happy" : "idle"} effect={summary.data?.novi?.effect} level={level} />
+                <NoviAvatar size={58} state={encouragement?.state ?? (noviOpen ? "happy" : "idle")} effect={summary.data?.novi?.effect} level={level} />
               </button>
             </>
           )}

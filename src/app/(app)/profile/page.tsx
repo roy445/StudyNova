@@ -56,7 +56,7 @@ function ProfileInner() {
           <NoviAvatar size={92} state="happy" level={profile?.level ?? 1} effect={profile?.effect} />
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-              <h1 className="text-lg font-bold">{me.data?.user.displayName}</h1>
+              <h1 className={`text-lg font-bold ${me.data?.user.isPro ? "pro-name" : ""}`}>{me.data?.user.displayName}</h1>
               {me.data?.user.isPro && <Badge tone="gold">Nova Pro</Badge>}
               {profile?.title && <Badge tone="violet">{profile.title}</Badge>}
             </div>

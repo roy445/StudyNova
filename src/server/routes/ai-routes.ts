@@ -188,7 +188,6 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/ai/conversations/:id/messages",
     auth: "user",
-    rate: { limit: 120, windowSec: 3600 },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000) }));
@@ -371,7 +370,6 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/ai/quick",
     auth: "user",
-    rate: { limit: 60, windowSec: 3600 },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ kind: z.enum(["today_advice", "weak_focus", "encourage"]) }));

@@ -17,6 +17,7 @@ import {
   adminLogs,
   activities,
   activityParticipants,
+  users,
 } from "@/db/schema";
 import { fail, todayStr } from "./core";
 
@@ -179,6 +180,11 @@ export async function featureState(userId: string, feature: string): Promise<Quo
   const perm = rows[0];
   if (!perm) {
     return { feature, label: feature, enabled: true, proOnly: false, limit: 0, used: 0, remaining: 0, unlimited: true, novaCost: 0 };
+  }
+  const adminRows = await db.select({ role: users.role }).from(users).where(eq(users.userId, userId)).limit(1);
+  const isAdmin = adminRows[0]?.role === "admin" || adminRows[0]?.role === "owner";
+  if (isAdmin) {
+    return { feature, label: perm.label, enabled: perm.enabled, proOnly: false, limit: -1, used: 0, remaining: Number.MAX_SAFE_INTEGER, unlimited: true, novaCost: 0 };
   }
   const pro = await isProUser(userId);
   const today = todayStr();

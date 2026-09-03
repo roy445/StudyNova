@@ -6,6 +6,8 @@ import { Badge, Button, Card, EmptyState, ErrorState, Progress, Skeleton, Stat, 
 import { LineChart } from "@/components/charts";
 import { NoviAvatar } from "@/components/brand";
 import { apiPost, useApi } from "@/lib/api";
+import { WordsPanel } from "@/features/study/panels-c";
+import { dailyKnowledge } from "@/data/daily-knowledge";
 
 type SubjectStat = {
   subject: string;
@@ -147,6 +149,17 @@ export default function DashboardPage() {
           </Link>
         </div>
       </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WordsPanel />
+        <Card title="💡 每日小知識" subtitle={dailyKnowledge(data.today).tag}>
+          <div className="glass-soft min-h-[180px] p-4">
+            <p className="text-base font-semibold text-[#37d3ff]">{dailyKnowledge(data.today).title}</p>
+            <p className="mt-3 text-sm leading-7 text-muted">{dailyKnowledge(data.today).body}</p>
+            <Link href="/study?tab=words" className="mt-4 inline-flex text-xs text-[#37d3ff] underline">用今日單字練習 →</Link>
+          </div>
+        </Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="🗓️ AI 今日讀書計畫" subtitle={data.plan.rationale} action={<Badge tone="cyan">{data.plan.totalMinutes} 分鐘</Badge>}>
