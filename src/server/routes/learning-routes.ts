@@ -855,23 +855,47 @@ export const routes: RouteDef[] = [
 
   route({
     method: "GET",
+    path: "/words/catalog",
+    auth: "user",
+    handler: async () => {
+      const rows = await db.execute(sql`select level, count(*)::int as count from daily_words where level in ('junior', 'senior') group by level`);
+      const counts = new Map(rows.rows.map((row) => [String(row.level), Number(row.count)]));
+      return {
+        tracks: [
+          { id: "senior", label: "高中 7000 單挑戰", description: "依高中英文參考詞彙表，適合高中學習與大考準備", count: counts.get("senior") ?? 0 },
+          { id: "junior", label: "國中 2000 單挑戰", description: "依國中英文 2000 字，打好基礎字彙力", count: counts.get("junior") ?? 0 },
+        ],
+      };
+    },
+  }),
+
+  route({
+    method: "GET",
     path: "/words/daily",
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
-      const count = settings?.dailyWordCount ?? 10;
-      const level = settings?.englishLevel ?? "A2";
-      const rows = await db.execute(sql`
+      const count = Math.max(1, Math.min(10, settings?.dailyWordCount ?? 10));
+      const requestedTrack = ctx.query.get("track");
+      const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : settings?.schoolLevel === "senior" ? "senior" : "junior";
+      const dayNumber = Math.floor(Date.now() / 86_400_000);
+      const totalResult = await db.execute(sql`select count(*)::int as count from daily_words where level = ${track}`);
+      const total = Number(totalResult.rows[0]?.count ?? 0);
+      if (!total) return { words: [], level: track, track, count: 0, dailyTarget: count };
+      const offset = (dayNumber * count) % total;
+      const baseQuery = sql`
         select w.id, w.word, w.meaning, w.part_of_speech, w.example, w.example_zh, w.level,
                coalesce(p.familiarity, 0) as familiarity, coalesce(p.correct_count,0) as correct_count,
                coalesce(p.wrong_count,0) as wrong_count, p.memory_tip
         from daily_words w
         left join word_progress p on p.word_id = w.id and p.user_id = ${user.userId}
-        where w.level = ${level} or w.level = 'ALL'
-        order by coalesce(p.familiarity, -1) asc, coalesce(p.wrong_count,0) desc, random()
-        limit ${count}`);
-      return { words: rows.rows, level, count };
+        where w.level = ${track}
+        order by w.word asc`;
+      const first = await db.execute(sql`${baseQuery} limit ${count} offset ${offset}`);
+      const remaining = count - first.rows.length;
+      const rows = remaining > 0 ? [...first.rows, ...(await db.execute(sql`${baseQuery} limit ${remaining}`)).rows] : first.rows;
+      return { words: rows, level: track, track, count: rows.length, dailyTarget: count };
     },
   }),
 

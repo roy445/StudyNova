@@ -17,9 +17,10 @@ function speak(text: string, lang = "en-US") {
 
 type Word = { id: string; word: string; meaning: string; part_of_speech: string; example: string; example_zh: string; familiarity: number; memory_tip: string | null };
 
-export function WordsPanel() {
+export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const toast = useToast();
-  const { data, loading, error, reload } = useApi<{ words: Word[]; level: string; count: number }>("/words/daily");
+  const dailyPath = track ? `/words/daily?track=${track}` : "/words/daily";
+  const { data, loading, error, reload } = useApi<{ words: Word[]; level: string; track?: string; count: number; dailyTarget?: number }>(dailyPath, [track]);
   const [index, setIndex] = useState(0);
   const [mode, setMode] = useState<"card" | "zh2en" | "en2zh" | "spell" | "timed">("card");
   const [flipped, setFlipped] = useState(false);
@@ -74,12 +75,12 @@ export function WordsPanel() {
 
   if (loading) return <Card title="🔤 快速背單字"><Skeleton lines={4} /></Card>;
   if (error) return <Card title="🔤 快速背單字"><ErrorState message={error} onRetry={reload} /></Card>;
-  if (!current) return <Card title="🔤 快速背單字"><EmptyState icon="📖" title="今天的單字都完成了！" hint="到「我的設定」調整每日單字量，或明天再來。" /></Card>;
+  if (!current) return <Card title="🔤 每日 10 個單字"><EmptyState icon="📖" title="今天的單字都完成了！" hint="明天再來即可取得下一組每日單字。" /></Card>;
 
   return (
     <Card
-      title="🔤 快速背單字"
-      subtitle={`程度 ${data?.level}・第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
+      title="🔤 每日 10 個單字"
+      subtitle={`${track === "senior" ? "高中 7000 單" : track === "junior" ? "國中 2000 單" : `程度 ${data?.level}`}・每日 ${data?.dailyTarget ?? words.length} 個・第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
       action={
         <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !py-1.5 text-xs">
           <option value="card">單字卡</option>

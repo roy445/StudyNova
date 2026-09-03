@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Tabs, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
+import { WordsPanel } from "@/features/study/panels-c";
 
 type Friend = { userId: string; novaId: string; displayName: string; level: number | null; xp: number | null };
 type Challenge = {
@@ -27,6 +28,8 @@ function ChallengeInner() {
   const activities = useApi<{ live: Array<{ id: string; title: string; cover: string; description: string; goalValue: number; progress: number; rewardNova: number; rewardXp: number; endsAt: string }>; upcoming: Array<{ id: string; title: string; startsAt: string }> }>("/activities");
   const board = useApi<{ weekly: Array<{ userId: string; displayName: string; novaId: string; minutes: number; level: number | null }>; xp: Array<{ userId: string; displayName: string; xp: number; level: number }>; me: string }>("/leaderboard?scope=global");
   const quizzes = useApi<{ quizzes: Array<{ id: string; title: string }> }>("/quizzes");
+  const vocabulary = useApi<{ tracks: Array<{ id: "junior" | "senior"; label: string; description: string; count: number }> }>("/words/catalog");
+  const [vocabTrack, setVocabTrack] = useState<"junior" | "senior">("junior");
 
   const [novaId, setNovaId] = useState(params.get("add") ?? "");
   const [qr, setQr] = useState<{ svg: string; link: string; novaId: string } | null>(null);
@@ -47,6 +50,7 @@ function ChallengeInner() {
         tabs={[
           { key: "friends", label: "好友", icon: "🤝" },
           { key: "challenge", label: "挑戰", icon: "⚔️" },
+          { key: "vocab", label: "分級單字", icon: "🔤" },
           { key: "room", label: "讀書房", icon: "🏫" },
           { key: "activity", label: "活動", icon: "🎉" },
           { key: "board", label: "排行榜", icon: "🏆" },
@@ -231,6 +235,36 @@ function ChallengeInner() {
             ))}
           </div>
         </Card>
+      )}
+
+      {tab === "vocab" && (
+        <div className="space-y-4">
+          <Card title="🔤 分級單字挑戰" subtitle="每天固定 10 個單字，依今天的日期輪替題目；重新整理不會換題。">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(vocabulary.data?.tracks ?? [
+                { id: "junior" as const, label: "國中 2000 單挑戰", description: "依國中英文 2000 字建立基礎字彙力", count: 2000 },
+                { id: "senior" as const, label: "高中 7000 單挑戰", description: "依高中英文參考詞彙表準備進階字彙", count: 7000 },
+              ]).map((trackOption) => (
+                <button
+                  key={trackOption.id}
+                  type="button"
+                  onClick={() => setVocabTrack(trackOption.id)}
+                  className={`focus-ring rounded-2xl border p-4 text-left transition ${vocabTrack === trackOption.id ? "border-[#37d3ff]/70 bg-[#37d3ff]/10 shadow-[0_0_24px_rgba(55,211,255,0.12)]" : "border-[var(--line)] bg-white/[0.02] hover:bg-white/5"}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{trackOption.label}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted">{trackOption.description}</p>
+                    </div>
+                    <Badge tone={vocabTrack === trackOption.id ? "cyan" : "muted"}>{trackOption.count.toLocaleString()} 字</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] text-muted">題庫來源：使用管理者提供的國中英文 2000 字與高中英文參考詞彙表 PDF。</p>
+          </Card>
+          <WordsPanel key={vocabTrack} track={vocabTrack} />
+        </div>
       )}
 
       {tab === "room" && (

@@ -15,8 +15,9 @@ import {
 } from "@/db/schema";
 import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
+import vocabulary from "@/data/vocabulary.json";
 
-const SEED_VERSION = 5;
+const SEED_VERSION = 6;
 
 const LEVELS = [
   { level: 1, name: "初始助手", requiredXp: 0, upgradeCostNova: 0, ability: "基本問答與今日建議", aura: "#38bdf8" },
@@ -140,6 +141,17 @@ export async function runSeed(force = false) {
       .insert(dailyWords)
       .values({ word, meaning, partOfSpeech: pos, example, exampleZh, level })
       .onConflictDoNothing();
+  }
+  for (let i = 0; i < vocabulary.length; i += 500) {
+    const batch = vocabulary.slice(i, i + 500).map((item) => ({
+      word: item.word,
+      meaning: item.meaning || "（高中詞彙表未提供中文釋義）",
+      partOfSpeech: item.partOfSpeech,
+      example: "",
+      exampleZh: "",
+      level: item.track,
+    }));
+    await db.insert(dailyWords).values(batch).onConflictDoNothing();
   }
   for (const [en, zh, level] of SENTENCES) {
     await db.insert(sentences).values({ en, zh, level, keywords: [] }).onConflictDoNothing();
