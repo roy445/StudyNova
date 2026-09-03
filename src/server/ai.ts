@@ -54,7 +54,7 @@ function cleanEnv(value?: string) {
 }
 
 function cleanModel(value?: string) {
-  return (cleanEnv(value) || "gemini-2.5-flash").replace(/^models\//, "");
+  return (cleanEnv(value) || "gemini-3.6-flash").replace(/^models\//, "");
 }
 
 export function providerConfigs(): ProviderConfig[] {

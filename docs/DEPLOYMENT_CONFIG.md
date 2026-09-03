@@ -22,10 +22,10 @@ AI 可設定為 Gemini-only 多 API key fallback。系統會依 `GEMINI_API_KEY_
 
 | Provider | 環境變數 | 預設模型 | 建議用途 |
 |---|---|---|---|
-| Gemini API 1 | `GEMINI_API_KEY_1` | `gemini-2.5-flash` | 第一順位 |
-| Gemini API 2 | `GEMINI_API_KEY_2` | `gemini-2.5-flash` | API 1 可重試錯誤時切換 |
-| Gemini API 3 | `GEMINI_API_KEY_3` | `gemini-2.5-flash` | API 2 可重試錯誤時切換 |
-| Gemini 舊別名 | `GOOGLE_GEMINI_API_KEY`／`GEMINI_API_KEY` | `gemini-2.5-flash` | 相容舊設定，等同 API 1 |
+| Gemini API 1 | `GEMINI_API_KEY_1` | `gemini-3.6-flash` | 第一順位 |
+| Gemini API 2 | `GEMINI_API_KEY_2` | `gemini-3.6-flash` | API 1 可重試錯誤時切換 |
+| Gemini API 3 | `GEMINI_API_KEY_3` | `gemini-3.6-flash` | API 2 可重試錯誤時切換 |
+| Gemini 舊別名 | `GOOGLE_GEMINI_API_KEY`／`GEMINI_API_KEY` | `gemini-3.6-flash` | 相容舊設定，等同 API 1 |
 | OpenAI／OpenRouter | `OPENAI_API_KEY`／`OPENROUTER_API_KEY` | 各自預設模型 | 可選；Gemini-only 時留空 |
 
 可用 `GEMINI_MODEL` 覆寫 Gemini 模型。程式也相容 `GOOGLE_GEMINI_API_KEY` 或 `GEMINI_API_KEY` 作為 API 1 的舊名稱；新部署建議使用 `GEMINI_API_KEY_1`、`GEMINI_API_KEY_2`、`GEMINI_API_KEY_3`。
@@ -69,7 +69,7 @@ Header: x-cron-secret: <CRON_SECRET>
 | `GEMINI_API_KEY_1` | Gemini-only 必填 | 第一組 Gemini API key |
 | `GEMINI_API_KEY_2` | 選填 | 第二組 Gemini API key，API 1 可重試錯誤時切換 |
 | `GEMINI_API_KEY_3` | 選填 | 第三組 Gemini API key，API 2 可重試錯誤時切換 |
-| `GEMINI_MODEL` | 選填 | 預設 `gemini-2.5-flash` |
+| `GEMINI_MODEL` | 選填 | 預設 `gemini-3.6-flash` |
 | `GOOGLE_GEMINI_API_KEY`／`GEMINI_API_KEY` | 舊別名 | 若沒有 `GEMINI_API_KEY_1`，可作為 API 1 相容設定 |
 | `OPENAI_API_KEY`／`OPENROUTER_API_KEY` | 選填 | Gemini-only 時留空 |
 | `OPENAI_MODEL`／`OPENROUTER_MODEL` | 選填 | 只有啟用對應 provider 時才使用 |
@@ -216,7 +216,7 @@ NODE_ENV=production
 GEMINI_API_KEY_1=<gemini-key-1>
 GEMINI_API_KEY_2=<gemini-key-2>
 GEMINI_API_KEY_3=<gemini-key-3>
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.6-flash
 # Gemini-only 時以下留空
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
