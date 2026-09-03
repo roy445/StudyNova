@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
@@ -111,6 +112,14 @@ function ProfileInner() {
 
       {tab === "profile" && (
         <div className="grid gap-4 lg:grid-cols-2">
+          {(me.data?.user.role === "admin" || me.data?.user.role === "owner") && (
+            <Card className="border-[#ffc857]/40 bg-gradient-to-br from-[#ffc857]/10 to-transparent lg:col-span-2" title="▣ 後台權力擁有者入口" subtitle="手機版也可以從這裡管理使用者、公告、推播、PRO 與每週小考。">
+              <Link href="/admin" className="focus-ring flex items-center justify-between gap-3 rounded-xl border border-[#ffc857]/30 bg-[#ffc857]/10 px-4 py-3 text-sm text-[#ffe7a8] transition hover:bg-[#ffc857]/20">
+                <span><strong>進入管理後台</strong><span className="ml-2 text-xs text-muted">管理員專用</span></span>
+                <span aria-hidden="true">→</span>
+              </Link>
+            </Card>
+          )}
           <Card title="◎ 個人資料">
             <div className="space-y-3">
               <Field label="顯示名稱">
