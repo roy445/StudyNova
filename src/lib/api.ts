@@ -120,6 +120,13 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refreshFromShell = () => { void load(); };
+    window.addEventListener("studynova:sync", refreshFromShell);
+    return () => window.removeEventListener("studynova:sync", refreshFromShell);
+  }, [load]);
+
   return {
     data,
     loading,

@@ -32,6 +32,7 @@ const ACTIONS = [
   { key: "reset_quota", label: "重設今日額度" },
   { key: "set_unlimited", label: "設定功能無限", needFeature: true },
   { key: "set_role", label: "設定角色", needRole: true },
+  { key: "send_notification", label: "發送通知／推播", needNotification: true },
 ];
 
 export default function AdminOverviewPage() {
@@ -45,7 +46,7 @@ export default function AdminOverviewPage() {
 
   const [selected, setSelected] = useState<string[]>([]);
   const [actionOpen, setActionOpen] = useState(false);
-  const [form, setForm] = useState({ action: "gift_nova", reason: "", amount: 100, days: 30, feature: "", role: "student" });
+  const [form, setForm] = useState({ action: "gift_nova", reason: "", amount: 100, days: 30, feature: "", role: "student", title: "🎁 StudyNova 最新通知", message: "Novi 有一則新消息想告訴你！", link: "/dashboard" });
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
 
   const currentAction = ACTIONS.find((a) => a.key === form.action);
@@ -62,6 +63,9 @@ export default function AdminOverviewPage() {
         days: form.days,
         feature: form.feature || undefined,
         role: form.role,
+        title: form.title,
+        message: form.message,
+        link: form.link,
       });
       const ok = res.results.filter((r) => r.ok).length;
       toast.push(ok === res.results.length ? "success" : "info", `完成 ${ok}/${res.results.length} 筆操作`);
@@ -252,6 +256,13 @@ export default function AdminOverviewPage() {
                 <option value="admin">管理員</option>
               </Select>
             </Field>
+          )}
+          {currentAction?.needNotification && (
+            <>
+              <Field label="通知標題"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+              <Field label="通知內容"><Input value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></Field>
+              <Field label="點擊後連結"><Input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} /></Field>
+            </>
           )}
           <Field label="操作原因" required hint="會完整記錄於 Audit Log">
             <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="例如：參加測試活動獎勵" />

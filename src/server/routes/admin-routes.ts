@@ -141,12 +141,15 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({
           userIds: z.array(z.string().uuid()).min(1).max(200),
-          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role"]),
+          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role", "send_notification"]),
           reason: z.string().min(1, "請填寫操作原因").max(300),
           amount: z.number().int().min(-100000).max(100000).optional(),
           days: z.number().int().min(1).max(3650).optional(),
           feature: z.string().max(60).optional(),
           role: z.enum(["student", "admin"]).optional(),
+          title: z.string().max(120).optional(),
+          message: z.string().max(400).optional(),
+          link: z.string().max(240).optional(),
         }),
       );
       const results: Array<{ userId: string; ok: boolean; detail: string }> = [];
@@ -197,6 +200,11 @@ export const routes: RouteDef[] = [
             }
             case "reset_quota": {
               await db.delete(featureUsage).where(and(eq(featureUsage.userId, userId), body.feature ? eq(featureUsage.feature, body.feature) : sql`true`));
+              break;
+            }
+            case "send_notification": {
+              if (!body.title || !body.message) throw fail("ADMIN_MISSING_PARAM", { message: "請輸入通知標題與內容" });
+              await notify({ userId, kind: "admin_notice", title: body.title, body: body.message, link: body.link ?? "/dashboard", push: true, dedupeKey: `adminnotice:${admin.userId}:${userId}:${Date.now()}` });
               break;
             }
             case "set_unlimited": {
@@ -801,7 +809,8 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const admin = ctx.requireUser();
       if (!pushConfigured()) throw fail("ADMIN_PUSH_NOT_CONFIGURED");
-      const res = await sendPush(admin.userId, { title: "StudyNova 測試推播", body: "推播設定正常運作 ✅", link: "/dashboard" });
+      const body = await ctx.json(z.object({ title: z.string().min(1).max(120).optional(), message: z.string().min(1).max(400).optional(), link: z.string().max(240).optional() }).optional());
+      const res = await sendPush(admin.userId, { title: body?.title ?? "StudyNova 測試推播", body: body?.message ?? "推播設定正常運作 ✅", link: body?.link ?? "/dashboard" });
       return res;
     },
   }),

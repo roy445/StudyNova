@@ -1,4 +1,4 @@
-import { and, eq, lte, sql, desc, gte } from "drizzle-orm";
+import { and, eq, lte, lt, sql, desc, gte } from "drizzle-orm";
 import { db } from "@/db";
 import {
   jobQueue,
@@ -22,6 +22,7 @@ export type JobName =
   | "weekly_report"
   | "membership_expiry"
   | "activity_reminder"
+  | "inactive_reminder"
   | "session_cleanup";
 
 export type JobPayload = Record<string, unknown>;
@@ -155,6 +156,33 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
       }
     }
     return `通知 ${sent} 位學生活動進行中`;
+  },
+
+  async inactive_reminder() {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60_000);
+    const rows = await db.select({ userId: users.userId, displayName: users.displayName }).from(users).where(and(eq(users.status, "active"), eq(users.role, "student"), lt(users.lastLoginAt, cutoff)));
+    const messages = [
+      { title: "🐦 Novi 的小提醒", body: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard" },
+      { title: "🪶 小鳥飛來報到", body: "今天還沒看到你，來做 10 個單字，讓記憶不要飛走吧！", link: "/study" },
+      { title: "😴 Novi 正在等你", body: "只要 5 分鐘也很棒，先從一題錯題開始吧。", link: "/study?tab=wrong" },
+      { title: "🎒 書包空位提醒", body: "今天的學習進度還在等你簽到，完成一小步就算勝利！", link: "/dashboard" },
+      { title: "✨ 你的連續學習在呼喚你", body: "別讓昨天的努力斷線，Novi 幫你把今天安排得剛剛好。", link: "/report" },
+    ];
+    let sent = 0;
+    for (const row of rows) {
+      const message = messages[Math.abs(row.userId.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % messages.length];
+      const created = await notify({
+        userId: row.userId,
+        kind: "reminder",
+        title: message.title,
+        body: `${row.displayName}，${message.body}`,
+        link: message.link,
+        dedupeKey: `inactive:${row.userId}:${todayStr()}`,
+        push: true,
+      });
+      if (created) sent += 1;
+    }
+    return `寄出 ${sent} 則久未登入關懷提醒`;
   },
 
   async session_cleanup() {
@@ -304,6 +332,7 @@ export const CRON_TASKS: Array<{ task: JobName; label: string; schedule: string 
   { task: "weekly_report", label: "每週學習報告", schedule: "每週一 09:00" },
   { task: "membership_expiry", label: "Nova Pro 到期提醒", schedule: "每日 10:00" },
   { task: "activity_reminder", label: "活動提醒", schedule: "每日 12:00" },
+  { task: "inactive_reminder", label: "久未登入關懷提醒", schedule: "每日 18:30" },
   { task: "session_cleanup", label: "Session / 通知清理", schedule: "每日 03:00" },
 ];
 

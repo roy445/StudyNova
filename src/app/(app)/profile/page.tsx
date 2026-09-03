@@ -459,11 +459,18 @@ function ProfileInner() {
                 {membership.data?.membership?.expiresAt ? `到期日：${new Date(membership.data.membership.expiresAt).toLocaleDateString("zh-TW")}` : "Nova Pro 由管理員授予，無法自行購買"}
               </p>
               {membership.data?.isPro && (
-                <ul className="mt-2 space-y-0.5 text-xs">
-                  <li><span className="mr-1 text-[#37d3ff]">✓</span>學習獎勵雙倍 Nova 與 XP</li>
-                  <li><span className="mr-1 text-[#37d3ff]">✓</span>金色身分與專屬徽章</li>
-                  <li><span className="mr-1 text-[#37d3ff]">✓</span>全部進階 AI 額度</li>
-                </ul>
+                  <ul className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>學習獎勵雙倍 Nova 與 XP</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>金色流動身分與專屬徽章</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>進階 AI 額度與較長對話</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>AI 題目分析與詳解教學</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>優先參加 PRO 每週小考</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>每週小考專屬排名標記</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>限定活動、挑戰與競賽</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>Novi PRO 表情與核心特效</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>錯題與學習報告進階洞察</li>
+                    <li><span className="mr-1 text-[#ffd98a]">✓</span>限定公告與專屬獎勵</li>
+                  </ul>
               )}
             </div>
             <div className="mt-3">

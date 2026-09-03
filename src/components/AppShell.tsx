@@ -55,6 +55,7 @@ const SIDE_NAV = [
 ];
 
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
+type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 
 export function AppShell({ user, children }: { user: ShellUser; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -72,6 +73,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [advice, setAdvice] = useState<string>("");
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
@@ -82,6 +85,11 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+    if (!standalone && !localStorage.getItem("sn-install-guide-seen")) setInstallGuideOpen(true);
+    const onInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
+    window.addEventListener("beforeinstallprompt", onInstall);
+    return () => window.removeEventListener("beforeinstallprompt", onInstall);
   }, []);
 
   useEffect(() => {
@@ -106,6 +114,17 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       cancelled = true;
       clearTimeout(timer);
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let timer: ReturnType<typeof setTimeout>;
+    const sync = () => {
+      window.dispatchEvent(new Event("studynova:sync"));
+      timer = setTimeout(sync, 10_000);
+    };
+    timer = setTimeout(sync, 10_000);
+    return () => clearTimeout(timer);
   }, []);
 
   const runSearch = useCallback(async () => {
@@ -355,6 +374,25 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               <Badge tone="muted">{kindLabel[r.kind] ?? r.kind}</Badge>
             </div>
           ))}
+        </div>
+      </Modal>
+
+      {/* First-login PWA and notification guide */}
+      <Modal open={installGuideOpen} onClose={() => { localStorage.setItem("sn-install-guide-seen", "1"); setInstallGuideOpen(false); }} title="先把 StudyNova 加到主畫面">
+        <div className="space-y-3 text-sm">
+          <p className="text-muted">為了即時收到限定功能、每週小考與 Novi 提醒，請先開啟通知，再把網站安裝到手機主畫面。</p>
+          <Button full onClick={async () => {
+            if (installPrompt) { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); }
+            else toast.push("info", "請使用瀏覽器選單的「加入主畫面／安裝應用程式」");
+          }}>安裝到主畫面</Button>
+          <Button full variant="ghost" onClick={async () => {
+            if ("Notification" in window) { const permission = await Notification.requestPermission(); toast.push(permission === "granted" ? "success" : "info", permission === "granted" ? "通知已開啟" : "請在瀏覽器設定允許通知"); }
+          }}>開啟通知</Button>
+          <div className="grid gap-2 text-xs text-muted sm:grid-cols-2">
+            <div className="glass-soft p-3"><p className="font-semibold text-white">iPhone／iPad</p><p className="mt-1">使用 Safari 開啟網站 → 點底部分享按鈕 → 選「加入主畫面」→ 按「加入」。請先在 iOS 設定 → 通知 → Safari 開啟通知。</p></div>
+            <div className="glass-soft p-3"><p className="font-semibold text-white">Android</p><p className="mt-1">使用 Chrome 開啟網站 → 點右上角 ⋮ → 選「安裝應用程式」或「加到主畫面」→ 確認安裝。出現通知提示時請選「允許」。</p></div>
+          </div>
+          <p className="text-[11px] text-muted">你也可以稍後在個人設定重新查看教學。網站會在開啟期間每 10 秒同步公告與通知。</p>
         </div>
       </Modal>
 

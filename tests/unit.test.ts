@@ -14,7 +14,7 @@ import {
 } from "@/server/core";
 import { fail, deriveErrorCode, lookupErrorCode, CATALOG_LIST, ERROR_CATALOG } from "@/server/errors";
 import { extractJson } from "@/server/ai";
-import { isWeekOpen } from "@/server/queue";
+import { CRON_TASKS, isWeekOpen } from "@/server/queue";
 
 describe("password hashing", () => {
   it("verifies the correct password and rejects wrong ones", () => {
@@ -78,6 +78,16 @@ describe("trend detection", () => {
     expect(trend([68, 75, 81, 84])).toBe("up");
     expect(trend([90, 80, 70])).toBe("down");
     expect(trend([60, 90, 55, 92])).toBe("volatile");
+  });
+});
+
+describe("scheduled learning reminders", () => {
+  it("exposes the inactive reminder task", () => {
+    expect(CRON_TASKS.some((task) => task.task === "inactive_reminder")).toBe(true);
+  });
+
+  it("keeps weekly exam scheduling deterministic", () => {
+    expect(isWeekOpen({ status: "published", openMode: "schedule", openDays: [1], openTime: "00:00", closeTime: "23:59", openFrom: null, openUntil: null })).toBe(false);
   });
 });
 

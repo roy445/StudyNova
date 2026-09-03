@@ -43,6 +43,7 @@ export default function AdminWeeklyPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({ weekCode: "", title: "", note: "" });
   const [busy, setBusy] = useState(false);
+  const [highlightJson, setHighlightJson] = useState("{}");
   const [draftEdit, setDraftEdit] = useState<string | null>(null);
   const [draftJson, setDraftJson] = useState("");
   const stats = useApi<{ participants: number; completionRate: number; average: number; highest: number; lowest: number; reciteRate: number; results: Array<{ novaId: string; displayName: string; score: number; correct: number; total: number; recite: boolean }>; commonWrong: Array<{ id: string; order: number; stem: string; wrongCount: number }> }>(
@@ -53,7 +54,9 @@ export default function AdminWeeklyPage() {
   async function loadDetail(id: string) {
     setLoading(true);
     try {
-      setDetail(await apiGet<Detail>(`/admin/weekly/${id}`));
+      const next = await apiGet<Detail>(`/admin/weekly/${id}`);
+      setDetail(next);
+      setHighlightJson(JSON.stringify(next.week.highlightMap ?? {}, null, 2));
     } catch (err) {
       toast.push("error", errorMessage(err));
     } finally {
@@ -127,7 +130,14 @@ export default function AdminWeeklyPage() {
       {loading && <Card><Skeleton lines={5} /></Card>}
 
       {detail && !loading && (
-        <Card title={`${detail.week.title}（${detail.week.weekCode}）`} subtitle={detail.week.note}>
+        <Card title={`${detail.week.title}（${detail.week.weekCode}）`} subtitle={`${detail.week.note}・封存只會下架，作答與歷史紀錄會保留，可再重新開放。`}>
+          <div className="mb-3 flex justify-end">
+            <Button size="sm" variant="ghost" onClick={async () => {
+              if (!confirm("確定要封存這個每週小考嗎？歷史作答會保留，之後仍可重新開放。")) return;
+              try { await apiDelete(`/admin/weekly/${detail.week.id}`); toast.push("success", "已封存每週小考，歷史紀錄保留"); setActiveId(null); setDetail(null); await list.reload(); }
+              catch (err) { toast.push("error", errorMessage(err)); }
+            }}>封存這個週次</Button>
+          </div>
           <Tabs
             tabs={[
               { key: "files", label: "考卷／答案", icon: "▧" },
@@ -452,6 +462,15 @@ export default function AdminWeeklyPage() {
                 </div>
                 <Field label="Nova 入場費">
                   <Input type="number" min={0} defaultValue={detail.week.novaCost} onBlur={(e) => patchWeek({ novaCost: Number(e.target.value) })} />
+                </Field>
+                <Field label="螢光筆語意（JSON，可彈性自訂）" hint={'例如 {"blue":"句子","pink":"單字"}；留空 {} 時，AI 會直接分析文字，不套用固定意義。'}>
+                  <div>
+                    <Textarea value={highlightJson} onChange={(e) => setHighlightJson(e.target.value)} className="min-h-[120px] font-mono text-xs" />
+                    <Button size="sm" variant="ghost" className="mt-2" onClick={async () => {
+                      try { await patchWeek({ highlightMap: JSON.parse(highlightJson) }); }
+                      catch { toast.push("error", "螢光筆語意必須是有效 JSON"); }
+                    }}>儲存螢光筆語意</Button>
+                  </div>
                 </Field>
                 <Field label="限定 Nova Pro">
                   <Select value={String(detail.week.proOnly)} onChange={(e) => patchWeek({ proOnly: e.target.value === "true" })}>

@@ -43,6 +43,7 @@ export default function AdminOpsPage() {
 
   const [annOpen, setAnnOpen] = useState(false);
   const [annForm, setAnnForm] = useState({ title: "", body: "", audience: "all", pinned: false, marquee: false, notify: true, push: false });
+  const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard" });
   const [actOpen, setActOpen] = useState(false);
   const [actForm, setActForm] = useState({
     title: "",
@@ -293,6 +294,29 @@ export default function AdminOpsPage() {
       )}
 
       {tab === "ann" && (
+        <>
+        <Card title="⌁ 推播測試" subtitle="只會送給目前登入的管理員，先確認瀏覽器通知與 VAPID 設定。">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Field label="測試範例">
+              <Select value="custom" onChange={(e) => {
+                const examples: Record<string, typeof pushForm> = {
+                  custom: pushForm,
+                  welcome: { title: "🌟 Novi 歡迎你回來", message: "今天先完成 10 個單字，讓進步從一小步開始！", link: "/dashboard" },
+                  inactive: { title: "🐦 Novi 的小提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/study" },
+                  weekly: { title: "🏁 每週小考開放", message: "準備好和好友比一場了嗎？現在就來挑戰！", link: "/weekly" },
+                  reward: { title: "🎁 限定獎勵解鎖", message: "完成今日任務即可領取 Nova 與 XP，快來看看！", link: "/profile?tab=nova" },
+                };
+                setPushForm(examples[e.target.value] ?? examples.custom);
+              }}>
+                <option value="custom">自訂內容</option><option value="welcome">歡迎回來</option><option value="inactive">久未登入</option><option value="weekly">每週小考</option><option value="reward">限定獎勵</option>
+              </Select>
+            </Field>
+            <Field label="標題"><Input value={pushForm.title} onChange={(e) => setPushForm({ ...pushForm, title: e.target.value })} /></Field>
+            <Field label="跳轉連結"><Input value={pushForm.link} onChange={(e) => setPushForm({ ...pushForm, link: e.target.value })} /></Field>
+          </div>
+          <Field label="通知內容"><Textarea value={pushForm.message} onChange={(e) => setPushForm({ ...pushForm, message: e.target.value })} /></Field>
+          <Button size="sm" className="mt-2" onClick={async () => { try { await apiPost("/admin/push/test", pushForm); toast.push("success", "測試推播已送出"); } catch (err) { toast.push("error", errorMessage(err)); } }}>立即測試推播</Button>
+        </Card>
         <Card title="▤ 公告" action={<Button size="sm" onClick={() => setAnnOpen(true)}>＋ 發布公告</Button>}>
           {anns.loading && <Skeleton lines={3} />}
           <div className="space-y-2">
@@ -330,10 +354,10 @@ export default function AdminOpsPage() {
               </div>
             ))}
             {!anns.loading && !anns.data?.announcements.length && <EmptyState icon="▤" title="尚未發布公告" />}
-          </div>
+                    </div>
         </Card>
+        </>
       )}
-
       {tab === "act" && (
         <Card title="◇ 活動" action={<Button size="sm" onClick={() => setActOpen(true)}>＋ 建立活動</Button>}>
           {acts.loading && <Skeleton lines={3} />}
