@@ -93,12 +93,12 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
     };
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!path) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     setErrorCode(null);
     try {
@@ -111,7 +111,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
         setErrorCode(info.code);
       }
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && !silent) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, ...deps]);
@@ -122,7 +122,12 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const refreshFromShell = () => { void load(); };
+    const refreshFromShell = () => {
+      if (document.visibilityState !== "visible") return;
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
+      void load(true);
+    };
     window.addEventListener("studynova:sync", refreshFromShell);
     return () => window.removeEventListener("studynova:sync", refreshFromShell);
   }, [load]);
