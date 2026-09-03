@@ -6,9 +6,9 @@
 
 ## CRON／Heartbeat
 
-StudyNova 的排程回呼路徑必須使用 `/api/scheduled/` 開頭，排程格式是六欄 UTC：`秒 分 時 日 月 星期`。例如每天台灣時間 08:00 是 `0 0 0 * * *`，因為台灣為 UTC+8；每天 UTC 00:00 會在台灣時間 08:00 觸發。
+StudyNova 的排程回呼端點是 `/api/v1/system/cron`，必須以 `POST` 呼叫並帶上 `x-cron-secret` Header。cron-job.org 可直接選擇 Asia/Taipei 時區；若使用 UTC，台灣時間需減 8 小時。每次呼叫的 `uid` 請使用 cron-job.org 的 `%cjo:unixtime%` 或 `%cjo:uuid4%` 變數，避免系統冪等去重把後續執行誤判成重複。
 
-建立或修改排程前，流程是：先把回呼程式推送並建立 checkpoint，再部署正式網站，確認正式網址可連線後才建立排程。不要在本機開發網址上建立排程，也不要在程式內使用 `setInterval`、`node-cron` 或常駐記憶體計時器；排程要由平台觸發 `/api/scheduled/*` 回呼。
+建立或修改排程前，流程是：先把回呼程式推送並建立 checkpoint，再部署正式網站，確認正式網址可連線後才建立排程。不要在本機開發網址上建立排程，也不要在程式內使用 `setInterval`、`node-cron` 或常駐記憶體計時器；排程要由 cron-job.org 觸發 `/api/v1/system/cron`。
 
 排程回呼必須驗證排程身分、使用平台提供的 task UID 查找資料，並讓工作具備冪等性。平台重試時不得重複發送獎勵、通知或建立資料。
 
