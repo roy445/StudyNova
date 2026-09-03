@@ -7,17 +7,19 @@ import {
   ocrDocuments,
   ocrPages,
   notes,
+  userVocabularies,
   voiceRecords,
   voiceTranscripts,
   voiceAnalysis,
   tasks,
   questions,
+  quizzes,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, sanitizeText, slugToken, todayStr, fingerprint } from "../core";
 import { putObject, readObject, deleteObject, signObjectUrl } from "../storage";
 import { consumeFeature, grantLearningReward, progressDailyTask, bumpAchievement } from "../economy";
-import { runAi, runAiJson, aiConfigured } from "../ai";
+import { runAi, runAiJson, aiConfigured, type AiPart } from "../ai";
 import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
 
@@ -303,6 +305,25 @@ export const contentRoutes: RouteDef[] = [
   }),
 
   route({
+    method: "GET",
+    path: "/ocr/search",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const q = (ctx.query.get("q") ?? "").trim().slice(0, 120);
+      if (!q) return { documents: [] };
+      const rows = await db.execute(sql`
+        select id, title, subject, status, combined_text, created_at, updated_at,
+          case when ai_result ? 'visionAnalysis' then '影像理解' when ai_result ? 'visionPreflight' then '影像預檢' else 'OCR' end as analysis_kind
+        from ocr_documents
+        where user_id = ${user.userId}
+          and (title ilike ${`%${q}%`} or combined_text ilike ${`%${q}%`} or coalesce(ai_result::text, '') ilike ${`%${q}%`})
+        order by updated_at desc limit 50
+      `);
+      return { documents: rows.rows };
+    },
+  }),
+  route({
     method: "POST",
     path: "/ocr/documents",
     auth: "user",
@@ -427,20 +448,25 @@ export const contentRoutes: RouteDef[] = [
           const hints = page.highlights.length
             ? `圖片上的螢光筆標記區域（相對座標 0-1）：${JSON.stringify(page.highlights)}。請特別標示這些區域內的文字，於輸出時以 [顏色] 前綴標註。`
             : "";
-          const res = await runAi({
-            feature: "ocr",
-            userId: user.userId,
-            system:
-              "你是高精度 OCR 引擎，擅長辨識中文課本、講義、考卷、手寫筆記、黑板、雜誌、表格與數學公式。" +
-              "完整輸出所有可見文字，保留題號與排版，公式用 LaTeX。只輸出文字內容。",
-            parts: [
-              { kind: "text", text: `請辨識這張圖片的所有文字。${hints}` },
-              { kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") },
-            ],
-            temperature: 0.1,
-            maxOutputTokens: 3000,
-          });
-          await db.update(ocrPages).set({ text: sanitizeText(res.text), status: "completed", confidence: 0.9 }).where(eq(ocrPages.id, page.id));
+          const { data: ocrData, meta: ocrMeta } = await runAiJson<{ text: string; blocks: Array<{ content: string; x: number; y: number; width: number; height: number; confidence: number; page: number; line: number; block: number }> }>(
+            {
+              feature: "ocr",
+              userId: user.userId,
+              system:
+                "你是高精度教育 OCR 引擎，擅長中文課本、講義、考卷、手寫筆記、表格與數學公式。請回傳 JSON，不得猜測看不清楚的文字；不確定內容請在文字加上 [不確定:候選]。公式用 LaTeX。JSON 形狀：{text:string,blocks:[{content,x,y,width,height,confidence,page,line,block}]}。座標必須是圖片相對比例 0-1；每段至少一個 block；page 使用圖片頁序 1；line 與 block 從 1 開始。" + hints,
+              parts: [
+                { kind: "text", text: "辨識圖片全部可見文字，保留題號、選項、段落、表格、公式與標點。" },
+                { kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") },
+              ],
+              temperature: 0.1,
+              maxOutputTokens: 5000,
+            },
+            { text: "", blocks: [] },
+          );
+          const normalizedBlocks = Array.isArray(ocrData.blocks) ? ocrData.blocks.filter((b) => b && typeof b.content === "string").map((b) => ({ ...b, x: Math.max(0, Math.min(1, Number(b.x) || 0)), y: Math.max(0, Math.min(1, Number(b.y) || 0)), width: Math.max(0, Math.min(1, Number(b.width) || 0)), height: Math.max(0, Math.min(1, Number(b.height) || 0)), confidence: Math.max(0, Math.min(1, Number(b.confidence) || 0)), page: Number(b.page) || 1, line: Number(b.line) || 1, block: Number(b.block) || 1 })) : [];
+          const ocrText = sanitizeText(ocrData.text || normalizedBlocks.map((b) => b.content).join("\n"));
+          const ocrConfidence = normalizedBlocks.length ? normalizedBlocks.reduce((sum, b) => sum + b.confidence, 0) / normalizedBlocks.length : ocrMeta.outputTokens > 0 ? 0.5 : 0;
+          await db.update(ocrPages).set({ text: ocrText, blocks: normalizedBlocks, status: "completed", confidence: ocrConfidence }).where(eq(ocrPages.id, page.id));
           results.push({ pageId: page.id, ok: true });
         } catch (err) {
           await db.update(ocrPages).set({ status: "failed" }).where(eq(ocrPages.id, page.id));
@@ -459,6 +485,145 @@ export const contentRoutes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "POST",
+    path: "/ocr/documents/:id/vision-analysis",
+    auth: "user",
+    rate: { limit: 20, windowSec: 3600 },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(
+        z.object({
+          stage: z.enum(["preflight", "analyze"]),
+          pageIds: z.array(z.string().uuid()).max(20).optional(),
+          itemIds: z.array(z.string().max(80)).max(100).optional(),
+          force: z.boolean().optional(),
+        }),
+      );
+      const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
+      if (!doc) throw notFound("找不到辨識文件");
+      if (doc.userId !== user.userId) throw forbidden();
+      const allPages = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
+      const pages = body.pageIds?.length ? allPages.filter((p) => body.pageIds!.includes(p.id)) : allPages;
+      if (!pages.length) throw fail("REQ_NO_FILE", { message: "請先選擇至少一張圖片" });
+      if (pages.length > 8) throw fail("SYS_CONFLICT", { message: "一次最多分析 8 張圖片，請分批處理" });
+      const imageParts: AiPart[] = [];
+      const pageContext: string[] = [];
+      for (const page of pages) {
+        if (!page.objectId) continue;
+        const obj = await readObject(page.objectId);
+        let ocrText = page.text;
+        if (!ocrText.trim()) {
+          const ocr = await runAi({
+            feature: "camera_ocr_stage",
+            userId: user.userId,
+            system: "你是高精度教育 OCR。辨識圖片中可見文字並保留題號、段落、選項、公式與標點；數學公式請使用 LaTeX；無法確認的字以 [不確定:候選] 標記，不要猜測。只輸出文字。",
+            parts: [{ kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") }],
+            maxOutputTokens: 5000,
+            temperature: 0.05,
+          });
+          ocrText = sanitizeText(ocr.text);
+          await db.update(ocrPages).set({ text: ocrText, status: "completed", confidence: 0.85 }).where(eq(ocrPages.id, page.id));
+        }
+        imageParts.push({ kind: "text", text: `\n--- PAGE ${page.orderIndex + 1} / pageId=${page.id} ---\n既有 OCR：${ocrText || "（影像未取得文字）"}` });
+        imageParts.push({ kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") });
+        pageContext.push(`pageId=${page.id}; page=${page.orderIndex + 1}; OCR=${ocrText.slice(0, 8000)}`);
+      }
+      if (!imageParts.length) throw fail("AI_OCR_EMPTY", { message: "圖片內容無法讀取，請重新上傳" });
+      const studentProfile = await db.execute(sql`select school_level, grade, english_level, favorite_subjects from user_settings where user_id = ${user.userId} limit 1`);
+      const profile = (studentProfile.rows[0] ?? {}) as { school_level?: string; grade?: number; english_level?: string; favorite_subjects?: string[] };
+      const level = profile.school_level === "senior" ? "高中" : "國中";
+      if (body.stage === "preflight") {
+        const { data } = await runAiJson<Record<string, unknown>>(
+          {
+            feature: "camera_vision_preflight",
+            userId: user.userId,
+            system: `你是 StudyNova 的影像品質與版面理解模型。你必須真的查看每張圖片，不可以只依 OCR 猜測。請輸出繁體中文 JSON，不得補造圖片中不存在的內容。學生程度：${level}${profile.grade ?? ""}年級。每頁回傳 quality（resolution、blur、brightness、contrast、glare、skew、textSize、occlusion、shadow、background、readability，皆為 good|warning|poor|unknown）、issues（實際原因）、canAnalyze（boolean）、contentTypes（題目／單字／英文句子／中文句子／文章／數學／自然／表格／圖表／圖形／手寫筆記／考卷／講義／混合內容／無法判斷）、detectedCounts（questions、vocabulary、sentences）與 items（每個題目或語言區塊的 id、kind、label、pageIds、bbox 0-1、confidence）。若不確定，confidence 必須降低並在 issues 或 notes 說明。JSON 形狀：{pages:[...], totalItems:number, notes:string[]}.`,
+            parts: imageParts,
+            maxOutputTokens: 6000,
+            temperature: 0.1,
+          },
+          { pages: [], totalItems: 0, notes: ["模型未回傳預檢結果"] },
+        );
+        await db.update(ocrDocuments).set({ aiResult: { ...(doc.aiResult ?? {}), visionPreflight: data }, updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
+        return { stage: body.stage, preflight: data, pages: pages.map((p) => ({ id: p.id, orderIndex: p.orderIndex, imageUrl: p.objectId ? signObjectUrl(p.objectId, user.userId) : null })) };
+      }
+      const preflight = (doc.aiResult as Record<string, unknown> | null)?.visionPreflight;
+      if (!body.force && !preflight) throw fail("SYS_CONFLICT", { message: "請先執行圖片品質檢查" });
+      const selected = body.itemIds?.length ? `只分析這些項目：${body.itemIds.join(", ")}` : "分析所有偵測到的項目";
+      const { data } = await runAiJson<Record<string, unknown>>(
+        {
+          feature: "camera_vision_analysis",
+          userId: user.userId,
+          system: `你是 StudyNova 的台灣國高中教學助教與 Vision 分析器。你必須同時查看原圖與 OCR，原圖優先；圖片中的圖形、表格、公式、附註、作答要求都屬於內容。${selected}。學生程度為${level}${profile.grade ?? ""}年級，英文程度為${profile.english_level ?? "未知"}。跨頁時請將文章頁與後續問題頁建立 sourcePageIds 關聯，若文章找不到答案，明確寫「文章中沒有找到足夠資訊確認答案」，不得推測。\n\n請只輸出 JSON，形狀如下：{\n  "documentSummary": "",\n  "contentTypes": [],\n  "uncertainties": [{"location":"pageId/itemId","text":"","alternatives":[]}],\n  "items": [{\n    "id":"stable-id", "kind":"question|vocabulary|sentence|article|note", "label":"", "sourcePageIds":[], "bbox":{"x":0,"y":0,"w":1,"h":1}, "confidence":0, "rawText":"完整原文", "subject":"國文|英文|數學|自然|社會|其他", "type":"選擇題|多選題|填空題|計算題|閱讀理解|文法題|翻譯題|配合題|證明題|應用題|實驗題|單字|句子|文章|手寫筆記|其他", "difficulty":"基礎|中等|困難|不確定", "elements":{"questionNumber":"","prompt":"","options":[{"label":"A","text":"","isCorrect":false,"confidence":0,"analysis":""}],"figures":[{"description":"","role":"題目必要圖片或圖表","observations":[]}],"tables":[],"formulas":[],"units":[],"annotations":[],"requirements":""}, "answer":{"value":"","certainty":"confirmed|uncertain|not-found","given":"","asked":"","concept":"","steps":[],"finalReason":""}, "language":{"translationNatural":"","translationStructural":"","grammar":[{"name":"","evidence":"","explanation":""}],"clauses":[{"text":"","role":"","explanation":""}],"mainVerb":"","subject":"","object":"","phrases":[{"phrase":"","meaning":"","pattern":"","example":"","usage":""}],"tokens":[{"surface":"","lemma":"","partOfSpeech":"","meaningInContext":"","tense":"","pronunciation":""}],"vocabulary":[{"word":"","partOfSpeech":"","meanings":[{"meaning":"","context":""}],"phonetic":"","uk":"","us":"","collocations":[],"synonyms":[],"nearSynonyms":[],"antonyms":[],"confusables":[{"word":"","difference":""}],"root":{"text":"","reliable":false},"learningAssociation":"","example":"","exampleZh":""}]}, "article":{"summary":"","paragraphs":[{"mainIdea":"","keyInformation":[],"keyVocabulary":[],"keyPatterns":[]}],"importantVocabulary":[],"importantPatterns":[]}, "chinese":{"words":[],"idioms":[],"partOfSpeech":[],"paragraphMeaning":"","theme":"","rhetoric":[{"device":"","evidence":"","certainty":"confirmed|possible","explanation":""}],"classical":{"original":"","vernacular":"","words":[],"sentences":[],"people":[],"events":[],"theme":"","examPoints":[]}}, "handwriting":{"originalText":"","ocrText":"","organizedNotes":"","summary":"","possibleErrors":[{"text":"","possibilities":[],"needsConfirmation":true}]}}],\n  "recommendedActions":[]\n}. 空陣列代表沒有該類內容；不要為了完整而捏造資料。`,
+          parts: [
+            { kind: "text", text: `頁面脈絡：\n${pageContext.join("\n")}\n\n預檢結果：${JSON.stringify(preflight ?? {})}` },
+            ...imageParts,
+          ],
+          maxOutputTokens: 14000,
+          temperature: 0.15,
+        },
+        { documentSummary: "", contentTypes: [], uncertainties: [{ location: "", text: "未取得分析結果", alternatives: [] }], items: [], recommendedActions: [] },
+      );
+      await db.update(ocrDocuments).set({ aiResult: { ...(doc.aiResult ?? {}), visionAnalysis: data }, updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
+      await recordStudy({ userId: user.userId, kind: "camera_analysis", subject: doc.subject, minutes: 3, detail: { documentId: doc.id, itemCount: Array.isArray((data as { items?: unknown[] }).items) ? (data as { items: unknown[] }).items.length : 0 } });
+      return { stage: body.stage, analysis: data };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/ocr/documents/:id/learning-action",
+    auth: "user",
+    rate: { limit: 80, windowSec: 3600 },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ action: z.enum(["vocabulary", "note", "question", "quiz"]), items: z.array(z.record(z.string(), z.unknown())).min(1).max(100) }));
+      const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
+      if (!doc) throw notFound("找不到辨識文件");
+      if (doc.userId !== user.userId) throw forbidden();
+      const pages = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
+      const sourceObjectId = pages.find((p) => p.objectId)?.objectId ?? null;
+      let saved = 0;
+      let duplicates = 0;
+      const quizQuestionIds: string[] = [];
+      for (const item of body.items) {
+        const sourcePageIds = Array.isArray(item.sourcePageIds) ? item.sourcePageIds.filter((x): x is string => typeof x === "string") : [];
+        const sourcePage = pages.find((p) => sourcePageIds.includes(p.id));
+        if (body.action === "vocabulary") {
+          const word = String(item.word ?? item.rawText ?? "").trim().slice(0, 200);
+          if (!word) continue;
+          const language = (item.language && typeof item.language === "object" ? item.language : {}) as Record<string, unknown>;
+          const meanings = Array.isArray(item.meanings) ? item.meanings : Array.isArray(language.meanings) ? language.meanings : [];
+          const meaning = String(item.meaning ?? (meanings[0] && typeof meanings[0] === "object" ? (meanings[0] as Record<string, unknown>).meaning : "") ?? "").slice(0, 1000);
+          const normalizedWord = word.toLocaleLowerCase("en-US");
+          const inserted = await db.insert(userVocabularies).values({ userId: user.userId, word, normalizedWord, partOfSpeech: String(item.partOfSpeech ?? "").slice(0, 80), meaning, phonetic: String(item.phonetic ?? "").slice(0, 160), example: String(item.example ?? "").slice(0, 1000), exampleZh: String(item.exampleZh ?? "").slice(0, 1000), analysis: item, sourceDocumentId: doc.id, sourceObjectId: sourcePage?.objectId ?? sourceObjectId }).onConflictDoNothing().returning({ id: userVocabularies.id });
+          if (inserted.length) saved += 1; else duplicates += 1;
+        } else if (body.action === "note") {
+          const title = String(item.label ?? item.title ?? `鏡頭分析 ${new Date().toLocaleDateString("zh-TW")}`).slice(0, 120);
+          const bodyText = String(item.organizedNotes ?? item.summary ?? item.rawText ?? JSON.stringify(item)).slice(0, 30000);
+          await db.insert(notes).values({ userId: user.userId, title, subject: String(item.subject ?? doc.subject).slice(0, 20), body: bodyText, source: "camera_analysis" });
+          saved += 1;
+        } else {
+          const stem = String(item.rawText ?? item.prompt ?? "").trim().slice(0, 10000);
+          if (!stem) continue;
+          const answer = (item.answer && typeof item.answer === "object" ? item.answer : {}) as Record<string, unknown>;
+          const elements = (item.elements && typeof item.elements === "object" ? item.elements : {}) as Record<string, unknown>;
+          const options = Array.isArray(elements.options) ? elements.options.map((o) => typeof o === "object" && o ? String((o as Record<string, unknown>).text ?? "") : String(o)).filter(Boolean).slice(0, 12) : [];
+          const answerValues = answer.value ? [String(answer.value).slice(0, 500)] : [];
+          const inserted = await db.insert(questions).values({ ownerId: user.userId, origin: "user", subject: String(item.subject ?? doc.subject).slice(0, 20), topic: String(item.type ?? "鏡頭分析").slice(0, 120), level: "junior", difficulty: String(item.difficulty ?? "不確定").slice(0, 20), type: String(item.type ?? "short").slice(0, 30), stem, options, answer: answerValues, explanation: String(answer.finalReason ?? (Array.isArray(answer.steps) ? answer.steps.join("\n") : "")).slice(0, 20000), fingerprint: fingerprint(`${user.userId}:camera:${stem}`) }).onConflictDoNothing().returning({ id: questions.id });
+          if (inserted.length) {
+            saved += 1;
+            quizQuestionIds.push(inserted[0].id);
+          } else duplicates += 1;
+        }
+      }
+      if (body.action === "quiz" && quizQuestionIds.length) {
+        const quizRows = await db.insert(quizzes).values({ userId: user.userId, title: `鏡頭分析練習・${todayStr()}`, subject: doc.subject, source: "camera_analysis", questionIds: quizQuestionIds, visibility: "private" }).returning({ id: quizzes.id, title: quizzes.title });
+        return { action: body.action, saved, duplicates, quiz: quizRows[0], sourceDocumentId: doc.id };
+      }
+      return { action: body.action, saved, duplicates, sourceDocumentId: doc.id };
+    },
+  }),
   route({
     method: "POST",
     path: "/ocr/documents/:id/transform",

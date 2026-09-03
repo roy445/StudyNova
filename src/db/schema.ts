@@ -238,6 +238,7 @@ export const ocrPages = pgTable(
     crop: jsonb("crop").$type<{ x: number; y: number; w: number; h: number } | null>(),
     highlights: jsonb("highlights").$type<Array<{ color: string; x: number; y: number; w: number; h: number }>>().notNull().default([]),
     text: text("text").notNull().default(""),
+    blocks: jsonb("blocks").$type<Array<{ content: string; x: number; y: number; width: number; height: number; confidence: number; page: number; line: number; block: number }>>().notNull().default([]),
     confidence: real("confidence").notNull().default(0),
     status: text("status").notNull().default("pending"),
   },
@@ -356,6 +357,30 @@ export const wrongQuestions = pgTable(
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("wq_user_question_uq").on(t.userId, t.questionId), index("wq_user_next_idx").on(t.userId, t.nextReviewAt)],
+);
+
+export const userVocabularies = pgTable(
+  "user_vocabularies",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    word: text("word").notNull(),
+    normalizedWord: text("normalized_word").notNull(),
+    partOfSpeech: text("part_of_speech").notNull().default(""),
+    meaning: text("meaning").notNull().default(""),
+    phonetic: text("phonetic").notNull().default(""),
+    example: text("example").notNull().default(""),
+    exampleZh: text("example_zh").notNull().default(""),
+    analysis: jsonb("analysis").$type<Record<string, unknown>>().notNull().default({}),
+    sourceDocumentId: uuid("source_document_id").references(() => ocrDocuments.id, { onDelete: "set null" }),
+    sourceObjectId: uuid("source_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    familiarity: integer("familiarity").notNull().default(0),
+    reviewCount: integer("review_count").notNull().default(0),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("user_vocabularies_word_uq").on(t.userId, t.normalizedWord), index("user_vocabularies_user_idx").on(t.userId, t.updatedAt)],
 );
 
 /* -------------------------------------------------------- PLAN / STUDY */

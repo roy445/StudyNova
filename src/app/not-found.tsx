@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { NoviAvatar } from "@/components/brand";
-
 export const metadata = { title: "找不到頁面" };
 
 export default function NotFound() {
   return (
     <div className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="glass anim-pop w-full max-w-md p-6 text-center">
-        <div className="flex justify-center">
-          <NoviAvatar size={88} state="thinking" />
+        <div className="mx-auto grid h-22 w-22 place-items-center rounded-full border-2 border-[#7c5cff]/70 bg-[#10172d] text-3xl shadow-[0_0_42px_rgba(124,92,255,0.35)]" aria-hidden>
+          ◌
         </div>
         <h1 className="mt-3 text-lg font-bold">找不到這個頁面</h1>
         <p className="mt-1 text-sm text-muted">連結可能已失效或輸入錯誤。</p>

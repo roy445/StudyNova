@@ -5,4 +5,5 @@ out/
 .env.*
 !.env.example
 coverage/
+*.tsbuildinfo
 .DS_Store
