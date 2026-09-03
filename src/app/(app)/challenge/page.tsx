@@ -28,6 +28,7 @@ function ChallengeInner() {
   const activities = useApi<{ live: Array<{ id: string; title: string; cover: string; description: string; goalValue: number; progress: number; rewardNova: number; rewardXp: number; endsAt: string }>; upcoming: Array<{ id: string; title: string; startsAt: string }> }>("/activities");
   const board = useApi<{ weekly: Array<{ userId: string; displayName: string; novaId: string; minutes: number; level: number | null }>; xp: Array<{ userId: string; displayName: string; xp: number; level: number }>; me: string }>("/leaderboard?scope=global");
   const quizzes = useApi<{ quizzes: Array<{ id: string; title: string }> }>("/quizzes");
+  const weekly = useApi<{ weeks: Array<{ id: string; weekCode: string; title: string; open: boolean; proOnly: boolean }> }>("/weekly");
   const vocabulary = useApi<{ tracks: Array<{ id: "junior" | "senior"; label: string; description: string; count: number }> }>("/words/catalog");
   const [vocabTrack, setVocabTrack] = useState<"junior" | "senior">("junior");
 
@@ -424,11 +425,22 @@ function ChallengeInner() {
             <Select value={cForm.kind} onChange={(e) => setCForm({ ...cForm, kind: e.target.value })}>
               <option value="word">單字挑戰</option>
               <option value="quiz">測驗挑戰</option>
+              <option value="weekly">每週小考競賽</option>
             </Select>
           </Field>
           <Field label="標題" required>
             <Input value={cForm.title} onChange={(e) => setCForm({ ...cForm, title: e.target.value })} placeholder="英文單字 1v1" />
           </Field>
+          {cForm.kind === "weekly" && (
+            <Field label="選擇每週小考">
+              <Select value={cForm.quizId} onChange={(e) => setCForm({ ...cForm, quizId: e.target.value })}>
+                <option value="">請選擇…</option>
+                {weekly.data?.weeks.filter((w) => w.open).map((w) => (
+                  <option key={w.id} value={w.id}>{w.weekCode}｜{w.title}{w.proOnly ? "（PRO）" : ""}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
           {cForm.kind === "quiz" && (
             <Field label="選擇測驗">
               <Select value={cForm.quizId} onChange={(e) => setCForm({ ...cForm, quizId: e.target.value })}>
@@ -451,7 +463,8 @@ function ChallengeInner() {
                 await apiPost("/challenges", {
                   kind: cForm.kind,
                   title: cForm.title,
-                  quizId: cForm.quizId || null,
+                  quizId: cForm.kind === "quiz" ? cForm.quizId || null : null,
+                  weekId: cForm.kind === "weekly" ? cForm.quizId || null : null,
                   durationHours: cForm.durationHours,
                   inviteIds: friends.data?.friends.map((f) => f.userId) ?? [],
                 });

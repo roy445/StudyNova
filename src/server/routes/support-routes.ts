@@ -15,7 +15,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   bug: "功能異常 / Bug",
   ai: "AI 回應問題",
   account: "帳號與登入",
-  weekly: "每週補習小考",
+  weekly: "每週小考",
   content: "教材／題目內容錯誤",
   membership: "Nova / 會員 / 點數",
   suggestion: "功能建議",
@@ -113,7 +113,8 @@ export const routes: RouteDef[] = [
     auth: "optional",
     rate: { limit: 8, windowSec: 3600, key: "issue-create" },
     handler: async (ctx) => {
-      const form = await ctx.formData().catch(() => null);
+      let form: FormData | null = null;
+      try { form = await ctx.formData(); } catch { form = null; }
       let payload: Record<string, unknown>;
       let file: File | null = null;
 
@@ -124,7 +125,7 @@ export const routes: RouteDef[] = [
         const f = form.get("attachment");
         if (f instanceof File && f.size > 0) file = f;
       } else {
-        payload = {};
+        payload = (await ctx.req.json().catch(() => ({}))) as Record<string, unknown>;
       }
 
       const parsed = z

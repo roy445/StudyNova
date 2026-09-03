@@ -97,7 +97,7 @@ export default function AdminWeeklyPage() {
   return (
     <div className="space-y-4">
       <Card
-        title="▦ 每週補習小考管理"
+        title="▦ 每週小考管理"
         subtitle={`目前週次代碼：${list.data?.currentWeekCode ?? "-"}・開放時間可自由設定，不寫死星期六`}
         action={
           <Button size="sm" onClick={() => { setCreateOpen(true); setForm({ weekCode: list.data?.currentWeekCode ?? "", title: "", note: "" }); }}>

@@ -9,7 +9,7 @@ type Conversation = { id: string; title: string; mode: string; archived: boolean
 type Message = { id: string; conversationId?: string; role: string; content: string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
 
 const MODES = [
-  { key: "teacher", label: "老師模式" },
+  { key: "teacher", label: "學習教練模式" },
   { key: "solve", label: "解題模式" },
   { key: "hint", label: "提示模式" },
   { key: "exam", label: "考試模式" },

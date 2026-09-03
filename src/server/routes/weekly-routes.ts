@@ -213,7 +213,7 @@ export const routes: RouteDef[] = [
           userId: user.userId,
           nova: 20 + Math.round(score / 5),
           xp: 40 + correct * 5,
-          reason: "完成每週補習小考",
+          reason: "完成每週小考",
           idempotencyKey: `weekexam:${attempt.weekId}:${user.userId}`,
         });
         await recordStudy({ userId: user.userId, kind: "weekly_exam", subject: "英文", minutes: 15, detail: { weekId: attempt.weekId, score } });

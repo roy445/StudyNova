@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const NAV = [
   { href: "/admin", label: "總覽・使用者", icon: "◒" },
-  { href: "/admin/weekly", label: "每週補習小考", icon: "▤" },
+  { href: "/admin/weekly", label: "每週小考", icon: "▤" },
   { href: "/admin/ops", label: "AI・會員・內容", icon: "✦" },
   { href: "/admin/support", label: "問題回報", icon: "◇" },
   { href: "/admin/system", label: "系統・測試・匯出", icon: "▣" },

@@ -23,6 +23,16 @@ const NAV = [
   { href: "/profile", label: "我的", icon: "◎" },
 ];
 
+const PAGE_PROMPTS: Record<string, string> = {
+  "/dashboard": "今天想先從每日單字、今日小知識，還是讀書計畫開始？",
+  "/study": "需要我陪你複習錯題、練單字，或安排一段專注時間嗎？",
+  "/weekly": "這裡可以查看每週小考、單字與解析；要不要先看看本週重點？",
+  "/challenge": "想和好友比一場嗎？可以選每日單字或已開放的每週小考。",
+  "/grades": "我可以幫你看成績趨勢，找出下一個最值得補強的科目。",
+  "/ai": "把題目或不懂的地方交給我，我可以用更有趣的方式拆解。",
+  "/profile": "要調整 Novi、學習設定或查看 PRO 身分嗎？我可以陪你一起設定。",
+};
+
 const ENCOURAGEMENTS: Array<{ text: string; state: NoviState }> = [
   { text: "慢慢來也沒關係，今天完成一小步，就是在變強。", state: "cheer" },
   { text: "你不需要一次做到完美，只要比昨天多理解一點。", state: "happy" },
@@ -38,7 +48,7 @@ const SIDE_NAV = [
   { href: "/study", label: "學習中心", icon: "▦" },
   { href: "/ai", label: "Novi AI", icon: "✦" },
   { href: "/grades", label: "成績分析", icon: "⌁" },
-  { href: "/weekly", label: "每週補習小考", icon: "▤" },
+  { href: "/weekly", label: "每週小考", icon: "▤" },
   { href: "/challenge", label: "好友・活動", icon: "◇" },
   { href: "/report", label: "學習報告", icon: "◒" },
   { href: "/profile", label: "我的 Nova", icon: "◎" },
@@ -49,6 +59,7 @@ type SearchResult = { kind: string; id: string; title: string; subject?: string 
 export function AppShell({ user, children }: { user: ShellUser; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const pagePrompt = Object.entries(PAGE_PROMPTS).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "需要我協助你完成目前這一步嗎？";
   const toast = useToast();
   const [noviOpen, setNoviOpen] = useState(false);
   const [noviMinimized, setNoviMinimized] = useState(false);
@@ -260,13 +271,14 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Novi 小助理</p>
                 <p className="text-[11px] text-muted">Lv.{level}・你的專屬 AI 學習夥伴</p>
+                {!encouragement && <p className="mt-1 text-[11px] text-[#7dd3fc]">{pagePrompt}</p>}
               </div>
               <button onClick={() => setNoviOpen(false)} aria-label="收起 Novi" className="focus-ring rounded-lg px-1.5 text-muted hover:bg-white/10">
                 ✕
               </button>
             </div>
             <div className="mt-2 max-h-40 overflow-y-auto scroll-thin rounded-xl bg-black/25 p-2.5 text-xs leading-relaxed">
-              {adviceLoading ? <Skeleton lines={2} /> : encouragement?.text || advice || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
+              {adviceLoading ? <Skeleton lines={2} /> : encouragement?.text || advice || pagePrompt || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <Button size="sm" variant="ghost" onClick={() => askQuick("today_advice")}>

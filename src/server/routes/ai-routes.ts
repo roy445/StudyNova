@@ -23,7 +23,7 @@ import { subjectStats, buildPlan } from "./learning-routes";
 import { generateQuestions } from "./quiz-routes";
 
 const MODES = {
-  teacher: "老師模式：像一位有耐心的台灣國高中老師，先確認學生理解程度，再一步步教學。",
+  teacher: "學習教練模式：像一位有耐心的台灣國高中學習教練，先確認學生理解程度，再一步步教學。",
   solve: "解題模式：完整寫出解題步驟與最後答案，指出常見錯誤。",
   hint: "提示模式：絕對不要直接給答案，只給循序漸進的提示與引導問題。",
   exam: "考試模式：用考題口吻出題並在學生回答後給分與講評。",

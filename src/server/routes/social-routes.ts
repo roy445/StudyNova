@@ -17,6 +17,7 @@ import {
   activities,
   activityParticipants,
   quizzes,
+  weeklyExamWeeks,
   novaAccounts,
   announcements,
 } from "@/db/schema";
@@ -216,9 +217,10 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const body = await ctx.json(
         z.object({
-          kind: z.enum(["word", "quiz"]),
+          kind: z.enum(["word", "quiz", "weekly"]),
           title: z.string().min(1).max(60),
           quizId: z.string().uuid().nullable().optional(),
+          weekId: z.string().uuid().nullable().optional(),
           durationHours: z.number().int().min(1).max(168).default(48),
           inviteIds: z.array(z.string().uuid()).max(20).default([]),
         }),
@@ -229,6 +231,11 @@ export const routes: RouteDef[] = [
         if (!q || q.userId !== user.userId) throw fail("SOCIAL_QUIZ_NOT_OWNED");
         await db.update(quizzes).set({ visibility: "friends", shareSlug: q.shareSlug ?? slugToken(12) }).where(eq(quizzes.id, q.id));
       }
+      if (body.kind === "weekly") {
+        if (!body.weekId) throw badRequest("請選擇每週小考");
+        const week = (await db.select({ id: weeklyExamWeeks.id, title: weeklyExamWeeks.title, status: weeklyExamWeeks.status }).from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, body.weekId)).limit(1))[0];
+        if (!week || week.status !== "published") throw badRequest("這個每週小考目前不可參加");
+      }
       const rows = await db
         .insert(challenges)
         .values({
@@ -236,6 +243,7 @@ export const routes: RouteDef[] = [
           kind: body.kind,
           title: body.title,
           quizId: body.quizId ?? null,
+          payload: body.kind === "weekly" ? { weekId: body.weekId } : {},
           expiresAt: new Date(Date.now() + body.durationHours * 3600_000),
         })
         .returning();

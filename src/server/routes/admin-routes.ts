@@ -23,11 +23,12 @@ import {
   gradeRecords,
   weeklyExamResults,
   weeklyExamWeeks,
+  passwordResetTokens,
   studyRecords,
   platformSettings,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart } from "../core";
+import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
 import { adminLog, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { providerMetrics, recentAiFailures, aiConfigured } from "../ai";
@@ -42,6 +43,28 @@ function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "POST",
+    path: "/admin/password-reset-links",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ email: z.string().email().max(180), expiresMinutes: z.number().int().min(10).max(10080).default(60), reason: z.string().min(1).max(300) }));
+      const target = (await db.select({ userId: users.userId, displayName: users.displayName, email: users.email }).from(users).where(eq(users.email, body.email.toLowerCase().trim())).limit(1))[0];
+      if (!target) throw notFound("找不到這個 Email 對應的使用者");
+      const token = randomToken(32);
+      await db.insert(passwordResetTokens).values({ userId: target.userId, tokenHash: sha256(token), expiresAt: new Date(Date.now() + body.expiresMinutes * 60_000) });
+      await adminLog({ actorId: admin.userId, action: "password-reset-link.create", targetType: "user", targetId: target.userId, reason: body.reason, after: { expiresMinutes: body.expiresMinutes }, ip: ctx.ip });
+      const origin = new URL(ctx.req.url).origin;
+      const link = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
+      return {
+        link,
+        expiresAt: new Date(Date.now() + body.expiresMinutes * 60_000).toISOString(),
+        customerMessage: `${target.displayName} 您好，\n\n這裡是 StudyNova 客服。依您提出的「${body.reason}」，我們已為您建立密碼重設連結。請於 ${body.expiresMinutes} 分鐘內點擊下方連結完成設定；連結僅能使用一次。\n\n${link}\n\n若這不是您提出的申請，請忽略此信件。` ,
+      };
+    },
+  }),
+
   route({
     method: "GET",
     path: "/admin/overview",

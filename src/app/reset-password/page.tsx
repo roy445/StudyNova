@@ -13,11 +13,11 @@ function ResetInner() {
   const toast = useToast();
   const token = params.get("token") ?? "";
   const [email, setEmail] = useState("");
+  const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
-  const [devLink, setDevLink] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function requestReset(e: React.FormEvent) {
@@ -25,9 +25,8 @@ function ResetInner() {
     setError(null);
     setPending(true);
     try {
-      const res = await apiPost<{ message: string; devResetLink?: string }>("/auth/password/forgot", { email });
-      setSent(res.message);
-      if (res.devResetLink) setDevLink(res.devResetLink);
+      const res = await apiPost<{ ticketNo: string }>("/support/issues", { category: "account", severity: "normal", title: "密碼重設申請", description: reason, contactEmail: email, pageUrl: window.location.href });
+      setSent(`申請已送出，回報單號：${res.ticketNo}。管理員確認後會為你建立限時重設連結，請留意 Email 或客服回覆。`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -60,7 +59,7 @@ function ResetInner() {
       <div className="glass anim-pop relative z-10 w-full max-w-md p-6">
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
           <Wordmark size={20} />
-          <p className="text-xs text-muted">{token ? "設定新密碼" : "輸入 Email 取得重設連結（連結 30 分鐘內有效，只能使用一次）"}</p>
+          <p className="text-xs text-muted">{token ? "設定新密碼" : "提交密碼重設申請給管理員"}</p>
         </div>
 
         {token ? (
@@ -81,22 +80,18 @@ function ResetInner() {
             <Field label="Email" required>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
             </Field>
+            <Field label="申請原因" required hint="請提供至少 10 個字，方便管理員核對與處理">
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="例如：忘記密碼，無法登入帳號" minLength={10} required />
+            </Field>
             {error && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{error}</p>}
             {sent && (
               <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
                 <p>{sent}</p>
-                {devLink && (
-                  <p className="mt-1">
-                    尚未設定 SMTP，重設連結：
-                    <Link href={devLink} className="ml-1 underline">
-                      立即重設密碼
-                    </Link>
-                  </p>
-                )}
+
               </div>
             )}
             <Button type="submit" full size="lg" loading={pending}>
-              寄送重設連結
+              送出重設申請
             </Button>
           </form>
         )}

@@ -67,7 +67,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         }
         setIndex(0);
         setStats({ correct: 0, total: 0 });
-        await reload();
+        toast.push("info", "今天的單字已完成，你仍可繼續回看與重練這 10 個單字。");
       }
     },
     [current, index, mode, reload, startedAt, stats, toast, words.length],
@@ -75,7 +75,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
 
   if (loading) return <Card title="🔤 快速背單字"><Skeleton lines={4} /></Card>;
   if (error) return <Card title="🔤 快速背單字"><ErrorState message={error} onRetry={reload} /></Card>;
-  if (!current) return <Card title="🔤 每日 10 個單字"><EmptyState icon="📖" title="今天的單字都完成了！" hint="明天再來即可取得下一組每日單字。" /></Card>;
+  if (!current) return <Card title="🔤 每日 10 個單字"><EmptyState icon="📖" title="今日單字載入中" hint="請重新整理頁面；當日單字會持續保留 24 小時供你查看與練習。" /></Card>;
 
   return (
     <Card

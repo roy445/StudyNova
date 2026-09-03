@@ -27,7 +27,7 @@ const CATEGORIES = [
   ["bug", "功能異常 / Bug"],
   ["ai", "AI 回應問題"],
   ["account", "帳號與登入"],
-  ["weekly", "每週補習小考"],
+  ["weekly", "每週小考"],
   ["content", "教材／題目內容錯誤"],
   ["membership", "Nova / 會員 / 點數"],
   ["suggestion", "功能建議"],

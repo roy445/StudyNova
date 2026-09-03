@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
-import { apiPatch, errorMessage, useApi } from "@/lib/api";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
+import { apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 type Issue = {
   id: string;
@@ -49,11 +49,34 @@ export default function AdminSupportPage() {
   const [note, setNote] = useState("");
   const [nextStatus, setNextStatus] = useState("in_progress");
   const [nextSeverity, setNextSeverity] = useState("normal");
+  const [resetForm, setResetForm] = useState({ email: "", reason: "使用者申請重設密碼", expiresMinutes: "60" });
+  const [resetResult, setResetResult] = useState<{ link: string; expiresAt: string; customerMessage: string } | null>(null);
 
   const count = (s: string) => list.data?.counts.find((c) => c.status === s)?.c ?? 0;
 
   return (
     <div className="space-y-4">
+      <Card title="🔐 產生密碼重設連結" subtitle="輸入使用者提出的 Email 與原因，產生一次性限時連結，再由你自行寄出。">
+        <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr_120px_auto] sm:items-end">
+          <Field label="使用者 Email"><Input type="email" value={resetForm.email} onChange={(e) => setResetForm({ ...resetForm, email: e.target.value })} placeholder="student@example.com" /></Field>
+          <Field label="申請原因"><Input value={resetForm.reason} onChange={(e) => setResetForm({ ...resetForm, reason: e.target.value })} /></Field>
+          <Field label="期限（分鐘）"><Input type="number" min={10} max={10080} value={resetForm.expiresMinutes} onChange={(e) => setResetForm({ ...resetForm, expiresMinutes: e.target.value })} /></Field>
+          <Button onClick={async () => {
+            try {
+              const result = await apiPost<{ link: string; expiresAt: string; customerMessage: string }>("/admin/password-reset-links", { email: resetForm.email, reason: resetForm.reason, expiresMinutes: Number(resetForm.expiresMinutes) });
+              setResetResult(result);
+              toast.push("success", "已產生密碼重設連結");
+            } catch (err) { toast.push("error", errorMessage(err)); }
+          }}>產生連結</Button>
+        </div>
+        {resetResult && <div className="mt-3 space-y-2 rounded-xl border border-[#ffc857]/30 bg-[#ffc857]/5 p-3 text-xs">
+          <p className="text-[#ffd98a]">有效期限：{new Date(resetResult.expiresAt).toLocaleString("zh-TW")}</p>
+          <Input readOnly value={resetResult.link} />
+          <div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.link)}>複製連結</Button><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.customerMessage)}>複製客服文字</Button></div>
+          <pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-2 leading-relaxed text-muted">{resetResult.customerMessage}</pre>
+        </div>}
+      </Card>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="待處理" value={count("open")} tone="gold" />
         <Stat label="處理中" value={count("in_progress")} tone="cyan" />

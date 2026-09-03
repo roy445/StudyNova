@@ -81,8 +81,8 @@ export default function WeeklyPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-xl font-bold sm:text-2xl">▦ 每週補習小考</h1>
-        <p className="text-xs text-muted sm:text-sm">老師上傳的本週單字、句子、考卷與答案，經人工確認後才會發布給你。</p>
+        <h1 className="text-xl font-bold sm:text-2xl">▦ 每週小考</h1>
+        <p className="text-xs text-muted sm:text-sm">管理員上傳的本週單字、句子、考卷與答案，經人工確認後才會發布給你。</p>
       </header>
 
       {list.loading && <Card><Skeleton lines={3} /></Card>}
@@ -109,7 +109,7 @@ export default function WeeklyPage() {
             </div>
           </button>
         ))}
-        {!list.loading && !list.data?.weeks.length && <EmptyState icon="▤" title="目前沒有已發布的週次" hint="老師建立並發布週次後就會顯示在這裡。" />}
+        {!list.loading && !list.data?.weeks.length && <EmptyState icon="▤" title="目前沒有已發布的週次" hint="管理員建立並發布週次後就會顯示在這裡。" />}
       </div>
 
       {loading && <Card><Skeleton lines={5} /></Card>}

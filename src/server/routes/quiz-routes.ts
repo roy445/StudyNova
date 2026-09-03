@@ -46,7 +46,7 @@ export async function generateQuestions(params: {
       feature: "quiz_generate",
       userId: params.userId,
       system:
-        "你是台灣國高中命題老師。請依提供教材出題，題目必須可由教材內容作答，不得杜撰教材沒有的事實。" +
+        "你是台灣國高中題目設計引擎。請依提供教材出題，題目必須可由教材內容作答，不得杜撰教材沒有的事實。" +
         '回傳 JSON：{"questions":[{"type":"single|multiple|fill|truefalse|short|reading","stem":"","options":["A選項",...],"answer":["正確選項文字"],"explanation":"","topic":""}]}。' +
         "single/multiple 必須提供 4 個 options，answer 必須完全等於某個 option 字串。使用繁體中文（英文科目可用英文）。",
       parts: [
