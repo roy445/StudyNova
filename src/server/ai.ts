@@ -89,9 +89,20 @@ export function aiConfigured(): boolean {
 
 class ProviderError extends Error {
   category: FailureCategory;
-  constructor(category: FailureCategory, message: string) {
+  reason: string;
+  constructor(category: FailureCategory, message: string, reason = "") {
     super(message);
     this.category = category;
+    this.reason = reason;
+  }
+}
+
+function safeProviderReason(body: string) {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string; status?: string } };
+    return String(parsed.error?.message || parsed.error?.status || "").replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").slice(0, 180);
+  } catch {
+    return body.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").replace(/\s+/g, " ").trim().slice(0, 180);
   }
 }
 
@@ -113,7 +124,10 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs = 60_000) {
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
     const text = await res.text();
-    if (!res.ok) throw new ProviderError(categorize(res.status, text), `provider responded ${res.status}`);
+    if (!res.ok) {
+      const reason = safeProviderReason(text);
+      throw new ProviderError(categorize(res.status, text), `provider responded ${res.status}`, reason);
+    }
     try {
       return JSON.parse(text) as Record<string, unknown>;
     } catch {
@@ -312,7 +326,11 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
         fallbackFrom,
       });
       if (!RETRYABLE.includes(category)) {
-        throw fail("AI_PROVIDER_ERROR", { message: `AI 服務暫時無法使用（原因：${category}）`, details: { category, provider: cfg.name } });
+        const reason = err instanceof ProviderError ? err.reason : "";
+        throw fail("AI_PROVIDER_ERROR", {
+          message: `AI 服務暫時無法使用（原因：${category}${reason ? `；${reason}` : ""}）`,
+          details: { category, provider: cfg.name, reason },
+        });
       }
       fallbackFrom = cfg.name;
     }
