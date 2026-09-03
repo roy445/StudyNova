@@ -128,7 +128,20 @@ export const routes: RouteDef[] = [
       const conv = (await db.select().from(aiConversations).where(eq(aiConversations.id, ctx.params.id)).limit(1))[0];
       if (!conv) throw notFound("找不到對話");
       if (conv.userId !== user.userId) throw forbidden();
-      const msgs = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(asc(aiMessages.createdAt)).limit(200);
+      const msgs = await db
+        .select({
+          id: aiMessages.id,
+          conversationId: aiMessages.conversationId,
+          role: aiMessages.role,
+          content: aiMessages.content,
+          action: aiMessages.action,
+          actionStatus: aiMessages.actionStatus,
+          createdAt: aiMessages.createdAt,
+        })
+        .from(aiMessages)
+        .where(eq(aiMessages.conversationId, conv.id))
+        .orderBy(asc(aiMessages.createdAt))
+        .limit(200);
       return { conversation: conv, messages: msgs };
     },
   }),
@@ -239,7 +252,18 @@ export const routes: RouteDef[] = [
         await db.update(aiConversations).set({ updatedAt: new Date() }).where(eq(aiConversations.id, conv.id));
       }
 
-      return { message: inserted[0], provider: meta.provider, model: meta.model, fallbackFrom: meta.fallbackFrom };
+      const message = inserted[0];
+      return {
+        message: {
+          id: message.id,
+          conversationId: message.conversationId,
+          role: message.role,
+          content: message.content,
+          action: message.action,
+          actionStatus: message.actionStatus,
+          createdAt: message.createdAt,
+        },
+      };
     },
   }),
 

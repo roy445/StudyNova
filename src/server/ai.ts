@@ -326,16 +326,12 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
         fallbackFrom,
       });
       if (!RETRYABLE.includes(category)) {
-        const reason = err instanceof ProviderError ? err.reason : "";
-        throw fail("AI_PROVIDER_ERROR", {
-          message: `AI 服務暫時無法使用（原因：${category}${reason ? `；${reason}` : ""}）`,
-          details: { category, provider: cfg.name, reason },
-        });
+        throw fail("AI_PROVIDER_ERROR", { message: "AI 服務暫時無法使用，請稍後再試。" });
       }
       fallbackFrom = cfg.name;
     }
   }
-  throw fail("AI_ALL_UNAVAILABLE", { message: `所有 AI 供應商目前皆無法使用（原因：${lastCategory}）`, details: { category: lastCategory } });
+  throw fail("AI_ALL_UNAVAILABLE", { message: "AI 服務暫時無法使用，請稍後再試。" });
 }
 
 export function extractJson<T>(raw: string, fallback: T): T {

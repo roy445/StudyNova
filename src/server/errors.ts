@@ -95,15 +95,15 @@ export const ERROR_CATALOG = {
   COUPON_LIMIT_REACHED: def("SN-NOVA-5012", 400, "NOVA", "這個優惠碼的使用次數已用完", "請向管理員索取新的優惠碼。"),
 
   /* ------------------------------------------------------------ AI 6xxx */
-  AI_NOT_CONFIGURED: def("SN-AI-6001", 503, "AI", "AI 服務尚未設定", "請管理員在環境變數設定 GOOGLE_GEMINI_API_KEY / OPENAI_API_KEY / OPENROUTER_API_KEY。"),
-  AI_PROVIDER_ERROR: def("SN-AI-6002", 502, "AI", "AI 服務暫時無法使用", "系統已自動嘗試備援供應商，請稍後再試一次。"),
-  AI_ALL_UNAVAILABLE: def("SN-AI-6003", 503, "AI", "所有 AI 供應商目前皆無法使用", "可能是額度用盡或服務中斷，管理員可在 AI Health 查看詳情。"),
+  AI_NOT_CONFIGURED: def("SN-AI-6001", 503, "AI", "AI 服務尚未設定", "請聯絡管理員確認 AI 服務設定。"),
+  AI_PROVIDER_ERROR: def("SN-AI-6002", 502, "AI", "AI 服務暫時無法使用", "請稍後再試一次；若持續發生，請透過回報問題聯絡管理員。"),
+  AI_ALL_UNAVAILABLE: def("SN-AI-6003", 503, "AI", "AI 服務暫時無法使用", "請稍後再試一次；若持續發生，請透過回報問題聯絡管理員。"),
   AI_EMPTY_RESULT: def("SN-AI-6004", 502, "AI", "AI 沒有回傳有效內容", "請補充更多內容或重新送出。"),
   AI_NO_VALID_QUESTIONS: def("SN-AI-6005", 400, "AI", "AI 沒有產生有效題目", "請提供更完整的教材內容後重試。"),
   AI_OCR_EMPTY: def("SN-AI-6006", 400, "AI", "OCR 沒有取得任何文字", "請確認照片清晰、光線充足且文字未被裁切。"),
   AI_ACTION_INVALID: def("SN-AI-6007", 400, "AI", "這個 AI 建議已處理過或沒有可執行動作", "請重新整理對話後再試。"),
   AI_ACTION_UNSUPPORTED: def("SN-AI-6008", 400, "AI", "不支援的 AI 動作", "Novi 只能建立任務／筆記／測驗或修改今日計畫。"),
-  AI_VOICE_REQUIRED: def("SN-AI-6009", 400, "AI", "語音分析需要 AI 服務", "請先請管理員設定 AI Provider。"),
+  AI_VOICE_REQUIRED: def("SN-AI-6009", 400, "AI", "語音分析需要 AI 服務", "請先請管理員確認 AI 服務設定。"),
 
   /* ---------------------------------------------------------- FILE 7xxx */
   FILE_EMPTY: def("SN-FILE-7001", 400, "FILE", "檔案是空的", "請重新選擇檔案。"),

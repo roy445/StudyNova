@@ -6,7 +6,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Selec
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
-type Message = { id: string; role: string; content: string; provider: string; model: string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
+type Message = { id: string; conversationId?: string; role: string; content: string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
 
 const MODES = [
   { key: "teacher", label: "老師模式" },
@@ -86,12 +86,11 @@ export default function AiPage() {
     setSending(true);
     setNoviState("thinking");
     setError(null);
-    setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content, provider: "", model: "", action: null, actionStatus: "none", createdAt: new Date().toISOString() }]);
+    setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content, action: null, actionStatus: "none", createdAt: new Date().toISOString() }]);
     try {
-      const res = await apiPost<{ message: Message; provider: string; fallbackFrom: string }>(`/ai/conversations/${activeId}/messages`, { content });
+      const res = await apiPost<{ message: Message }>(`/ai/conversations/${activeId}/messages`, { content });
       setMessages((m) => [...m, res.message]);
       setNoviState("happy");
-      if (res.fallbackFrom) toast.push("info", `主要 AI 忙碌，已自動切換到 ${res.provider}`);
       await convs.reload();
     } catch (err) {
       setNoviState("error");
@@ -158,10 +157,10 @@ export default function AiPage() {
               </button>
             </div>
           ))}
-          {!convs.loading && !convs.data?.conversations.length && <EmptyState icon="💭" title="還沒有對話" hint="建立一個對話開始問 Novi。" />}
+          {!convs.loading && !convs.data?.conversations.length && <EmptyState icon="◌" title="還沒有對話" hint="建立一個對話開始問 Novi。" />}
         </div>
         <Button size="sm" variant="ghost" className="mt-2" full onClick={() => setShowMemory(true)}>
-          🧠 Novi 記憶（{memory.data?.memory.length ?? 0}）
+          ✦ Novi 記憶（{memory.data?.memory.length ?? 0}）
         </Button>
       </Card>
 
@@ -235,14 +234,9 @@ export default function AiPage() {
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : "glass-soft"}`}>
                     <pre className="whitespace-pre-wrap font-sans">{m.content}</pre>
-                    {m.role === "assistant" && m.provider && (
-                      <p className="mt-1 text-[10px] opacity-60">
-                        {m.provider} · {m.model}
-                      </p>
-                    )}
                     {m.action && (
                       <div className="mt-2 rounded-xl border border-[#ffc857]/40 bg-[#ffc857]/10 p-2.5 text-xs">
-                        <p className="font-medium text-[#ffd98a]">🤖 Novi 想要：{ACTION_LABEL[m.action.type] ?? m.action.type}</p>
+                        <p className="font-medium text-[#ffd98a]">✦ Novi 想要：{ACTION_LABEL[m.action.type] ?? m.action.type}</p>
                         {m.action.preview && <p className="mt-0.5 text-muted">{m.action.preview}</p>}
                         <pre className="mt-1 max-h-28 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[10px]">{JSON.stringify(m.action.payload ?? {}, null, 2)}</pre>
                         {m.actionStatus === "pending" ? (
