@@ -587,6 +587,7 @@ export const aiMessages = pgTable(
     conversationId: uuid("conversation_id").notNull().references(() => aiConversations.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
     content: text("content").notNull(),
+    importance: text("importance").notNull().default("normal"), // normal | important | critical
     provider: text("provider").notNull().default(""),
     model: text("model").notNull().default(""),
     action: jsonb("action").$type<Record<string, unknown> | null>(),
@@ -882,7 +883,9 @@ export const assistantProfiles = pgTable("assistant_profiles", {
   level: integer("level").notNull().default(1),
   xp: integer("xp").notNull().default(0),
   skin: text("skin").notNull().default("core-classic"),
+  core: text("core").notNull().default("none"),
   effect: text("effect").notNull().default("none"),
+  float: text("float").notNull().default("none"),
   voice: text("voice").notNull().default("default"),
   title: text("title").notNull().default(""),
   badge: text("badge").notNull().default(""),

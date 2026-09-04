@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
+const DEFAULT_ACTIVITY_START = new Date().toISOString().slice(0, 16);
+const DEFAULT_ACTIVITY_END = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16);
+
 type Provider = {
   provider: string;
   priority: number;
@@ -38,6 +41,7 @@ export default function AdminOpsPage() {
   const coupons = useApi<{ coupons: Array<{ id: string; code: string; kind: string; value: number; maxRedemptions: number; redeemedCount: number; enabled: boolean }> }>("/admin/coupons");
   const bank = useApi<{ questions: Array<{ id: string; subject: string; stem: string; difficulty: string }>; total: number }>("/admin/questions");
   const usage = useApi<{ usage: Array<{ feature: string; total: number; users: number }> }>("/admin/usage");
+  const shop = useApi<{ items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; enabled: boolean }> }>("/admin/shop/items");
 
   const [annOpen, setAnnOpen] = useState(false);
   const [annForm, setAnnForm] = useState({ title: "", body: "", audience: "all", pinned: false, marquee: false, notify: true, push: false });
@@ -53,8 +57,8 @@ export default function AdminOpsPage() {
     goalValue: 60,
     rewardNova: 50,
     rewardXp: 100,
-    startsAt: new Date().toISOString().slice(0, 16),
-    endsAt: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16),
+    startsAt: DEFAULT_ACTIVITY_START,
+    endsAt: DEFAULT_ACTIVITY_END,
     published: true,
   });
   const [couponForm, setCouponForm] = useState({ code: "", kind: "nova", value: 100, maxRedemptions: 50 });
@@ -68,6 +72,7 @@ export default function AdminOpsPage() {
         tabs={[
           { key: "ai", label: "AI Health", icon: "✦" },
           { key: "features", label: "功能權限", icon: "⌁" },
+          { key: "shop", label: "商城管理", icon: "▧" },
           { key: "ann", label: "公告", icon: "▤" },
           { key: "act", label: "活動", icon: "◇" },
           { key: "coupon", label: "優惠碼", icon: "▧" },
@@ -291,6 +296,29 @@ export default function AdminOpsPage() {
             {usage.data?.usage.map((u) => (
               <Stat key={u.feature} label={u.feature} value={u.total} hint={`${u.users} 位使用者（30 天）`} />
             ))}
+          </div>
+        </Card>
+      )}
+
+      {tab === "shop" && (
+        <Card title="▧ Novi 商城管理" subtitle="調整 Nova 價格與上架狀態；下架或重新上架時會自動建立公告並通知使用者。">
+          {shop.loading && <Skeleton lines={5} />}
+          {shop.error && <ErrorState message={shop.error} onRetry={shop.reload} />}
+          <div className="overflow-x-auto scroll-thin">
+            <table className="w-full min-w-[760px] text-xs">
+              <thead><tr className="text-left text-muted"><th className="pb-2">商品</th><th className="pb-2">分類</th><th className="pb-2">限制</th><th className="pb-2 text-right">Nova 價格</th><th className="pb-2 text-center">上架</th></tr></thead>
+              <tbody>
+                {shop.data?.items.map((item) => (
+                  <tr key={item.id} className="border-t border-[var(--line)]">
+                    <td className="py-2"><p className="font-medium">{item.name}</p><p className="text-[10px] text-muted">{item.description}</p></td>
+                    <td className="py-2 text-muted">{item.category}</td>
+                    <td className="py-2">{item.proOnly ? <Badge tone="gold">PRO</Badge> : `Lv.${item.requiredLevel}`}</td>
+                    <td className="py-2 text-right"><input type="number" min={0} max={100000} defaultValue={item.priceNova} onBlur={async (e) => { const priceNova = Number(e.target.value); if (!Number.isInteger(priceNova) || priceNova < 0) return toast.push("error", "價格必須是 0 以上整數"); try { await apiPatch(`/admin/shop/items/${item.id}`, { priceNova }); toast.push("success", `${item.name} 價格已更新`); await shop.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }} className="w-24 rounded border border-[var(--line)] bg-black/20 px-1.5 py-1 text-right" /></td>
+                    <td className="py-2 text-center"><input type="checkbox" checked={item.enabled} onChange={async (e) => { try { await apiPatch(`/admin/shop/items/${item.id}`, { enabled: e.target.checked, announce: true }); toast.push("success", e.target.checked ? "商品已上架並發出公告" : "商品已下架並發出公告"); await shop.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }} className="accent-[#7c5cff]" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}

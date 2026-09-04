@@ -17,7 +17,7 @@ import {
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, todayStr } from "../core";
-import { consumeFeature } from "../economy";
+import { consumeFeature, isProUser } from "../economy";
 import { runAiJson, aiConfigured } from "../ai";
 import { subjectStats, buildPlan } from "./learning-routes";
 import { generateQuestions } from "./quiz-routes";
@@ -134,6 +134,7 @@ export const routes: RouteDef[] = [
           conversationId: aiMessages.conversationId,
           role: aiMessages.role,
           content: aiMessages.content,
+          importance: aiMessages.importance,
           action: aiMessages.action,
           actionStatus: aiMessages.actionStatus,
           createdAt: aiMessages.createdAt,
@@ -201,14 +202,15 @@ export const routes: RouteDef[] = [
       const history = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(asc(aiMessages.createdAt)).limit(30);
       const context = await buildContext(user.userId, conv.allowContext, conv.contextMaterialId);
 
-      const { data, meta } = await runAiJson<{ reply?: string; action?: { type?: string; payload?: Record<string, unknown>; preview?: string } | null; memory?: Array<{ key: string; value: string }> }>(
+      const { data, meta } = await runAiJson<{ reply?: string; importance?: string; action?: { type?: string; payload?: Record<string, unknown>; preview?: string } | null; memory?: Array<{ key: string; value: string }> }>(
         {
           feature: "ai_chat",
           userId: user.userId,
           system:
             `你是 StudyNova 的 AI 學習助理 Novi，服務台灣國高中學生。${MODES[conv.mode as keyof typeof MODES] ?? MODES.teacher}\n` +
             "你不能自行修改使用者資料。若需要建立任務／筆記／測驗或修改讀書計畫，請在 action 欄位提出建議，等使用者確認。\n" +
-            '回傳 JSON：{"reply":"回覆內容（markdown）","action":{"type":"create_task|create_note|create_quiz|update_plan","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
+            '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_quiz|update_plan","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
+            "importance 規則：normal 是一般說明；important 是考試重點、常見錯誤或需要特別注意的內容；critical 是安全、截止時間、明確答案或不可忽略的關鍵提醒。回答中請用 markdown 條列與粗體呈現重點。\n" +
             "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；update_plan payload：{blocks:[{subject,minutes,focus}]}。\n" +
             "繁體中文回答。不得杜撰使用者資料。",
           parts: [
@@ -230,6 +232,7 @@ export const routes: RouteDef[] = [
           conversationId: conv.id,
           role: "assistant",
           content: reply,
+          importance: ["normal", "important", "critical"].includes(String(data.importance)) ? String(data.importance) : "normal",
           provider: meta.provider,
           model: meta.model,
           action: action ? (action as Record<string, unknown>) : null,
@@ -258,6 +261,7 @@ export const routes: RouteDef[] = [
           conversationId: message.conversationId,
           role: message.role,
           content: message.content,
+          importance: message.importance,
           action: message.action,
           actionStatus: message.actionStatus,
           createdAt: message.createdAt,
@@ -293,6 +297,7 @@ export const routes: RouteDef[] = [
         const rows = await db.insert(tasks).values({ userId: user.userId, title: parsed.title, detail: parsed.detail ?? "", source: "ai" }).returning();
         result = { task: rows[0] };
       } else if (action.type === "create_note") {
+        if (!(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "AI 建立筆記需要 Nova Pro 資格，請先升級後再使用。" });
         const parsed = z.object({ title: z.string().min(1).max(120), subject: z.string().max(20).default("其他"), body: z.string().max(20000) }).parse(payload);
         const rows = await db.insert(notes).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, body: parsed.body, source: "ai" }).returning();
         result = { note: rows[0] };

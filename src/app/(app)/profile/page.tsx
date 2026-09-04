@@ -8,7 +8,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Se
 import { apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
 
 type Novi = {
-  profile: { name: string; level: number; xp: number; skin: string; effect: string; voice: string; title: string; badge: string } | null;
+  profile: { name: string; level: number; xp: number; skin: string; core: string; effect: string; float: string; voice: string; title: string; badge: string } | null;
   levels: Array<{ level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string; aura: string }>;
   nextLevel: { level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string } | null;
   items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; owned: boolean }>;
@@ -54,7 +54,7 @@ function ProfileInner() {
     <div className="space-y-4">
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-col items-center gap-3 bg-gradient-to-r from-[#7c5cff]/20 to-[#ffc857]/10 p-5 sm:flex-row">
-          <NoviAvatar size={92} state="happy" level={profile?.level ?? 1} effect={profile?.effect} />
+          <NoviAvatar size={92} state="happy" level={profile?.level ?? 1} skin={profile?.skin} core={profile?.core} effect={profile?.effect} float={profile?.float} />
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <h1 className={`text-lg font-bold ${me.data?.user.isPro ? "pro-name" : ""}`}>{me.data?.user.displayName}</h1>
@@ -80,13 +80,16 @@ function ProfileInner() {
                   const res = await shareContent({
                     title: "StudyNova AI",
                     text: `我的 NOVA ID 是 ${me.data?.user.novaId}，一起來 StudyNova 讀書！`,
-                    url: `${window.location.origin}/challenge?add=${me.data?.user.novaId}`,
+                    url: `${window.location.origin}/nova/${me.data?.user.novaId}`,
                   });
                   toast.push("success", res === "copied" ? "已複製分享內容" : "已開啟分享");
                 }}
               >
-                分享
+                分享 NOVA
               </Button>
+              <Link href={`/nova/${me.data?.user.novaId}`} className="focus-ring inline-flex items-center rounded-xl border border-[var(--line)] px-3 py-2 text-xs text-muted transition hover:border-[#37d3ff]/50 hover:text-[#7dd3fc]">
+                公開展示頁
+              </Link>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -306,8 +309,8 @@ function ProfileInner() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {(["skin", "effect", "voice", "title", "badge"] as const).map((cat) => (
-                  <Field key={cat} label={{ skin: "外觀", effect: "特效", voice: "聲音", title: "稱號", badge: "徽章" }[cat]}>
+                {(["skin", "core", "effect", "float", "voice", "title", "badge"] as const).map((cat) => (
+                    <Field key={cat} label={{ skin: "外觀", core: "核心", effect: "特效", float: "漂浮", voice: "聲音", title: "稱號", badge: "徽章" }[cat]}>
                     <Select
                       value={String(profile?.[cat] ?? "none")}
                       onChange={async (e) => {

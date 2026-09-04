@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import { db } from "@/db";
-import { users, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles } from "@/db/schema";
+import { users, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import {
   fail,
@@ -356,10 +356,11 @@ export const routes: RouteDef[] = [
         .where(eq(users.novaId, ctx.params.novaId.toUpperCase()))
         .limit(1);
       if (!rows[0]) throw fail("ACCT_NOT_FOUND");
-      const novi = (await db.select({ level: assistantProfiles.level, xp: assistantProfiles.xp }).from(assistantProfiles).where(eq(assistantProfiles.userId, rows[0].userId)).limit(1))[0];
+      const novi = (await db.select({ level: assistantProfiles.level, xp: assistantProfiles.xp, skin: assistantProfiles.skin, core: assistantProfiles.core, effect: assistantProfiles.effect, float: assistantProfiles.float, title: assistantProfiles.title, badge: assistantProfiles.badge }).from(assistantProfiles).where(eq(assistantProfiles.userId, rows[0].userId)).limit(1))[0];
+      const inventory = await db.select({ code: assistantItems.code, name: assistantItems.name, category: assistantItems.category }).from(assistantInventory).innerJoin(assistantItems, eq(assistantItems.id, assistantInventory.itemId)).where(eq(assistantInventory.userId, rows[0].userId));
       const m = (await db.select().from(memberships).where(eq(memberships.userId, rows[0].userId)).limit(1))[0];
       const isPro = m?.tier === "pro" && (!m.expiresAt || new Date(m.expiresAt) > new Date());
-      return { profile: { ...rows[0], level: novi?.level ?? 1, xp: novi?.xp ?? 0, isPro: Boolean(isPro) } };
+      return { profile: { ...rows[0], ...novi, level: novi?.level ?? 1, xp: novi?.xp ?? 0, isPro: Boolean(isPro), inventory } };
     },
   }),
 ];

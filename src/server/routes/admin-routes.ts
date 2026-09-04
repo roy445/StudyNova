@@ -267,11 +267,17 @@ export const routes: RouteDef[] = [
           proDailyLimit: z.number().int().min(-1).max(100000).optional(),
           monthlyLimit: z.number().int().min(0).max(1000000).optional(),
           novaCost: z.number().int().min(0).max(10000).optional(),
+          announce: z.boolean().default(true),
         }),
       );
       const before = (await db.select().from(featurePermissions).where(eq(featurePermissions.id, ctx.params.id)).limit(1))[0];
       if (!before) throw notFound("找不到功能設定");
-      const rows = await db.update(featurePermissions).set({ ...body, updatedAt: new Date() }).where(eq(featurePermissions.id, ctx.params.id)).returning();
+      const { announce, ...updates } = body;
+      const rows = await db.update(featurePermissions).set({ ...updates, updatedAt: new Date() }).where(eq(featurePermissions.id, ctx.params.id)).returning();
+      if (announce && body.enabled !== undefined && before.enabled !== body.enabled) {
+        const announcement = (await db.insert(announcements).values({ title: `功能${body.enabled ? "已開啟" : "已暫停"}：${before.label}`, body: `管理員已${body.enabled ? "開啟" : "關閉"}「${before.label}」，請重新整理頁面查看最新狀態。`, audience: "all", audienceIds: [], pinned: false, marquee: false, notify: true, push: false, sortOrder: 0, startsAt: new Date(), endsAt: null, createdBy: admin.userId }).returning())[0];
+        for (const userId of await resolveAudience("all", [])) await notify({ userId, kind: "announcement", title: `📢 ${announcement.title}`, body: announcement.body, link: "/dashboard", dedupeKey: `ann:${announcement.id}:${userId}` });
+      }
       await adminLog({ actorId: admin.userId, action: "feature.update", targetType: "feature", targetId: before.feature, before, after: rows[0], ip: ctx.ip });
       return { feature: rows[0] };
     },
@@ -647,6 +653,12 @@ export const routes: RouteDef[] = [
 
   /* ---------------------------------------------------- shop items */
   route({
+    method: "GET",
+    path: "/admin/shop/items",
+    auth: "admin",
+    handler: async () => ({ items: await db.select().from(assistantItems).orderBy(asc(assistantItems.category), asc(assistantItems.priceNova)) }),
+  }),
+  route({
     method: "POST",
     path: "/admin/shop/items",
     auth: "admin",
@@ -674,9 +686,16 @@ export const routes: RouteDef[] = [
     path: "/admin/shop/items/:id",
     auth: "admin",
     handler: async (ctx) => {
-      const body = await ctx.json(z.object({ enabled: z.boolean().optional(), priceNova: z.number().int().min(0).max(100000).optional() }));
-      const rows = await db.update(assistantItems).set(body).where(eq(assistantItems.id, ctx.params.id)).returning();
-      if (!rows[0]) throw notFound("找不到商品");
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ enabled: z.boolean().optional(), priceNova: z.number().int().min(0).max(100000).optional(), announce: z.boolean().default(true) }));
+      const before = (await db.select().from(assistantItems).where(eq(assistantItems.id, ctx.params.id)).limit(1))[0];
+      if (!before) throw notFound("找不到商品");
+      const { announce, ...updates } = body;
+      const rows = await db.update(assistantItems).set(updates).where(eq(assistantItems.id, ctx.params.id)).returning();
+      if (announce && body.enabled !== undefined && before.enabled !== body.enabled) {
+        const announcement = (await db.insert(announcements).values({ title: `商城商品${body.enabled ? "已上架" : "已下架"}：${before.name}`, body: `「${before.name}」目前${body.enabled ? "已開放購買" : "暫停購買"}。`, audience: "all", audienceIds: [], pinned: false, marquee: false, notify: true, push: false, sortOrder: 0, startsAt: new Date(), endsAt: null, createdBy: admin.userId }).returning())[0];
+        for (const userId of await resolveAudience("all", [])) await notify({ userId, kind: "announcement", title: `📢 ${announcement.title}`, body: announcement.body, link: "/profile?tab=shop", dedupeKey: `ann:${announcement.id}:${userId}` });
+      }
       return { item: rows[0] };
     },
   }),

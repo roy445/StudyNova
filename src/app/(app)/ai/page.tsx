@@ -6,7 +6,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Selec
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
-type Message = { id: string; conversationId?: string; role: string; content: string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
+type Message = { id: string; conversationId?: string; role: string; content: string; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
 
 const MODES = [
   { key: "teacher", label: "學習教練模式" },
@@ -55,14 +55,19 @@ export default function AiPage() {
 
   useEffect(() => {
     if (!activeId) return;
-    setLoadingMsg(true);
+    const loadingTimer = window.setTimeout(() => setLoadingMsg(true), 0);
     apiGet<{ conversation: Conversation; messages: Message[] }>(`/ai/conversations/${activeId}`)
       .then((res) => {
+        setLoadingMsg(false);
         setConv(res.conversation);
         setMessages(res.messages);
       })
       .catch((err) => setError(errorMessage(err)))
-      .finally(() => setLoadingMsg(false));
+      .finally(() => {
+        window.clearTimeout(loadingTimer);
+        setLoadingMsg(false);
+      });
+    return () => window.clearTimeout(loadingTimer);
   }, [activeId]);
 
   useEffect(() => {
@@ -232,11 +237,13 @@ export default function AiPage() {
               {loadingMsg && <Skeleton lines={4} />}
               {messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : "glass-soft"}`}>
+                  <div className={`max-w-[88%] rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "border-transparent bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : m.importance === "critical" ? "border-rose-300/60 bg-rose-400/15 text-rose-50 shadow-[0_0_24px_rgba(251,113,133,0.14)]" : m.importance === "important" ? "border-amber-300/50 bg-amber-400/12 text-amber-50" : "glass-soft border-transparent"}`}>
+                    {m.role !== "user" && m.importance && m.importance !== "normal" && <p className={`mb-1 text-[10px] font-bold tracking-wide ${m.importance === "critical" ? "text-rose-200" : "text-amber-200"}`}>{m.importance === "critical" ? "⚠ 關鍵提醒" : "✦ 學習重點"}</p>}
                     <pre className="whitespace-pre-wrap font-sans">{m.content}</pre>
                     {m.action && (
                       <div className="mt-2 rounded-xl border border-[#ffc857]/40 bg-[#ffc857]/10 p-2.5 text-xs">
-                        <p className="font-medium text-[#ffd98a]">✦ Novi 想要：{ACTION_LABEL[m.action.type] ?? m.action.type}</p>
+                        <p className="font-medium text-[#ffd98a]">✦ Novi 想要：{ACTION_LABEL[m.action.type] ?? m.action.type} {m.action.type === "create_note" && <Badge tone="gold">Nova Pro 專屬</Badge>}</p>
+                        {m.action.type === "create_note" && <p className="mt-0.5 text-[11px] text-amber-100/80">AI 建立筆記需要有效的 Nova Pro 資格，系統會在執行時再次驗證。</p>}
                         {m.action.preview && <p className="mt-0.5 text-muted">{m.action.preview}</p>}
                         <pre className="mt-1 max-h-28 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[10px]">{JSON.stringify(m.action.payload ?? {}, null, 2)}</pre>
                         {m.actionStatus === "pending" ? (

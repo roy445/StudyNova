@@ -83,7 +83,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
   );
-  const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; effect: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }> }>(
+  const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }> }>(
     "/dashboard",
   );
 
@@ -357,7 +357,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         {noviOpen && (
           <div className="glass anim-pop w-[min(92vw,340px)] p-3">
             <div className="flex items-start gap-2">
-              <NoviAvatar size={54} state={noviState} effect={summary.data?.novi?.effect} level={level} />
+              <NoviAvatar size={54} state={noviState} skin={summary.data?.novi?.skin} core={summary.data?.novi?.core} effect={summary.data?.novi?.effect} float={summary.data?.novi?.float} level={level} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Novi 小助理</p>
                 <p className="text-[11px] text-muted">Lv.{level}・你的專屬 AI 學習夥伴</p>
@@ -415,7 +415,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                 －
               </button>
               <button onClick={() => setNoviOpen((v) => !v)} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
-                <NoviAvatar size={58} state={encouragement?.state ?? (noviOpen ? "happy" : "idle")} effect={summary.data?.novi?.effect} level={level} />
+                <NoviAvatar size={58} state={encouragement?.state ?? (noviOpen ? "happy" : "idle")} skin={summary.data?.novi?.skin} core={summary.data?.novi?.core} effect={summary.data?.novi?.effect} float={summary.data?.novi?.float} level={level} />
               </button>
             </>
           )}

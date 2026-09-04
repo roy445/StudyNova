@@ -101,7 +101,9 @@ export const routes: RouteDef[] = [
         z.object({
           name: z.string().min(1).max(20).optional(),
           skin: z.string().max(40).optional(),
+          core: z.string().max(40).optional(),
           effect: z.string().max(40).optional(),
+          float: z.string().max(40).optional(),
           voice: z.string().max(40).optional(),
           title: z.string().max(40).optional(),
           badge: z.string().max(40).optional(),
@@ -114,7 +116,7 @@ export const routes: RouteDef[] = [
         .where(eq(assistantInventory.userId, user.userId));
       const owns = (code: string | undefined, category: string) =>
         !code || code === "none" || code === "core-classic" || inventory.some((i) => i.code === code && i.category === category);
-      if (!owns(body.skin, "skin") || !owns(body.effect, "effect") || !owns(body.voice, "voice") || !owns(body.title, "title") || !owns(body.badge, "badge")) {
+      if (!owns(body.skin, "skin") || !owns(body.core, "core") || !owns(body.effect, "effect") || !owns(body.float, "float") || !owns(body.voice, "voice") || !owns(body.title, "title") || !owns(body.badge, "badge")) {
         throw badRequest("你尚未擁有這個外觀，請先到 Novi 商店購買");
       }
       const rows = await db.update(assistantProfiles).set({ ...body, updatedAt: new Date() }).where(eq(assistantProfiles.userId, user.userId)).returning();
