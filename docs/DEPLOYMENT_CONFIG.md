@@ -253,3 +253,15 @@ SMTP_URL=smtps://user:password@smtp.example.com:465
 | `app` | `http://localhost:3000` | StudyNova Next.js app |
 
 如果採用 Neon 部署，Compose 中的 `db`、`redis`、`minio` 都可以不啟動；只需把 `DATABASE_URL` 指向 Neon。若未設定 `REDIS_URL`，StudyNova 會使用 PostgreSQL queue adapter。若未設定 S3 組合，檔案會暫存於 Neon PostgreSQL 的 bytea 欄位，正式環境仍建議另接 R2 或其他 S3 相容儲存。
+
+## 詞庫匯入
+
+Neon 完成 `database/neon-init.sql` 後，請再於同一個 SQL Editor 執行 `database/vocabulary-seed.sql`。該檔案會匯入國中分級與高中進階分級單字，並以 `word + level` 去重；每日單字 API 會依使用者英文程度、熟悉度與錯誤次數挑選 10 個單字。每筆資料包含單字、詞性、中文意思、英文例句與例句中文翻譯。
+
+新使用者預設每日 10 個單字；若使用者在個人設定調整每日單字量，API 會依個人設定提供相應數量。
+
+> `database/vocabulary-seed.sql` 不包含任何帳號密碼、API key 或其他機密，可直接在 Neon SQL Editor 執行。重複執行會更新既有的單字內容，不會建立重複的 `word + level` 資料。
+
+### 詞庫來源說明
+
+本次匯入以使用者提供的國中 2000 字教材與高中英文／學測教材為來源。國中教材擷取約 1,938 筆具中文釋義的詞彙，高中學測教材擷取約 76 筆具中文釋義的進階詞彙；高中參考詞彙表中只有英文與詞性、沒有逐字中文釋義的項目未直接寫入，以避免產生未經核對的翻譯。

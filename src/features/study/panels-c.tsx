@@ -73,14 +73,14 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
     [current, index, mode, reload, startedAt, stats, toast, words.length],
   );
 
-  if (loading) return <Card title="🔤 快速背單字"><Skeleton lines={4} /></Card>;
-  if (error) return <Card title="🔤 快速背單字"><ErrorState message={error} onRetry={reload} /></Card>;
-  if (!current) return <Card title="🔤 每日 10 個單字"><EmptyState icon="📖" title="題庫正在準備中" hint="請稍後再試；如果持續沒有單字，請按瀏覽器重新載入或聯絡管理員。" action={<Button size="sm" onClick={() => reload()}>重新載入</Button>} /></Card>;
+  if (loading) return <Card title="▤ 每日單字"><Skeleton lines={4} /></Card>;
+  if (error) return <Card title="▤ 每日單字"><ErrorState message={error} onRetry={reload} /></Card>;
+  if (!current) return <Card title="▤ 每日 10 個單字"><EmptyState icon="□" title="題庫正在準備中" hint="請稍後再試；如果持續沒有單字，請按瀏覽器重新整理或聯絡管理員。" action={<Button size="sm" onClick={() => reload()}>重新載入</Button>} /></Card>;
 
   return (
     <Card
-      title="🔤 每日 10 個單字"
-      subtitle={`${track === "senior" ? "高中 7000 單" : track === "junior" ? "國中 2000 單" : `程度 ${data?.level}`}・每日 ${data?.dailyTarget ?? words.length} 個・第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
+      title="▤ 每日 10 個單字"
+      subtitle={`${track === "senior" ? "高中 7000 單" : track === "junior" ? "國中 2000 單" : `程度 ${data?.level}`}・每日 ${data?.dailyTarget ?? words.length} 個・目前第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
       action={
         <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !py-1.5 text-xs">
           <option value="card">單字卡</option>
@@ -93,10 +93,35 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
     >
       {mode === "timed" && (
         <div className="mb-2 flex items-center gap-2 text-xs">
-          <Badge tone={timeLeft < 15 ? "rose" : "cyan"}>⏱ {timeLeft}s</Badge>
+          <Badge tone={timeLeft < 15 ? "rose" : "cyan"}>剩餘 {timeLeft}s</Badge>
           <Progress value={timeLeft} max={60} tone={timeLeft < 15 ? "gold" : "cyan"} />
         </div>
       )}
+
+      <ol className="mb-3 space-y-2" aria-label="今日單字清單">
+        {words.map((word, wordIndex) => (
+          <li key={word.id}>
+            <button
+              type="button"
+              onClick={() => { setIndex(wordIndex); setFlipped(false); setTip(null); }}
+              className={`w-full rounded-xl border p-3 text-left transition ${wordIndex === index ? "border-[#37d3ff]/60 bg-[#37d3ff]/10" : "border-[var(--line)] bg-black/10 hover:border-[#37d3ff]/40"}`}
+            >
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 min-w-5 text-xs font-semibold text-muted">{wordIndex + 1}.</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <strong className="text-base text-[var(--text)]">{word.word}</strong>
+                    <span className="text-xs text-muted">{word.part_of_speech}</span>
+                    <span className="text-sm text-[#7dd3fc]">{word.meaning}</span>
+                  </span>
+                  {word.example && <span className="mt-1 block text-xs leading-relaxed text-muted">{word.example}</span>}
+                  {word.example_zh && <span className="block text-xs leading-relaxed text-muted">{word.example_zh}</span>}
+                </span>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ol>
 
       <div className="glass-soft flex min-h-[190px] flex-col items-center justify-center gap-2 p-5 text-center">
         {mode === "zh2en" ? (
@@ -135,11 +160,11 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
             {flipped ? "隱藏答案" : "顯示答案"}
           </Button>
           <Button variant="ghost" onClick={() => { if (!speak(current.word)) toast.push("error", "此瀏覽器不支援語音"); }}>
-            🔊 聽發音
+            朗讀
           </Button>
-          <Button onClick={() => answer(true)}>我記得 ✅</Button>
+          <Button onClick={() => answer(true)}>我記得</Button>
           <Button variant="outline" onClick={() => answer(false)}>
-            不熟 🔁
+            還不熟
           </Button>
         </div>
       )}
@@ -161,7 +186,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
             }
           }}
         >
-          🧠 AI 記憶方法
+          ✦ 記憶方法
         </Button>
       </div>
     </Card>
