@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
@@ -29,10 +29,8 @@ type Provider = {
 export default function AdminOpsPage() {
   const toast = useToast();
   const [tab, setTab] = useState("ai");
-  const [tick, setTick] = useState(0);
   const ai = useApi<{ providers: Provider[]; failures: Array<{ id: string; provider: string; feature: string; failureCategory: string; createdAt: string }>; byFeature: Array<{ feature: string; c: number; ok: number }>; configured: boolean }>(
     "/admin/ai/health",
-    [tick],
   );
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; novaCost: number }> }>("/admin/features");
   const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string }> }>("/admin/announcements");
@@ -63,11 +61,6 @@ export default function AdminOpsPage() {
   const [importJson, setImportJson] = useState("");
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
 
-  useEffect(() => {
-    if (tab !== "ai") return;
-    const t = setInterval(() => setTick((v) => v + 1), 15000);
-    return () => clearInterval(t);
-  }, [tab]);
 
   return (
     <div className="space-y-4">
@@ -86,7 +79,15 @@ export default function AdminOpsPage() {
 
       {tab === "ai" && (
         <>
-          <Card title="✦ Gemini API Health" subtitle="每 15 秒自動更新・各 API slot 的用量、成功率、fallback 與冷卻狀態；成本為本地估算">
+          <Card
+            title="✦ Gemini API Health"
+            subtitle="資料只在首次進入或你手動重新整理時更新；各 API slot 的用量、成功率、fallback 與冷卻狀態"
+            action={
+              <Button size="sm" variant="ghost" onClick={() => ai.reload()} disabled={ai.loading}>
+                {ai.loading ? "更新中…" : "重新整理"}
+              </Button>
+            }
+          >
             {ai.loading && <Skeleton lines={4} />}
             {ai.error && <ErrorState message={ai.error} onRetry={ai.reload} />}
             {!ai.data?.configured && <p className="mb-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">尚未設定任何 AI API Key，AI 功能將回傳明確錯誤。</p>}
