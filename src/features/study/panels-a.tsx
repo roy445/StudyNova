@@ -228,6 +228,7 @@ export function OcrPanel() {
   const detail = useApi<{ document: OcrDoc; pages: OcrPage[] }>(activeId ? `/ocr/documents/${activeId}` : null, [activeId]);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"highlight" | "crop">("highlight");
+  const [analysisMode, setAnalysisMode] = useState<"auto" | "vocabulary" | "sentences" | "questions">("auto");
   const [color, setColor] = useState("yellow");
   const [result, setResult] = useState<{ action: string; result: Record<string, unknown> } | null>(null);
   const [visionPreflight, setVisionPreflight] = useState<Record<string, unknown> | null>(null);
@@ -373,9 +374,20 @@ export function OcrPanel() {
 
   async function createCameraQuiz() {
     if (!activeId || !visionAnalysis) return;
-    const items = Array.isArray(visionAnalysis.items) ? (visionAnalysis.items as Array<Record<string, unknown>>).filter((item) => item.kind === "question") : [];
+    const sourceItems = Array.isArray(visionAnalysis.items) ? (visionAnalysis.items as Array<Record<string, unknown>>) : [];
+    const items = sourceItems.flatMap((item) => {
+      if (item.kind === "question") return [item];
+      if (item.kind === "vocabulary") {
+        const language = item.language && typeof item.language === "object" ? item.language as Record<string, unknown> : {};
+        const meanings = Array.isArray(item.meanings) ? item.meanings : Array.isArray(language.meanings) ? language.meanings : [];
+        const meaning = String(item.meaning ?? (meanings[0] && typeof meanings[0] === "object" ? (meanings[0] as Record<string, unknown>).meaning : "") ?? "").trim();
+        return meaning ? [{ ...item, kind: "question", rawText: `${meaning} 的英文是？`, elements: { options: [{ text: String(item.word ?? "") }] }, answer: { value: String(item.word ?? "") }, type: "單字四選一" }] : [];
+      }
+      if (item.kind === "sentence") return [{ ...item, kind: "question", rawText: String(item.rawText ?? item.label ?? ""), type: "句子理解" }];
+      return [];
+    });
     if (!items.length) {
-      toast.push("info", "目前分析結果沒有可建立測驗的題目");
+      toast.push("info", "目前分析結果沒有可建立測驗的單字、句子或題目");
       return;
     }
     try {
@@ -394,6 +406,8 @@ export function OcrPanel() {
         stage,
         pageIds: detail.data?.pages.map((p) => p.id),
         itemIds: selectedVisionItems.length ? selectedVisionItems : undefined,
+        analysisMode,
+        selectedHighlightColors: [color],
         force,
       });
       if (stage === "preflight") {
@@ -478,6 +492,12 @@ export function OcrPanel() {
               <Button size="sm" loading={busy} onClick={runOcr}>
               ✨ 開始 AI 辨識
             </Button>
+            <Select value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value as typeof analysisMode)} className="!w-auto !py-1.5 text-xs" aria-label="AI 分析模式">
+              <option value="auto">智慧讀取（AI 自動判斷）</option>
+              <option value="vocabulary">只分析單字／片語</option>
+              <option value="sentences">只分析句子／句型</option>
+              <option value="questions">只分析題目</option>
+            </Select>
             <Button size="sm" variant="ghost" onClick={() => setCameraOpen(true)}>開啟取景器</Button>
             <div className="flex items-center gap-1.5 text-xs">
               <button onClick={() => setMode("highlight")} className={`rounded-lg px-2 py-1 ${mode === "highlight" ? "bg-[#7c5cff]/30" : "bg-white/5"}`}>
@@ -647,7 +667,7 @@ export function OcrPanel() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold">AI 鏡頭智慧分析</p>
-                  <p className="text-[11px] text-muted">影像 → 品質 → OCR → 版面理解 → 教學分析；原圖會保留。</p>
+                  <p className="text-[11px] text-muted">影像 → 品質 → OCR → 版面理解 → 教學分析；原圖會保留。可切換智慧讀取、單字／片語、句子／句型或題目模式。</p>
                 </div>
                 <Button size="sm" loading={busy} onClick={() => vision("preflight")}>先檢查圖片</Button>
               </div>
@@ -666,7 +686,7 @@ export function OcrPanel() {
                       })}</div>}
                     </div>
                   ))}
-                  <div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={() => setSelectedVisionItems([])}>全部分析</Button><Button size="sm" loading={busy} onClick={() => vision("analyze", true)}>{selectedVisionItems.length ? `分析選取 ${selectedVisionItems.length} 項` : "開始完整分析"}</Button></div>
+                  <div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={() => setSelectedVisionItems([])}>全部分析</Button><Button size="sm" loading={busy} onClick={() => vision("analyze", true)}>{selectedVisionItems.length ? `分析選取 ${selectedVisionItems.length} 項` : analysisMode === "vocabulary" ? "找單字與片語" : analysisMode === "sentences" ? "找句子與句型" : "開始智慧分析"}</Button></div>
                 </div>
               )}
               {visionAnalysis && <VisionAnalysisResult data={visionAnalysis} onAction={saveLearning} onBatchVocabulary={saveVocabularyBatch} onCreateQuiz={createCameraQuiz} />}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
@@ -15,7 +15,7 @@ function speak(text: string, lang = "en-US") {
   return true;
 }
 
-type Word = { id: string; word: string; meaning: string; part_of_speech: string; example: string; example_zh: string; familiarity: number; memory_tip: string | null };
+type Word = { id: string; word: string; meaning: string; meanings?: string[]; phrases?: Array<{ en: string; zh: string }>; part_of_speech: string; example: string; example_zh: string; familiarity: number; memory_tip: string | null };
 
 export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const toast = useToast();
@@ -26,19 +26,20 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const [flipped, setFlipped] = useState(false);
   const [input, setInput] = useState("");
   const [stats, setStats] = useState({ correct: 0, total: 0 });
-  const [startedAt] = useState(Date.now());
+  const [startedAt] = useState(() => Date.now());
   const [timeLeft, setTimeLeft] = useState(60);
   const [tip, setTip] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
+  const [detailWord, setDetailWord] = useState<Word | null>(null);
 
   const words = data?.words ?? [];
   const current = words[index];
 
   useEffect(() => {
     if (mode !== "timed") return;
-    setTimeLeft(60);
-    const t = setInterval(() => setTimeLeft((v) => Math.max(0, v - 1)), 1000);
-    return () => clearInterval(t);
+    const resetTimer = window.setTimeout(() => setTimeLeft(60), 0);
+    const t = window.setInterval(() => setTimeLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => { window.clearTimeout(resetTimer); window.clearInterval(t); };
   }, [mode]);
 
   const answer = useCallback(
@@ -103,7 +104,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
           <li key={word.id}>
             <button
               type="button"
-              onClick={() => { setIndex(wordIndex); setFlipped(false); setTip(null); }}
+              onClick={() => { setIndex(wordIndex); setFlipped(false); setTip(null); setDetailWord(word); }}
               className={`w-full rounded-xl border p-3 text-left transition ${wordIndex === index ? "border-[#37d3ff]/60 bg-[#37d3ff]/10" : "border-[var(--line)] bg-black/10 hover:border-[#37d3ff]/40"}`}
             >
               <div className="flex items-start gap-3">
@@ -168,6 +169,39 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
           </Button>
         </div>
       )}
+
+      <Modal open={Boolean(detailWord)} onClose={() => setDetailWord(null)} title={detailWord?.word ?? "單字詳情"}>
+        {detailWord && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="cyan">{detailWord.part_of_speech}</Badge>
+              <Badge tone="muted">熟悉度 {detailWord.familiarity}%</Badge>
+              <Button size="sm" variant="ghost" onClick={() => { if (!speak(detailWord.word)) toast.push("error", "此瀏覽器不支援語音"); }}>朗讀</Button>
+            </div>
+            <section className="rounded-2xl border border-[#37d3ff]/20 bg-[#37d3ff]/10 p-3.5">
+              <p className="text-xs text-muted">主要中文</p>
+              <p className="mt-1 text-lg font-semibold text-[#7dd3fc]">{detailWord.meaning || "尚未補上中文釋義"}</p>
+            </section>
+            <section>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">一字多意</p>
+              <div className="space-y-1.5">
+                {(detailWord.meanings?.length ? detailWord.meanings : [detailWord.meaning]).filter(Boolean).map((meaning, meaningIndex) => (
+                  <div key={`${meaning}-${meaningIndex}`} className="rounded-xl bg-white/5 px-3 py-2 text-sm">{meaning}</div>
+                ))}
+              </div>
+            </section>
+            <section>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">相關片語與中文</p>
+              {detailWord.phrases?.length ? (
+                <div className="space-y-1.5">
+                  {detailWord.phrases.map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="rounded-xl border border-[var(--line)] px-3 py-2"><p className="text-sm font-medium text-[#e8edff]">{phrase.en}</p><p className="mt-0.5 text-xs text-muted">{phrase.zh}</p></div>)}
+                </div>
+              ) : <p className="rounded-xl bg-white/5 px-3 py-2 text-sm text-muted">這個單字目前沒有整理到常用片語。</p>}
+            </section>
+            {(detailWord.example || detailWord.example_zh) && <section className="rounded-xl bg-black/20 p-3 text-sm"><p className="text-xs text-muted">例句</p>{detailWord.example && <p className="mt-1">{detailWord.example}</p>}{detailWord.example_zh && <p className="mt-0.5 text-muted">{detailWord.example_zh}</p>}</section>}
+          </div>
+        )}
+      </Modal>
 
       <div className="mt-2">
         <Button

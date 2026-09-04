@@ -90,10 +90,10 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     const standalone = window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-    if (!standalone && !localStorage.getItem("sn-install-guide-seen")) setInstallGuideOpen(true);
+    const guideTimer = !standalone && !localStorage.getItem("sn-install-guide-seen") ? window.setTimeout(() => setInstallGuideOpen(true), 0) : undefined;
     const onInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", onInstall);
-    return () => window.removeEventListener("beforeinstallprompt", onInstall);
+    return () => { if (guideTimer) window.clearTimeout(guideTimer); window.removeEventListener("beforeinstallprompt", onInstall); };
   }, []);
 
   useEffect(() => {
@@ -269,7 +269,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                 aria-haspopup="menu"
                 className={`focus-ring flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-xs transition hover:bg-white/5 ${user.isPro ? "pro-frame" : "border-[var(--line)]"}`}
               >
-                <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold ${user.isPro ? "bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "bg-white/10"}`}>
+                <span className={`grid h-6 w-6 place-items-center rounded-full border text-[11px] font-bold text-white shadow-sm ${user.isPro ? "border-amber-200/80 bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "border-cyan-200/40 bg-gradient-to-br from-[#7c5cff] to-[#20c5e8]"}`}>
                   {user.displayName.slice(0, 1)}
                 </span>
                 <span className={`hidden max-w-[90px] truncate sm:inline ${user.isPro ? "pro-name font-semibold" : ""}`}>{user.displayName}</span>

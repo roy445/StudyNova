@@ -20,6 +20,7 @@ import {
   weeklyExamWeeks,
   novaAccounts,
   announcements,
+  dailyWords,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, forbidden, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
@@ -223,6 +224,10 @@ export const routes: RouteDef[] = [
           weekId: z.string().uuid().nullable().optional(),
           durationHours: z.number().int().min(1).max(168).default(48),
           inviteIds: z.array(z.string().uuid()).max(20).default([]),
+          track: z.enum(["junior", "senior"]).default("junior"),
+          questionCount: z.number().int().min(5).max(200).default(10),
+          direction: z.enum(["zh2en", "en2zh", "mixed"]).default("mixed"),
+          difficulty: z.enum(["easy", "normal", "hard"]).default("normal"),
         }),
       );
       if (body.kind === "quiz") {
@@ -243,7 +248,12 @@ export const routes: RouteDef[] = [
           kind: body.kind,
           title: body.title,
           quizId: body.quizId ?? null,
-          payload: body.kind === "weekly" ? { weekId: body.weekId } : {},
+          payload: body.kind === "weekly" ? { weekId: body.weekId } : body.kind === "word" ? {
+            track: body.track,
+            questionCount: body.questionCount,
+            direction: body.direction,
+            difficulty: body.difficulty,
+          } : {},
           expiresAt: new Date(Date.now() + body.durationHours * 3600_000),
         })
         .returning();
@@ -252,6 +262,25 @@ export const routes: RouteDef[] = [
         await notify({ userId: id, kind: "challenge", title: `⚔️ ${user.displayName} 向你發起挑戰`, body: body.title, link: "/challenge", dedupeKey: `chal:${rows[0].id}:${id}`, push: true });
       }
       return { challenge: rows[0] };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/challenges/:id/words",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
+      if (!challenge) throw notFound("找不到挑戰");
+      const ids = await friendIds(user.userId);
+      if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
+      if (challenge.kind !== "word") throw badRequest("這不是單字挑戰");
+      const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string };
+      const track = payload.track === "senior" ? "senior" : "junior";
+      const count = Math.max(5, Math.min(200, Number(payload.questionCount ?? 10)));
+      const rows = await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, track)).orderBy(sql`random()`).limit(count);
+      return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal" }, words: rows };
     },
   }),
 

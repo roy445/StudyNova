@@ -467,6 +467,8 @@ export const dailyWords = pgTable(
     id: id(),
     word: text("word").notNull(),
     meaning: text("meaning").notNull(),
+    meanings: jsonb("meanings").$type<string[]>().notNull().default([]),
+    phrases: jsonb("phrases").$type<Array<{ en: string; zh: string }>>().notNull().default([]),
     partOfSpeech: text("part_of_speech").notNull().default(""),
     example: text("example").notNull().default(""),
     exampleZh: text("example_zh").notNull().default(""),

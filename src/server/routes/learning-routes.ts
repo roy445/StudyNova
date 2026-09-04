@@ -888,7 +888,7 @@ export const routes: RouteDef[] = [
       if (!total) return { words: [], level: track, track, count: 0, dailyTarget: count };
       const offset = (dayNumber * count) % total;
       const baseQuery = sql`
-        select w.id, w.word, w.meaning, w.part_of_speech, w.example, w.example_zh, w.level,
+        select w.id, w.word, w.meaning, w.meanings, w.phrases, w.part_of_speech, w.example, w.example_zh, w.level,
                coalesce(p.familiarity, 0) as familiarity, coalesce(p.correct_count,0) as correct_count,
                coalesce(p.wrong_count,0) as wrong_count, p.memory_tip
         from daily_words w
@@ -906,8 +906,12 @@ export const routes: RouteDef[] = [
     method: "GET",
     path: "/words/all",
     auth: "user",
-    handler: async () => {
-      const rows = await db.select().from(dailyWords).orderBy(asc(dailyWords.word)).limit(500);
+    handler: async (ctx) => {
+      const requestedTrack = ctx.query.get("track");
+      const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : null;
+      const requestedLimit = Number(ctx.query.get("limit") ?? 500);
+      const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
+      const rows = await db.select().from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined).orderBy(asc(dailyWords.word)).limit(limit);
       return { words: rows };
     },
   }),

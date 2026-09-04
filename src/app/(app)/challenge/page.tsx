@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Tabs, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
@@ -13,10 +13,59 @@ type Challenge = {
   title: string;
   creatorName: string;
   quizId: string | null;
+  payload?: { track?: "junior" | "senior"; questionCount?: number; direction?: "zh2en" | "en2zh" | "mixed"; difficulty?: "easy" | "normal" | "hard" };
   expiresAt: string;
   joined: boolean;
   participants: Array<{ userId: string; displayName: string; score: number; durationSec: number; finishedAt: string | null }>;
 };
+
+type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string };
+
+type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; onFinish: (score: number, total: number, durationSec: number) => Promise<void> };
+
+function QuizRunner({ title, words, direction, difficulty, onFinish }: QuizRunnerProps) {
+  const [index, setIndex] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [startedAt] = useState(() => Date.now());
+  const [selected, setSelected] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const current = words[index];
+  const actualDirection = direction === "mixed" ? (index % 2 === 0 ? "zh2en" : "en2zh") : direction;
+  const choices = useMemo(() => {
+    if (!current) return [];
+    const answer = actualDirection === "zh2en" ? current.word : current.meaning;
+    const pool = words.filter((word) => word.id !== current.id).map((word) => actualDirection === "zh2en" ? word.word : word.meaning).filter(Boolean);
+    return [answer, ...pool].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
+  }, [actualDirection, current, words]);
+
+  if (!current) return <EmptyState icon="✓" title="題目準備中" />;
+  async function choose(answer: string) {
+    if (selected || submitting) return;
+    setSelected(answer);
+    const expected = actualDirection === "zh2en" ? current.word : current.meaning;
+    const nextCorrect = correct + (answer === expected ? 1 : 0);
+    setCorrect(nextCorrect);
+    setTimeout(async () => {
+      if (index + 1 < words.length) {
+        setIndex((value) => value + 1);
+        setSelected(null);
+        return;
+      }
+      setSubmitting(true);
+      await onFinish(Math.round((nextCorrect / words.length) * 100), words.length, Math.round((Date.now() - startedAt) / 1000));
+      setSubmitting(false);
+    }, 550);
+  }
+  const expected = actualDirection === "zh2en" ? current.word : current.meaning;
+  return (
+    <Card title={title} subtitle={`${index + 1}/${words.length} 題・難度 ${difficulty === "easy" ? "簡單" : difficulty === "hard" ? "困難" : "普通"}`}>
+      <div className="mb-4 flex items-center justify-between text-xs text-muted"><span>{actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}</span><Badge tone="cyan">目前答對 {correct} 題</Badge></div>
+      <div className="glass-soft mb-4 rounded-2xl p-6 text-center"><p className="text-2xl font-bold text-[#e8edff]">{actualDirection === "zh2en" ? current.meaning : current.word}</p><p className="mt-2 text-xs text-muted">{current.partOfSpeech}</p></div>
+      <div className="grid gap-2 sm:grid-cols-2">{choices.map((choice) => <button key={choice} type="button" disabled={Boolean(selected) || submitting} onClick={() => void choose(choice)} className={`focus-ring rounded-xl border p-3 text-left text-sm transition ${selected ? choice === expected ? "border-emerald-400/60 bg-emerald-400/10" : choice === selected ? "border-rose-400/60 bg-rose-400/10" : "border-[var(--line)] opacity-60" : "border-[var(--line)] bg-white/[0.03] hover:border-[#37d3ff]/60 hover:bg-[#37d3ff]/10"}`}>{choice}</button>)}</div>
+      <p className="mt-4 text-center text-[11px] text-muted">選出最適合的答案，答完會自動進入下一題</p>
+    </Card>
+  );
+}
 
 function ChallengeInner() {
   const toast = useToast();
@@ -31,14 +80,29 @@ function ChallengeInner() {
   const weekly = useApi<{ weeks: Array<{ id: string; weekCode: string; title: string; open: boolean; proOnly: boolean }> }>("/weekly");
   const vocabulary = useApi<{ tracks: Array<{ id: "junior" | "senior"; label: string; description: string; count: number }> }>("/words/catalog");
   const [vocabTrack, setVocabTrack] = useState<"junior" | "senior">("junior");
+  const [selfForm, setSelfForm] = useState({ track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard", shuffle: true });
+  const [quizSession, setQuizSession] = useState<{ title: string; challengeId?: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string } | null>(null);
 
   const [novaId, setNovaId] = useState(params.get("add") ?? "");
   const [qr, setQr] = useState<{ svg: string; link: string; novaId: string } | null>(null);
   const [challengeOpen, setChallengeOpen] = useState(false);
-  const [cForm, setCForm] = useState({ kind: "word", title: "", quizId: "", durationHours: 48 });
+  const [cForm, setCForm] = useState({ kind: "word", title: "", quizId: "", durationHours: 48, track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard" });
   const [roomOpen, setRoomOpen] = useState(false);
   const [roomForm, setRoomForm] = useState({ name: "", kind: "room", goalMinutes: 120 });
   const [joinCode, setJoinCode] = useState("");
+
+  async function startSelfChallenge() {
+    try {
+      const result = await apiGet<{ words: ChallengeWord[] }>(`/words/all?track=${selfForm.track}&limit=${selfForm.questionCount}`);
+      const words = selfForm.shuffle ? [...result.words].sort(() => Math.random() - 0.5) : result.words;
+      if (!words.length) throw new Error("目前沒有可用的題目");
+      setQuizSession({ title: `自我挑戰・${selfForm.track === "junior" ? "國中" : "高中"}單字`, words: words.slice(0, selfForm.questionCount), direction: selfForm.direction, difficulty: selfForm.difficulty });
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
+
+  if (quizSession) return <div className="space-y-4"><QuizRunner {...quizSession} onFinish={async (score, total, durationSec) => { if (quizSession.challengeId) await apiPost(`/challenges/${quizSession.challengeId}/submit`, { score, durationSec }); else await apiPost("/words/session-complete", { correct: Math.round((score / 100) * total), total, seconds: durationSec }); toast.push("success", `挑戰完成！得分 ${score} 分`); setQuizSession(null); await challenges.reload(); }} /><Button variant="ghost" onClick={() => setQuizSession(null)}>離開挑戰</Button></div>;
 
   return (
     <div className="space-y-4">
@@ -192,7 +256,20 @@ function ChallengeInner() {
       )}
 
       {tab === "challenge" && (
-        <Card title="⚔️ 好友挑戰" action={<Button size="sm" onClick={() => setChallengeOpen(true)}>＋ 發起挑戰</Button>}>
+        <div className="space-y-4">
+          <Card title="🎯 自我挑戰" subtitle="自訂國中／高中單字測驗，完成後立即看到分數與獎勵。" action={<Badge tone="cyan">單人練習</Badge>}>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="詞庫">
+                <Select value={selfForm.track} onChange={(e) => setSelfForm({ ...selfForm, track: e.target.value as "junior" | "senior" })}><option value="junior">國中 2000 單</option><option value="senior">高中 7000 單</option></Select>
+              </Field>
+              <Field label="題數"><Select value={String(selfForm.questionCount)} onChange={(e) => setSelfForm({ ...selfForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option><option value="100">100 題</option></Select></Field>
+              <Field label="難度"><Select value={selfForm.difficulty} onChange={(e) => setSelfForm({ ...selfForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
+              <Field label="題目方向"><Select value={selfForm.direction} onChange={(e) => setSelfForm({ ...selfForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
+            </div>
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-muted"><input type="checkbox" checked={selfForm.shuffle} onChange={(e) => setSelfForm({ ...selfForm, shuffle: e.target.checked })} />每次開始時打亂題目</label>
+            <Button className="mt-4" onClick={() => void startSelfChallenge()}>開始自我挑戰</Button>
+          </Card>
+          <Card title="⚔️ 好友挑戰" subtitle="邀請好友後，雙方完成同一組題目即可比較分數。" action={<div className="flex gap-1.5"><Button size="sm" variant="ghost" onClick={() => void challenges.reload()}>更新比分</Button><Button size="sm" onClick={() => setChallengeOpen(true)}>＋ 發起挑戰</Button></div>}>
           {challenges.loading && <Skeleton lines={3} />}
           {!challenges.loading && !challenges.data?.challenges.length && <EmptyState icon="⚔️" title="還沒有進行中的挑戰" hint="發起單字或測驗挑戰，和好友比分數！" />}
           <div className="space-y-2">
@@ -208,18 +285,16 @@ function ChallengeInner() {
                   <Button
                     size="sm"
                     onClick={async () => {
-                      const score = Math.round(Number(prompt("輸入你這次挑戰的分數（0-100）") ?? "0"));
-                      if (!Number.isFinite(score)) return;
                       try {
-                        await apiPost(`/challenges/${c.id}/submit`, { score: Math.max(0, Math.min(100, score)), durationSec: 60 });
-                        toast.push("success", "成績已登錄！");
-                        await challenges.reload();
+                        const result = await apiGet<{ title: string; words: ChallengeWord[]; settings: { direction: "zh2en" | "en2zh" | "mixed"; difficulty: string } }>(`/challenges/${c.id}/words`);
+                        if (!result.words.length) throw new Error("目前沒有可用的挑戰題目");
+                        setQuizSession({ title: result.title, challengeId: c.id, words: result.words, direction: result.settings.direction, difficulty: result.settings.difficulty });
                       } catch (err) {
                         toast.push("error", errorMessage(err));
                       }
                     }}
                   >
-                    登錄成績
+                    開始作答
                   </Button>
                 </div>
                 <div className="mt-2 space-y-1">
@@ -235,7 +310,8 @@ function ChallengeInner() {
               </div>
             ))}
           </div>
-        </Card>
+          </Card>
+        </div>
       )}
 
       {tab === "vocab" && (
@@ -441,6 +517,14 @@ function ChallengeInner() {
               </Select>
             </Field>
           )}
+          {cForm.kind === "word" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="詞庫"><Select value={cForm.track} onChange={(e) => setCForm({ ...cForm, track: e.target.value as "junior" | "senior" })}><option value="junior">國中 2000 單</option><option value="senior">高中 7000 單</option></Select></Field>
+              <Field label="題數"><Select value={String(cForm.questionCount)} onChange={(e) => setCForm({ ...cForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option></Select></Field>
+              <Field label="難度"><Select value={cForm.difficulty} onChange={(e) => setCForm({ ...cForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
+              <Field label="題目方向"><Select value={cForm.direction} onChange={(e) => setCForm({ ...cForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
+            </div>
+          )}
           {cForm.kind === "quiz" && (
             <Field label="選擇測驗">
               <Select value={cForm.quizId} onChange={(e) => setCForm({ ...cForm, quizId: e.target.value })}>
@@ -466,6 +550,10 @@ function ChallengeInner() {
                   quizId: cForm.kind === "quiz" ? cForm.quizId || null : null,
                   weekId: cForm.kind === "weekly" ? cForm.quizId || null : null,
                   durationHours: cForm.durationHours,
+                  track: cForm.track,
+                  questionCount: cForm.questionCount,
+                  direction: cForm.direction,
+                  difficulty: cForm.difficulty,
                   inviteIds: friends.data?.friends.map((f) => f.userId) ?? [],
                 });
                 toast.push("success", "挑戰已建立，已通知好友");
