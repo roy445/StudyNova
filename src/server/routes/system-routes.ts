@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { pushSubscriptions, notifications, users, novaTransactions, questions, jobQueue, weeklyExamWeeks, storageObjects, featurePermissions } from "@/db/schema";
-import { route, type RouteDef } from "../router";
+import { route, type Ctx, type RouteDef } from "../router";
 import { badRequest, fail, hashPassword, verifyPassword, generateNovaId, toCsv, todayStr } from "../core";
 import { listNotifications, markRead, unreadCount, pushConfigured, sendPush } from "../notify";
 import { CRON_TASKS, queue, runCronTask, isWeekOpen, type JobName } from "../queue";
@@ -22,6 +22,19 @@ async function timed(name: string, group: string, fn: () => Promise<string>): Pr
     if (msg.startsWith("SKIP:")) return { name, group, status: "SKIP", durationMs: Date.now() - start, detail: msg.slice(5) };
     return { name, group, status: "FAIL", durationMs: Date.now() - start, detail: msg.slice(0, 300) };
   }
+}
+
+async function handleCron(ctx: Ctx) {
+  const secret = process.env.CRON_SECRET;
+  const authorization = ctx.req.headers.get("authorization") ?? "";
+  const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const provided = ctx.req.headers.get("x-cron-secret") ?? ctx.query.get("secret") ?? bearer;
+  if (!secret) throw fail("ADMIN_CRON_SECRET_MISSING");
+  if (provided !== secret) throw fail("ADMIN_CRON_SECRET_INVALID");
+  const task = (ctx.query.get("task") ?? "daily_tasks_refresh") as JobName;
+  if (!CRON_TASKS.some((t) => t.task === task)) throw fail("ADMIN_CRON_TASK_UNKNOWN");
+  const taskUid = ctx.query.get("uid") || `${todayStr()}:${new Date().getUTCHours()}`;
+  return runCronTask(task, taskUid);
 }
 
 export const routes: RouteDef[] = [
@@ -112,21 +125,8 @@ export const routes: RouteDef[] = [
   }),
 
   /* ---------------------------------------------------------- cron */
-  route({
-    method: "POST",
-    path: "/system/cron",
-    auth: "none",
-    handler: async (ctx) => {
-      const secret = process.env.CRON_SECRET;
-      const provided = ctx.req.headers.get("x-cron-secret") ?? ctx.query.get("secret") ?? "";
-      if (!secret) throw fail("ADMIN_CRON_SECRET_MISSING");
-      if (provided !== secret) throw fail("ADMIN_CRON_SECRET_INVALID");
-      const task = (ctx.query.get("task") ?? "daily_tasks_refresh") as JobName;
-      if (!CRON_TASKS.some((t) => t.task === task)) throw fail("ADMIN_CRON_TASK_UNKNOWN");
-      const taskUid = ctx.query.get("uid") ?? `${todayStr()}:${new Date().getUTCHours()}`;
-      return runCronTask(task, taskUid);
-    },
-  }),
+  route({ method: "GET", path: "/system/cron", auth: "none", handler: handleCron }),
+  route({ method: "POST", path: "/system/cron", auth: "none", handler: handleCron }),
 
   route({
     method: "GET",
