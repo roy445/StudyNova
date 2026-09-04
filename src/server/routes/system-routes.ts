@@ -33,7 +33,8 @@ async function handleCron(ctx: Ctx) {
   if (provided !== secret) throw fail("ADMIN_CRON_SECRET_INVALID");
   const task = (ctx.query.get("task") ?? "daily_tasks_refresh") as JobName;
   if (!CRON_TASKS.some((t) => t.task === task)) throw fail("ADMIN_CRON_TASK_UNKNOWN");
-  const taskUid = ctx.query.get("uid") || `${todayStr()}:${new Date().getUTCHours()}`;
+  const requestedUid = ctx.query.get("uid") ?? "";
+  const taskUid = requestedUid && !requestedUid.includes("%") ? requestedUid : `${todayStr()}:${new Date().getUTCHours()}`;
   return runCronTask(task, taskUid);
 }
 
