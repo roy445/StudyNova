@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
-import { Badge, Button, Input, Modal, Skeleton, useToast } from "./ui";
-import { apiGet, apiPost, useApi } from "@/lib/api";
+import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
+import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
 
 export type ShellUser = {
   userId: string;
@@ -75,6 +75,10 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [redeemOpen, setRedeemOpen] = useState(false);
+  const [redeemCode, setRedeemCode] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
@@ -159,10 +163,32 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   );
 
   const logout = useCallback(async () => {
+    setAccountMenuOpen(false);
     await apiPost("/auth/logout");
     router.replace("/login");
     router.refresh();
   }, [router]);
+
+  const redeemCoupon = useCallback(async () => {
+    const code = redeemCode.trim();
+    if (!code) {
+      toast.push("error", "請輸入兌換碼");
+      return;
+    }
+    setRedeeming(true);
+    try {
+      const result = await apiPost<{ redeemed: boolean; kind: "nova" | "xp" | "pro"; value: number }>("/coupons/redeem", { code });
+      const reward = result.kind === "pro" ? `Nova Pro ${result.value} 天` : `${result.value} ${result.kind.toUpperCase()}`;
+      toast.push("success", `兌換成功！獲得 ${reward}`);
+      setRedeemCode("");
+      setRedeemOpen(false);
+      window.dispatchEvent(new Event("studynova:sync"));
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setRedeeming(false);
+    }
+  }, [redeemCode, toast]);
 
   const unread = notif.data?.unread ?? 0;
   const nova = summary.data?.nova ?? 0;
@@ -234,12 +260,57 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               ◌
               {unread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
             </button>
-            <Link href="/profile" className={`focus-ring flex items-center gap-2 rounded-xl border px-2 py-1.5 text-xs ${user.isPro ? "pro-frame" : "border-[var(--line)]"}`}>
-              <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold ${user.isPro ? "bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "bg-white/10"}`}>
-                {user.displayName.slice(0, 1)}
-              </span>
-              <span className={`hidden max-w-[90px] truncate sm:inline ${user.isPro ? "pro-name font-semibold" : ""}`}>{user.displayName}</span>
-            </Link>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAccountMenuOpen((open) => !open)}
+                aria-label="開啟帳號選單"
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="menu"
+                className={`focus-ring flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-xs transition hover:bg-white/5 ${user.isPro ? "pro-frame" : "border-[var(--line)]"}`}
+              >
+                <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold ${user.isPro ? "bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "bg-white/10"}`}>
+                  {user.displayName.slice(0, 1)}
+                </span>
+                <span className={`hidden max-w-[90px] truncate sm:inline ${user.isPro ? "pro-name font-semibold" : ""}`}>{user.displayName}</span>
+                <span className="text-[10px] text-muted" aria-hidden="true">⌄</span>
+              </button>
+              {accountMenuOpen && (
+                <div role="menu" aria-label="帳號選單" className="glass anim-pop absolute right-0 top-[calc(100%+0.5rem)] z-50 w-64 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.35)]">
+                  <div className="px-3 py-2.5">
+                    <p className={`truncate text-sm font-semibold ${user.isPro ? "pro-name" : ""}`}>{user.displayName}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-muted">{user.novaId}</p>
+                  </div>
+                  <div className="border-t border-[var(--line)] pt-1.5">
+                    <Link
+                      href="/profile"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-white/5 hover:text-[var(--text)]"
+                    >
+                      <span>個人設定</span><span aria-hidden="true">→</span>
+                    </Link>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); setRedeemOpen(true); }}
+                      className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-[#d9d0ff] transition hover:bg-[#7c5cff]/10"
+                    >
+                      <span className="flex items-center gap-2"><span aria-hidden="true">✦</span>輸入兌換碼</span><span aria-hidden="true">→</span>
+                    </button>
+                    <div className="my-1.5 border-t border-[var(--line)]" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void logout()}
+                      className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-rose-200 transition hover:bg-rose-500/10"
+                    >
+                      <span>登出</span><span aria-hidden="true">↗</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -374,6 +445,33 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               <Badge tone="muted">{kindLabel[r.kind] ?? r.kind}</Badge>
             </div>
           ))}
+        </div>
+      </Modal>
+
+      {/* Redeem code */}
+      <Modal open={redeemOpen} onClose={() => { if (!redeeming) { setRedeemOpen(false); setRedeemCode(""); } }} title="輸入兌換碼">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-[#7c5cff]/25 bg-[#7c5cff]/10 p-3.5">
+            <p className="text-sm font-medium text-[#e9e3ff]">解鎖你的專屬獎勵</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">輸入管理員提供的兌換碼，可獲得 Nova、XP 或 Nova Pro 天數。每組兌換碼每個帳號只能使用一次。</p>
+          </div>
+          <Field label="兌換碼" required hint="不區分大小寫，前後空白會自動移除。">
+            <Input
+              value={redeemCode}
+              onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => { if (e.key === "Enter") void redeemCoupon(); }}
+              placeholder="例如：NOVA-2026"
+              maxLength={40}
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              disabled={redeeming}
+            />
+          </Field>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => { setRedeemOpen(false); setRedeemCode(""); }} disabled={redeeming}>取消</Button>
+            <Button onClick={() => void redeemCoupon()} loading={redeeming} disabled={!redeemCode.trim()}>確認兌換</Button>
+          </div>
         </div>
       </Modal>
 
