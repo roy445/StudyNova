@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
-import { apiPost, errorMessage, useApi } from "@/lib/api";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
+import { apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
 
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
 
@@ -11,6 +11,9 @@ export default function AdminSystemPage() {
   const [tab, setTab] = useState("tests");
   const health = useApi<{ services: Array<{ name: string; status: string; detail: string }>; checkedAt: string }>("/admin/system/health");
   const cron = useApi<{ tasks: Array<{ task: string; label: string; schedule: string }>; jobs: Array<{ id: string; name: string; status: string; lastError: string; createdAt: string }>; adapter: string; health: { status: string; detail: string; pending: number }; secretConfigured: boolean }>("/admin/cron");
+  const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
+  const gradeWindow = (settings.data?.settings.find((s) => s.key === "grade_input_window")?.value ?? {}) as { enabled?: boolean; startsAt?: string; endsAt?: string };
+  const countdowns = (settings.data?.settings.find((s) => s.key === "exam_countdowns")?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [summary, setSummary] = useState<{ total: number; pass: number; fail: number; skip: number; durationMs: number } | null>(null);
@@ -33,6 +36,7 @@ export default function AdminSystemPage() {
           { key: "tests", label: "System Test Center", icon: "🧪" },
           { key: "health", label: "系統健康", icon: "❤️" },
           { key: "cron", label: "Cron / Queue", icon: "⏰" },
+          { key: "settings", label: "開放設定", icon: "⚙" },
           { key: "export", label: "CSV 匯出", icon: "📤" },
           { key: "logs", label: "System Log", icon: "📜" },
         ]}
@@ -111,6 +115,28 @@ export default function AdminSystemPage() {
         </Card>
       )}
 
+      {tab === "settings" && (
+        <Card title="⚙ 成績輸入時段" subtitle="只有管理員能控制；前端與後端都會阻擋非開放時段的新增成績。">
+          {settings.loading && <Skeleton lines={3} />}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="目前狀態"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="grade-window-enabled" type="checkbox" defaultChecked={gradeWindow.enabled !== false} className="accent-[#7c5cff]" /> 開放成績輸入</label></Field>
+            <Field label="開始時間"><Input id="grade-window-start" type="datetime-local" defaultValue={gradeWindow.startsAt ? new Date(gradeWindow.startsAt).toISOString().slice(0, 16) : ""} /></Field>
+            <Field label="結束時間"><Input id="grade-window-end" type="datetime-local" defaultValue={gradeWindow.endsAt ? new Date(gradeWindow.endsAt).toISOString().slice(0, 16) : ""} /></Field>
+          </div>
+          <Button className="mt-3" onClick={async () => { const enabled = (document.getElementById("grade-window-enabled") as HTMLInputElement).checked; const startsAt = (document.getElementById("grade-window-start") as HTMLInputElement).value; const endsAt = (document.getElementById("grade-window-end") as HTMLInputElement).value; if (startsAt && endsAt && new Date(startsAt) >= new Date(endsAt)) return toast.push("error", "結束時間必須晚於開始時間"); try { await apiPut("/admin/settings/grade_input_window", { value: { enabled, startsAt: startsAt ? new Date(startsAt).toISOString() : "", endsAt: endsAt ? new Date(endsAt).toISOString() : "" } }); toast.push("success", "成績輸入時段已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存成績設定</Button>
+          <div className="mt-6 border-t border-[var(--line)] pt-4">
+            <p className="mb-3 text-sm font-semibold">⌁ 首頁考試／學測倒數</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="考試名稱"><Input id="countdown-exam-name" defaultValue={countdowns.exam?.name ?? "段考倒數"} /></Field>
+              <Field label="考試日期"><Input id="countdown-exam-date" type="date" defaultValue={countdowns.exam?.date ?? ""} /></Field>
+              <Field label="學測名稱"><Input id="countdown-gsat-name" defaultValue={countdowns.gsat?.name ?? "學測倒數"} /></Field>
+              <Field label="學測日期"><Input id="countdown-gsat-date" type="date" defaultValue={countdowns.gsat?.date ?? ""} /></Field>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-4 text-sm"><label className="flex items-center gap-2"><input id="countdown-exam-enabled" type="checkbox" defaultChecked={countdowns.exam?.enabled !== false} className="accent-[#7c5cff]" /> 顯示考試倒數</label><label className="flex items-center gap-2"><input id="countdown-gsat-enabled" type="checkbox" defaultChecked={countdowns.gsat?.enabled !== false} className="accent-[#7c5cff]" /> 顯示學測倒數</label></div>
+            <Button className="mt-3" onClick={async () => { try { await apiPut("/admin/settings/exam_countdowns", { value: { exam: { name: (document.getElementById("countdown-exam-name") as HTMLInputElement).value, date: (document.getElementById("countdown-exam-date") as HTMLInputElement).value, enabled: (document.getElementById("countdown-exam-enabled") as HTMLInputElement).checked }, gsat: { name: (document.getElementById("countdown-gsat-name") as HTMLInputElement).value, date: (document.getElementById("countdown-gsat-date") as HTMLInputElement).value, enabled: (document.getElementById("countdown-gsat-enabled") as HTMLInputElement).checked } } }); toast.push("success", "倒數設定已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存倒數設定</Button>
+          </div>
+        </Card>
+      )}
       {tab === "cron" && (
         <Card title="◷ Cron / Queue" subtitle={cron.data ? `Adapter：${cron.data.adapter}・待處理 ${cron.data.health.pending}・CRON_SECRET ${cron.data.secretConfigured ? "已設定" : "未設定"}` : ""}>
           {cron.loading && <Skeleton lines={4} />}

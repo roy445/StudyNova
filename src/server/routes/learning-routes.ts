@@ -24,6 +24,7 @@ import {
   achievements,
   userAchievements,
   dailyWords,
+  platformSettings,
   wordProgress,
   questions,
 } from "@/db/schema";
@@ -243,6 +244,9 @@ export const routes: RouteDef[] = [
         .where(and(eq(exams.userId, user.userId), gte(exams.examDate, today)))
         .orderBy(asc(exams.examDate))
         .limit(3);
+      const countdownSetting = (await db.select().from(platformSettings).where(eq(platformSettings.key, "exam_countdowns")).limit(1))[0];
+      const countdownConfig = (countdownSetting?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
+      const countdowns = [countdownConfig.exam ? { type: "exam", name: countdownConfig.exam.name ?? "考試倒數", date: countdownConfig.exam.date ?? "", enabled: countdownConfig.exam.enabled !== false } : null, countdownConfig.gsat ? { type: "gsat", name: countdownConfig.gsat.name ?? "學測倒數", date: countdownConfig.gsat.date ?? "", enabled: countdownConfig.gsat.enabled !== false } : null].filter((item): item is { type: string; name: string; date: string; enabled: boolean } => Boolean(item?.enabled && item.date)).map((item) => ({ ...item, daysLeft: Math.max(0, Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000)), urgent: Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000) <= 5 }));
 
       const [dueWrong] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -309,6 +313,7 @@ export const routes: RouteDef[] = [
         weakest,
         recentGrades,
         upcomingExams: upcomingExams.map((e) => ({ ...e, daysLeft: daysBetween(today, e.examDate) })),
+        countdowns,
         dueWrong: dueWrong?.count ?? 0,
         wordsDue: wordsDue?.count ?? 0,
         nova: nova?.balance ?? 0,
@@ -343,6 +348,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      await assertGradeInputOpen();
       const body = await ctx.json(
         z.object({
           subject: z.string().min(1).max(20),
@@ -929,6 +935,14 @@ export const routes: RouteDef[] = [
     },
   }),
 ];
+
+async function assertGradeInputOpen() {
+  const setting = (await db.select().from(platformSettings).where(eq(platformSettings.key, "grade_input_window")).limit(1))[0];
+  const value = (setting?.value ?? {}) as { enabled?: boolean; startsAt?: string; endsAt?: string };
+  if (value.enabled === false) throw fail("QUOTA_FEATURE_DISABLED", { message: "目前未開放成績輸入，請等待管理員開放。" });
+  if (value.startsAt && new Date(value.startsAt) > new Date()) throw fail("QUOTA_FEATURE_DISABLED", { message: `成績輸入將於 ${new Date(value.startsAt).toLocaleString("zh-TW")} 開放。` });
+  if (value.endsAt && new Date(value.endsAt) < new Date()) throw fail("QUOTA_FEATURE_DISABLED", { message: "本次成績輸入時段已結束，請等待管理員重新開放。" });
+}
 
 function buildNoviAdvice(input: {
   displayName: string;

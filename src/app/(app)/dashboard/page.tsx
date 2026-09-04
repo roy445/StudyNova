@@ -32,6 +32,8 @@ type Dashboard = {
   weakest: SubjectStat | null;
   recentGrades: Array<{ id: string; subject: string; examName: string; score: number; fullScore: number; examDate: string; percentage: number }>;
   upcomingExams: Array<{ id: string; name: string; examDate: string; daysLeft: number }>;
+  countdowns: Array<{ type: string; name: string; date: string; daysLeft: number; urgent: boolean }>;
+
   dueWrong: number;
   wordsDue: number;
   nova: number;
@@ -215,6 +217,19 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {data.countdowns?.length > 0 && (
+        <section className="grid gap-3 sm:grid-cols-2" aria-label="重要倒數">
+          {data.countdowns.map((countdown) => (
+            <div key={countdown.type} className={`relative overflow-hidden rounded-2xl border p-5 ${countdown.urgent ? "border-[#ff6b8a]/70 bg-gradient-to-br from-[#7f1d3b]/60 to-[#2b1635] shadow-[0_0_34px_rgba(255,107,138,0.25)]" : "border-[#37d3ff]/35 bg-gradient-to-br from-[#102e55] to-[#161b3d]"}`}>
+              <p className={`text-xs font-semibold tracking-[0.24em] ${countdown.urgent ? "text-[#ff9bb0]" : "text-[#7dd3fc]"}`}>{countdown.urgent ? "⚠ 最後衝刺" : "✦ 重要倒數"}</p>
+              <p className="mt-1 text-sm text-muted">{countdown.name}</p>
+              <div className="mt-1 flex items-end gap-2"><strong className={`text-5xl font-black tabular-nums ${countdown.urgent ? "text-[#ffd1da]" : "text-white"}`}>{countdown.daysLeft}</strong><span className="pb-1 text-lg text-muted">天</span></div>
+              <p className="mt-1 text-xs text-muted">日期：{countdown.date}</p>
+              {countdown.urgent && <p className="mt-3 text-xs font-semibold text-[#ffd1da]">每天都要記得讀書，現在開始準備還來得及。</p>}
+            </div>
+          ))}
+        </section>
+      )}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="⌁ 考試倒數" action={<Link href="/grades" className="text-xs underline text-muted">管理</Link>}>
           {data.upcomingExams.length ? (

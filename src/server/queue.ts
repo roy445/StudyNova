@@ -10,6 +10,7 @@ import {
   studyRecords,
   focusSessions,
   notifications,
+  userSettings,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
@@ -23,7 +24,8 @@ export type JobName =
   | "membership_expiry"
   | "activity_reminder"
   | "inactive_reminder"
-  | "session_cleanup";
+  | "session_cleanup"
+  | "study_reminder";
 
 export type JobPayload = Record<string, unknown>;
 
@@ -41,6 +43,20 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     const rows = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
     for (const r of rows) await ensureDailyTasks(r.userId);
     return `已為 ${rows.length} 位使用者建立今日任務`;
+  },
+
+  async study_reminder() {
+    const today = todayStr();
+    const students = await db.select({ userId: users.userId, displayName: users.displayName, goal: userSettings.dailyGoalMinutes }).from(users).leftJoin(userSettings, eq(userSettings.userId, users.userId)).where(and(eq(users.status, "active"), eq(users.role, "student")));
+    let sent = 0;
+    for (const student of students) {
+      const [progress] = await db.select({ minutes: sql<number>`coalesce(sum(${studyRecords.minutes}),0)::int` }).from(studyRecords).where(and(eq(studyRecords.userId, student.userId), eq(studyRecords.recordDate, today)));
+      const goal = student.goal ?? 45;
+      if ((progress?.minutes ?? 0) >= goal) continue;
+      const created = await notify({ userId: student.userId, kind: "study_reminder", title: "📚 記得今天讀書", body: `${student.displayName}，今天已學習 ${progress?.minutes ?? 0} 分鐘，距離目標還有 ${Math.max(0, goal - (progress?.minutes ?? 0))} 分鐘。`, link: "/dashboard", dedupeKey: `study:${student.userId}:${today}`, push: true });
+      if (created) sent += 1;
+    }
+    return `寄出 ${sent} 則每日讀書提醒`;
   },
 
   async review_reminder() {
@@ -334,6 +350,7 @@ export const CRON_TASKS: Array<{ task: JobName; label: string; schedule: string 
   { task: "activity_reminder", label: "活動提醒", schedule: "每日 12:00" },
   { task: "inactive_reminder", label: "久未登入關懷提醒", schedule: "每日 18:30" },
   { task: "session_cleanup", label: "Session / 通知清理", schedule: "每日 03:00" },
+  { task: "study_reminder", label: "每日讀書提醒", schedule: "每日 20:00" },
 ];
 
 export async function runCronTask(task: JobName, taskUid: string) {
