@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, gte, sql, isNull, lte } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import {
   gradeRecords,
@@ -877,28 +877,41 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      await ensureSeeded();
       const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
-      const count = Math.max(1, Math.min(10, settings?.dailyWordCount ?? 10));
+      const dailyTarget = Math.max(1, Math.min(10, settings?.dailyWordCount ?? 10));
       const requestedTrack = ctx.query.get("track");
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : settings?.schoolLevel === "senior" ? "senior" : "junior";
       const dayNumber = Math.floor(Date.now() / 86_400_000);
-      const totalResult = await db.execute(sql`select count(*)::int as count from daily_words where level = ${track}`);
-      const total = Number(totalResult.rows[0]?.count ?? 0);
-      if (!total) return { words: [], level: track, track, count: 0, dailyTarget: count };
-      const offset = (dayNumber * count) % total;
-      const baseQuery = sql`
-        select w.id, w.word, w.meaning, w.meanings, w.phrases, w.part_of_speech, w.example, w.example_zh, w.level,
-               coalesce(p.familiarity, 0) as familiarity, coalesce(p.correct_count,0) as correct_count,
-               coalesce(p.wrong_count,0) as wrong_count, p.memory_tip
-        from daily_words w
-        left join word_progress p on p.word_id = w.id and p.user_id = ${user.userId}
-        where w.level = ${track}
-        order by w.word asc`;
-      const first = await db.execute(sql`${baseQuery} limit ${count} offset ${offset}`);
-      const remaining = count - first.rows.length;
-      const rows = remaining > 0 ? [...first.rows, ...(await db.execute(sql`${baseQuery} limit ${remaining}`)).rows] : first.rows;
-      return { words: rows, level: track, track, count: rows.length, dailyTarget: count };
+      const [{ total }] = await db.select({ total: count() }).from(dailyWords).where(eq(dailyWords.level, track));
+      const totalWords = Number(total ?? 0);
+      if (!totalWords) return { words: [], level: track, track, count: 0, dailyTarget };
+      const offset = (dayNumber * dailyTarget) % totalWords;
+      const fetchWords = (limit: number, skip: number) => db
+        .select({
+          id: dailyWords.id,
+          word: dailyWords.word,
+          meaning: dailyWords.meaning,
+          meanings: dailyWords.meanings,
+          phrases: dailyWords.phrases,
+          part_of_speech: dailyWords.partOfSpeech,
+          example: dailyWords.example,
+          example_zh: dailyWords.exampleZh,
+          level: dailyWords.level,
+          familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
+          correct_count: sql<number>`coalesce(${wordProgress.correctCount}, 0)`,
+          wrong_count: sql<number>`coalesce(${wordProgress.wrongCount}, 0)`,
+          memory_tip: wordProgress.memoryTip,
+        })
+        .from(dailyWords)
+        .leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId)))
+        .where(eq(dailyWords.level, track))
+        .orderBy(asc(dailyWords.word))
+        .limit(limit)
+        .offset(skip);
+      const first = await fetchWords(dailyTarget, offset);
+      const remaining = dailyTarget - first.length;
+      const rows = remaining > 0 ? [...first, ...(await fetchWords(remaining, 0))] : first;
+      return { words: rows, level: track, track, count: rows.length, dailyTarget };
     },
   }),
 
