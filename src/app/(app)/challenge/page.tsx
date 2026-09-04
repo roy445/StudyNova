@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Tabs, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
 import { WordsPanel } from "@/features/study/panels-c";
+import { DAILY_KNOWLEDGE, dailyKnowledge } from "@/data/daily-knowledge";
 
 type Friend = { userId: string; novaId: string; displayName: string; level: number | null; xp: number | null };
 type Challenge = {
@@ -116,6 +118,8 @@ function ChallengeInner() {
           { key: "friends", label: "好友", icon: "🤝" },
           { key: "challenge", label: "挑戰", icon: "⚔️" },
           { key: "vocab", label: "分級單字", icon: "🔤" },
+          { key: "knowledge", label: "每日小知識", icon: "💡" },
+          { key: "literacy", label: "素養挑戰", icon: "🧠" },
           { key: "room", label: "讀書房", icon: "🏫" },
           { key: "activity", label: "活動", icon: "🎉" },
           { key: "board", label: "排行榜", icon: "🏆" },
@@ -344,6 +348,38 @@ function ChallengeInner() {
         </div>
       )}
 
+      {tab === "knowledge" && (
+        <div className="space-y-4">
+          <Card title="💡 每日小知識" subtitle="每天一則，讀完就能把知識帶走。">
+            <div className="rounded-2xl border border-[#37d3ff]/30 bg-gradient-to-br from-[#102e55] to-[#171936] p-5">
+              <Badge tone="cyan">{dailyKnowledge(new Date().toISOString().slice(0, 10)).tag}</Badge>
+              <h2 className="mt-3 text-xl font-bold text-[#e8edff]">{dailyKnowledge(new Date().toISOString().slice(0, 10)).title}</h2>
+              <p className="mt-3 leading-8 text-muted">{dailyKnowledge(new Date().toISOString().slice(0, 10)).body}</p>
+              <Link href="/study?tab=words" className="mt-4 inline-flex text-sm text-[#7dd3fc] underline">用今日單字複習 →</Link>
+            </div>
+          </Card>
+          <Card title="知識庫" subtitle={`目前共有 ${DAILY_KNOWLEDGE.length} 則主題`}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {DAILY_KNOWLEDGE.map((item) => <article key={item.title} className="glass-soft p-3"><Badge tone="muted">{item.tag}</Badge><h3 className="mt-2 text-sm font-semibold">{item.title}</h3><p className="mt-1 text-xs leading-6 text-muted">{item.body}</p></article>)}
+            </div>
+          </Card>
+        </div>
+      )}
+      {tab === "literacy" && (
+        <div className="space-y-4">
+          <Card title="🧠 素養挑戰" subtitle="用情境理解、跨科閱讀與推理題檢驗自己。">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="glass-soft p-4"><p className="font-semibold">每週小考</p><p className="mt-1 text-xs leading-6 text-muted">依管理員發布的閱讀與素養題組作答，完成後會留下成績與錯題。</p><Link href="/weekly" className="mt-3 inline-flex text-sm text-[#7dd3fc] underline">前往每週小考 →</Link></div>
+              <div className="glass-soft p-4"><p className="font-semibold">我的題庫</p><p className="mt-1 text-xs leading-6 text-muted">從 AI 鏡頭或學習資料建立測驗，支援限時作答與結果分析。</p><Link href="/study?tab=ai" className="mt-3 inline-flex text-sm text-[#7dd3fc] underline">建立素養測驗 →</Link></div>
+            </div>
+          </Card>
+          <Card title="可作答題組" subtitle="你已建立的 AI 測驗">
+            {quizzes.loading && <Skeleton lines={3} />}
+            {!quizzes.loading && !quizzes.data?.quizzes.length && <EmptyState icon="🧠" title="尚未建立題組" hint="可從 AI 鏡頭或學習資料建立第一份素養測驗。" />}
+            <div className="space-y-2">{quizzes.data?.quizzes.map((quiz) => <div key={quiz.id} className="glass-soft flex items-center justify-between gap-3 p-3"><span className="text-sm">{quiz.title}</span><Link href="/study?tab=quiz" className="text-xs text-[#7dd3fc] underline">前往測驗</Link></div>)}</div>
+          </Card>
+        </div>
+      )}
       {tab === "room" && (
         <div className="space-y-4">
           <Card title="🏫 讀書房" action={<Button size="sm" onClick={() => setRoomOpen(true)}>＋ 建立</Button>}>
