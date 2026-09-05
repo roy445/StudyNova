@@ -383,7 +383,7 @@ export const routes: RouteDef[] = [
       const sentences = await db.select().from(weeklyExamSentences).where(eq(weeklyExamSentences.weekId, week.id));
       return {
         week: { ...week, open: isWeekOpen(week) },
-        files: files.map((f) => ({ ...f, url: f.objectId ? signObjectUrl(f.objectId, admin.userId) : null })),
+        files: files.map((f) => ({ ...f, ocrText: f.ocrText.slice(0, 4000), url: f.objectId ? signObjectUrl(f.objectId, admin.userId) : null })),
         drafts,
         questions,
         answers,
@@ -393,6 +393,29 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/weekly/:id/files",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const week = (await db.select({ id: weeklyExamWeeks.id }).from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
+      if (!week) throw fail("WEEK_NOT_FOUND");
+      const files = await db.select().from(weeklyExamFiles).where(eq(weeklyExamFiles.weekId, week.id)).orderBy(asc(weeklyExamFiles.fileKind), asc(weeklyExamFiles.orderIndex));
+      return { files: files.map((f) => ({ ...f, ocrText: f.ocrText.slice(0, 4000), url: f.objectId ? signObjectUrl(f.objectId, admin.userId) : null })) };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/weekly/files/:fileId",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const file = (await db.select().from(weeklyExamFiles).where(eq(weeklyExamFiles.id, ctx.params.fileId)).limit(1))[0];
+      if (!file) throw notFound("找不到檔案");
+      return { file: { ...file, url: file.objectId ? signObjectUrl(file.objectId, admin.userId) : null } };
+    },
+  }),
   route({
     method: "POST",
     path: "/admin/weekly/:id/files",
