@@ -21,18 +21,21 @@ type Challenge = {
   participants: Array<{ userId: string; displayName: string; score: number; durationSec: number; finishedAt: string | null }>;
 };
 
-type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string; direction?: "zh2en" | "en2zh"; options?: string[]; answer?: string };
+type ChallengeMode = "choice" | "listening" | "handwriting" | "confusable";
+type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string; direction?: "zh2en" | "en2zh"; challengeMode?: ChallengeMode; options?: string[]; answer?: string };
 
-type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; onFinish: (score: number, total: number, durationSec: number) => Promise<void> };
+type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; challengeMode?: ChallengeMode; onFinish: (score: number, total: number, durationSec: number) => Promise<void> };
 
-function QuizRunner({ title, words, direction, difficulty, onFinish }: QuizRunnerProps) {
+function QuizRunner({ title, words, direction, difficulty, challengeMode = "choice", onFinish }: QuizRunnerProps) {
   const [index, setIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [startedAt] = useState(() => Date.now());
   const [selected, setSelected] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [typed, setTyped] = useState("");
   const current = words[index];
-  const actualDirection = direction === "mixed" ? (index % 2 === 0 ? "zh2en" : "en2zh") : direction;
+  const actualDirection = current?.direction ?? (direction === "mixed" ? (index % 2 === 0 ? "zh2en" : "en2zh") : direction);
+  const mode = current?.challengeMode ?? challengeMode;
   const choices = useMemo(() => {
     if (!current) return [];
     const answer = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
@@ -58,6 +61,7 @@ function QuizRunner({ title, words, direction, difficulty, onFinish }: QuizRunne
       if (index + 1 < words.length) {
         setIndex((value) => value + 1);
         setSelected(null);
+        setTyped("");
         return;
       }
       setSubmitting(true);
@@ -68,9 +72,12 @@ function QuizRunner({ title, words, direction, difficulty, onFinish }: QuizRunne
   const expected = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
   return (
     <Card title={title} subtitle={`${index + 1}/${words.length} 題・難度 ${difficulty === "easy" ? "簡單" : difficulty === "hard" ? "困難" : "普通"}`}>
-      <div className="mb-4 flex items-center justify-between text-xs text-muted"><span>{actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}</span><Badge tone="cyan">目前答對 {correct} 題</Badge></div>
-      <div className="glass-soft mb-4 rounded-2xl p-6 text-center"><p className="text-2xl font-bold text-[#e8edff]">{actualDirection === "zh2en" ? current.meaning : current.word}</p><p className="mt-2 text-xs text-muted">{current.partOfSpeech}</p></div>
-      <div className="grid gap-2 sm:grid-cols-2">{choices.map((choice) => <button key={choice} type="button" disabled={Boolean(selected) || submitting} onClick={() => void choose(choice)} className={`focus-ring rounded-xl border p-3 text-left text-sm transition ${selected ? choice === expected ? "border-emerald-400/60 bg-emerald-400/10" : choice === selected ? "border-rose-400/60 bg-rose-400/10" : "border-[var(--line)] opacity-60" : "border-[var(--line)] bg-white/[0.03] hover:border-[#37d3ff]/60 hover:bg-[#37d3ff]/10"}`}>{choice}</button>)}</div>
+      <div className="mb-4 flex items-center justify-between text-xs text-muted"><span>{mode === "listening" ? "聽力辨識" : mode === "confusable" ? "易混淆單字辨析" : actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}</span><Badge tone="cyan">目前答對 {correct} 題</Badge></div>
+      <div className="glass-soft mb-4 rounded-2xl p-6 text-center">
+        {mode === "listening" ? <><p className="text-sm text-muted">請先播放音檔，再選出你聽到的答案</p><Button className="mt-3" onClick={() => { const text = actualDirection === "zh2en" ? current.word : current.meaning; if ("speechSynthesis" in window) { const u = new SpeechSynthesisUtterance(text); u.lang = actualDirection === "zh2en" ? "en-US" : "zh-TW"; window.speechSynthesis.speak(u); } }}>播放聽力</Button></> : <p className="text-2xl font-bold text-[#e8edff]">{actualDirection === "zh2en" ? current.meaning : current.word}</p>}
+        <p className="mt-2 text-xs text-muted">{current.partOfSpeech}</p>
+      </div>
+      {mode === "handwriting" ? <div className="flex gap-2"><Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={actualDirection === "zh2en" ? "請手寫輸入英文" : "請手寫輸入中文"} disabled={Boolean(selected) || submitting} onKeyDown={(e) => e.key === "Enter" && void choose(typed.trim())} /><Button disabled={!typed.trim()} onClick={() => void choose(typed.trim())}>送出</Button></div> : <div className="grid gap-2 sm:grid-cols-2">{choices.map((choice) => <button key={choice} type="button" disabled={Boolean(selected) || submitting} onClick={() => void choose(choice)} className={`focus-ring rounded-xl border p-3 text-left text-sm transition ${selected ? choice === expected ? "border-emerald-400/60 bg-emerald-400/10" : choice === selected ? "border-rose-400/60 bg-rose-400/10" : "border-[var(--line)] opacity-60" : "border-[var(--line)] bg-white/[0.03] hover:border-[#37d3ff]/60 hover:bg-[#37d3ff]/10"}`}>{choice}</button>)}</div>}
       <p className="mt-4 text-center text-[11px] text-muted">選出最適合的答案，答完會自動進入下一題</p>
     </Card>
   );
@@ -89,14 +96,14 @@ function ChallengeInner() {
   const weekly = useApi<{ weeks: Array<{ id: string; weekCode: string; title: string; open: boolean; proOnly: boolean }> }>("/weekly");
   const vocabulary = useApi<{ tracks: Array<{ id: "junior" | "senior"; label: string; description: string; count: number }> }>("/words/catalog");
   const [vocabTrack, setVocabTrack] = useState<"junior" | "senior">("junior");
-  const [selfForm, setSelfForm] = useState({ track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard", shuffle: true });
+  const [selfForm, setSelfForm] = useState({ track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard", challengeMode: "choice" as ChallengeMode, shuffle: true });
   const [quizSession, setQuizSession] = useState<{ title: string; challengeId?: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string } | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const [novaId, setNovaId] = useState(params.get("add") ?? "");
   const [qr, setQr] = useState<{ svg: string; link: string; novaId: string } | null>(null);
   const [challengeOpen, setChallengeOpen] = useState(false);
-  const [cForm, setCForm] = useState({ kind: "word", title: "", quizId: "", durationHours: 48, track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard" });
+  const [cForm, setCForm] = useState({ kind: "word", title: "", quizId: "", durationHours: 48, track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard", challengeMode: "choice" as ChallengeMode });
   const [roomOpen, setRoomOpen] = useState(false);
   const [roomForm, setRoomForm] = useState({ name: "", kind: "room", goalMinutes: 120 });
   const [joinCode, setJoinCode] = useState("");
@@ -106,7 +113,7 @@ function ChallengeInner() {
       const result = await apiGet<{ words: ChallengeWord[] }>(`/words/all?track=${selfForm.track}&limit=${selfForm.questionCount}`);
       const words = selfForm.shuffle ? [...result.words].sort(() => Math.random() - 0.5) : result.words;
       if (!words.length) throw new Error("目前沒有可用的題目");
-      const nextSession = { title: `自我挑戰・${selfForm.track === "junior" ? "國中" : "高中"}單字`, words: words.slice(0, selfForm.questionCount), direction: selfForm.direction, difficulty: selfForm.difficulty } as const;
+      const nextSession = { title: `自我挑戰・${selfForm.track === "junior" ? "國中" : "高中"}單字`, words: words.slice(0, selfForm.questionCount).map((word) => ({ ...word, challengeMode: selfForm.challengeMode })), direction: selfForm.direction, difficulty: selfForm.difficulty, challengeMode: selfForm.challengeMode } as const;
       setCountdown(3);
       window.setTimeout(() => setCountdown(2), 1000);
       window.setTimeout(() => setCountdown(1), 2000);
@@ -282,6 +289,7 @@ function ChallengeInner() {
               <Field label="題數"><Select value={String(selfForm.questionCount)} onChange={(e) => setSelfForm({ ...selfForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option><option value="100">100 題</option></Select></Field>
               <Field label="難度"><Select value={selfForm.difficulty} onChange={(e) => setSelfForm({ ...selfForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
               <Field label="題目方向"><Select value={selfForm.direction} onChange={(e) => setSelfForm({ ...selfForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
+              <Field label="題型"><Select value={selfForm.challengeMode} onChange={(e) => setSelfForm({ ...selfForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="listening">聽力辨識</option><option value="handwriting">中翻英手寫</option><option value="confusable">易混淆辨析</option></Select></Field>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-muted"><input type="checkbox" checked={selfForm.shuffle} onChange={(e) => setSelfForm({ ...selfForm, shuffle: e.target.checked })} />每次開始時打亂題目</label>
             <Button className="mt-4" onClick={() => void startSelfChallenge()}>開始自我挑戰</Button>
@@ -589,6 +597,7 @@ function ChallengeInner() {
               <Field label="題數"><Select value={String(cForm.questionCount)} onChange={(e) => setCForm({ ...cForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option></Select></Field>
               <Field label="難度"><Select value={cForm.difficulty} onChange={(e) => setCForm({ ...cForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
               <Field label="題目方向"><Select value={cForm.direction} onChange={(e) => setCForm({ ...cForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
+              <Field label="題型"><Select value={cForm.challengeMode} onChange={(e) => setCForm({ ...cForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="listening">聽力辨識</option><option value="handwriting">中翻英手寫</option><option value="confusable">易混淆辨析</option></Select></Field>
             </div>
           )}
           {cForm.kind === "quiz" && (
@@ -620,6 +629,7 @@ function ChallengeInner() {
                   questionCount: cForm.questionCount,
                   direction: cForm.direction,
                   difficulty: cForm.difficulty,
+                  challengeMode: cForm.challengeMode,
                   inviteIds: friends.data?.friends.map((f) => f.userId) ?? [],
                 });
                 toast.push("success", "挑戰已建立，已通知好友");

@@ -228,6 +228,7 @@ export const routes: RouteDef[] = [
           questionCount: z.number().int().min(5).max(200).default(10),
           direction: z.enum(["zh2en", "en2zh", "mixed"]).default("mixed"),
           difficulty: z.enum(["easy", "normal", "hard"]).default("normal"),
+          challengeMode: z.enum(["choice", "listening", "handwriting", "confusable"]).default("choice"),
         }),
       );
       if (body.kind === "quiz") {
@@ -258,7 +259,7 @@ export const routes: RouteDef[] = [
           const answer = direction === "zh2en" ? group[0].word : group[0].meaning;
           const options = group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
           const shuffled = [...options].sort(() => Math.random() - 0.5);
-          challengeItems.push({ ...group[0], direction, options: shuffled, answer });
+          challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, options: shuffled, answer });
         }
         if (challengeItems.length < 5) throw badRequest("目前題庫不足，請稍後再試");
       }
@@ -274,6 +275,7 @@ export const routes: RouteDef[] = [
             questionCount: body.questionCount,
             direction: body.direction,
             difficulty: body.difficulty,
+            challengeMode: body.challengeMode,
             items: challengeItems,
             readyUserIds: [user.userId],
           } : {},

@@ -227,6 +227,31 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   );
 }
 
+type PersonalWord = { id: string; word: string; meaning: string; partOfSpeech: string; phonetic: string; example: string; exampleZh: string; analysis: Record<string, unknown>; familiarity: number; reviewCount: number; updatedAt: string };
+
+export function MyVocabularyPanel() {
+  const toast = useToast();
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [active, setActive] = useState<PersonalWord | null>(null);
+  const { data, loading, error, reload } = useApi<{ items: PersonalWord[]; total: number }>(`/my-vocabulary?q=${encodeURIComponent(q)}`, [q]);
+  const items = (data?.items ?? []).filter((item) => filter === "all" || filter === "new" && item.familiarity < 40 || filter === "review" && item.familiarity >= 40 && item.familiarity < 80 || filter === "mastered" && item.familiarity >= 80);
+  async function review(item: PersonalWord, known: boolean) {
+    try {
+      await apiPatch(`/my-vocabulary/${item.id}`, { familiarity: Math.max(0, Math.min(100, item.familiarity + (known ? 20 : -10))), review: true });
+      toast.push("success", known ? "已記錄熟悉度" : "已標記為需要複習");
+      setActive(null);
+      await reload();
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+  return <Card title="我的單字" subtitle={`OCR、教材與手動收藏的單字都集中在這裡・共 ${data?.total ?? 0} 個`} action={<div className="flex gap-1.5"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋單字或中文" className="!w-36 !py-1.5 text-xs" /><Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto !py-1.5 text-xs"><option value="all">全部</option><option value="new">需加強</option><option value="review">複習中</option><option value="mastered">已熟悉</option></Select></div>}>
+    <div className="mb-3 grid grid-cols-3 gap-2"><div className="glass-soft p-2"><p className="text-[11px] text-muted">總單字</p><p className="text-lg font-bold">{data?.total ?? 0}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">需要加強</p><p className="text-lg font-bold text-rose-300">{(data?.items ?? []).filter((i) => i.familiarity < 40).length}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">已熟悉</p><p className="text-lg font-bold text-emerald-300">{(data?.items ?? []).filter((i) => i.familiarity >= 80).length}</p></div></div>
+    {loading && <Skeleton lines={4} />}{error && <ErrorState message={error} onRetry={reload} />}{!loading && !items.length && <EmptyState icon="◇" title="還沒有我的單字" hint="從圖片 OCR 或教材分析結果按『加入單字本』開始建立。" />}
+    <div className="grid gap-2 sm:grid-cols-2">{items.map((item) => <button key={item.id} type="button" onClick={() => setActive(item)} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.word}</p><p className="text-xs text-[#7dd3fc]">{item.meaning}</p><p className="mt-1 text-[11px] text-muted">{item.partOfSpeech || "未分類"}・複習 {item.reviewCount} 次</p></div><Badge tone={item.familiarity >= 80 ? "green" : item.familiarity >= 40 ? "cyan" : "rose"}>{item.familiarity}%</Badge></div><Progress value={item.familiarity} max={100} tone={item.familiarity >= 80 ? "green" : "violet"} /></button>)}</div>
+    <Modal open={Boolean(active)} onClose={() => setActive(null)} title={active?.word ?? "單字詳情"}>{active && <div className="space-y-3"><div className="flex items-center gap-2"><Badge tone="cyan">{active.partOfSpeech || "單字"}</Badge><Badge tone="muted">熟悉度 {active.familiarity}%</Badge><Button size="sm" variant="ghost" onClick={() => { speak(active.word); }}>朗讀</Button></div><div className="rounded-xl bg-[#37d3ff]/10 p-3"><p className="text-lg font-semibold">{active.meaning}</p><p className="mt-1 text-xs text-muted">{active.phonetic}</p></div>{active.example && <div className="rounded-xl bg-white/5 p-3 text-sm"><p>{active.example}</p><p className="text-muted">{active.exampleZh}</p></div>}<div className="flex flex-wrap gap-2"><Button onClick={() => review(active, true)}>我會了</Button><Button variant="outline" onClick={() => review(active, false)}>加入複習</Button><Button variant="ghost" onClick={async () => { if (confirm("確定移除此單字？")) { await apiDelete(`/my-vocabulary/${active.id}`); setActive(null); await reload(); } }}>移除</Button></div></div>}</Modal>
+  </Card>;
+}
+
 type Sentence = { id: string; en: string; zh: string; level: string; familiarity: number };
 
 export function SentencesPanel() {

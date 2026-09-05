@@ -693,6 +693,43 @@ export const contentRoutes: RouteDef[] = [
     },
   }),
 
+  /* ---------------------------------------------------- my vocabulary */
+  route({
+    method: "GET",
+    path: "/my-vocabulary",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const q = (ctx.query.get("q") ?? "").trim().slice(0, 80);
+      const rows = await db.select().from(userVocabularies).where(and(eq(userVocabularies.userId, user.userId), q ? sql`(${userVocabularies.word} ilike ${`%${q}%`} or ${userVocabularies.meaning} ilike ${`%${q}%`})` : sql`true`)).orderBy(desc(userVocabularies.updatedAt)).limit(300);
+      return { items: rows, total: rows.length };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/my-vocabulary/:id",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ familiarity: z.number().int().min(0).max(100).optional(), review: z.boolean().optional() }));
+      const current = (await db.select().from(userVocabularies).where(and(eq(userVocabularies.id, ctx.params.id), eq(userVocabularies.userId, user.userId))).limit(1))[0];
+      if (!current) throw notFound("找不到我的單字");
+      const familiarity = body.familiarity ?? (body.review ? Math.min(100, current.familiarity + 20) : current.familiarity);
+      const rows = await db.update(userVocabularies).set({ familiarity, reviewCount: body.review ? current.reviewCount + 1 : current.reviewCount, lastReviewedAt: body.review ? new Date() : current.lastReviewedAt, updatedAt: new Date() }).where(eq(userVocabularies.id, current.id)).returning();
+      return { item: rows[0] };
+    },
+  }),
+  route({
+    method: "DELETE",
+    path: "/my-vocabulary/:id",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const deleted = await db.delete(userVocabularies).where(and(eq(userVocabularies.id, ctx.params.id), eq(userVocabularies.userId, user.userId))).returning({ id: userVocabularies.id });
+      if (!deleted[0]) throw notFound("找不到我的單字");
+      return { deleted: true };
+    },
+  }),
   /* ---------------------------------------------------------- notes */
   route({
     method: "GET",

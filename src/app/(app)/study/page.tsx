@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Tabs } from "@/components/ui";
 import { MaterialsPanel, NotesPanel, OcrPanel } from "@/features/study/panels-a";
 import { QuizPanel, WrongPanel } from "@/features/study/panels-b";
-import { FocusPanel, PlanPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, WordsPanel } from "@/features/study/panels-c";
+import { FocusPanel, MyVocabularyPanel, PlanPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, WordsPanel } from "@/features/study/panels-c";
 
 const TABS = [
   { key: "plan", label: "今日計畫", icon: "▤" },
@@ -14,6 +14,7 @@ const TABS = [
   { key: "quiz", label: "測驗", icon: "▤" },
   { key: "wrong", label: "錯題本", icon: "◇" },
   { key: "words", label: "單字", icon: "⌁" },
+  { key: "my-vocabulary", label: "我的單字", icon: "◇" },
   { key: "quick-memory", label: "快速背", icon: "✦" },
   { key: "sentences", label: "句子", icon: "◌" },
   { key: "voice", label: "錄音", icon: "◉" },
@@ -40,6 +41,7 @@ function StudyInner() {
       {tab === "quiz" && <QuizPanel />}
       {tab === "wrong" && <WrongPanel />}
       {tab === "words" && <WordsPanel />}
+      {tab === "my-vocabulary" && <MyVocabularyPanel />}
       {tab === "quick-memory" && <QuickMemoryPanel />}
       {tab === "sentences" && <SentencesPanel />}
       {tab === "voice" && <VoicePanel />}
