@@ -107,7 +107,7 @@ export const ERROR_CATALOG = {
 
   /* ---------------------------------------------------------- FILE 7xxx */
   FILE_EMPTY: def("SN-FILE-7001", 400, "FILE", "檔案是空的", "請重新選擇檔案。"),
-  FILE_TOO_LARGE: def("SN-FILE-7002", 400, "FILE", "檔案太大", "請壓縮後再上傳，單檔上限預設為 15MB。"),
+  FILE_TOO_LARGE: def("SN-FILE-7002", 400, "FILE", "檔案太大", "請壓縮後再上傳，單檔上限預設為 50MB。"),
   FILE_MIME_UNSUPPORTED: def("SN-FILE-7003", 400, "FILE", "不支援的檔案類型", "支援 PNG / JPG / WEBP / HEIC / PDF / TXT / 音訊檔。"),
   FILE_EXT_UNSUPPORTED: def("SN-FILE-7004", 400, "FILE", "不支援的副檔名", "請確認檔名結尾是否為允許的格式。"),
   FILE_NOT_FOUND: def("SN-FILE-7005", 404, "FILE", "找不到檔案", "檔案可能已被刪除。"),

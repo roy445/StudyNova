@@ -6,7 +6,7 @@ import { fail, randomToken } from "./core";
 
 export type StorageDriver = "db" | "s3";
 
-const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 15 * 1024 * 1024);
+const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024);
 
 export const ALLOWED_MIME: Record<string, string[]> = {
   image: ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic"],

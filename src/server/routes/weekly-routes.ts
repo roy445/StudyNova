@@ -440,7 +440,7 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ filename: z.string().min(1).max(180), contentType: z.string().min(1).max(120), size: z.number().int().positive().max(15 * 1024 * 1024), fileKind: z.enum(["paper", "answer", "magazine", "word_source", "sentence_source", "extra"]) }));
+      const body = await ctx.json(z.object({ filename: z.string().min(1).max(180), contentType: z.string().min(1).max(120), size: z.number().int().positive().max(50 * 1024 * 1024), fileKind: z.enum(["paper", "answer", "magazine", "word_source", "sentence_source", "extra"]) }));
       const week = (await db.select({ id: weeklyExamWeeks.id }).from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
       if (!week) throw fail("WEEK_NOT_FOUND");
       const upload = await createPresignedUpload({ userId: admin.userId, filename: body.filename, mimeType: body.contentType, sizeBytes: body.size });
