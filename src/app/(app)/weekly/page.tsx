@@ -238,8 +238,8 @@ export default function WeeklyPage() {
                           <Button size="sm" variant="ghost" onClick={() => speak(detail.words[flashIndex]?.word ?? "")}>🔊 朗讀</Button>
                           {flipped && (
                         <>
-                          <p className="mt-1 text-[#37d3ff]">{detail.words[flashIndex]?.meaning}</p>
-                          <p className="mt-1 text-xs text-muted">{detail.words[flashIndex]?.example}</p>
+                          <div className="mt-1 flex items-center justify-center gap-2 text-[#37d3ff]"><p>{detail.words[flashIndex]?.meaning}</p><Button size="sm" variant="ghost" onClick={() => speak(detail.words[flashIndex]?.meaning ?? "", "zh-TW")}>🔊 中文</Button></div>
+                          <div className="mt-1 flex items-center justify-center gap-2 text-xs text-muted"><p>{detail.words[flashIndex]?.example}</p><Button size="sm" variant="ghost" onClick={() => speak(detail.words[flashIndex]?.example ?? "")}>🔊 例句</Button></div>
                         </>
                           )}
                           {showMore && (
@@ -278,8 +278,8 @@ export default function WeeklyPage() {
                       <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold">
                         {w.word} <Badge tone="violet">{detail.week.highlightMap[w.highlightColor] ?? w.highlightColor}</Badge>
                       </p><Button size="sm" variant="ghost" onClick={() => speak(w.word)}>🔊</Button></div>
-                      <p className="text-xs text-muted">{w.meaning}</p>
-                      {w.example && <p className="mt-1 text-[11px] text-muted">{w.example}</p>}
+                      <div className="mt-1 flex items-center justify-between gap-2"><p className="text-xs text-muted">{w.meaning}</p><Button size="sm" variant="ghost" onClick={() => speak(w.meaning, "zh-TW")}>🔊 中文</Button></div>
+                      {w.example && <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[11px] text-muted">{w.example}</p><Button size="sm" variant="ghost" onClick={() => speak(w.example)}>🔊 例句</Button></div>}
                       <p className="mt-2 text-[11px] text-muted">易錯／文法：{grammarHint(w.example)}</p>
                     </div>
                   ))}

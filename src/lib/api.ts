@@ -27,6 +27,9 @@ export class ApiRequestError extends Error {
   }
 }
 
+const GET_CACHE_TTL_MS = 10_000;
+const GET_CACHE = new Map<string, { expiresAt: number; value: unknown }>();
+
 async function parse<T>(res: Response): Promise<T> {
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
@@ -51,11 +54,17 @@ async function parse<T>(res: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
+  const cached = GET_CACHE.get(path);
+  if (cached && cached.expiresAt > Date.now()) return cached.value as T;
+  if (cached) GET_CACHE.delete(path);
   const res = await fetch(`/api/v1${path}`, { credentials: "same-origin", cache: "no-store" });
-  return parse<T>(res);
+  const value = await parse<T>(res);
+  GET_CACHE.set(path, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
+  return value;
 }
 
 export async function apiSend<T>(path: string, method: "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown): Promise<T> {
+  GET_CACHE.clear();
   const res = await fetch(`/api/v1${path}`, {
     method,
     credentials: "same-origin",
@@ -113,7 +122,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
     } finally {
       if (mounted.current && !silent) setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
   }, [path, ...deps]);
 
   useEffect(() => {
@@ -158,7 +167,6 @@ export function useAsyncAction<TArgs extends unknown[], TResult>(fn: (...args: T
         setPending(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [fn],
   );
   return { run, pending, error, setError };
