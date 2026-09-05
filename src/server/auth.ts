@@ -65,6 +65,7 @@ export async function getSession(): Promise<SessionInfo | null> {
     .select({
       sessionId: sessions.id,
       rotatedAt: sessions.rotatedAt,
+      sessionExpiresAt: sessions.expiresAt,
       userId: users.userId,
       novaId: users.novaId,
       email: users.email,
@@ -84,6 +85,16 @@ export async function getSession(): Promise<SessionInfo | null> {
   const row = rows[0];
   if (!row) return null;
   if (row.status === "blocked") return null;
+
+  // 延長舊版本 cookie，讓已登入使用者不必因為舊的 14 天期限重新登入。
+  try {
+    store.set(SESSION_COOKIE, token, cookieOptions(Math.floor(SESSION_TTL_MS / 1000)));
+  } catch {
+    /* read-only render context；API request 會在下一次請求更新 cookie */
+  }
+  if (new Date(row.sessionExpiresAt).getTime() < Date.now() + SESSION_TTL_MS / 2) {
+    await db.update(sessions).set({ expiresAt: new Date(Date.now() + SESSION_TTL_MS) }).where(and(eq(sessions.id, row.sessionId), eq(sessions.tokenHash, tokenHash)));
+  }
 
   const proActive = row.tier === "pro" && (!row.expiresAt || new Date(row.expiresAt) > new Date());
   return {
