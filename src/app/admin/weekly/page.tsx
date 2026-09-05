@@ -75,18 +75,17 @@ export default function AdminWeeklyPage() {
 
   async function uploadFiles(kind: string, files: FileList | null) {
     if (!files?.length || !activeId) return;
-    const totalBytes = Array.from(files).reduce((sum, file) => sum + file.size, 0);
-    if (totalBytes > 90 * 1024 * 1024) {
-      toast.push("error", "本次上傳總大小不可超過 90MB，請分批上傳檔案（伺服器上限 100MB）。");
-      return;
-    }
     setBusy(true);
     try {
-      const fd = new FormData();
-      fd.append("fileKind", kind);
-      Array.from(files).forEach((f) => fd.append("files", f));
-      await apiPost(`/admin/weekly/${activeId}/files`, fd);
-      toast.push("success", `已上傳 ${files.length} 個檔案`);
+      let completed = 0;
+      for (const file of Array.from(files)) {
+        const signed = await apiPost<{ uploadUrl: string; objectId: string; fileId: string }>(`/admin/weekly/${activeId}/files/upload-url`, { filename: file.name, contentType: file.type, size: file.size, fileKind: kind });
+        const put = await fetch(signed.uploadUrl, { method: "PUT", headers: { "content-type": file.type }, body: file });
+        if (!put.ok) throw new Error(`Storage 上傳失敗（${put.status}）`);
+        await apiPost(`/admin/weekly/${activeId}/files/${signed.fileId}/complete`, { objectId: signed.objectId, size: file.size, contentType: file.type });
+        completed += 1;
+        toast.push("success", `已完成 ${completed}/${files.length} 個檔案`);
+      }
       await loadDetail(activeId);
     } catch (err) {
       toast.push("error", errorMessage(err));

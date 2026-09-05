@@ -113,6 +113,7 @@ export const ERROR_CATALOG = {
   FILE_NOT_FOUND: def("SN-FILE-7005", 404, "FILE", "找不到檔案", "檔案可能已被刪除。"),
   FILE_READ_FAILED: def("SN-FILE-7006", 502, "FILE", "檔案讀取失敗", "儲存服務可能暫時異常，請稍後再試。"),
   FILE_STORAGE_MISCONFIG: def("SN-FILE-7007", 500, "FILE", "檔案服務設定不完整", "請管理員確認 SESSION_SECRET 與 S3 設定。"),
+  FILE_UPLOAD_INCOMPLETE: def("SN-FILE-7008", 400, "FILE", "檔案尚未完成上傳", "請等待檔案上傳完成後再試。"),
 
   /* ---------------------------------------------------------- WEEK 8xxx */
   WEEK_NOT_FOUND: def("SN-WEEK-8001", 404, "WEEK", "找不到這個週次", "週次可能尚未發布或已被封存。"),

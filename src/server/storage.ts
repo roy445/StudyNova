@@ -2,7 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { storageObjects } from "@/db/schema";
-import { fail } from "./core";
+import { fail, randomToken } from "./core";
 
 export type StorageDriver = "db" | "s3";
 
@@ -43,6 +43,33 @@ async function s3Client() {
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
     },
   });
+}
+
+export async function createPresignedUpload(params: { userId: string; filename: string; mimeType: string; sizeBytes: number }) {
+  const { userId, filename, mimeType, sizeBytes } = params;
+  if (!s3Configured()) throw fail("FILE_STORAGE_MISCONFIG", { message: "Vercel 直傳需要設定 S3 / R2 Object Storage" });
+  if (!sizeBytes || sizeBytes > MAX_BYTES) throw fail("FILE_TOO_LARGE", { hint: `單檔上限為 ${(MAX_BYTES / 1024 / 1024).toFixed(0)}MB，請壓縮後再上傳。` });
+  const baseMime = mimeType.split(";")[0].trim().toLowerCase();
+  if (![...ALLOWED_MIME.image, ...ALLOWED_MIME.pdf].includes(baseMime)) throw fail("FILE_MIME_UNSUPPORTED", { message: `不支援的檔案類型：${baseMime}` });
+  const ext = extensionOf(filename);
+  if (ext && !EXT_WHITELIST.has(ext)) throw fail("FILE_EXT_UNSUPPORTED", { message: `不支援的副檔名：.${ext}` });
+  const storageKey = `${userId}/weekly/${new Date().toISOString().slice(0, 10)}/${randomToken(18)}${ext ? `.${ext}` : ""}`;
+  const rows = await db.insert(storageObjects).values({ userId, driver: "s3", storageKey, bucket: process.env.S3_BUCKET!, mimeType: baseMime, sizeBytes, filename: filename.slice(0, 180), data: null }).returning({ id: storageObjects.id });
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+  const uploadUrl = await getSignedUrl(await s3Client(), new PutObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: storageKey, ContentType: baseMime, ContentLength: sizeBytes }), { expiresIn: 900 });
+  return { objectId: rows[0].id, objectKey: storageKey, uploadUrl, contentType: baseMime, expiresAt: new Date(Date.now() + 900_000).toISOString() };
+}
+
+export async function verifyPresignedUpload(objectId: string, expectedSize: number, expectedMime: string) {
+  const row = (await db.select().from(storageObjects).where(eq(storageObjects.id, objectId)).limit(1))[0];
+  if (!row || row.driver !== "s3") throw fail("FILE_NOT_FOUND");
+  const { HeadObjectCommand } = await import("@aws-sdk/client-s3");
+  const res = await (await s3Client()).send(new HeadObjectCommand({ Bucket: row.bucket, Key: row.storageKey }));
+  const size = Number(res.ContentLength ?? 0);
+  const mime = String(res.ContentType ?? "").split(";")[0].toLowerCase();
+  if (size !== expectedSize || mime !== expectedMime.toLowerCase()) throw fail("FILE_UPLOAD_INCOMPLETE", { message: "檔案尚未完整上傳，或檔案大小／格式與原本不一致" });
+  return row;
 }
 
 export async function putObject(params: {

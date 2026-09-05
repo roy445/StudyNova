@@ -19,7 +19,7 @@ import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, forbidden, isoWeekCode, notFound, sanitizeText } from "../core";
 import { adminLog, grantLearningReward, grantNova, isProUser } from "../economy";
 import { isWeekOpen } from "../queue";
-import { putObject, readObject, deleteObject, signObjectUrl } from "../storage";
+import { putObject, readObject, deleteObject, signObjectUrl, createPresignedUpload, verifyPresignedUpload, objectOwner } from "../storage";
 import { runAi, runAiJson, aiConfigured } from "../ai";
 import { recordStudy } from "./learning-routes";
 import { notify } from "../notify";
@@ -432,6 +432,37 @@ export const routes: RouteDef[] = [
       const file = (await db.select().from(weeklyExamFiles).where(eq(weeklyExamFiles.id, ctx.params.fileId)).limit(1))[0];
       if (!file) throw notFound("找不到檔案");
       return { file: { ...file, url: file.objectId ? signObjectUrl(file.objectId, admin.userId) : null } };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/weekly/:id/files/upload-url",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ filename: z.string().min(1).max(180), contentType: z.string().min(1).max(120), size: z.number().int().positive().max(15 * 1024 * 1024), fileKind: z.enum(["paper", "answer", "magazine", "word_source", "sentence_source", "extra"]) }));
+      const week = (await db.select({ id: weeklyExamWeeks.id }).from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
+      if (!week) throw fail("WEEK_NOT_FOUND");
+      const upload = await createPresignedUpload({ userId: admin.userId, filename: body.filename, mimeType: body.contentType, sizeBytes: body.size });
+      const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(weeklyExamFiles).where(and(eq(weeklyExamFiles.weekId, week.id), eq(weeklyExamFiles.fileKind, body.fileKind)));
+      const rows = await db.insert(weeklyExamFiles).values({ weekId: week.id, objectId: upload.objectId, fileKind: body.fileKind, orderIndex: count, ocrStatus: "uploading" }).returning({ id: weeklyExamFiles.id });
+      return { ...upload, fileId: rows[0].id };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/weekly/:id/files/:fileId/complete",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ objectId: z.string().uuid(), size: z.number().int().positive(), contentType: z.string().min(1).max(120) }));
+      const file = (await db.select().from(weeklyExamFiles).where(and(eq(weeklyExamFiles.id, ctx.params.fileId), eq(weeklyExamFiles.weekId, ctx.params.id))).limit(1))[0];
+      if (!file || !file.objectId || file.objectId !== body.objectId) throw notFound("找不到上傳檔案");
+      const owner = await objectOwner(body.objectId);
+      if (!owner || owner.userId !== admin.userId) throw forbidden();
+      await verifyPresignedUpload(body.objectId, body.size, body.contentType);
+      const updated = await db.update(weeklyExamFiles).set({ ocrStatus: "pending" }).where(eq(weeklyExamFiles.id, file.id)).returning();
+      return { file: updated[0], uploaded: true };
     },
   }),
   route({
