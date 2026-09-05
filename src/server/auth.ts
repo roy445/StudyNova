@@ -5,8 +5,8 @@ import { sessions, users, memberships, rateLimits } from "@/db/schema";
 import { AppError, forbidden, randomToken, sha256, tooMany, unauthorized } from "./core";
 
 export const SESSION_COOKIE = "sn_session";
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14;
-const ROTATE_AFTER_MS = 1000 * 60 * 60 * 12;
+// 使用明確 30 天長效 session，避免跨日被瀏覽器當成 session cookie 清除。
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
 export type AuthUser = {
   userId: string;
@@ -29,6 +29,8 @@ function cookieOptions(maxAge: number) {
     sameSite: "lax" as const,
     path: "/",
     maxAge,
+    expires: new Date(Date.now() + Math.max(0, maxAge) * 1000),
+    priority: "high" as const,
   };
 }
 
@@ -82,24 +84,6 @@ export async function getSession(): Promise<SessionInfo | null> {
   const row = rows[0];
   if (!row) return null;
   if (row.status === "blocked") return null;
-
-  // Session rotation (only possible in mutable contexts such as route handlers)
-  if (Date.now() - new Date(row.rotatedAt).getTime() > ROTATE_AFTER_MS) {
-    try {
-      const nextToken = randomToken(32);
-      store.set(SESSION_COOKIE, nextToken, cookieOptions(Math.floor(SESSION_TTL_MS / 1000)));
-      await db
-        .update(sessions)
-        .set({
-          tokenHash: sha256(nextToken),
-          rotatedAt: new Date(),
-          expiresAt: new Date(Date.now() + SESSION_TTL_MS),
-        })
-        .where(eq(sessions.id, row.sessionId));
-    } catch {
-      /* read-only render context – rotation happens on the next API call */
-    }
-  }
 
   const proActive = row.tier === "pro" && (!row.expiresAt || new Date(row.expiresAt) > new Date());
   return {
