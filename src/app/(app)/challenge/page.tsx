@@ -90,7 +90,9 @@ function ChallengeInner() {
   const friends = useApi<{ friends: Friend[]; incoming: Array<{ id: string; novaId: string; displayName: string }>; outgoing: Array<{ id: string; novaId: string; displayName: string }>; blocked: Array<{ id: string; blockedId: string; novaId: string; displayName: string }> }>("/friends");
   const challenges = useApi<{ challenges: Challenge[] }>("/challenges");
   const rooms = useApi<{ rooms: Array<{ id: string; name: string; kind: string; joinCode: string; goalMinutes: number; totalToday: number; members: Array<{ userId: string; displayName: string; minutesToday: number }> }> }>("/rooms");
-  const activities = useApi<{ live: Array<{ id: string; title: string; cover: string; description: string; goalValue: number; progress: number; rewardNova: number; rewardXp: number; endsAt: string }>; upcoming: Array<{ id: string; title: string; startsAt: string }> }>("/activities");
+  const activities = useApi<{ live: Array<{ id: string; title: string; cover: string; description: string; goalValue: number; progress: number; rewardNova: number; rewardXp: number; endsAt: string; questionCount: number }>; upcoming: Array<{ id: string; title: string; startsAt: string }> }>("/activities");
+  const [activityQuestionId, setActivityQuestionId] = useState<string | null>(null);
+  const activityQuestions = useApi<{ questions: Array<{ id: string; subject: string; type: string; stem: string; options: string[]; explanation: string }> }>(activityQuestionId ? `/activities/${activityQuestionId}/questions` : null, [activityQuestionId]);
   const board = useApi<{ weekly: Array<{ userId: string; displayName: string; novaId: string; minutes: number; level: number | null }>; xp: Array<{ userId: string; displayName: string; xp: number; level: number }>; me: string }>("/leaderboard?scope=global");
   const quizzes = useApi<{ quizzes: Array<{ id: string; title: string }> }>("/quizzes");
   const weekly = useApi<{ weeks: Array<{ id: string; weekCode: string; title: string; open: boolean; proOnly: boolean }> }>("/weekly");
@@ -503,9 +505,14 @@ function ChallengeInner() {
                 <p className="mt-1 text-[11px] text-muted">
                   {a.progress}/{a.goalValue}・結束 {new Date(a.endsAt).toLocaleString("zh-TW")}
                 </p>
+                {a.questionCount > 0 && <Button size="sm" className="mt-2" onClick={() => setActivityQuestionId(a.id)}>開啟活動專屬題庫（{a.questionCount} 題）</Button>}
               </div>
             ))}
           </div>
+          {activityQuestionId && <Card title="活動專屬題庫" subtitle="只有活動進行期間才會顯示與開放作答。">
+            {activityQuestions.loading && <Skeleton lines={3} />}
+            {activityQuestions.data?.questions.map((q, index) => <div key={q.id} className="glass-soft mb-2 p-3"><p className="text-sm font-medium">{index + 1}. {q.stem}</p>{q.options.length > 0 && <div className="mt-2 grid gap-1 sm:grid-cols-2">{q.options.map((option) => <span key={option} className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs">{option}</span>)}</div>}<p className="mt-2 text-xs text-muted">題型：{q.type}・{q.subject}</p></div>)}
+          </Card>}
           {activities.data?.upcoming.length ? (
             <div className="mt-3 space-y-1 text-xs text-muted">
               <p>即將開始</p>

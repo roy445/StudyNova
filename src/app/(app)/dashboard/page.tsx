@@ -107,6 +107,7 @@ export default function DashboardPage() {
       {/* Novi greeting */}
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-col gap-3 bg-gradient-to-r from-[#7c5cff]/20 via-transparent to-[#37d3ff]/10 p-4 sm:flex-row sm:items-center sm:p-5">
+          {data.countdowns?.[0] && <div className={`order-first rounded-2xl border px-4 py-2 text-center sm:order-last sm:min-w-[150px] ${data.countdowns[0].urgent ? "border-rose-300/70 bg-rose-500/15" : "border-cyan-300/40 bg-cyan-500/10"}`}><p className="text-[10px] font-semibold text-muted">{data.countdowns[0].name}</p><strong className="block text-4xl font-black tabular-nums text-white">{data.countdowns[0].daysLeft}</strong><span className="text-xs text-muted">天倒數</span></div>}
           <NoviAvatar size={76} state={data.dueWrong > 0 ? "remind" : "happy"} level={data.novi?.level ?? 1} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -115,6 +116,7 @@ export default function DashboardPage() {
               {!data.aiEnabled && <Badge tone="muted">AI 未設定</Badge>}
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted">{data.greeting}</p>
+            {data.countdowns?.some((countdown) => countdown.daysLeft < 5) && <p className="mt-2 rounded-lg bg-rose-400/10 px-2 py-1 text-xs font-semibold text-rose-200">距離重要考試不到 5 天，今天請優先完成複習任務。</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href="/study?tab=plan">
                 <Button size="sm">開始今日任務</Button>

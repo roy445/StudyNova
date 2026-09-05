@@ -1238,6 +1238,24 @@ export const activityRewards = pgTable(
   (t) => [uniqueIndex("activity_reward_uq").on(t.activityId, t.userId)],
 );
 
+export const activityQuestions = pgTable(
+  "activity_questions",
+  {
+    id: id(),
+    activityId: uuid("activity_id").notNull().references(() => activities.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull().default("英文"),
+    type: text("type").notNull().default("single"),
+    stem: text("stem").notNull(),
+    options: jsonb("options").$type<string[]>().notNull().default([]),
+    answer: jsonb("answer").$type<string[]>().notNull().default([]),
+    explanation: text("explanation").notNull().default(""),
+    orderIndex: integer("order_index").notNull().default(0),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: created(),
+  },
+  (t) => [index("activity_questions_idx").on(t.activityId, t.enabled, t.orderIndex)],
+);
+
 export const announcements = pgTable(
   "announcements",
   {

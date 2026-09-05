@@ -230,6 +230,8 @@ export function OcrPanel() {
   const [mode, setMode] = useState<"highlight" | "crop">("highlight");
   const [analysisMode, setAnalysisMode] = useState<"auto" | "vocabulary" | "sentences" | "questions">("auto");
   const [color, setColor] = useState("yellow");
+  const [highlightPriorityEnabled, setHighlightPriorityEnabled] = useState(false);
+  const [highlightPrefs, setHighlightPrefs] = useState({ vocabulary: "pink", sentence: "blue", keypoint: "yellow" });
   const [result, setResult] = useState<{ action: string; result: Record<string, unknown> } | null>(null);
   const [visionPreflight, setVisionPreflight] = useState<Record<string, unknown> | null>(null);
   const [visionAnalysis, setVisionAnalysis] = useState<Record<string, unknown> | null>(null);
@@ -431,7 +433,8 @@ export function OcrPanel() {
         itemIds: selectedVisionItems.length ? selectedVisionItems : undefined,
         analysisMode,
         // 不預設任何顏色，讓 AI 自己判斷圖片中是否真的有螢光筆與其語意。
-        selectedHighlightColors: [],
+        selectedHighlightColors: highlightPriorityEnabled ? [highlightPrefs.vocabulary, highlightPrefs.sentence, highlightPrefs.keypoint] : [],
+        highlightPreferences: highlightPriorityEnabled ? highlightPrefs : null,
         force,
       });
       if (stage === "preflight") {
@@ -523,8 +526,16 @@ export function OcrPanel() {
               <option value="sentences">只分析句子／句型</option>
               <option value="questions">只分析題目</option>
             </Select>
+            <label className="flex items-center gap-1.5 rounded-lg border border-[var(--line)] px-2 py-1.5 text-xs">
+              <input type="checkbox" checked={highlightPriorityEnabled} onChange={(e) => setHighlightPriorityEnabled(e.target.checked)} className="accent-[#7c5cff]" />
+              螢光筆優先分析
+            </label>
+            {highlightPriorityEnabled && <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-[#f9c74f]/30 px-2 py-1.5 text-xs">
+              <span className="text-muted">顏色用途：</span>
+              {([['vocabulary', '單字'], ['sentence', '句子'], ['keypoint', '重點']] as const).map(([key, label]) => <label key={key} className="flex items-center gap-1"><span>{label}</span><select value={highlightPrefs[key]} onChange={(e) => setHighlightPrefs((old) => ({ ...old, [key]: e.target.value }))} className="rounded bg-black/20 px-1 py-0.5"><option value="yellow">黃</option><option value="green">綠</option><option value="blue">藍</option><option value="pink">粉</option><option value="orange">橘</option><option value="purple">紫</option></select></label>)}
+            </div>}
             <Button size="sm" variant="ghost" onClick={() => setCameraOpen(true)}>開啟取景器</Button>
-            <div className="flex items-center gap-1.5 text-xs">
+            <div className="hidden">
               <button onClick={() => setMode("highlight")} className={`rounded-lg px-2 py-1 ${mode === "highlight" ? "bg-[#7c5cff]/30" : "bg-white/5"}`}>
                 螢光筆
               </button>
@@ -616,8 +627,7 @@ export function OcrPanel() {
                 </div>
                 <div
                   className="relative touch-none overflow-hidden rounded-lg bg-black/40"
-                  onPointerDown={(e) => onPointerDown(e, p.id)}
-                  onPointerUp={(e) => onPointerUp(e, p)}
+                  // 螢光筆改由分析前的用途與顏色設定控制，不在線上圖片上繪製。
                 >
                   {p.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element

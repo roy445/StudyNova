@@ -445,8 +445,8 @@ export const contentRoutes: RouteDef[] = [
 
       await db.update(ocrDocuments).set({ status: "processing", updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
       const results: Array<{ pageId: string; ok: boolean; error?: string }> = [];
-      for (const page of pages) {
-        if (!page.objectId) continue;
+      await Promise.all(pages.map(async (page) => {
+        if (!page.objectId) return;
         try {
           await db.update(ocrPages).set({ status: "processing" }).where(eq(ocrPages.id, page.id));
           const obj = await readObject(page.objectId);
@@ -477,7 +477,7 @@ export const contentRoutes: RouteDef[] = [
           await db.update(ocrPages).set({ status: "failed" }).where(eq(ocrPages.id, page.id));
           results.push({ pageId: page.id, ok: false, error: err instanceof Error ? err.message : "辨識失敗" });
         }
-      }
+      }));
       const fresh = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
       const combined = fresh.map((p) => p.text).join("\n\n");
       const anyOk = results.some((r) => r.ok);
@@ -504,6 +504,7 @@ export const contentRoutes: RouteDef[] = [
           itemIds: z.array(z.string().max(80)).max(100).optional(),
           analysisMode: z.enum(["auto", "vocabulary", "sentences", "questions"]).default("auto"),
           selectedHighlightColors: z.array(z.enum(["yellow", "green", "blue", "pink", "orange", "purple"])).max(6).default([]),
+          highlightPreferences: z.object({ vocabulary: z.string().max(20), sentence: z.string().max(20), keypoint: z.string().max(20) }).nullable().optional(),
           force: z.boolean().optional(),
         }),
       );
@@ -571,7 +572,7 @@ export const contentRoutes: RouteDef[] = [
         return [item.kind === "vocabulary" ? item.word : null, ...vocabulary.map((v) => v && typeof v === "object" ? (v as Record<string, unknown>).word : null)].filter((word): word is string => typeof word === "string" && word.trim().length > 0);
       });
       const duplicateInstruction = `同一批圖片中相同單字只輸出一次；如果下列單字已在前一次批次分析過，這次請直接省略：${previousWords.slice(0, 200).join(", ")}；題目若出現斜線、或、頓號分隔的多個答案，必須保留成 answer.values 陣列，代表多個可接受答案。`;
-      const colorInstruction = (body.selectedHighlightColors.length ? `只優先分析指定螢光筆顏色：${body.selectedHighlightColors.join("、")}；其他顏色內容標記為未選取，不要主動納入。` : "若圖片有螢光筆，辨識並在結果中標注顏色與用途。") + ` ${duplicateInstruction}`;
+      const colorInstruction = body.highlightPreferences ? `已開啟螢光筆優先分析：${body.highlightPreferences.vocabulary}代表單字、${body.highlightPreferences.sentence}代表句子、${body.highlightPreferences.keypoint}代表重點；請只分析這些指定用途，沒有指定顏色的內容不必特別分析。` : "未開啟螢光筆優先分析，不要因為看到螢光筆就自行擴大分析範圍。";
       const { data } = await runAiJson<Record<string, unknown>>(
         {
           feature: "camera_vision_analysis",

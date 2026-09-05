@@ -15,6 +15,7 @@ import {
   announcements,
   activities,
   activityParticipants,
+  activityQuestions,
   adminLogs,
   systemLogs,
   aiProviderHealth,
@@ -493,6 +494,30 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/activities/:id/questions",
+    auth: "admin",
+    handler: async (ctx) => ({ questions: await db.select().from(activityQuestions).where(eq(activityQuestions.activityId, ctx.params.id)).orderBy(asc(activityQuestions.orderIndex)) }),
+  }),
+  route({
+    method: "POST",
+    path: "/admin/activities/:id/questions",
+    auth: "admin",
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({ questions: z.array(z.object({ subject: z.string().max(30).default("英文"), type: z.string().max(30).default("single"), stem: z.string().min(1).max(10000), options: z.array(z.string().max(500)).max(12).default([]), answer: z.array(z.string().max(500)).min(1).max(12), explanation: z.string().max(20000).default(""), orderIndex: z.number().int().min(0).default(0) })).min(1).max(500) }));
+      const activity = (await db.select({ id: activities.id }).from(activities).where(eq(activities.id, ctx.params.id)).limit(1))[0];
+      if (!activity) throw notFound("找不到活動");
+      const rows = await db.insert(activityQuestions).values(body.questions.map((q) => ({ ...q, activityId: ctx.params.id }))).returning();
+      return { questions: rows };
+    },
+  }),
+  route({
+    method: "DELETE",
+    path: "/admin/activities/:id/questions/:qid",
+    auth: "admin",
+    handler: async (ctx) => { await db.delete(activityQuestions).where(and(eq(activityQuestions.id, ctx.params.qid), eq(activityQuestions.activityId, ctx.params.id))); return { deleted: true }; },
+  }),
   route({
     method: "POST",
     path: "/admin/activities/:id/duplicate",

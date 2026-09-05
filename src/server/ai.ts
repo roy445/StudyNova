@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { aiProviderHealth, aiUsageLogs } from "@/db/schema";
 import { fail, monthStart, nextUtcMonthStart } from "./core";
 
-export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "openai" | "openrouter";
+export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "gemini_4" | "gemini_5" | "openai" | "openrouter";
 
 export type ProviderConfig = {
   name: ProviderName;
@@ -68,15 +68,17 @@ export function providerConfigs(): ProviderConfig[] {
     },
     { name: "gemini_2", priority: 2, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_2) },
     { name: "gemini_3", priority: 3, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_3) },
+    { name: "gemini_4", priority: 4, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_4) },
+    { name: "gemini_5", priority: 5, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_5) },
     {
       name: "openai",
-      priority: 4,
+      priority: 6,
       model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
       apiKey: process.env.OPENAI_API_KEY,
     },
     {
       name: "openrouter",
-      priority: 5,
+      priority: 7,
       model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free",
       apiKey: process.env.OPENROUTER_API_KEY,
     },

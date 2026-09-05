@@ -16,6 +16,7 @@ import {
   focusSessions,
   activities,
   activityParticipants,
+  activityQuestions,
   quizzes,
   weeklyExamWeeks,
   novaAccounts,
@@ -548,15 +549,28 @@ export const routes: RouteDef[] = [
         .orderBy(asc(activities.startsAt))
         .limit(5);
       return {
-        live: rows.map((a) => {
+        live: await Promise.all(rows.map(async (a) => {
           const p = mine.find((m) => m.activityId === a.id);
-          return { ...a, progress: p?.progress ?? 0, completedAt: p?.completedAt ?? null };
-        }),
+          const [q] = await db.select({ count: sql<number>`count(*)::int` }).from(activityQuestions).where(and(eq(activityQuestions.activityId, a.id), eq(activityQuestions.enabled, true)));
+          return { ...a, progress: p?.progress ?? 0, completedAt: p?.completedAt ?? null, questionCount: Number(q?.count ?? 0) };
+        })),
         upcoming,
       };
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/activities/:id/questions",
+    auth: "user",
+    handler: async (ctx) => {
+      const now = new Date();
+      const activity = (await db.select({ id: activities.id, title: activities.title, startsAt: activities.startsAt, endsAt: activities.endsAt, published: activities.published }).from(activities).where(eq(activities.id, ctx.params.id)).limit(1))[0];
+      if (!activity || !activity.published || activity.startsAt > now || activity.endsAt < now) throw notFound("活動尚未開始或已結束");
+      const questions = await db.select().from(activityQuestions).where(and(eq(activityQuestions.activityId, activity.id), eq(activityQuestions.enabled, true))).orderBy(asc(activityQuestions.orderIndex));
+      return { activity, questions };
+    },
+  }),
   route({
     method: "GET",
     path: "/announcements",

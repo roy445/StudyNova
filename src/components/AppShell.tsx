@@ -79,6 +79,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemCode, setRedeemCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
@@ -86,6 +87,13 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }> }>(
     "/dashboard",
   );
+  const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
+  const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -298,6 +306,10 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                     >
                       <span>我的單字</span><span aria-hidden="true">→</span>
                     </Link>
+                    {user.isPro && <>
+                      <div className="px-3 py-2 text-xs text-[#ffd98a]">PRO 剩餘 {proDays === null ? "∞" : `${proDays} 天`}</div>
+                      <Link href="/api/v1/exports/my-learning?kind=vocabulary" className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-white/5 hover:text-[var(--text)]">我的單字匯出<span aria-hidden="true">↓</span></Link>
+                    </>}
                     <button
                       type="button"
                       role="menuitem"

@@ -597,7 +597,7 @@ export const routes: RouteDef[] = [
             `你是補習班教材數位化助理。這次只處理 ${body.scope === "vocabulary" ? "單字與片語" : body.scope === "sentences" ? "英文句子、中文翻譯與句型" : "考卷題目"}，不可把其他類型內容混入。` +
             (body.scope === "questions" || body.scope === "all" ? "請自己判斷題目；中文題幹或中文答案請補上自然英文翻譯，並保留原文。" : body.scope === "sentences" ? "只找完整句子、片語與句型，並提供自然中文翻譯、文法重點與英文原句。" : "只找值得學習的單字與片語，提供中文意思、詞性、例句與易混淆字；不要把整句文章當成單字。") +
             '回傳：{"questions":[{"number":1,"stem":"","options":[],"answer":[""],"explanation":"","confidence":0-1}],"answers":[{"number":1,"answer":"","confidence":0-1}],"words":[{"word":"","meaning":"","example":"","color":"pink"}],"sentences":[{"en":"","zh":"","color":"blue"}],"summary":""}' +
-            "。不確定的項目 confidence 給低分。不要杜撰不存在的題目。",
+            "。答案卷可能已經寫入學生答案：請比較題目與答案的顏色／位置，只有與題目對應且確實寫上的答案才納入；紅色簽名、老師刪除線、批改姓名與非作答文字一律忽略。字跡潦草時，請依上下文找最接近的合理英文翻譯並標低 confidence。不同檔案重複出現的單字、句子或題目只建立一次。不確定的項目 confidence 給低分。不要杜撰不存在的題目。",
           parts: [
             { kind: "text", text: `螢光筆設定：${Object.keys(week.highlightMap ?? {}).length ? JSON.stringify(week.highlightMap) : "關閉；不要特別分析螢光筆"}` },
             { kind: "text", text: `題目來源 OCR：\n${paperText.slice(0, 12000)}` },

@@ -27,9 +27,10 @@ import {
   platformSettings,
   wordProgress,
   questions,
+  userVocabularies,
 } from "@/db/schema";
 import { route, zDate, type RouteDef } from "../router";
-import { addDaysStr, badRequest, daysBetween, fail, notFound, round1, todayStr, trend } from "../core";
+import { addDaysStr, badRequest, daysBetween, fail, notFound, round1, todayStr, trend, toCsv } from "../core";
 import {
   bumpAchievement,
   claimDailyTask,
@@ -38,6 +39,7 @@ import {
   progressActivities,
   progressDailyTask,
 } from "../economy";
+import { isProUser } from "../economy";
 import { isWeekOpen } from "../queue";
 import { unreadCount } from "../notify";
 import { runAiJson, aiConfigured } from "../ai";
@@ -934,6 +936,20 @@ export const routes: RouteDef[] = [
       const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
       const rows = await db.select().from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined).orderBy(asc(dailyWords.word)).limit(limit);
       return { words: rows };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/exports/my-learning",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      if (!(await isProUser(user.userId))) throw fail("SYS_CONFLICT", { message: "學習紀錄匯出功能僅限 PRO 會員" });
+      const kind = ctx.query.get("kind") === "wrong" ? "wrong" : "vocabulary";
+      const rows = kind === "wrong"
+        ? await db.select({ subject: wrongQuestions.subject, wrongCount: wrongQuestions.wrongCount, mastery: wrongQuestions.mastery, reason: wrongQuestions.reason, nextReviewAt: wrongQuestions.nextReviewAt }).from(wrongQuestions).where(eq(wrongQuestions.userId, user.userId)).orderBy(desc(wrongQuestions.wrongCount))
+        : await db.select({ word: userVocabularies.word, meaning: userVocabularies.meaning, partOfSpeech: userVocabularies.partOfSpeech, phonetic: userVocabularies.phonetic, example: userVocabularies.example, exampleZh: userVocabularies.exampleZh, familiarity: userVocabularies.familiarity, reviewCount: userVocabularies.reviewCount }).from(userVocabularies).where(eq(userVocabularies.userId, user.userId)).orderBy(asc(userVocabularies.word));
+      return new Response(toCsv(rows as Array<Record<string, unknown>>), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="studynova-${kind}.csv"` } });
     },
   }),
 ];

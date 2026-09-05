@@ -291,8 +291,8 @@ export default function WeeklyPage() {
                 <div className="space-y-2">
                   {detail.sentences.map((s) => (
                     <div key={s.id} className="glass-soft p-3">
-                      <div className="flex items-start justify-between gap-2"><p className="text-sm">{s.en}</p><Button size="sm" variant="ghost" onClick={() => speak(s.en)}>🔊 朗讀</Button></div>
-                      <p className="text-xs text-muted">{s.zh}</p>
+                      <div className="flex items-start justify-between gap-2"><p className="text-sm">{s.en}</p><Button size="sm" variant="ghost" onClick={() => speak(s.en)}>🔊 英文</Button></div>
+                      <div className="mt-1 flex items-start justify-between gap-2"><p className="text-xs text-muted">{s.zh}</p><Button size="sm" variant="ghost" onClick={() => speak(s.zh, "zh-TW")}>🔊 中文</Button></div>
                     </div>
                   ))}
                   {!detail.sentences.length && <EmptyState icon="◌" title="本週尚未發布句子" />}
