@@ -241,6 +241,27 @@ export const routes: RouteDef[] = [
         const week = (await db.select({ id: weeklyExamWeeks.id, title: weeklyExamWeeks.title, status: weeklyExamWeeks.status }).from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, body.weekId)).limit(1))[0];
         if (!week || week.status !== "published") throw badRequest("這個每週小考目前不可參加");
       }
+      let challengeItems: Array<Record<string, unknown>> = [];
+      if (body.kind === "word") {
+        const count = Math.max(5, Math.min(200, body.questionCount));
+        // 題目在建立挑戰時一次抽好並寫入 payload，所有參與者讀到完全相同的題目。
+        // 每一題的選項也預先洗牌，且同一輪不重複使用選項文字。
+        const pool = await db
+          .select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level })
+          .from(dailyWords)
+          .where(eq(dailyWords.level, body.track))
+          .orderBy(sql`random()`)
+          .limit(Math.min(800, count * 4));
+        for (let i = 0; i < Math.min(count, Math.floor(pool.length / 4)); i += 1) {
+          const group = pool.slice(i * 4, i * 4 + 4);
+          const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
+          const answer = direction === "zh2en" ? group[0].word : group[0].meaning;
+          const options = group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
+          const shuffled = [...options].sort(() => Math.random() - 0.5);
+          challengeItems.push({ ...group[0], direction, options: shuffled, answer });
+        }
+        if (challengeItems.length < 5) throw badRequest("目前題庫不足，請稍後再試");
+      }
       const rows = await db
         .insert(challenges)
         .values({
@@ -253,6 +274,8 @@ export const routes: RouteDef[] = [
             questionCount: body.questionCount,
             direction: body.direction,
             difficulty: body.difficulty,
+            items: challengeItems,
+            readyUserIds: [user.userId],
           } : {},
           expiresAt: new Date(Date.now() + body.durationHours * 3600_000),
         })
@@ -276,11 +299,29 @@ export const routes: RouteDef[] = [
       const ids = await friendIds(user.userId);
       if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       if (challenge.kind !== "word") throw badRequest("這不是單字挑戰");
-      const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string };
+      const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string; items?: Array<Record<string, unknown>>; readyUserIds?: string[] };
       const track = payload.track === "senior" ? "senior" : "junior";
       const count = Math.max(5, Math.min(200, Number(payload.questionCount ?? 10)));
-      const rows = await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, track)).orderBy(sql`random()`).limit(count);
-      return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal" }, words: rows };
+      const rows = payload.items?.length ? payload.items.slice(0, count) : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, track)).orderBy(sql`random()`).limit(count);
+      return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal" }, words: rows };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/challenges/:id/ready",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
+      if (!challenge || challenge.kind !== "word") throw notFound("找不到單字挑戰");
+      const ids = await friendIds(user.userId);
+      if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
+      const payload = challenge.payload as { readyUserIds?: string[] };
+      const readyUserIds = Array.from(new Set([...(payload.readyUserIds ?? []), user.userId]));
+      await db.update(challenges).set({ payload: { ...payload, readyUserIds } }).where(eq(challenges.id, challenge.id));
+      await db.insert(challengeParticipants).values({ challengeId: challenge.id, userId: user.userId }).onConflictDoNothing();
+      return { ready: true, readyCount: readyUserIds.length, canStart: readyUserIds.length >= 2 };
     },
   }),
 

@@ -354,6 +354,7 @@ export function OcrPanel() {
 
   async function saveLearning(action: "vocabulary" | "note" | "question", item: Record<string, unknown>) {
     if (!activeId) return;
+    if (!window.confirm(`要將這筆${action === "vocabulary" ? "單字／片語" : action === "note" ? "筆記" : "題目"}加入「我的教材／我的單字」嗎？加入後可以在學習中心查看並製作測驗。`)) return;
     try {
       const res = await apiPost<{ saved: number; duplicates: number }>(`/ocr/documents/${activeId}/learning-action`, { action, items: [item] });
       toast.push("success", res.duplicates ? "這筆資料已存在，沒有重複建立" : `已加入${action === "vocabulary" ? "單字本" : action === "note" ? "筆記" : "題目／錯題資料"}`);
@@ -364,6 +365,7 @@ export function OcrPanel() {
 
   async function saveVocabularyBatch(items: Array<Record<string, unknown>>) {
     if (!activeId || !items.length) return;
+    if (!window.confirm(`AI 已整理出 ${items.length} 個單字／片語，要加入「我的單字」嗎？`)) return;
     try {
       const res = await apiPost<{ saved: number; duplicates: number }>(`/ocr/documents/${activeId}/learning-action`, { action: "vocabulary", items });
       toast.push("success", `已加入 ${res.saved} 個單字${res.duplicates ? `，${res.duplicates} 個已存在` : ""}`);
@@ -390,6 +392,7 @@ export function OcrPanel() {
       toast.push("info", "目前分析結果沒有可建立測驗的單字、句子或題目");
       return;
     }
+    if (!window.confirm(`要將這 ${items.length} 個辨識內容建立成測驗，並加入你的題庫嗎？`)) return;
     try {
       const res = await apiPost<{ saved: number; quiz?: { title: string } }>(`/ocr/documents/${activeId}/learning-action`, { action: "quiz", items });
       toast.push("success", res.quiz ? `已建立 ${res.quiz.title}` : `已建立 ${res.saved} 題練習`);
@@ -402,19 +405,20 @@ export function OcrPanel() {
     if (!activeId) return;
     setBusy(true);
     try {
-      const res = await apiPost<{ stage: string; preflight?: Record<string, unknown>; analysis?: Record<string, unknown> }>(`/ocr/documents/${activeId}/vision-analysis`, {
+      const res = await apiPost<{ stage: string; preflight?: Record<string, unknown>; analysis?: Record<string, unknown>; retakeMessage?: string | null }>(`/ocr/documents/${activeId}/vision-analysis`, {
         stage,
         pageIds: detail.data?.pages.map((p) => p.id),
         itemIds: selectedVisionItems.length ? selectedVisionItems : undefined,
         analysisMode,
-        selectedHighlightColors: [color],
+        // 不預設任何顏色，讓 AI 自己判斷圖片中是否真的有螢光筆與其語意。
+        selectedHighlightColors: [],
         force,
       });
       if (stage === "preflight") {
         setVisionPreflight(res.preflight ?? null);
         setVisionAnalysis(null);
         setSelectedVisionItems([]);
-        toast.push("success", "圖片品質與內容偵測完成");
+        toast.push(res.retakeMessage ? "error" : "success", res.retakeMessage ?? "圖片品質與內容偵測完成");
       } else {
         setVisionAnalysis(res.analysis ?? null);
         toast.push("success", "影像理解分析完成，可檢查並編輯結果");

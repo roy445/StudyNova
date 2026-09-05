@@ -15,13 +15,13 @@ type Challenge = {
   title: string;
   creatorName: string;
   quizId: string | null;
-  payload?: { track?: "junior" | "senior"; questionCount?: number; direction?: "zh2en" | "en2zh" | "mixed"; difficulty?: "easy" | "normal" | "hard" };
+  payload?: { track?: "junior" | "senior"; questionCount?: number; direction?: "zh2en" | "en2zh" | "mixed"; difficulty?: "easy" | "normal" | "hard"; readyUserIds?: string[] };
   expiresAt: string;
   joined: boolean;
   participants: Array<{ userId: string; displayName: string; score: number; durationSec: number; finishedAt: string | null }>;
 };
 
-type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string };
+type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string; direction?: "zh2en" | "en2zh"; options?: string[]; answer?: string };
 
 type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; onFinish: (score: number, total: number, durationSec: number) => Promise<void> };
 
@@ -35,7 +35,8 @@ function QuizRunner({ title, words, direction, difficulty, onFinish }: QuizRunne
   const actualDirection = direction === "mixed" ? (index % 2 === 0 ? "zh2en" : "en2zh") : direction;
   const choices = useMemo(() => {
     if (!current) return [];
-    const answer = actualDirection === "zh2en" ? current.word : current.meaning;
+    const answer = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
+    if (current.options?.length) return current.options;
     const pool = words.filter((word) => word.id !== current.id).map((word) => actualDirection === "zh2en" ? word.word : word.meaning).filter(Boolean);
     return [answer, ...pool].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
   }, [actualDirection, current, words]);
@@ -44,9 +45,15 @@ function QuizRunner({ title, words, direction, difficulty, onFinish }: QuizRunne
   async function choose(answer: string) {
     if (selected || submitting) return;
     setSelected(answer);
-    const expected = actualDirection === "zh2en" ? current.word : current.meaning;
+    const expected = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
     const nextCorrect = correct + (answer === expected ? 1 : 0);
     setCorrect(nextCorrect);
+    if (answer !== expected) {
+      const addToWrongBook = window.confirm(`答錯了：${current.word}\n要加入錯題本，之後到「學習中心 → 錯題本」複習嗎？`);
+      void apiPost("/words/answer", { wordId: current.id, correct: false, mode: "challenge", addToWrongBook });
+    } else {
+      void apiPost("/words/answer", { wordId: current.id, correct: true, mode: "challenge", addToWrongBook: false });
+    }
     setTimeout(async () => {
       if (index + 1 < words.length) {
         setIndex((value) => value + 1);
@@ -58,7 +65,7 @@ function QuizRunner({ title, words, direction, difficulty, onFinish }: QuizRunne
       setSubmitting(false);
     }, 550);
   }
-  const expected = actualDirection === "zh2en" ? current.word : current.meaning;
+  const expected = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
   return (
     <Card title={title} subtitle={`${index + 1}/${words.length} 題・難度 ${difficulty === "easy" ? "簡單" : difficulty === "hard" ? "困難" : "普通"}`}>
       <div className="mb-4 flex items-center justify-between text-xs text-muted"><span>{actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}</span><Badge tone="cyan">目前答對 {correct} 題</Badge></div>
@@ -84,6 +91,7 @@ function ChallengeInner() {
   const [vocabTrack, setVocabTrack] = useState<"junior" | "senior">("junior");
   const [selfForm, setSelfForm] = useState({ track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard", shuffle: true });
   const [quizSession, setQuizSession] = useState<{ title: string; challengeId?: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string } | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const [novaId, setNovaId] = useState(params.get("add") ?? "");
   const [qr, setQr] = useState<{ svg: string; link: string; novaId: string } | null>(null);
@@ -98,12 +106,17 @@ function ChallengeInner() {
       const result = await apiGet<{ words: ChallengeWord[] }>(`/words/all?track=${selfForm.track}&limit=${selfForm.questionCount}`);
       const words = selfForm.shuffle ? [...result.words].sort(() => Math.random() - 0.5) : result.words;
       if (!words.length) throw new Error("目前沒有可用的題目");
-      setQuizSession({ title: `自我挑戰・${selfForm.track === "junior" ? "國中" : "高中"}單字`, words: words.slice(0, selfForm.questionCount), direction: selfForm.direction, difficulty: selfForm.difficulty });
+      const nextSession = { title: `自我挑戰・${selfForm.track === "junior" ? "國中" : "高中"}單字`, words: words.slice(0, selfForm.questionCount), direction: selfForm.direction, difficulty: selfForm.difficulty } as const;
+      setCountdown(3);
+      window.setTimeout(() => setCountdown(2), 1000);
+      window.setTimeout(() => setCountdown(1), 2000);
+      window.setTimeout(() => { setCountdown(null); setQuizSession(nextSession); }, 3000);
     } catch (err) {
       toast.push("error", errorMessage(err));
     }
   }
 
+  if (countdown !== null) return <Card title="⚔️ 雙方已準備" subtitle="題目與選項已鎖定，所有參與者完全相同"><div className="flex min-h-[260px] flex-col items-center justify-center"><p className="text-sm text-muted">挑戰即將開始</p><p className="mt-3 text-8xl font-black text-[#37d3ff]">{countdown}</p></div></Card>;
   if (quizSession) return <div className="space-y-4"><QuizRunner {...quizSession} onFinish={async (score, total, durationSec) => { if (quizSession.challengeId) await apiPost(`/challenges/${quizSession.challengeId}/submit`, { score, durationSec }); else await apiPost("/words/session-complete", { correct: Math.round((score / 100) * total), total, seconds: durationSec }); toast.push("success", `挑戰完成！得分 ${score} 分`); setQuizSession(null); await challenges.reload(); }} /><Button variant="ghost" onClick={() => setQuizSession(null)}>離開挑戰</Button></div>;
 
   return (
@@ -285,14 +298,31 @@ function ChallengeInner() {
                     <p className="text-[11px] text-muted">
                       {c.kind === "word" ? "單字挑戰" : "測驗挑戰"}・由 {c.creatorName} 發起・截止 {new Date(c.expiresAt).toLocaleString("zh-TW")}
                     </p>
+                    {c.kind === "word" && <p className="mt-1 text-[11px] text-[#7dd3fc]">準備進度：{c.payload?.readyUserIds?.length ?? 0}/2（雙方同題）</p>}
                   </div>
                   <Button
                     size="sm"
                     onClick={async () => {
                       try {
-                        const result = await apiGet<{ title: string; words: ChallengeWord[]; settings: { direction: "zh2en" | "en2zh" | "mixed"; difficulty: string } }>(`/challenges/${c.id}/words`);
+                        const result = await apiGet<{ title: string; words: ChallengeWord[]; ready: boolean; readyCount: number; settings: { direction: "zh2en" | "en2zh" | "mixed"; difficulty: string } }>(`/challenges/${c.id}/words`);
                         if (!result.words.length) throw new Error("目前沒有可用的挑戰題目");
-                        setQuizSession({ title: result.title, challengeId: c.id, words: result.words, direction: result.settings.direction, difficulty: result.settings.difficulty });
+                        if (!result.ready) {
+                          await apiPost(`/challenges/${c.id}/ready`);
+                          toast.push("info", `你已準備，等待另一方加入（目前 ${result.readyCount + 1} 人）`);
+                          await challenges.reload();
+                          return;
+                        }
+                        if (result.readyCount < 2) {
+                          toast.push("info", "等待另一方加入並準備後才會開始");
+                          return;
+                        }
+                        setCountdown(3);
+                        window.setTimeout(() => setCountdown(2), 1000);
+                        window.setTimeout(() => setCountdown(1), 2000);
+                        window.setTimeout(() => {
+                          setCountdown(null);
+                          setQuizSession({ title: result.title, challengeId: c.id, words: result.words, direction: result.settings.direction, difficulty: result.settings.difficulty });
+                        }, 3000);
                       } catch (err) {
                         toast.push("error", errorMessage(err));
                       }

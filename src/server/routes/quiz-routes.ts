@@ -509,7 +509,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ wordId: z.string().uuid(), correct: z.boolean(), mode: z.string().max(20).default("card") }));
+      const body = await ctx.json(z.object({ wordId: z.string().uuid(), correct: z.boolean(), mode: z.string().max(20).default("card"), addToWrongBook: z.boolean().default(false) }));
       const word = (await db.select().from(dailyWords).where(eq(dailyWords.id, body.wordId)).limit(1))[0];
       if (!word) throw notFound("找不到單字");
       await db.insert(wordProgress).values({ userId: user.userId, wordId: word.id }).onConflictDoNothing();
@@ -526,6 +526,24 @@ export const routes: RouteDef[] = [
         .returning();
       await progressDailyTask(user.userId, "words", 1);
       await progressActivities(user.userId, "words", 1);
+      if (!body.correct && body.addToWrongBook) {
+        const qRows = await db.insert(questions).values({
+          ownerId: user.userId,
+          origin: "word_challenge",
+          subject: "英文單字",
+          topic: "單字挑戰錯題",
+          level: word.level,
+          difficulty: "normal",
+          type: "short",
+          stem: `請寫出「${word.meaning}」的英文。`,
+          options: [],
+          answer: [word.word],
+          explanation: `${word.word}：${word.meaning}`,
+          fingerprint: fingerprint("英文單字", word.word, word.meaning),
+        }).onConflictDoNothing().returning({ id: questions.id });
+        const q = qRows[0] ?? (await db.select({ id: questions.id }).from(questions).where(eq(questions.fingerprint, fingerprint("英文單字", word.word, word.meaning))).limit(1))[0];
+        if (q) await addWrongQuestion(user.userId, q.id, "英文單字", "挑戰答錯，使用者選擇加入錯題本");
+      }
       const mastered = await db
         .select({ c: sql<number>`count(*)::int` })
         .from(wordProgress)

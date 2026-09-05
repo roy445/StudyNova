@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { BarChart } from "@/components/charts";
-import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 type AdminUser = {
   userId: string;
@@ -43,6 +43,7 @@ export default function AdminOverviewPage() {
   const users = useApi<{ users: AdminUser[] }>(`/admin/users?q=${encodeURIComponent(q)}`, [q]);
   const logs = useApi<{ logs: Array<{ id: string; action: string; targetType: string; targetId: string; reason: string; createdAt: string; actor: string | null }> }>("/admin/logs?kind=admin");
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string }> }>("/admin/features");
+  const challengeAdmin = useApi<{ challenges: Array<{ id: string; title: string; kind: string; status: string; expiresAt: string; createdAt: string; creatorName: string; participants: number }> }>("/admin/challenges");
 
   const [selected, setSelected] = useState<string[]>([]);
   const [actionOpen, setActionOpen] = useState(false);
@@ -84,6 +85,7 @@ export default function AdminOverviewPage() {
           { key: "overview", label: "總覽", icon: "◒" },
           { key: "users", label: "使用者管理", icon: "◎" },
           { key: "logs", label: "Audit Log", icon: "▤" },
+          { key: "challenges", label: "挑戰管理", icon: "⚔️" },
         ]}
         active={tab}
         onChange={setTab}
@@ -212,6 +214,22 @@ export default function AdminOverviewPage() {
               </div>
             ))}
             {!logs.loading && !logs.data?.logs.length && <EmptyState icon="▤" title="尚無管理紀錄" />}
+          </div>
+        </Card>
+      )}
+
+      {tab === "challenges" && (
+        <Card title="⚔️ 挑戰管理" subtitle="查看目前挑戰、暫停或關閉；關閉只停止作答，參與紀錄會保留。">
+          {challengeAdmin.loading && <Skeleton lines={5} />}
+          {challengeAdmin.error && <ErrorState message={challengeAdmin.error} onRetry={challengeAdmin.reload} />}
+          <div className="space-y-2">
+            {challengeAdmin.data?.challenges.map((c) => (
+              <div key={c.id} className="glass-soft flex flex-wrap items-center justify-between gap-3 p-3 text-xs">
+                <div><p className="font-medium">{c.title}</p><p className="text-muted">{c.kind}・發起人 {c.creatorName}・{c.participants} 人・截止 {new Date(c.expiresAt).toLocaleString("zh-TW")}</p></div>
+                <div className="flex gap-1.5"><Badge tone={c.status === "open" ? "green" : "muted"}>{c.status}</Badge><Button size="sm" variant="ghost" onClick={async () => { await apiPatch(`/admin/challenges/${c.id}`, { status: "paused" }); await challengeAdmin.reload(); }}>暫停</Button><Button size="sm" variant="ghost" onClick={async () => { if (!confirm("關閉這個挑戰？參與紀錄會保留。")) return; await fetch(`/api/v1/admin/challenges/${c.id}`, { method: "DELETE", credentials: "same-origin" }); await challengeAdmin.reload(); }}>關閉</Button></div>
+              </div>
+            ))}
+            {!challengeAdmin.loading && !challengeAdmin.data?.challenges.length && <EmptyState icon="⚔️" title="目前沒有挑戰" />}
           </div>
         </Card>
       )}

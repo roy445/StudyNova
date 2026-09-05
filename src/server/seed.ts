@@ -1,4 +1,6 @@
 import { eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { db } from "@/db";
 import {
   faqEntries,
@@ -17,7 +19,7 @@ import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
 import vocabulary from "@/data/vocabulary.json";
 
-const SEED_VERSION = 8;
+const SEED_VERSION = 9;
 
 const LEVELS = [
   { level: 1, name: "初始助手", requiredXp: 0, upgradeCostNova: 0, ability: "基本問答與今日建議", aura: "#38bdf8" },
@@ -113,6 +115,24 @@ const BANK = [
   { subject: "英文", topic: "閱讀", level: "senior", difficulty: "exam", type: "single", stem: "Choose the word closest in meaning to 'gradually'.", options: ["suddenly", "slowly", "rarely", "hardly"], answer: ["slowly"], explanation: "gradually 表示逐漸地，與 slowly 最接近。" },
 ];
 
+function importedPhraseRows() {
+  try {
+    const raw = readFileSync(join(process.cwd(), "data/english-phrases.txt"), "utf8");
+    const rows: Array<{ word: string; meaning: string; phrase: { en: string; zh: string } }> = [];
+    for (const line of raw.split(/\r?\n/)) {
+      const match = line.match(/(^|\s{2,})([A-Za-z][A-Za-z0-9'().?!,/ -]{1,100})\s{2,}([\u4e00-\u9fff].{1,180})/);
+      if (!match) continue;
+      const word = match[2].trim().replace(/\s+/g, " ");
+      const meaning = match[3].trim();
+      if (!word || !meaning || /^(托福|常用|英文|片語)/.test(word)) continue;
+      rows.push({ word, meaning, phrase: { en: word, zh: meaning } });
+    }
+    return rows.filter((row, i, all) => all.findIndex((x) => x.word.toLowerCase() === row.word.toLowerCase()) === i).slice(0, 7000);
+  } catch {
+    return [];
+  }
+}
+
 export async function runSeed(force = false) {
   const existing = (await db.select().from(platformSettings).where(eq(platformSettings.key, "seed")).limit(1))[0];
   const version = Number((existing?.value as { version?: number } | undefined)?.version ?? 0);
@@ -159,6 +179,13 @@ export async function runSeed(force = false) {
         set: { meaning: item.meaning, meanings: item.meanings, phrases: item.phrases, partOfSpeech: item.partOfSpeech, example: item.example, exampleZh: item.exampleZh },
       });
     }
+  }
+  // 管理員提供的高中片語 PDF 轉成可搜尋的高中片語題庫；重跑 seed 不會覆蓋使用者進度。
+  for (const item of importedPhraseRows()) {
+    await db.insert(dailyWords).values({ word: item.word, meaning: item.meaning, meanings: [item.meaning], phrases: [item.phrase], partOfSpeech: "phrase", level: "senior" }).onConflictDoUpdate({
+      target: [dailyWords.word, dailyWords.level],
+      set: { meaning: item.meaning, meanings: [item.meaning], phrases: [item.phrase], partOfSpeech: "phrase" },
+    });
   }
   for (const [en, zh, level] of SENTENCES) {
     await db.insert(sentences).values({ en, zh, level, keywords: [] }).onConflictDoNothing();

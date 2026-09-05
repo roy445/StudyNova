@@ -26,6 +26,8 @@ import {
   passwordResetTokens,
   studyRecords,
   platformSettings,
+  challenges,
+  challengeParticipants,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
@@ -43,6 +45,47 @@ function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/admin/challenges",
+    auth: "admin",
+    handler: async () => {
+      const rows = await db.select({ id: challenges.id, title: challenges.title, kind: challenges.kind, status: challenges.status, expiresAt: challenges.expiresAt, createdAt: challenges.createdAt, creatorName: users.displayName }).from(challenges).innerJoin(users, eq(users.userId, challenges.creatorId)).orderBy(desc(challenges.createdAt)).limit(100);
+      const out = [];
+      for (const row of rows) {
+        const [count] = await db.select({ c: sql<number>`count(*)::int` }).from(challengeParticipants).where(eq(challengeParticipants.challengeId, row.id));
+        out.push({ ...row, participants: count?.c ?? 0 });
+      }
+      return { challenges: out };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/challenges/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ status: z.enum(["open", "paused", "closed"]).optional(), expiresAt: z.string().datetime().optional() }));
+      const current = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
+      if (!current) throw notFound("找不到挑戰");
+      const rows = await db.update(challenges).set({ ...body, expiresAt: body.expiresAt ? new Date(body.expiresAt) : current.expiresAt }).where(eq(challenges.id, current.id)).returning();
+      await adminLog({ actorId: admin.userId, action: "challenge.update", targetType: "challenge", targetId: current.id, before: current, after: rows[0], ip: ctx.ip });
+      return { challenge: rows[0] };
+    },
+  }),
+  route({
+    method: "DELETE",
+    path: "/admin/challenges/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const current = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
+      if (!current) throw notFound("找不到挑戰");
+      await db.update(challenges).set({ status: "closed", expiresAt: new Date() }).where(eq(challenges.id, current.id));
+      await adminLog({ actorId: admin.userId, action: "challenge.close", targetType: "challenge", targetId: current.id, before: current, after: { status: "closed" }, ip: ctx.ip });
+      return { closed: true, preservedHistory: true };
+    },
+  }),
   route({
     method: "POST",
     path: "/admin/password-reset-links",

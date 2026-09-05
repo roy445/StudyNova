@@ -548,7 +548,11 @@ export const contentRoutes: RouteDef[] = [
           { pages: [], totalItems: 0, notes: ["模型未回傳預檢結果"] },
         );
         await db.update(ocrDocuments).set({ aiResult: { ...(doc.aiResult ?? {}), visionPreflight: data }, updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
-        return { stage: body.stage, preflight: data, pages: pages.map((p) => ({ id: p.id, orderIndex: p.orderIndex, imageUrl: p.objectId ? signObjectUrl(p.objectId, user.userId) : null })) };
+        const qualityText = JSON.stringify(data);
+        const retakeMessage = /"poor"|看不清|模糊|解析度不足|無法辨識/i.test(qualityText)
+          ? "圖片有些內容看不清楚，請拍攝的清楚一點後再分析。"
+          : null;
+        return { stage: body.stage, preflight: data, retakeMessage, pages: pages.map((p) => ({ id: p.id, orderIndex: p.orderIndex, imageUrl: p.objectId ? signObjectUrl(p.objectId, user.userId) : null })) };
       }
       const preflight = (doc.aiResult as Record<string, unknown> | null)?.visionPreflight;
       if (!body.force && !preflight) throw fail("SYS_CONFLICT", { message: "請先執行圖片品質檢查" });
