@@ -75,6 +75,11 @@ export default function AdminWeeklyPage() {
 
   async function uploadFiles(kind: string, files: FileList | null) {
     if (!files?.length || !activeId) return;
+    const totalBytes = Array.from(files).reduce((sum, file) => sum + file.size, 0);
+    if (totalBytes > 90 * 1024 * 1024) {
+      toast.push("error", "本次上傳總大小不可超過 90MB，請分批上傳檔案（伺服器上限 100MB）。");
+      return;
+    }
     setBusy(true);
     try {
       const fd = new FormData();
