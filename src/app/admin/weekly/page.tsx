@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
@@ -79,10 +80,12 @@ export default function AdminWeeklyPage() {
     try {
       let completed = 0;
       for (const file of Array.from(files)) {
-        const signed = await apiPost<{ uploadUrl: string; objectId: string; fileId: string }>(`/admin/weekly/${activeId}/files/upload-url`, { filename: file.name, contentType: file.type, size: file.size, fileKind: kind });
-        const put = await fetch(signed.uploadUrl, { method: "PUT", headers: { "content-type": file.type }, body: file });
-        if (!put.ok) throw new Error(`Storage 上傳失敗（${put.status}）`);
-        await apiPost(`/admin/weekly/${activeId}/files/${signed.fileId}/complete`, { objectId: signed.objectId, size: file.size, contentType: file.type });
+        await upload(file.name, file, {
+          access: "private",
+          handleUploadUrl: "/api/blob/weekly-upload",
+          clientPayload: JSON.stringify({ weekId: activeId, fileKind: kind }),
+          multipart: file.size > 5 * 1024 * 1024,
+        });
         completed += 1;
         toast.push("success", `已完成 ${completed}/${files.length} 個檔案`);
       }

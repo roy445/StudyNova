@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { storageObjects } from "@/db/schema";
 import { fail, randomToken } from "./core";
+import { del as deleteBlob, get as getBlob } from "@vercel/blob";
 
 export type StorageDriver = "db" | "s3";
 
@@ -132,6 +133,11 @@ export async function readObject(objectId: string): Promise<{ data: Buffer; mime
     if (!bytes) throw fail("FILE_READ_FAILED");
     return { data: Buffer.from(bytes), mimeType: row.mimeType, filename: row.filename, userId: row.userId };
   }
+  if (row.driver === "blob") {
+    const result = await getBlob(row.storageKey, { access: "private" });
+    if (!result?.stream) throw fail("FILE_READ_FAILED");
+    return { data: Buffer.from(await new Response(result.stream).arrayBuffer()), mimeType: row.mimeType, filename: row.filename, userId: row.userId };
+  }
   if (!row.data) throw fail("FILE_READ_FAILED", { message: "檔案內容遺失" });
   return { data: Buffer.from(row.data), mimeType: row.mimeType, filename: row.filename, userId: row.userId };
 }
@@ -156,6 +162,7 @@ export async function deleteObject(objectId: string, requesterId: string, isAdmi
     const client = await s3Client();
     await client.send(new DeleteObjectCommand({ Bucket: row.bucket, Key: row.storageKey }));
   }
+  if (row?.driver === "blob") await deleteBlob(row.storageKey);
   await db.delete(storageObjects).where(eq(storageObjects.id, objectId));
 }
 
