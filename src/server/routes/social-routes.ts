@@ -22,6 +22,7 @@ import {
   novaAccounts,
   announcements,
   dailyWords,
+  userSettings,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, forbidden, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
@@ -536,16 +537,18 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const now = new Date();
+      const profile = (await db.select({ schoolName: userSettings.schoolName }).from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
+      const schoolName = profile?.schoolName?.trim() ?? "";
       const rows = await db
         .select()
         .from(activities)
-        .where(and(eq(activities.published, true), lte(activities.startsAt, now), gte(activities.endsAt, now)))
+        .where(and(eq(activities.published, true), lte(activities.startsAt, now), gte(activities.endsAt, now), or(eq(activities.accessSchoolName, ""), eq(activities.accessSchoolName, schoolName))))
         .orderBy(asc(activities.sortOrder));
       const mine = await db.select().from(activityParticipants).where(eq(activityParticipants.userId, user.userId));
       const upcoming = await db
         .select()
         .from(activities)
-        .where(and(eq(activities.published, true), gte(activities.startsAt, now)))
+        .where(and(eq(activities.published, true), gte(activities.startsAt, now), or(eq(activities.accessSchoolName, ""), eq(activities.accessSchoolName, schoolName))))
         .orderBy(asc(activities.startsAt))
         .limit(5);
       return {
@@ -564,9 +567,12 @@ export const routes: RouteDef[] = [
     path: "/activities/:id/questions",
     auth: "user",
     handler: async (ctx) => {
+      const user = ctx.requireUser();
       const now = new Date();
-      const activity = (await db.select({ id: activities.id, title: activities.title, startsAt: activities.startsAt, endsAt: activities.endsAt, published: activities.published }).from(activities).where(eq(activities.id, ctx.params.id)).limit(1))[0];
+      const profile = (await db.select({ schoolName: userSettings.schoolName }).from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
+      const activity = (await db.select({ id: activities.id, title: activities.title, startsAt: activities.startsAt, endsAt: activities.endsAt, published: activities.published, accessSchoolName: activities.accessSchoolName }).from(activities).where(eq(activities.id, ctx.params.id)).limit(1))[0];
       if (!activity || !activity.published || activity.startsAt > now || activity.endsAt < now) throw notFound("活動尚未開始或已結束");
+      if (activity.accessSchoolName && activity.accessSchoolName !== (profile?.schoolName?.trim() ?? "")) throw forbidden("此活動僅開放指定學校");
       const questions = await db.select().from(activityQuestions).where(and(eq(activityQuestions.activityId, activity.id), eq(activityQuestions.enabled, true))).orderBy(asc(activityQuestions.orderIndex));
       return { activity, questions };
     },

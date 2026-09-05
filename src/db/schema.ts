@@ -1198,6 +1198,7 @@ export const activities = pgTable(
     id: id(),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
+    accessSchoolName: text("access_school_name").notNull().default(""),
     cover: text("cover").notNull().default("🎉"),
     kind: text("kind").notNull().default("weekend_double"),
     goalMetric: text("goal_metric").notNull().default("minutes"),

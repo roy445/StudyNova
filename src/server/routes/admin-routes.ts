@@ -446,6 +446,7 @@ export const routes: RouteDef[] = [
         z.object({
           title: z.string().min(1).max(80),
           description: z.string().max(1000).default(""),
+          accessSchoolName: z.string().trim().max(120).default(""),
           cover: z.string().max(8).default("🎉"),
           kind: z.enum(["weekend_double", "festival", "limited", "streak", "quiz", "focus"]).default("limited"),
           goalMetric: z.enum(["minutes", "quiz", "words", "wrong"]).default("minutes"),
@@ -476,6 +477,7 @@ export const routes: RouteDef[] = [
         z.object({
           title: z.string().min(1).max(80).optional(),
           description: z.string().max(1000).optional(),
+          accessSchoolName: z.string().trim().max(120).optional(),
           published: z.boolean().optional(),
           sortOrder: z.number().int().min(0).max(999).optional(),
           goalValue: z.number().int().min(1).max(100000).optional(),
