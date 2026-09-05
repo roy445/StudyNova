@@ -25,7 +25,7 @@ type Detail = {
   week: Week;
   files: Array<{ id: string; fileKind: string; orderIndex: number; ocrStatus: string; ocrText: string; url: string | null }>;
   drafts: Array<{ id: string; payload: Record<string, unknown>; confidence: number; status: string; createdAt: string }>;
-  questions: Array<{ id: string; orderIndex: number; stem: string; options: string[]; answer: string[]; aiConfidence: number; needsReview: boolean; published: boolean }>;
+  questions: Array<{ id: string; orderIndex: number; stem: string; options: string[]; answer: string[]; explanation: string; aiConfidence: number; needsReview: boolean; published: boolean }>;
   words: Array<{ id: string; word: string; meaning: string; published: boolean }>;
   sentences: Array<{ id: string; en: string; zh: string; published: boolean }>;
   answers: Array<{ id: string; questionNumber: number; answerText: string; confidence: number }>;
@@ -46,6 +46,9 @@ export default function AdminWeeklyPage() {
   const [highlightJson, setHighlightJson] = useState("{}");
   const [draftEdit, setDraftEdit] = useState<string | null>(null);
   const [draftJson, setDraftJson] = useState("");
+  const [analysisScope, setAnalysisScope] = useState<"all" | "vocabulary" | "sentences" | "questions">("all");
+  const [detailItem, setDetailItem] = useState<Record<string, unknown> | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<Detail["questions"][number] | null>(null);
   const stats = useApi<{ participants: number; completionRate: number; average: number; highest: number; lowest: number; reciteRate: number; results: Array<{ novaId: string; displayName: string; score: number; correct: number; total: number; recite: boolean }>; commonWrong: Array<{ id: string; order: number; stem: string; wrongCount: number }> }>(
     activeId && tab === "stats" ? `/admin/weekly/${activeId}/stats` : null,
     [activeId, tab],
@@ -65,6 +68,7 @@ export default function AdminWeeklyPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (activeId) void loadDetail(activeId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -157,7 +161,9 @@ export default function AdminWeeklyPage() {
                   {[
                     ["paper", "上傳本週考卷"],
                     ["answer", "上傳本週答案"],
-                    ["magazine", "上傳雜誌／教材"],
+                    ["word_source", "上傳單字來源"],
+                    ["sentence_source", "上傳句子來源"],
+                    ["magazine", "上傳雜誌／教材（可同時分析）"],
                     ["extra", "補充檔案"],
                   ].map(([kind, label]) => (
                     <label key={kind} className="focus-ring cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-xs hover:bg-white/5">
@@ -199,13 +205,17 @@ export default function AdminWeeklyPage() {
                   {!detail.files.length && <EmptyState icon="▧" title="尚未上傳檔案" hint="考卷與答案請分開上傳。" />}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                  <Select value={analysisScope} onChange={(e) => setAnalysisScope(e.target.value as typeof analysisScope)} className="!w-auto text-xs">
+                    <option value="all">分析全部</option><option value="questions">只分析題目</option><option value="vocabulary">只分析單字／片語</option><option value="sentences">只分析句子／句型</option>
+                  </Select>
                   <Button
                     loading={busy}
                     onClick={async () => {
                       setBusy(true);
                       try {
-                        await apiPost(`/admin/weekly/${detail.week.id}/analyze`);
-                        toast.push("success", "AI OCR 與整理完成，已建立草稿（尚未發布）");
+                        await apiPost(`/admin/weekly/${detail.week.id}/analyze`, { scope: analysisScope });
+                        toast.push("success", `${analysisScope === "vocabulary" ? "單字" : analysisScope === "sentences" ? "句子" : analysisScope === "questions" ? "題目" : "全部內容"}分析完成，已建立草稿（尚未發布）`);
                         await loadDetail(detail.week.id);
                         setTab("ai");
                       } catch (err) {
@@ -215,8 +225,9 @@ export default function AdminWeeklyPage() {
                       }
                     }}
                   >
-                    ✦ 執行 AI OCR + 整理
+                    ✦ 執行分區 AI OCR + 整理
                   </Button>
+                  </div>
                   <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted">
                     螢光筆語意：
                     {Object.entries(detail.week.highlightMap).map(([k, v]) => (
@@ -243,6 +254,12 @@ export default function AdminWeeklyPage() {
                       <span className="text-[11px] text-muted">{new Date(d.createdAt).toLocaleString("zh-TW")}</span>
                     </div>
                     <pre className="mt-2 max-h-64 overflow-auto scroll-thin whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[10px]">{JSON.stringify(d.payload, null, 2)}</pre>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                      {(["words", "sentences", "questions"] as const).map((kind) => {
+                        const values = Array.isArray(d.payload[kind]) ? d.payload[kind] as unknown[] : [];
+                        return <div key={kind} className="rounded-xl border border-[var(--line)] p-2"><p className="text-xs font-semibold">{kind === "words" ? "單字／片語" : kind === "sentences" ? "句子／句型" : "題目"}（{values.length}）</p><div className="mt-1 space-y-1">{values.slice(0, 5).map((value, i) => <button key={i} type="button" onClick={() => setDetailItem({ category: kind, index: i, ...(typeof value === "object" && value ? value as Record<string, unknown> : { value }) })} className="block w-full truncate rounded-lg bg-white/5 px-2 py-1 text-left text-[11px] hover:bg-white/10">{typeof value === "object" && value ? String((value as Record<string, unknown>).word ?? (value as Record<string, unknown>).en ?? (value as Record<string, unknown>).stem ?? "詳細項目") : String(value)}</button>)}</div>{values.length > 5 && <p className="mt-1 text-[10px] text-muted">其餘內容可用上方 JSON 查看</p>}</div>;
+                      })}
+                    </div>
                     {d.status === "draft" && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         <Button
@@ -306,14 +323,16 @@ export default function AdminWeeklyPage() {
                   <p className="mb-1 text-xs font-medium">題目（{detail.questions.length}）</p>
                   <div className="max-h-80 space-y-1.5 overflow-y-auto scroll-thin">
                     {detail.questions.map((q) => (
-                      <div key={q.id} className="glass-soft p-2 text-xs">
+                      <div key={q.id} className="glass-soft p-3 text-xs">
                         <p className="font-medium">
                           {q.orderIndex + 1}. {q.stem.slice(0, 80)}
                         </p>
-                        <p className="text-muted">答案：{q.answer.join("、") || "（未設定）"}</p>
+                        <div className="mt-2 space-y-1">{q.options.map((option, i) => <div key={`${q.id}-${i}`} className={`rounded-lg border px-2 py-1 ${q.answer.includes(option) ? "border-emerald-400/50 bg-emerald-400/10" : "border-[var(--line)]"}`}>{String.fromCharCode(65 + i)}. {option}</div>)}</div>
+                        <p className="mt-2 text-muted">答案：{q.answer.join("、") || "（未設定）"}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-1">
                           {q.needsReview && <Badge tone="rose">⚠️ 待確認</Badge>}
                           <Badge tone={q.published ? "green" : "muted"}>{q.published ? "已發布" : "未發布"}</Badge>
+                          <button className="underline" onClick={() => setSelectedQuestion(q)}>詳細</button>
                           <button
                             className="underline"
                             onClick={async () => {
@@ -463,7 +482,10 @@ export default function AdminWeeklyPage() {
                 <Field label="Nova 入場費">
                   <Input type="number" min={0} defaultValue={detail.week.novaCost} onBlur={(e) => patchWeek({ novaCost: Number(e.target.value) })} />
                 </Field>
-                <Field label="螢光筆語意（JSON，可彈性自訂）" hint={'例如 {"blue":"句子","pink":"單字"}；留空 {} 時，AI 會直接分析文字，不套用固定意義。'}>
+                <Field label="螢光筆分析" hint="開啟時，圖片有螢光筆就優先分析標記區域；關閉時 AI 不會特別尋找螢光筆。">
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Object.keys(detail.week.highlightMap ?? {}).length > 0} onChange={() => { const next = Object.keys(detail.week.highlightMap ?? {}).length > 0 ? {} : { blue: "句子", pink: "單字", yellow: "重要" }; setHighlightJson(JSON.stringify(next, null, 2)); void patchWeek({ highlightMap: next }); }} className="accent-[#37d3ff]" /> 開啟螢光筆優先分析</label>
+                </Field>
+                <Field label="螢光筆語意（JSON，可彈性自訂）" hint={'例如 {"blue":"句子","pink":"單字"}；若關閉，請儲存 {}。'}>
                   <div>
                     <Textarea value={highlightJson} onChange={(e) => setHighlightJson(e.target.value)} className="min-h-[120px] font-mono text-xs" />
                     <Button size="sm" variant="ghost" className="mt-2" onClick={async () => {
@@ -553,6 +575,13 @@ export default function AdminWeeklyPage() {
           </div>
         </Card>
       )}
+
+      <Modal open={Boolean(detailItem)} onClose={() => setDetailItem(null)} title="AI 分析詳細結果" wide>
+        {detailItem && <div className="space-y-3"><div className="flex gap-2"><Badge tone="cyan">{String(detailItem.category ?? "分析項目")}</Badge>{detailItem.confidence !== undefined && <Badge tone={Number(detailItem.confidence) < 0.6 ? "rose" : "green"}>信心 {Math.round(Number(detailItem.confidence) * 100)}%</Badge>}</div><pre className="max-h-[65vh] overflow-auto whitespace-pre-wrap rounded-xl bg-black/30 p-4 text-xs">{JSON.stringify(detailItem, null, 2)}</pre></div>}
+      </Modal>
+      <Modal open={Boolean(selectedQuestion)} onClose={() => setSelectedQuestion(null)} title="題目完整解析" wide>
+        {selectedQuestion && <div className="space-y-3"><p className="text-base font-semibold">{selectedQuestion.orderIndex + 1}. {selectedQuestion.stem}</p><div className="space-y-1.5">{selectedQuestion.options.map((option, i) => <div key={option} className={`rounded-xl border p-3 text-sm ${selectedQuestion.answer.includes(option) ? "border-emerald-400/60 bg-emerald-400/10" : "border-[var(--line)]"}`}>{String.fromCharCode(65 + i)}. {option}{selectedQuestion.answer.includes(option) && <Badge tone="green">正解</Badge>}</div>)}</div><div className="rounded-xl bg-[#37d3ff]/10 p-3 text-sm"><p className="font-semibold">答案</p><p className="mt-1">{selectedQuestion.answer.join("、") || "未設定"}</p><p className="mt-2 font-semibold">解析</p><p className="mt-1 whitespace-pre-wrap text-muted">{selectedQuestion.explanation || "尚未提供解析"}</p></div><div className="flex gap-2"><Badge tone={selectedQuestion.needsReview ? "rose" : "green"}>{selectedQuestion.needsReview ? "需要人工確認" : "AI 信心足夠"}</Badge><Badge tone={selectedQuestion.published ? "green" : "muted"}>{selectedQuestion.published ? "已發布" : "未發布"}</Badge></div></div>}
+      </Modal>
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="建立週次">
         <div className="space-y-3">

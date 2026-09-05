@@ -403,7 +403,7 @@ export const routes: RouteDef[] = [
       if (!week) throw fail("WEEK_NOT_FOUND");
       const form = await ctx.formData();
       const kind = String(form.get("fileKind") ?? "paper");
-      if (!["paper", "answer", "magazine", "extra"].includes(kind)) throw badRequest("檔案類型不正確");
+      if (!["paper", "answer", "magazine", "word_source", "sentence_source", "extra"].includes(kind)) throw badRequest("檔案類型不正確");
       const files = form.getAll("files").filter((f): f is File => f instanceof File);
       if (!files.length) throw fail("REQ_NO_FILE");
       const [{ count }] = await db
@@ -466,6 +466,7 @@ export const routes: RouteDef[] = [
     rate: { limit: 20, windowSec: 3600 },
     handler: async (ctx) => {
       const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ scope: z.enum(["all", "vocabulary", "sentences", "questions"]).default("all") }));
       const week = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
       if (!week) throw fail("WEEK_NOT_FOUND");
       if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
@@ -478,9 +479,12 @@ export const routes: RouteDef[] = [
         try {
           const obj = await readObject(f.objectId);
           if (!obj.mimeType.startsWith("image/") && obj.mimeType !== "application/pdf") continue;
-          const hl = f.highlights.length
-            ? `螢光筆標記（相對座標 0-1，管理員自訂顏色語意 ${JSON.stringify(week.highlightMap)}）：${JSON.stringify(f.highlights)}。輸出時請在對應文字前加 [顏色]。`
-            : "未指定螢光筆語意，請直接分析文字內容，依句子、單字、重要與注意等語意提出標記建議，但不要假設固定顏色。";
+          const highlightEnabled = Object.keys(week.highlightMap ?? {}).length > 0;
+          const hl = highlightEnabled && f.highlights.length
+            ? `螢光筆已開啟，請優先分析螢光筆標記區域（相對座標 0-1，顏色語意 ${JSON.stringify(week.highlightMap)}）：${JSON.stringify(f.highlights)}。`
+            : highlightEnabled
+              ? `螢光筆已開啟；若影像中有螢光筆，請優先分析被標記內容。顏色語意：${JSON.stringify(week.highlightMap)}。`
+              : "螢光筆分析已關閉，請不要特別尋找或偏重顏色，直接依文字內容分析。";
           const res = await runAi({
             feature: "weekly_ocr",
             userId: admin.userId,
@@ -499,9 +503,12 @@ export const routes: RouteDef[] = [
       }
 
       const fresh = await db.select().from(weeklyExamFiles).where(eq(weeklyExamFiles.weekId, week.id)).orderBy(asc(weeklyExamFiles.orderIndex));
-      const paperText = fresh.filter((f) => f.fileKind !== "answer").map((f) => `【${f.fileKind} #${f.orderIndex + 1}】\n${f.ocrText}`).join("\n\n");
+      const paperText = fresh.filter((f) => ["paper", "answer", "extra"].includes(f.fileKind)).map((f) => `【${f.fileKind} #${f.orderIndex + 1}】\n${f.ocrText}`).join("\n\n");
+      const vocabularyText = fresh.filter((f) => ["word_source", "magazine", "extra"].includes(f.fileKind)).map((f) => `【${f.fileKind} #${f.orderIndex + 1}】\n${f.ocrText}`).join("\n\n");
+      const sentenceText = fresh.filter((f) => ["sentence_source", "magazine", "extra"].includes(f.fileKind)).map((f) => `【${f.fileKind} #${f.orderIndex + 1}】\n${f.ocrText}`).join("\n\n");
       const answerText = fresh.filter((f) => f.fileKind === "answer").map((f) => `【answer #${f.orderIndex + 1}】\n${f.ocrText}`).join("\n\n");
-      if (!paperText.trim()) throw fail("AI_OCR_EMPTY");
+      const sourceText = body.scope === "vocabulary" ? vocabularyText : body.scope === "sentences" ? sentenceText : paperText;
+      if (!sourceText.trim()) throw fail("AI_OCR_EMPTY", { message: body.scope === "vocabulary" ? "請先上傳單字來源或雜誌" : body.scope === "sentences" ? "請先上傳句子來源或雜誌" : "請先上傳考卷" });
 
       // 2) Structure into a draft (never auto-published)
       const { data } = await runAiJson<{
@@ -515,12 +522,15 @@ export const routes: RouteDef[] = [
           feature: "weekly_structure",
           userId: admin.userId,
           system:
-            "你是補習班教材數位化助理。將 OCR 文字整理成結構化 JSON，並把題目與答案配對。" +
+            `你是補習班教材數位化助理。這次只處理 ${body.scope === "vocabulary" ? "單字與片語" : body.scope === "sentences" ? "英文句子、中文翻譯與句型" : "考卷題目"}，不可把其他類型內容混入。` +
+            (body.scope === "questions" || body.scope === "all" ? "請自己判斷題目；中文題幹或中文答案請補上自然英文翻譯，並保留原文。" : body.scope === "sentences" ? "只找完整句子、片語與句型，並提供自然中文翻譯、文法重點與英文原句。" : "只找值得學習的單字與片語，提供中文意思、詞性、例句與易混淆字；不要把整句文章當成單字。") +
             '回傳：{"questions":[{"number":1,"stem":"","options":[],"answer":[""],"explanation":"","confidence":0-1}],"answers":[{"number":1,"answer":"","confidence":0-1}],"words":[{"word":"","meaning":"","example":"","color":"pink"}],"sentences":[{"en":"","zh":"","color":"blue"}],"summary":""}' +
             "。不確定的項目 confidence 給低分。不要杜撰不存在的題目。",
           parts: [
-            { kind: "text", text: `螢光筆顏色語意：${JSON.stringify(week.highlightMap)}` },
-            { kind: "text", text: `考卷／雜誌 OCR：\n${paperText.slice(0, 16000)}` },
+            { kind: "text", text: `螢光筆設定：${Object.keys(week.highlightMap ?? {}).length ? JSON.stringify(week.highlightMap) : "關閉；不要特別分析螢光筆"}` },
+            { kind: "text", text: `題目來源 OCR：\n${paperText.slice(0, 12000)}` },
+            { kind: "text", text: `單字來源 OCR：\n${vocabularyText.slice(0, 8000)}` },
+            { kind: "text", text: `句子來源 OCR：\n${sentenceText.slice(0, 8000)}` },
             { kind: "text", text: `答案卷 OCR：\n${answerText.slice(0, 6000) || "（未提供）"}` },
           ],
           maxOutputTokens: 4000,
