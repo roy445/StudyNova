@@ -383,7 +383,15 @@ export const routes: RouteDef[] = [
       const sentences = await db.select().from(weeklyExamSentences).where(eq(weeklyExamSentences.weekId, week.id));
       return {
         week: { ...week, open: isWeekOpen(week) },
-        files: files.map((f) => ({ ...f, ocrText: f.ocrText.slice(0, 4000), url: f.objectId ? signObjectUrl(f.objectId, admin.userId) : null })),
+        files: files.map((f) => ({
+          id: f.id,
+          fileKind: f.fileKind,
+          orderIndex: f.orderIndex,
+          ocrStatus: f.ocrStatus,
+          ocrText: f.ocrText.slice(0, 500),
+          hasHighlights: f.highlights.length > 0,
+          url: f.objectId ? signObjectUrl(f.objectId, admin.userId) : null,
+        })),
         drafts,
         questions,
         answers,
@@ -402,7 +410,17 @@ export const routes: RouteDef[] = [
       const week = (await db.select({ id: weeklyExamWeeks.id }).from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
       if (!week) throw fail("WEEK_NOT_FOUND");
       const files = await db.select().from(weeklyExamFiles).where(eq(weeklyExamFiles.weekId, week.id)).orderBy(asc(weeklyExamFiles.fileKind), asc(weeklyExamFiles.orderIndex));
-      return { files: files.map((f) => ({ ...f, ocrText: f.ocrText.slice(0, 4000), url: f.objectId ? signObjectUrl(f.objectId, admin.userId) : null })) };
+      return {
+        files: files.map((f) => ({
+          id: f.id,
+          fileKind: f.fileKind,
+          orderIndex: f.orderIndex,
+          ocrStatus: f.ocrStatus,
+          ocrText: f.ocrText.slice(0, 500),
+          hasHighlights: f.highlights.length > 0,
+          url: f.objectId ? signObjectUrl(f.objectId, admin.userId) : null,
+        })),
+      };
     },
   }),
   route({
