@@ -8,15 +8,24 @@ import { requireAdmin } from "@/server/auth";
 
 const KINDS = ["paper", "answer", "magazine", "word_source", "sentence_source", "extra"] as const;
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   const body = (await request.json()) as HandleUploadBody;
   try {
     const response = await handleUpload({
       body,
       request,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async (_pathname, clientPayload) => {
+        if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("BLOB_READ_WRITE_TOKEN 未設定，請在 Vercel Production 環境變數加入 Blob token 並重新部署");
         const admin = await requireAdmin();
-        const payload = JSON.parse(clientPayload || "{}") as { weekId?: string; fileKind?: string };
+        let payload: { weekId?: string; fileKind?: string };
+        try {
+          payload = JSON.parse(clientPayload || "{}");
+        } catch {
+          throw new Error("上傳請求缺少有效的 Weekly 參數");
+        }
         if (!payload.weekId || !payload.fileKind || !KINDS.includes(payload.fileKind as (typeof KINDS)[number])) throw new Error("Weekly 上傳參數不正確");
         const week = (await db.select({ id: weeklyExamWeeks.id }).from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, payload.weekId)).limit(1))[0];
         if (!week) throw new Error("找不到 Weekly 週次");
@@ -37,6 +46,8 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(response);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "上傳失敗" }, { status: 400 });
+    const message = error instanceof Error ? error.message : "上傳失敗";
+    console.error("[weekly-blob-upload]", error);
+    return NextResponse.json({ ok: false, code: "WEEKLY_BLOB_UPLOAD_FAILED", error: message }, { status: 400 });
   }
 }
