@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   description: "讓學習更聰明，讓進步看得見。StudyNova AI 是專為台灣國中、高中生打造的 AI 學習平台：成績分析、教材 OCR、AI 出題、錯題本、每週小考、錄音評分與 Novi AI 助理。",
   applicationName: "StudyNova AI",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/studynova-icon.png", type: "image/png", sizes: "512x512" }],
+    apple: [{ url: "/studynova-icon.png", type: "image/png", sizes: "512x512" }],
+  },
   appleWebApp: { capable: true, title: "StudyNova", statusBarStyle: "black-translucent" },
   openGraph: {
     title: "StudyNova AI｜超強 AI 讀書神器",

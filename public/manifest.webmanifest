@@ -4,10 +4,10 @@
   "description": "讓學習更聰明，讓進步看得見。",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#060915",
-  "theme_color": "#060915",
+  "background_color": "#102940",
+  "theme_color": "#102940",
   "lang": "zh-Hant-TW",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/studynova-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }

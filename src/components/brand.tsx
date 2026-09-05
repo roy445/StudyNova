@@ -30,42 +30,20 @@ const STATE_FACE: Record<NoviState, string> = {
   levelup: "★ ★",
 };
 
-/** StudyNova logo mark: planet + orbit + rising study spark. */
+/** StudyNova study mark supplied by the new brand lockup. */
 export function LogoMark({ size = 40, glow = true }: { size?: number; glow?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="sn-core" x1="12" y1="10" x2="54" y2="56" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#9d8cff" />
-          <stop offset="0.55" stopColor="#37d3ff" />
-          <stop offset="1" stopColor="#ffc857" />
-        </linearGradient>
-        <linearGradient id="sn-orbit" x1="4" y1="32" x2="60" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#7c5cff" stopOpacity="0.15" />
-          <stop offset="0.5" stopColor="#37d3ff" />
-          <stop offset="1" stopColor="#7c5cff" stopOpacity="0.15" />
-        </linearGradient>
-      </defs>
-      {glow && <circle cx="32" cy="32" r="20" fill="url(#sn-core)" opacity="0.18" />}
-      <circle cx="32" cy="32" r="14" fill="url(#sn-core)" />
-      <path d="M25 33.5l4.5 4.5L40 27" stroke="#08101f" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-      <ellipse cx="32" cy="32" rx="27" ry="11" transform="rotate(-26 32 32)" stroke="url(#sn-orbit)" strokeWidth="2.4" fill="none" />
-      <circle cx="53" cy="20" r="2.6" fill="#ffc857" />
-      <circle cx="11" cy="44" r="1.8" fill="#37d3ff" />
-    </svg>
+    <span className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      {glow && <span className="absolute inset-0 rounded-full bg-[#27c4bd]/15 blur-md" />}
+      <img src="/studynova-mark.png" alt="" aria-hidden className="relative h-full w-full object-contain" />
+    </span>
   );
 }
 
 export function Wordmark({ size = 22 }: { size?: number }) {
   return (
-    <span className="flex items-center gap-2">
-      <LogoMark size={size + 14} />
-      <span className="flex flex-col leading-none">
-        <span className="neon-text text-[length:var(--fs)] font-extrabold tracking-tight" style={{ ["--fs" as string]: `${size}px` }}>
-          StudyNova
-        </span>
-        <span className="text-[10px] tracking-[0.18em] text-muted">AI 讀書神器</span>
-      </span>
+    <span className="inline-flex items-center justify-center overflow-hidden" style={{ width: size * 2.5, height: size * 2.15 }}>
+      <img src="/studynova-logo.png" alt="StudyNova" className="h-full w-full object-contain" />
     </span>
   );
 }
