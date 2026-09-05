@@ -290,6 +290,14 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                     >
                       <span>個人設定</span><span aria-hidden="true">→</span>
                     </Link>
+                    <Link
+                      href="/study?tab=words"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-muted transition hover:bg-white/5 hover:text-[var(--text)]"
+                    >
+                      <span>我的單字</span><span aria-hidden="true">→</span>
+                    </Link>
                     <button
                       type="button"
                       role="menuitem"

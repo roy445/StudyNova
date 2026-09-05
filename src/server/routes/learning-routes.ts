@@ -885,7 +885,8 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
-      const dailyTarget = Math.max(1, Math.min(10, settings?.dailyWordCount ?? 10));
+      // 同一學制的所有使用者每天看到同一批單字；個人設定只影響學習提醒，不改變共同題目。
+      const dailyTarget = 10;
       const requestedTrack = ctx.query.get("track");
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : settings?.schoolLevel === "senior" ? "senior" : "junior";
       const dayNumber = Math.floor(Date.now() / 86_400_000);

@@ -367,6 +367,8 @@ export const contentRoutes: RouteDef[] = [
       if (!files.length) throw fail("REQ_NO_FILE", { message: "請至少選擇一張圖片" });
       const existing = await db.select({ c: sql<number>`count(*)::int` }).from(ocrPages).where(eq(ocrPages.documentId, doc.id));
       let order = existing[0]?.c ?? 0;
+      const previousBatches = Array.isArray((doc.aiResult as Record<string, unknown> | null)?.uploadBatches) ? ((doc.aiResult as Record<string, unknown>).uploadBatches as unknown[]) : [];
+      const batchNumber = previousBatches.length + 1;
       const created = [];
       for (const file of files) {
         const buf = Buffer.from(await file.arrayBuffer());
@@ -375,7 +377,8 @@ export const contentRoutes: RouteDef[] = [
         created.push({ ...rows[0], imageUrl: signObjectUrl(stored.id, user.userId) });
         order += 1;
       }
-      return { pages: created };
+      await db.update(ocrDocuments).set({ aiResult: { ...(doc.aiResult ?? {}), uploadBatches: [...previousBatches, { batchNumber, pageIds: created.map((p) => p.id), count: created.length, uploadedAt: new Date().toISOString() }] }, updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
+      return { pages: created, batchNumber };
     },
   }),
 
@@ -430,10 +433,12 @@ export const contentRoutes: RouteDef[] = [
     rate: { limit: 40, windowSec: 3600 },
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ pageIds: z.array(z.string().uuid()).max(20).optional() }));
       const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
       if (doc.userId !== user.userId) throw forbidden();
-      const pages = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
+      const allPages = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
+      const pages = body.pageIds?.length ? allPages.filter((p) => body.pageIds!.includes(p.id)) : allPages;
       if (!pages.length) throw fail("REQ_NO_FILE", { message: "請先上傳圖片再執行 OCR" });
       if (pages.length > 1) await consumeFeature(user.userId, "multi_image_ocr");
       await consumeFeature(user.userId, "image_ocr", pages.length);
@@ -558,7 +563,15 @@ export const contentRoutes: RouteDef[] = [
       if (!body.force && !preflight) throw fail("SYS_CONFLICT", { message: "請先執行圖片品質檢查" });
       const selected = body.itemIds?.length ? `只分析這些項目：${body.itemIds.join(", ")}` : "分析所有偵測到的項目";
       const modeInstruction = body.analysisMode === "vocabulary" ? "目前模式是只分析單字與片語：忽略一般文章與廣告文字，只輸出有學習價值的單字、補充單字、片語，並補上繁體中文、詞性、一字多意與中文片語。" : body.analysisMode === "sentences" ? "目前模式是只分析句子與句型：忽略零散單字，只輸出完整英文句子、中文翻譯、重要句型、文法與重要單字。" : body.analysisMode === "questions" ? "目前模式是只分析題目：只輸出題目、選項、答案與詳細解析，不要把普通文章文字當成題目。" : "目前模式是智慧讀取：自動判斷題目、單字、句子、文章、筆記與混合內容。";
-      const colorInstruction = body.selectedHighlightColors.length ? `只優先分析指定螢光筆顏色：${body.selectedHighlightColors.join("、")}；其他顏色內容標記為未選取，不要主動納入。` : "若圖片有螢光筆，辨識並在結果中標注顏色與用途。";
+      const previousAnalysis = (doc.aiResult as Record<string, unknown> | null)?.visionAnalysis;
+      const previousItems = previousAnalysis && typeof previousAnalysis === "object" && Array.isArray((previousAnalysis as Record<string, unknown>).items) ? (previousAnalysis as Record<string, unknown>).items as Array<Record<string, unknown>> : [];
+      const previousWords = previousItems.flatMap((item) => {
+        const language = item.language && typeof item.language === "object" ? item.language as Record<string, unknown> : {};
+        const vocabulary = Array.isArray(language.vocabulary) ? language.vocabulary : [];
+        return [item.kind === "vocabulary" ? item.word : null, ...vocabulary.map((v) => v && typeof v === "object" ? (v as Record<string, unknown>).word : null)].filter((word): word is string => typeof word === "string" && word.trim().length > 0);
+      });
+      const duplicateInstruction = `同一批圖片中相同單字只輸出一次；如果下列單字已在前一次批次分析過，這次請直接省略：${previousWords.slice(0, 200).join(", ")}；題目若出現斜線、或、頓號分隔的多個答案，必須保留成 answer.values 陣列，代表多個可接受答案。`;
+      const colorInstruction = (body.selectedHighlightColors.length ? `只優先分析指定螢光筆顏色：${body.selectedHighlightColors.join("、")}；其他顏色內容標記為未選取，不要主動納入。` : "若圖片有螢光筆，辨識並在結果中標注顏色與用途。") + ` ${duplicateInstruction}`;
       const { data } = await runAiJson<Record<string, unknown>>(
         {
           feature: "camera_vision_analysis",
@@ -617,7 +630,8 @@ export const contentRoutes: RouteDef[] = [
           const answer = (item.answer && typeof item.answer === "object" ? item.answer : {}) as Record<string, unknown>;
           const elements = (item.elements && typeof item.elements === "object" ? item.elements : {}) as Record<string, unknown>;
           const options = Array.isArray(elements.options) ? elements.options.map((o) => typeof o === "object" && o ? String((o as Record<string, unknown>).text ?? "") : String(o)).filter(Boolean).slice(0, 12) : [];
-          const answerValues = answer.value ? [String(answer.value).slice(0, 500)] : [];
+          const rawAnswerValues = Array.isArray(answer.values) ? answer.values.map(String) : answer.value ? [String(answer.value)] : [];
+          const answerValues = rawAnswerValues.flatMap((value) => value.split(/\s*\/\s*|\s*或\s*|、/).map((part) => part.trim()).filter(Boolean)).map((value) => value.slice(0, 500)).slice(0, 12);
           const inserted = await db.insert(questions).values({ ownerId: user.userId, origin: "user", subject: String(item.subject ?? doc.subject).slice(0, 20), topic: String(item.type ?? "鏡頭分析").slice(0, 120), level: "junior", difficulty: String(item.difficulty ?? "不確定").slice(0, 20), type: String(item.type ?? "short").slice(0, 30), stem, options, answer: answerValues, explanation: String(answer.finalReason ?? (Array.isArray(answer.steps) ? answer.steps.join("\n") : "")).slice(0, 20000), fingerprint: fingerprint(`${user.userId}:camera:${stem}`) }).onConflictDoNothing().returning({ id: questions.id });
           if (inserted.length) {
             saved += 1;

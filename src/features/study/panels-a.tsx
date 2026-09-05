@@ -209,7 +209,7 @@ export function MaterialsPanel() {
 }
 
 type OcrPage = { id: string; orderIndex: number; rotation: number; text: string; status: string; imageUrl: string | null; highlights: Array<{ color: string; x: number; y: number; w: number; h: number }>; crop: { x: number; y: number; w: number; h: number } | null };
-type OcrDoc = { id: string; title: string; subject: string; status: string; combinedText: string };
+type OcrDoc = { id: string; title: string; subject: string; status: string; combinedText: string; aiResult?: Record<string, unknown> | null };
 
 const HIGHLIGHT_COLORS = [
   { key: "yellow", label: "黃：本次考試", css: "#facc15" },
@@ -234,12 +234,26 @@ export function OcrPanel() {
   const [visionPreflight, setVisionPreflight] = useState<Record<string, unknown> | null>(null);
   const [visionAnalysis, setVisionAnalysis] = useState<Record<string, unknown> | null>(null);
   const [selectedVisionItems, setSelectedVisionItems] = useState<string[]>([]);
+  const [latestBatchIds, setLatestBatchIds] = useState<string[]>([]);
+  const [latestBatchNumber, setLatestBatchNumber] = useState<number | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
   const [torchOn, setTorchOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStream = useRef<MediaStream | null>(null);
   const drag = useRef<{ pageId: string; startX: number; startY: number } | null>(null);
+
+  useEffect(() => {
+    const batches = detail.data?.document.aiResult?.uploadBatches;
+    const last = Array.isArray(batches) ? batches.at(-1) : null;
+    if (!last || typeof last !== "object") return;
+    const item = last as { batchNumber?: number; pageIds?: unknown[] };
+    if (latestBatchIds.length) return;
+    // Restore the persisted latest batch after a page refresh.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLatestBatchIds(Array.isArray(item.pageIds) ? item.pageIds.filter((id): id is string => typeof id === "string") : []);
+    setLatestBatchNumber(typeof item.batchNumber === "number" ? item.batchNumber : null);
+  }, [detail.data, latestBatchIds.length]);
 
   useEffect(() => {
     if (!cameraOpen) {
@@ -299,6 +313,10 @@ export function OcrPanel() {
     try {
       const res = await apiPost<{ document: OcrDoc }>("/ocr/documents", { title: `辨識 ${new Date().toLocaleDateString("zh-TW")}` });
       setActiveId(res.document.id);
+      setLatestBatchIds([]);
+      setLatestBatchNumber(null);
+      setVisionPreflight(null);
+      setVisionAnalysis(null);
       await list.reload();
     } catch (err) {
       toast.push("error", errorMessage(err));
@@ -313,8 +331,10 @@ export function OcrPanel() {
     try {
       const fd = new FormData();
       Array.from(files).forEach((f) => fd.append("files", f));
-      await apiPost(`/ocr/documents/${activeId}/pages`, fd);
-      toast.push("success", `已加入 ${files.length} 張圖片`);
+      const res = await apiPost<{ pages: Array<{ id: string }>; batchNumber: number }>(`/ocr/documents/${activeId}/pages`, fd);
+      setLatestBatchIds(res.pages.map((page) => page.id));
+      setLatestBatchNumber(res.batchNumber);
+      toast.push("success", `第 ${res.batchNumber} 次上傳：已加入 ${files.length} 張圖片；接下來只會分析這一批`);
       await detail.reload();
     } catch (err) {
       toast.push("error", errorMessage(err));
@@ -327,7 +347,7 @@ export function OcrPanel() {
     if (!activeId) return;
     setBusy(true);
     try {
-      await apiPost(`/ocr/documents/${activeId}/run`);
+      await apiPost(`/ocr/documents/${activeId}/run`, { pageIds: latestBatchIds.length ? latestBatchIds : undefined });
       toast.push("success", "OCR 完成，可直接編輯文字");
       await detail.reload();
     } catch (err) {
@@ -407,7 +427,7 @@ export function OcrPanel() {
     try {
       const res = await apiPost<{ stage: string; preflight?: Record<string, unknown>; analysis?: Record<string, unknown>; retakeMessage?: string | null }>(`/ocr/documents/${activeId}/vision-analysis`, {
         stage,
-        pageIds: detail.data?.pages.map((p) => p.id),
+        pageIds: latestBatchIds.length ? latestBatchIds : detail.data?.pages.map((p) => p.id),
         itemIds: selectedVisionItems.length ? selectedVisionItems : undefined,
         analysisMode,
         // 不預設任何顏色，讓 AI 自己判斷圖片中是否真的有螢光筆與其語意。
@@ -465,7 +485,7 @@ export function OcrPanel() {
       subtitle="拍照或上傳多張圖片 → 排序／旋轉／裁切／螢光筆標記 → AI 辨識 → 轉成筆記、題目、記憶卡"
       action={
         <div className="flex gap-1.5">
-          <Select value={activeId ?? ""} onChange={(e) => setActiveId(e.target.value || null)} className="!w-auto !py-1.5 text-xs">
+          <Select value={activeId ?? ""} onChange={(e) => { setActiveId(e.target.value || null); setLatestBatchIds([]); setLatestBatchNumber(null); setVisionPreflight(null); setVisionAnalysis(null); }} className="!w-auto !py-1.5 text-xs">
             <option value="">選擇文件…</option>
             {list.data?.documents.map((d) => (
               <option key={d.id} value={d.id}>
@@ -493,9 +513,10 @@ export function OcrPanel() {
               📸 拍照
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => uploadImages(e.target.files)} />
             </label>
-              <Button size="sm" loading={busy} onClick={runOcr}>
+            <Button size="sm" loading={busy} onClick={runOcr}>
               ✨ 開始 AI 辨識
             </Button>
+            {latestBatchNumber && <Badge tone="cyan">目前分析第 {latestBatchNumber} 批（{latestBatchIds.length} 張）</Badge>}
             <Select value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value as typeof analysisMode)} className="!w-auto !py-1.5 text-xs" aria-label="AI 分析模式">
               <option value="auto">智慧讀取（AI 自動判斷）</option>
               <option value="vocabulary">只分析單字／片語</option>
