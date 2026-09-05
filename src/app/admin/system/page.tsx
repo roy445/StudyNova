@@ -14,6 +14,7 @@ export default function AdminSystemPage() {
   const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
   const gradeWindow = (settings.data?.settings.find((s) => s.key === "grade_input_window")?.value ?? {}) as { enabled?: boolean; startsAt?: string; endsAt?: string };
   const countdowns = (settings.data?.settings.find((s) => s.key === "exam_countdowns")?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
+  const exportConfig = (settings.data?.settings.find((s) => s.key === "learning_exports")?.value ?? {}) as { enabled?: boolean; proOnly?: boolean; novaPerKb?: number; minimumNova?: number; allowedKinds?: string[] };
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [summary, setSummary] = useState<{ total: number; pass: number; fail: number; skip: number; durationMs: number } | null>(null);
@@ -134,6 +135,17 @@ export default function AdminSystemPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-4 text-sm"><label className="flex items-center gap-2"><input id="countdown-exam-enabled" type="checkbox" defaultChecked={countdowns.exam?.enabled !== false} className="accent-[#7c5cff]" /> 顯示考試倒數</label><label className="flex items-center gap-2"><input id="countdown-gsat-enabled" type="checkbox" defaultChecked={countdowns.gsat?.enabled !== false} className="accent-[#7c5cff]" /> 顯示學測倒數</label></div>
             <Button className="mt-3" onClick={async () => { try { await apiPut("/admin/settings/exam_countdowns", { value: { exam: { name: (document.getElementById("countdown-exam-name") as HTMLInputElement).value, date: (document.getElementById("countdown-exam-date") as HTMLInputElement).value, enabled: (document.getElementById("countdown-exam-enabled") as HTMLInputElement).checked }, gsat: { name: (document.getElementById("countdown-gsat-name") as HTMLInputElement).value, date: (document.getElementById("countdown-gsat-date") as HTMLInputElement).value, enabled: (document.getElementById("countdown-gsat-enabled") as HTMLInputElement).checked } } }); toast.push("success", "倒數設定已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存倒數設定</Button>
+          </div>
+          <div className="mt-6 border-t border-[var(--line)] pt-4">
+            <p className="mb-3 text-sm font-semibold">↥ PRO 匯出與 Nova 收費</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="匯出功能"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-enabled" type="checkbox" defaultChecked={exportConfig.enabled !== false} className="accent-[#7c5cff]" /> 開放匯出</label></Field>
+              <Field label="會員限制"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-pro-only" type="checkbox" defaultChecked={exportConfig.proOnly !== false} className="accent-[#7c5cff]" /> 僅限 PRO</label></Field>
+              <Field label="每 KB Nova"><Input id="export-nova-kb" type="number" min={0} step={0.1} defaultValue={String(exportConfig.novaPerKb ?? 1)} /></Field>
+              <Field label="最低 Nova"><Input id="export-min-nova" type="number" min={0} defaultValue={String(exportConfig.minimumNova ?? 5)} /></Field>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-4 text-sm"><label className="flex items-center gap-2"><input id="export-vocab" type="checkbox" defaultChecked={exportConfig.allowedKinds?.includes("vocabulary") ?? true} className="accent-[#7c5cff]" /> 我的單字</label><label className="flex items-center gap-2"><input id="export-wrong" type="checkbox" defaultChecked={exportConfig.allowedKinds?.includes("wrong") ?? true} className="accent-[#7c5cff]" /> 錯題本</label></div>
+            <Button className="mt-3" onClick={async () => { const allowedKinds = [((document.getElementById("export-vocab") as HTMLInputElement).checked ? "vocabulary" : ""), ((document.getElementById("export-wrong") as HTMLInputElement).checked ? "wrong" : "")].filter(Boolean); try { await apiPut("/admin/settings/learning_exports", { value: { enabled: (document.getElementById("export-enabled") as HTMLInputElement).checked, proOnly: (document.getElementById("export-pro-only") as HTMLInputElement).checked, novaPerKb: Number((document.getElementById("export-nova-kb") as HTMLInputElement).value), minimumNova: Number((document.getElementById("export-min-nova") as HTMLInputElement).value), allowedKinds } }); toast.push("success", "匯出收費設定已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存匯出設定</Button>
           </div>
         </Card>
       )}

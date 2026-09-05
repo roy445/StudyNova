@@ -147,6 +147,16 @@ function ProfileInner() {
             {settings.loading && <Skeleton lines={4} />}
             {settings.data && (
               <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="就讀學校（可選填）">
+                  <Input
+                    defaultValue={String(settings.data.settings.schoolName ?? "")}
+                    placeholder="例如：清水高中"
+                    onBlur={async (e) => {
+                      await apiPatch("/account/settings", { schoolName: e.target.value.trim() });
+                      toast.push("success", "已更新學校資訊");
+                    }}
+                  />
+                </Field>
                 <Field label="每日學習目標（分鐘）">
                   <Input
                     type="number"

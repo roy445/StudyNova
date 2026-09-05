@@ -276,6 +276,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({
           schoolLevel: z.enum(["junior", "senior"]).optional(),
+          schoolName: z.string().trim().max(120).optional(),
           grade: z.number().int().min(1).max(3).optional(),
           dailyGoalMinutes: z.number().int().min(10).max(600).optional(),
           favoriteSubjects: z.array(z.string().max(20)).max(12).optional(),

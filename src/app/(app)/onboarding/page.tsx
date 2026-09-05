@@ -16,6 +16,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     schoolLevel: "junior" as "junior" | "senior",
+    schoolName: "",
     grade: 1,
     dailyGoalMinutes: 45,
     favoriteSubjects: ["英文", "數學"] as string[],
@@ -64,6 +65,9 @@ export default function OnboardingPage() {
       {step === 0 && (
         <Card title="1／3 學制與年級">
           <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="學校名稱（選填）">
+              <Input value={form.schoolName} placeholder="例如：清水高中" onChange={(e) => setForm({ ...form, schoolName: e.target.value })} />
+            </Field>
             <Field label="學制">
               <Select value={form.schoolLevel} onChange={(e) => setForm({ ...form, schoolLevel: e.target.value as "junior" | "senior" })}>
                 <option value="junior">國中</option>

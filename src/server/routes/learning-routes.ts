@@ -30,12 +30,13 @@ import {
   userVocabularies,
 } from "@/db/schema";
 import { route, zDate, type RouteDef } from "../router";
-import { addDaysStr, badRequest, daysBetween, fail, notFound, round1, todayStr, trend, toCsv } from "../core";
+import { addDaysStr, badRequest, daysBetween, fail, notFound, randomToken, round1, todayStr, trend, toCsv } from "../core";
 import {
   bumpAchievement,
   claimDailyTask,
   ensureDailyTasks,
   grantLearningReward,
+  grantNova,
   progressActivities,
   progressDailyTask,
 } from "../economy";
@@ -205,6 +206,31 @@ export async function buildPlan(userId: string, date: string) {
 }
 
 /* ------------------------------------------------------------ routes */
+
+type ExportKind = "vocabulary" | "wrong";
+type ExportSettings = { enabled: boolean; proOnly: boolean; allowedKinds: ExportKind[]; novaPerKb: number; minimumNova: number };
+const DEFAULT_EXPORT_SETTINGS: ExportSettings = { enabled: true, proOnly: true, allowedKinds: ["vocabulary", "wrong"], novaPerKb: 1, minimumNova: 5 };
+
+async function exportSettings(): Promise<ExportSettings> {
+  const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "learning_exports")).limit(1))[0];
+  const value = (row?.value ?? {}) as Partial<ExportSettings>;
+  return {
+    enabled: value.enabled ?? DEFAULT_EXPORT_SETTINGS.enabled,
+    proOnly: value.proOnly ?? DEFAULT_EXPORT_SETTINGS.proOnly,
+    allowedKinds: (value.allowedKinds ?? DEFAULT_EXPORT_SETTINGS.allowedKinds).filter((k): k is ExportKind => k === "vocabulary" || k === "wrong"),
+    novaPerKb: Math.max(0, Number(value.novaPerKb ?? DEFAULT_EXPORT_SETTINGS.novaPerKb)),
+    minimumNova: Math.max(0, Math.floor(Number(value.minimumNova ?? DEFAULT_EXPORT_SETTINGS.minimumNova))),
+  };
+}
+
+async function buildLearningExport(userId: string, kind: ExportKind) {
+  const rows = kind === "wrong"
+    ? await db.select({ subject: wrongQuestions.subject, wrongCount: wrongQuestions.wrongCount, mastery: wrongQuestions.mastery, reason: wrongQuestions.reason, nextReviewAt: wrongQuestions.nextReviewAt }).from(wrongQuestions).where(eq(wrongQuestions.userId, userId)).orderBy(desc(wrongQuestions.wrongCount))
+    : await db.select({ word: userVocabularies.word, meaning: userVocabularies.meaning, partOfSpeech: userVocabularies.partOfSpeech, phonetic: userVocabularies.phonetic, example: userVocabularies.example, exampleZh: userVocabularies.exampleZh, familiarity: userVocabularies.familiarity, reviewCount: userVocabularies.reviewCount }).from(userVocabularies).where(eq(userVocabularies.userId, userId)).orderBy(asc(userVocabularies.word));
+  const csv = toCsv(rows as Array<Record<string, unknown>>);
+  const bytes = Buffer.byteLength(csv, "utf8");
+  return { csv, bytes };
+}
 
 export const routes: RouteDef[] = [
   route({
@@ -940,16 +966,33 @@ export const routes: RouteDef[] = [
   }),
   route({
     method: "GET",
+    path: "/exports/my-learning/estimate",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const settings = await exportSettings();
+      const kind = ctx.query.get("kind") === "wrong" ? "wrong" : "vocabulary";
+      if (!settings.enabled || !settings.allowedKinds.includes(kind)) throw fail("QUOTA_FEATURE_DISABLED", { message: "此匯出項目目前未開放" });
+      if (settings.proOnly && !(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "學習紀錄匯出功能僅限 PRO 會員" });
+      const file = await buildLearningExport(user.userId, kind);
+      const novaCost = Math.max(settings.minimumNova, Math.ceil(file.bytes / 1024) * settings.novaPerKb);
+      return { kind, bytes: file.bytes, rows: file.csv.split("\n").length - 1, novaCost, currency: "Nova", warning: `下載前會消耗 ${novaCost} Nova，檔案大小約 ${(file.bytes / 1024).toFixed(1)} KB。` };
+    },
+  }),
+  route({
+    method: "GET",
     path: "/exports/my-learning",
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      if (!(await isProUser(user.userId))) throw fail("SYS_CONFLICT", { message: "學習紀錄匯出功能僅限 PRO 會員" });
+      const settings = await exportSettings();
       const kind = ctx.query.get("kind") === "wrong" ? "wrong" : "vocabulary";
-      const rows = kind === "wrong"
-        ? await db.select({ subject: wrongQuestions.subject, wrongCount: wrongQuestions.wrongCount, mastery: wrongQuestions.mastery, reason: wrongQuestions.reason, nextReviewAt: wrongQuestions.nextReviewAt }).from(wrongQuestions).where(eq(wrongQuestions.userId, user.userId)).orderBy(desc(wrongQuestions.wrongCount))
-        : await db.select({ word: userVocabularies.word, meaning: userVocabularies.meaning, partOfSpeech: userVocabularies.partOfSpeech, phonetic: userVocabularies.phonetic, example: userVocabularies.example, exampleZh: userVocabularies.exampleZh, familiarity: userVocabularies.familiarity, reviewCount: userVocabularies.reviewCount }).from(userVocabularies).where(eq(userVocabularies.userId, user.userId)).orderBy(asc(userVocabularies.word));
-      return new Response(toCsv(rows as Array<Record<string, unknown>>), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="studynova-${kind}.csv"` } });
+      if (!settings.enabled || !settings.allowedKinds.includes(kind)) throw fail("QUOTA_FEATURE_DISABLED", { message: "此匯出項目目前未開放" });
+      if (settings.proOnly && !(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "學習紀錄匯出功能僅限 PRO 會員" });
+      const file = await buildLearningExport(user.userId, kind);
+      const novaCost = Math.max(settings.minimumNova, Math.ceil(file.bytes / 1024) * settings.novaPerKb);
+      const charge = await grantNova({ userId: user.userId, amount: -novaCost, reason: `匯出學習紀錄：${kind}`, source: "learning_export", idempotencyKey: `export:${user.userId}:${kind}:${randomToken(12)}` });
+      return new Response(file.csv, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="studynova-${kind}.csv"`, "x-nova-charged": String(novaCost), "x-nova-balance": String(charge.balance) } });
     },
   }),
 ];

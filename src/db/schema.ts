@@ -81,6 +81,7 @@ export const passwordResetTokens = pgTable(
 export const userSettings = pgTable("user_settings", {
   userId: uuid("user_id").primaryKey().references(() => users.userId, { onDelete: "cascade" }),
   schoolLevel: text("school_level").notNull().default("junior"), // junior | senior
+  schoolName: text("school_name").notNull().default(""),
   grade: integer("grade").notNull().default(1),
   dailyGoalMinutes: integer("daily_goal_minutes").notNull().default(45),
   favoriteSubjects: jsonb("favorite_subjects").$type<string[]>().notNull().default([]),
