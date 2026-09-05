@@ -4,14 +4,14 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
 
 type Novi = {
   profile: { name: string; level: number; xp: number; skin: string; core: string; effect: string; float: string; voice: string; title: string; badge: string } | null;
   levels: Array<{ level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string; aura: string }>;
   nextLevel: { level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string } | null;
-  items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; owned: boolean }>;
+  items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; owned: boolean; enabled?: boolean }>;
   balance: number;
   isPro: boolean;
 };
@@ -31,6 +31,7 @@ function ProfileInner() {
   const [displayName, setDisplayName] = useState("");
   const [coupon, setCoupon] = useState("");
   const [pwd, setPwd] = useState({ current: "", next: "" });
+  const [previewItem, setPreviewItem] = useState<Novi["items"][number] | null>(null);
 
   const profile = novi.data?.profile;
 
@@ -352,7 +353,8 @@ function ProfileInner() {
       )}
 
       {tab === "shop" && (
-        <Card title="▧ Novi 商店" subtitle={`目前 Nova 餘額：${novi.data?.balance ?? 0}`}>
+        <Card title="▧ Novi 商店" subtitle={`目前 Nova 餘額：${novi.data?.balance ?? 0}`} action={<Button size="sm" variant="ghost" onClick={() => void novi.reload()}>重新整理商品</Button>}>
+          <div className="mb-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 px-3 py-2 text-xs text-muted">商品下架後會立即從這裡消失；PRO 商品會先顯示資格要求，購買時後端也會再次驗證。</div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {novi.data?.items.map((item) => (
               <div key={item.id} className="glass-soft p-3">
@@ -360,34 +362,51 @@ function ProfileInner() {
                   <p className="truncate text-sm font-medium">{item.name}</p>
                   {item.proOnly && <Badge tone="gold">Pro</Badge>}
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted">{item.description}</p>
-                <p className="mt-1 text-[11px] text-muted">需要 Lv.{item.requiredLevel}</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-[#ffd98a]">✦ {item.priceNova}</span>
-                  {item.owned ? (
-                    <Badge tone="green">已擁有</Badge>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          await apiPost(`/novi/shop/${item.id}/buy`);
-                          toast.push("success", `已購買 ${item.name}`);
-                          await novi.reload();
-                          await nova.reload();
-                        } catch (err) {
-                          toast.push("error", errorMessage(err));
-                        }
-                      }}
+                  <p className="mt-0.5 text-[11px] text-muted">{item.description}</p>
+                  <p className="mt-1 text-[11px] text-muted">需要 Lv.{item.requiredLevel}{item.proOnly ? "・需要 Nova Pro" : ""}</p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-[#ffd98a]">✦ {item.priceNova}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Button size="sm" variant="ghost" onClick={() => setPreviewItem(item)}>預覽</Button>
+                      {item.owned ? (
+                        <Badge tone="green">已擁有</Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          disabled={Boolean(item.proOnly && !novi.data?.isPro)}
+                          onClick={async () => {
+                            if (item.proOnly && !novi.data?.isPro) return toast.push("error", "這是 Nova Pro 專屬商品，請先升級資格");
+                            try {
+                              await apiPost(`/novi/shop/${item.id}/buy`);
+                              toast.push("success", `已購買 ${item.name}`);
+                              await novi.reload();
+                              await nova.reload();
+                            } catch (err) {
+                              toast.push("error", errorMessage(err));
+                            }
+                          }}
                     >
-                      購買
+                      {item.proOnly && !novi.data?.isPro ? "需 Pro" : "購買"}
                     </Button>
                   )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </Card>
+      )}
+
+      {previewItem && (
+        <Modal open={Boolean(previewItem)} onClose={() => setPreviewItem(null)} title={`預覽：${previewItem.name}`}>
+          <div className="space-y-4">
+            <div className="flex justify-center rounded-2xl border border-[#37d3ff]/20 bg-gradient-to-b from-[#162b54] to-[#101326] p-6">
+              <NoviAvatar size={150} state="cheer" level={profile?.level ?? 1} skin={previewItem.category === "skin" ? previewItem.code : profile?.skin} core={previewItem.category === "core" ? previewItem.code : profile?.core} effect={previewItem.category === "effect" ? previewItem.code : profile?.effect} float={previewItem.category === "float" ? previewItem.code : profile?.float} />
+            </div>
+            <div><p className="font-semibold">{previewItem.name}</p><p className="mt-1 text-sm leading-6 text-muted">{previewItem.description}</p><p className="mt-2 text-xs text-muted">購買後可在「Novi 養成」裝備；{previewItem.proOnly ? "此商品需要 Nova Pro。" : "此商品可由一般會員購買。"}</p></div>
+            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setPreviewItem(null)}>關閉</Button>{!previewItem.owned && <Button disabled={Boolean(previewItem.proOnly && !novi.data?.isPro)} onClick={() => { setPreviewItem(null); toast.push("info", previewItem.proOnly ? "請先升級 Nova Pro 後購買" : "請回到商品卡片完成購買"); }}>{previewItem.proOnly && !novi.data?.isPro ? "需要 Pro" : "返回購買"}</Button>}</div>
+          </div>
+        </Modal>
       )}
 
       {tab === "nova" && (
