@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   novaAccounts,
@@ -10,6 +10,8 @@ import {
   assistantItems,
   assistantInventory,
   assistantTransactions,
+  novaProExchangePlans,
+  novaProExchangeTransactions,
   memberships,
   membershipHistory,
   coupons,
@@ -18,7 +20,7 @@ import {
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, notFound } from "../core";
-import { allFeatureStates, grantNova, grantXp, isProUser } from "../economy";
+import { allFeatureStates, grantMembership, grantNova, grantXp, isProUser } from "../economy";
 import { notify } from "../notify";
 
 export const routes: RouteDef[] = [
@@ -43,7 +45,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const profile = (await db.select().from(assistantProfiles).where(eq(assistantProfiles.userId, user.userId)).limit(1))[0];
       const levels = await db.select().from(assistantLevels).orderBy(asc(assistantLevels.level));
-      const items = await db.select().from(assistantItems).where(eq(assistantItems.enabled, true)).orderBy(asc(assistantItems.category), asc(assistantItems.priceNova));
+      const items = await db.select().from(assistantItems).where(and(eq(assistantItems.enabled, true), inArray(assistantItems.category, ["badge", "title", "frame"]))).orderBy(asc(assistantItems.category), asc(assistantItems.priceNova));
       const inventory = await db.select().from(assistantInventory).where(eq(assistantInventory.userId, user.userId));
       const balance = (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0;
       const next = levels.find((l) => l.level === (profile?.level ?? 1) + 1) ?? null;
@@ -100,13 +102,9 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({
           name: z.string().min(1).max(20).optional(),
-          skin: z.string().max(40).optional(),
-          core: z.string().max(40).optional(),
-          effect: z.string().max(40).optional(),
-          float: z.string().max(40).optional(),
-          voice: z.string().max(40).optional(),
           title: z.string().max(40).optional(),
           badge: z.string().max(40).optional(),
+          frame: z.string().max(40).optional(),
         }),
       );
       const inventory = await db
@@ -115,11 +113,11 @@ export const routes: RouteDef[] = [
         .innerJoin(assistantItems, eq(assistantItems.id, assistantInventory.itemId))
         .where(eq(assistantInventory.userId, user.userId));
       const owns = (code: string | undefined, category: string) =>
-        !code || code === "none" || code === "core-classic" || inventory.some((i) => i.code === code && i.category === category);
-      if (!owns(body.skin, "skin") || !owns(body.core, "core") || !owns(body.effect, "effect") || !owns(body.float, "float") || !owns(body.voice, "voice") || !owns(body.title, "title") || !owns(body.badge, "badge")) {
+        !code || code === "none" || code === "frame-default" || inventory.some((i) => i.code === code && i.category === category);
+      if (!owns(body.frame, "frame") || !owns(body.title, "title") || !owns(body.badge, "badge")) {
         throw badRequest("你尚未擁有這個外觀，請先到 Novi 商店購買");
       }
-      const rows = await db.update(assistantProfiles).set({ ...body, updatedAt: new Date() }).where(eq(assistantProfiles.userId, user.userId)).returning();
+      const rows = await db.update(assistantProfiles).set({ name: body.name, title: body.title, badge: body.badge, frame: body.frame, skin: "core-classic", core: "none", effect: "none", float: "none", voice: "default", updatedAt: new Date() }).where(eq(assistantProfiles.userId, user.userId)).returning();
       return { profile: rows[0] };
     },
   }),
@@ -149,6 +147,35 @@ export const routes: RouteDef[] = [
       if (!rows[0]) throw fail("NOVA_ITEM_OWNED");
       await db.insert(assistantTransactions).values({ userId: user.userId, itemId: item.id, kind: "purchase", costNova: item.priceNova });
       return { item, inventory: rows[0], balance: (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0 };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/membership/pro-exchange-plans",
+    auth: "user",
+    handler: async () => ({ plans: await db.select().from(novaProExchangePlans).where(eq(novaProExchangePlans.enabled, true)).orderBy(asc(novaProExchangePlans.days)) }),
+  }),
+
+  route({
+    method: "POST",
+    path: "/membership/pro-exchange",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ planId: z.string().uuid(), requestId: z.string().uuid().optional() }));
+      const plan = (await db.select().from(novaProExchangePlans).where(and(eq(novaProExchangePlans.id, body.planId), eq(novaProExchangePlans.enabled, true))).limit(1))[0];
+      if (!plan) throw notFound("找不到可用的 Nova Pro 方案");
+      if (plan.days > 30) throw badRequest("Nova Pro 兌換方案最多 30 天");
+      const idempotencyKey = body.requestId ?? crypto.randomUUID();
+      const previous = (await db.select().from(novaProExchangeTransactions).where(eq(novaProExchangeTransactions.idempotencyKey, idempotencyKey)).limit(1))[0];
+      if (previous && previous.userId !== user.userId) throw conflict("此兌換請求識別碼已被使用");
+      if (previous) return { exchanged: false, plan, transaction: previous, balance: (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0 };
+      await grantNova({ userId: user.userId, amount: -plan.priceNova, reason: `Nova 點數兌換 Nova Pro ${plan.days} 天`, source: "pro_exchange", idempotencyKey: `proexchange:${idempotencyKey}` });
+      await grantMembership({ userId: user.userId, days: plan.days, actorId: user.userId, reason: `Nova 點數兌換 ${plan.days} 天`, action: "extend" });
+      const transaction = (await db.insert(novaProExchangeTransactions).values({ userId: user.userId, days: plan.days, priceNova: plan.priceNova, idempotencyKey }).returning())[0];
+      await notify({ userId: user.userId, kind: "membership", title: "✨ Nova Pro 兌換成功", body: `已使用 ${plan.priceNova} Nova 兌換 ${plan.days} 天 Nova Pro。`, link: "/profile?tab=pass", dedupeKey: `proexchange-notify:${transaction.id}` });
+      return { exchanged: true, plan, transaction, balance: (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0 };
     },
   }),
 

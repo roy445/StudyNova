@@ -667,7 +667,7 @@ export const routes: RouteDef[] = [
         z.object({
           code: z.string().min(2).max(40),
           name: z.string().min(1).max(60),
-          category: z.enum(["skin", "core", "effect", "float", "voice", "title", "badge", "pass"]),
+          category: z.enum(["frame", "skin", "core", "effect", "float", "voice", "title", "badge", "pass"]),
           priceNova: z.number().int().min(0).max(100000),
           description: z.string().max(300).default(""),
           requiredLevel: z.number().int().min(1).max(5).default(1),

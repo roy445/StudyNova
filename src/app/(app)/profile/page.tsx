@@ -4,11 +4,11 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
 
 type Novi = {
-  profile: { name: string; level: number; xp: number; skin: string; core: string; effect: string; float: string; voice: string; title: string; badge: string } | null;
+  profile: { name: string; level: number; xp: number; skin: string; core: string; effect: string; float: string; voice: string; title: string; badge: string; frame: string } | null;
   levels: Array<{ level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string; aura: string }>;
   nextLevel: { level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string } | null;
   items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; owned: boolean; enabled?: boolean }>;
@@ -25,13 +25,13 @@ function ProfileInner() {
   const nova = useApi<{ account: { balance: number; lifetimeEarned: number; lifetimeSpent: number }; ledger: Array<{ id: string; amount: number; reason: string; createdAt: string; balanceAfter: number }>; xp: Array<{ id: string; amount: number; reason: string; createdAt: string }> }>("/nova");
   const achievements = useApi<{ achievements: Array<{ id: string; code: string; title: string; description: string; icon: string; target: number; progress: number; unlockedAt: string | null; rewardNova: number }> }>("/achievements");
   const membership = useApi<{ membership: { tier: string; expiresAt: string | null } | null; isPro: boolean; quotas: Array<{ feature: string; label: string; used: number; limit: number; unlimited: boolean; proOnly: boolean }>; comparison: Array<{ feature: string; label: string; free: number; pro: number; proOnly: boolean }>; history: Array<{ id: string; action: string; days: number; reason: string; createdAt: string }> }>("/membership");
+  const proPlans = useApi<{ plans: Array<{ id: string; days: number; priceNova: number }> }>("/membership/pro-exchange-plans");
   const push = useApi<{ configured: boolean; publicKey: string; subscriptions: number }>("/push/config");
   const settings = useApi<{ settings: Record<string, unknown> }>("/account/settings");
 
   const [displayName, setDisplayName] = useState("");
   const [coupon, setCoupon] = useState("");
   const [pwd, setPwd] = useState({ current: "", next: "" });
-  const [previewItem, setPreviewItem] = useState<Novi["items"][number] | null>(null);
 
   const profile = novi.data?.profile;
 
@@ -55,7 +55,7 @@ function ProfileInner() {
     <div className="space-y-4">
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-col items-center gap-3 bg-gradient-to-r from-[#7c5cff]/20 to-[#ffc857]/10 p-5 sm:flex-row">
-          <NoviAvatar size={92} state="happy" level={profile?.level ?? 1} skin={profile?.skin} core={profile?.core} effect={profile?.effect} float={profile?.float} />
+          <NoviAvatar size={92} state="happy" level={profile?.level ?? 1} />
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <h1 className={`text-lg font-bold ${me.data?.user.isPro ? "pro-name" : ""}`}>{me.data?.user.displayName}</h1>
@@ -276,7 +276,7 @@ function ProfileInner() {
           {novi.data && (
             <div className="space-y-4">
               <div className="flex flex-col items-center gap-3 sm:flex-row">
-                <NoviAvatar size={110} state="cheer" level={profile?.level ?? 1} effect={profile?.effect} />
+                <NoviAvatar size={110} state="cheer" level={profile?.level ?? 1} />
                 <div className="min-w-0 flex-1">
                   <p className="text-lg font-bold">
                     {profile?.name} · Lv.{profile?.level} {novi.data.levels.find((l) => l.level === profile?.level)?.name}
@@ -310,8 +310,8 @@ function ProfileInner() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {(["skin", "core", "effect", "float", "voice", "title", "badge"] as const).map((cat) => (
-                    <Field key={cat} label={{ skin: "外觀", core: "核心", effect: "特效", float: "漂浮", voice: "聲音", title: "稱號", badge: "徽章" }[cat]}>
+                {(["frame", "title", "badge"] as const).map((cat) => (
+                    <Field key={cat} label={{ frame: "頭像框", title: "稱號", badge: "徽章" }[cat]}>
                     <Select
                       value={String(profile?.[cat] ?? "none")}
                       onChange={async (e) => {
@@ -324,7 +324,7 @@ function ProfileInner() {
                         }
                       }}
                     >
-                      <option value={cat === "skin" ? "core-classic" : "none"}>預設</option>
+                      <option value={cat === "frame" ? "frame-default" : "none"}>預設</option>
                       {novi.data?.items.filter((i) => i.category === cat && i.owned).map((i) => (
                         <option key={i.id} value={i.code}>
                           {i.name}
@@ -359,7 +359,7 @@ function ProfileInner() {
             {novi.data?.items.map((item) => (
               <div key={item.id} className="glass-soft p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-medium">{item.name}</p>
+                  <div className="flex min-w-0 items-center gap-2"><Badge tone="cyan">{{ badge: "徽章", title: "稱號", frame: "頭像框" }[item.category] ?? "商品"}</Badge><p className="truncate text-sm font-medium">{item.name}</p></div>
                   {item.proOnly && <Badge tone="gold">Pro</Badge>}
                 </div>
                   <p className="mt-0.5 text-[11px] text-muted">{item.description}</p>
@@ -367,7 +367,6 @@ function ProfileInner() {
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-[#ffd98a]">✦ {item.priceNova}</span>
                     <div className="flex items-center gap-1.5">
-                      <Button size="sm" variant="ghost" onClick={() => setPreviewItem(item)}>預覽</Button>
                       {item.owned ? (
                         <Badge tone="green">已擁有</Badge>
                       ) : (
@@ -397,17 +396,6 @@ function ProfileInner() {
         </Card>
       )}
 
-      {previewItem && (
-        <Modal open={Boolean(previewItem)} onClose={() => setPreviewItem(null)} title={`預覽：${previewItem.name}`}>
-          <div className="space-y-4">
-            <div className="flex justify-center rounded-2xl border border-[#37d3ff]/20 bg-gradient-to-b from-[#162b54] to-[#101326] p-6">
-              <NoviAvatar size={150} state="cheer" level={profile?.level ?? 1} skin={previewItem.category === "skin" ? previewItem.code : profile?.skin} core={previewItem.category === "core" ? previewItem.code : profile?.core} effect={previewItem.category === "effect" ? previewItem.code : profile?.effect} float={previewItem.category === "float" ? previewItem.code : profile?.float} />
-            </div>
-            <div><p className="font-semibold">{previewItem.name}</p><p className="mt-1 text-sm leading-6 text-muted">{previewItem.description}</p><p className="mt-2 text-xs text-muted">購買後可在「Novi 養成」裝備；{previewItem.proOnly ? "此商品需要 Nova Pro。" : "此商品可由一般會員購買。"}</p></div>
-            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setPreviewItem(null)}>關閉</Button>{!previewItem.owned && <Button disabled={Boolean(previewItem.proOnly && !novi.data?.isPro)} onClick={() => { setPreviewItem(null); toast.push("info", previewItem.proOnly ? "請先升級 Nova Pro 後購買" : "請回到商品卡片完成購買"); }}>{previewItem.proOnly && !novi.data?.isPro ? "需要 Pro" : "返回購買"}</Button>}</div>
-          </div>
-        </Modal>
-      )}
 
       {tab === "nova" && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -503,6 +491,13 @@ function ProfileInner() {
                     <li><span className="mr-1 text-[#ffd98a]">✓</span>限定公告與專屬獎勵</li>
                   </ul>
               )}
+            </div>
+            <div className="mt-4 rounded-2xl border border-[#ffc857]/25 bg-[#ffc857]/5 p-3">
+              <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-[#ffd98a]">用 Nova 點數兌換 Nova Pro</p><Badge tone="gold">最多 30 天</Badge></div>
+              <p className="mt-1 text-xs text-muted">天數越長總價越高，30 天方案提供最多使用天數但價格也最高。</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {proPlans.data?.plans.map((plan) => <Button key={plan.id} disabled={membership.data?.isPro === true} variant={plan.days === 30 ? "gold" : "ghost"} onClick={async () => { try { const res = await apiPost<{ plan: { days: number; priceNova: number }; balance: number }>("/membership/pro-exchange", { planId: plan.id, requestId: crypto.randomUUID() }); toast.push("success", `已兌換 Nova Pro ${res.plan.days} 天，剩餘 ${res.balance} Nova`); await Promise.all([nova.reload(), membership.reload(), me.reload()]); } catch (err) { toast.push("error", errorMessage(err)); } }}>{membership.data?.isPro ? "目前為 Pro" : `${plan.days} 天・✦ ${plan.priceNova} Nova`}</Button>)}
+              </div>
             </div>
             <div className="mt-3">
               <Field label="優惠碼">

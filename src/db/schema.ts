@@ -889,6 +889,7 @@ export const assistantProfiles = pgTable("assistant_profiles", {
   voice: text("voice").notNull().default("default"),
   title: text("title").notNull().default(""),
   badge: text("badge").notNull().default(""),
+  frame: text("frame").notNull().default("frame-default"),
   updatedAt: updated(),
 });
 
@@ -939,6 +940,23 @@ export const memberships = pgTable("memberships", {
   grantedBy: uuid("granted_by").references(() => users.userId, { onDelete: "set null" }),
   updatedAt: updated(),
 });
+
+export const novaProExchangePlans = pgTable("nova_pro_exchange_plans", {
+  id: id(),
+  days: integer("days").notNull(),
+  priceNova: integer("price_nova").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+}, (t) => [uniqueIndex("nova_pro_plan_days_uq").on(t.days)]);
+
+export const novaProExchangeTransactions = pgTable("nova_pro_exchange_transactions", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+  days: integer("days").notNull(),
+  priceNova: integer("price_nova").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  createdAt: created(),
+}, (t) => [uniqueIndex("nova_pro_exchange_idempotency_uq").on(t.idempotencyKey), index("nova_pro_exchange_user_idx").on(t.userId, t.createdAt)]);
 
 export const membershipHistory = pgTable(
   "membership_history",
