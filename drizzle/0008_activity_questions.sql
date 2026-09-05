@@ -14,8 +14,3 @@ CREATE TABLE IF NOT EXISTS "activity_questions" (
 );
 CREATE INDEX IF NOT EXISTS "activity_questions_idx"
   ON "activity_questions" ("activity_id", "enabled", "order_index");
-INSERT INTO "__drizzle_migrations" ("hash", "created_at")
-SELECT '0008_activity_questions', extract(epoch from now()) * 1000
-WHERE NOT EXISTS (
-  SELECT 1 FROM "__drizzle_migrations" WHERE "hash" = '0008_activity_questions'
-);
