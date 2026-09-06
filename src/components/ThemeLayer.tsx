@@ -71,7 +71,7 @@ export default function ThemeLayer() {
   if (!theme) return null;
   return <>
     {theme.enabled && theme.snow && <div className="christmas-snowfall" aria-hidden="true" />}
-    <ChristmasEventLayer enabled={theme.enabled} reindeer={theme.reindeer} />
+    <ChristmasEventLayer enabled={theme.enabled} reindeer={theme.reindeer} sound={theme.sound} />
   </>;
 }
 

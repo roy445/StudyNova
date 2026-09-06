@@ -283,7 +283,7 @@ export default function AdminOverviewPage() {
         <Card title="✦ 節慶外觀與 NOVA 助理" subtitle="只有管理員可以修改；儲存後全站立即套用，操作會寫入 Audit Log。">
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              {[["enabled", "Christmas Theme"], ["novi", "聖誕 NOVA 外觀"], ["snow", "雪花效果"], ["decorations", "聖誕裝飾"], ["reindeer", "隨機馴鹿事件"]].map(([key, label]) => (
+              {[["enabled", "Christmas Theme"], ["novi", "聖誕 NOVA 外觀"], ["snow", "雪花效果"], ["particles", "NOVA 閃爍粒子"], ["decorations", "進階聖誕裝飾"], ["sound", "馴鹿鈴聲"], ["reindeer", "隨機馴鹿事件"]].map(([key, label]) => (
                 <label key={key} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={themeForm[key as keyof ChristmasTheme] as boolean} onChange={(e) => setThemeForm({ ...themeForm, [key]: e.target.checked })} className="accent-[#37d3ff]" /></label>
               ))}
             </div>

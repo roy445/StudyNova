@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { apiGet, apiPost } from "@/lib/api";
 
-type Props = { enabled: boolean; reindeer: boolean };
+type Props = { enabled: boolean; reindeer: boolean; sound: boolean };
 type EventState = { token: string; durationMs: number } | null;
 
 function playBell() {
@@ -30,7 +30,7 @@ function playBell() {
   }
 }
 
-export default function ChristmasEventLayer({ enabled, reindeer }: Props) {
+export default function ChristmasEventLayer({ enabled, reindeer, sound }: Props) {
   const [event, setEvent] = useState<EventState>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export default function ChristmasEventLayer({ enabled, reindeer }: Props) {
         const result = await apiGet<{ event: EventState }>("/christmas/reindeer/event");
         if (mounted.current && result.event) {
           setEvent(result.event);
-          playBell();
+          if (sound) playBell();
           timer = window.setTimeout(() => setEvent(null), result.event.durationMs);
         }
       } catch {
@@ -58,7 +58,7 @@ export default function ChristmasEventLayer({ enabled, reindeer }: Props) {
       mounted.current = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [enabled, reindeer]);
+  }, [enabled, reindeer, sound]);
 
   async function claim() {
     if (!event || busy) return;

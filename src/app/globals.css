@@ -393,6 +393,10 @@ html[data-festival-intensity="festive"] .christmas-snowfall { opacity: 0.82; }
 .novi-festive::after { position: absolute; z-index: 3; color: var(--christmas-primary); font-size: 11px; animation: christmas-novi-sparkle 2.8s ease-in-out infinite; pointer-events: none; }
 .novi-festive::before { content: "✦  ·  ✧"; left: -7px; top: 23%; }
 .novi-festive::after { content: "·  ✧  ✦"; right: -10px; top: 57%; animation-delay: 1.2s; color: var(--christmas-accent); }
+html[data-christmas-decorations="off"] .novi-festive-extra { display: none; }
+html[data-christmas-particles="off"] .novi-festive::before,
+html[data-christmas-particles="off"] .novi-festive::after,
+html[data-christmas-particles="off"] .novi-festive-particles { display: none; }
 @keyframes christmas-novi-sparkle { 0%, 100% { opacity: .25; transform: translateY(3px) scale(.88); } 50% { opacity: 1; transform: translateY(-4px) scale(1.08); } }
 @keyframes christmas-reindeer-flight { 0% { transform: translate3d(0, 0, 0) rotate(-2deg); opacity: 0; } 8% { opacity: 1; } 48% { transform: translate3d(58vw, -18px, 0) rotate(2deg); } 92% { opacity: 1; } 100% { transform: translate3d(calc(100vw + 260px), 18px, 0) rotate(-1deg); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
