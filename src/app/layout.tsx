@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   applicationName: "StudyNova AI",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/studynova-icon.png", type: "image/png", sizes: "512x512" }],
-    apple: [{ url: "/studynova-icon.png", type: "image/png", sizes: "512x512" }],
+    icon: [{ url: "/studynova-icon.png", type: "image/png", sizes: "1254x1254" }],
+    apple: [{ url: "/studynova-icon.png", type: "image/png", sizes: "1254x1254" }],
   },
   appleWebApp: { capable: true, title: "StudyNova", statusBarStyle: "black-translucent" },
   openGraph: {

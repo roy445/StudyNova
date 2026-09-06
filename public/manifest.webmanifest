@@ -8,6 +8,6 @@
   "theme_color": "#102940",
   "lang": "zh-Hant-TW",
   "icons": [
-    { "src": "/studynova-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/studynova-icon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any maskable" }
   ]
 }
