@@ -38,7 +38,7 @@ import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, r
 import { adminLog, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { providerMetrics, recentAiFailures, aiConfigured } from "../ai";
-import { accountEmailTemplate, sendAccountEmail } from "../email";
+import { accountEmailTemplate, sendAccountEmail, smtpConfigured } from "../email";
 
 function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
   return new Response(toCsv(rows), {
@@ -771,10 +771,10 @@ export const routes: RouteDef[] = [
         const target = (await db.select({ displayName: users.displayName }).from(users).where(eq(users.userId, appeal.userId)).limit(1))[0];
         const link = `${body.baseUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://study-nova-psi.vercel.app"}/login`;
         const message = accountEmailTemplate({ kind: "reactivate", displayName: target?.displayName ?? "StudyNova 使用者", link, note: body.adminNote });
-        const email = body.sendEmail ? await sendAccountEmail(appeal.contactEmail, message) : { sent: false, configured: Boolean(process.env.RESEND_API_KEY), reason: "未要求寄信" };
+        const email = body.sendEmail ? await sendAccountEmail(appeal.contactEmail, message) : { sent: false, configured: smtpConfigured(), reason: "未要求寄信" };
         return { appealId: appeal.id, status: body.status, email, customerMessage: message.text, subject: message.subject };
       }
-      return { appealId: appeal.id, status: body.status, email: { sent: false, configured: Boolean(process.env.RESEND_API_KEY), reason: "未解封" } };
+      return { appealId: appeal.id, status: body.status, email: { sent: false, configured: smtpConfigured(), reason: "未解封" } };
     },
   }),
 

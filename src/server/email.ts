@@ -1,4 +1,8 @@
+import nodemailer from "nodemailer";
+
 export type AccountEmailKind = "reactivate" | "password_reset" | "pro_reward";
+
+type EmailMessage = { subject: string; html: string; text: string };
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] ?? char));
@@ -13,12 +17,37 @@ export function accountEmailTemplate(input: { kind: AccountEmailKind; displayNam
   return { subject: `${title}｜StudyNova`, html, text: `${input.displayName}，您好：\n\n${intro}\n\n連結：${input.link}\n${input.expiresText ? `有效期限：${input.expiresText}` : ""}` };
 }
 
-export async function sendAccountEmail(to: string, email: { subject: string; html: string; text: string }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL ?? "StudyNova <onboarding@resend.dev>";
-  if (!apiKey) return { sent: false, configured: false, reason: "尚未設定 RESEND_API_KEY" };
-  const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from, to: [to], subject: email.subject, html: email.html, text: email.text }) });
-  if (!response.ok) return { sent: false, configured: true, reason: `郵件供應商回應 ${response.status}` };
-  const result = await response.json() as { id?: string };
-  return { sent: true, configured: true, id: result.id ?? null };
+function smtpConfig() {
+  const user = process.env.SMTP_USER?.trim();
+  const password = process.env.SMTP_PASSWORD?.replace(/\s/g, "");
+  if (!user || !password) return null;
+  const port = Number(process.env.SMTP_PORT ?? "465");
+  return {
+    host: process.env.SMTP_HOST ?? "smtp.gmail.com",
+    port,
+    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE !== "false" : port === 465,
+    auth: { user, pass: password },
+    from: process.env.EMAIL_FROM ?? `StudyNova <${user}>`,
+  };
+}
+
+export function smtpConfigured() {
+  return Boolean(smtpConfig());
+}
+
+export async function sendAccountEmail(to: string, email: EmailMessage) {
+  const config = smtpConfig();
+  if (!config) return { sent: false, configured: false, reason: "尚未設定 Gmail SMTP：SMTP_USER 與 SMTP_PASSWORD" };
+  try {
+    const transporter = nodemailer.createTransport({ host: config.host, port: config.port, secure: config.secure, auth: config.auth });
+    const result = await transporter.sendMail({ from: config.from, to, subject: email.subject, html: email.html, text: email.text });
+    return { sent: true, configured: true, id: result.messageId };
+  } catch (error) {
+    console.error("[email] Gmail SMTP send failed", error);
+    return { sent: false, configured: true, reason: "Gmail SMTP 寄信失敗，請確認帳號、應用程式密碼與 Vercel 環境變數" };
+  }
+}
+
+export async function sendPasswordResetEmail(input: { to: string; displayName: string; link: string; expiresText: string }) {
+  return sendAccountEmail(input.to, accountEmailTemplate({ kind: "password_reset", displayName: input.displayName, link: input.link, expiresText: input.expiresText }));
 }

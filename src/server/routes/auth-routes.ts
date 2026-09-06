@@ -19,6 +19,7 @@ import {
 import { createSession, destroySession, getSession } from "../auth";
 import { ensureDailyTasks, ensureUserEconomy, allFeatureStates, novaBalance } from "../economy";
 import { notify } from "../notify";
+import { sendPasswordResetEmail } from "../email";
 
 const emailSchema = z.string().email("Email 格式不正確").max(180);
 const passwordSchema = z.string().min(8, "密碼至少 8 個字元").max(128);
@@ -198,8 +199,10 @@ export const routes: RouteDef[] = [
         link,
         dedupeKey: `reset:${token.slice(0, 12)}`,
       });
-      // In dev / self-hosted mode without SMTP the link is returned so the owner can deliver it.
-      if (process.env.SMTP_URL) return generic;
+      const origin = process.env.NEXT_PUBLIC_APP_URL ?? new URL(ctx.req.url).origin;
+      const emailResult = await sendPasswordResetEmail({ to: rows[0].email, displayName: rows[0].displayName, link: `${origin}${link}`, expiresText: "30 分鐘" });
+      if (emailResult.sent) return generic;
+      // 沒有設定 Gmail SMTP 時，保留開發／手動寄送用連結。
       return { ...generic, devResetLink: link };
     },
   }),

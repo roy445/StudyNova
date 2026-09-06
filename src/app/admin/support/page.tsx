@@ -85,7 +85,7 @@ export default function AdminSupportPage() {
         </div>}
       </Card>
 
-      <Card title="✉ StudyNova 帳號通知信" subtitle="使用統一品牌排版寄送重啟、密碼重設、Pro 或獎勵連結。需先設定 RESEND_API_KEY 才會實際寄出。">
+      <Card title="✉ StudyNova 帳號通知信" subtitle="使用統一品牌排版寄送重啟、密碼重設、Pro 或獎勵連結。需先設定 Gmail SMTP 與 16 位應用程式密碼才會實際寄出。">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="收件 Email"><Input type="email" value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} /></Field>
           <Field label="使用者名稱"><Input value={emailForm.displayName} onChange={(e) => setEmailForm({ ...emailForm, displayName: e.target.value })} /></Field>
