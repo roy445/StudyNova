@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Card, Button, EmptyState, ErrorState, Skeleton, Badge, useToast } from "@/components/ui";
 import { apiDelete, apiPost, errorMessage, useApi } from "@/lib/api";
+import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 type Result = {
   ocrText?: string;
@@ -20,6 +21,8 @@ const SCORE_LABELS: Record<string, string> = { grammar: "Grammar", vocabulary: "
 export default function EssayPage() {
   const toast = useToast();
   const history = useApi<{ gradings: Grading[] }>("/essay/gradings");
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const essayCost = quotas.data?.quotas.find((item) => item.feature === "essay_grading")?.novaCost ?? null;
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState("");
@@ -31,6 +34,7 @@ export default function EssayPage() {
       toast.push("error", "請上傳英文作文圖片，或先貼上作文文字");
       return;
     }
+    if (!confirmNovaSpend("英文作文批改", essayCost)) return;
     setBusy(true);
     try {
       const form = new FormData();
@@ -72,7 +76,9 @@ export default function EssayPage() {
         <Badge tone="gold">AI 評估，僅供學習參考</Badge>
       </div>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card title="建立批改任務" subtitle="服務狀態、PRO 權限、每日／每月上限與 Nova 消耗都由後端驗證。">
+                  <Card title="建立批改任務" subtitle="服務狀態、PRO 權限、每日／每月上限與 Nova 消耗都由後端驗證。">
+            <NovaCostNotice cost={essayCost} action="英文作文批改" className="mb-4" />
+
           <div className="grid gap-3 sm:grid-cols-2">
             <button type="button" onClick={() => fileRef.current?.click()} className="focus-ring rounded-2xl border border-dashed border-[#37d3ff]/50 bg-[#37d3ff]/5 p-6 text-left transition hover:bg-[#37d3ff]/10">
               <span className="block text-sm font-semibold">上傳作文圖片</span>

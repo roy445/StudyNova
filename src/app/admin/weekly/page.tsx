@@ -126,7 +126,7 @@ export default function AdminWeeklyPage() {
             <button key={w.id} onClick={() => setActiveId(w.id)} className={`glass-soft focus-ring p-3 text-left hover:bg-white/5 ${activeId === w.id ? "border border-[#37d3ff]/60" : ""}`}>
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-medium">{w.title}</p>
-                <Badge tone={w.status === "published" ? (w.open ? "green" : "cyan") : "muted"}>{w.status === "published" ? (w.open ? "開放中" : "已發布") : w.status}</Badge>
+                <Badge tone={w.status === "published" ? (w.open ? "green" : "cyan") : w.status === "closed" ? "rose" : "muted"}>{w.status === "published" ? (w.open ? "開放中" : "已發布") : w.status === "closed" ? "關閉" : w.status === "draft" ? "草稿" : "封存"}</Badge>
               </div>
               <p className="text-[11px] text-muted">{w.weekCode}</p>
               <p className="mt-1 text-[11px] text-muted">
@@ -141,7 +141,7 @@ export default function AdminWeeklyPage() {
       {loading && <Card><Skeleton lines={5} /></Card>}
 
       {detail && !loading && (
-        <Card title={`${detail.week.title}（${detail.week.weekCode}）`} subtitle={`${detail.week.note}・封存只會下架，作答與歷史紀錄會保留，可再重新開放。`}>
+            <Card title={`${detail.week.title}（${detail.week.weekCode}）`} subtitle={`${detail.week.note}・關閉會暫停學生進入但保留內容與歷史紀錄；已發布週次再次確認草稿會更新既有題目。`}>
           <div className="mb-3 flex justify-end">
             <Button size="sm" variant="ghost" onClick={async () => {
               if (!confirm("確定要封存這個每週小考嗎？歷史作答會保留，之後仍可重新開放。")) return;
@@ -304,7 +304,8 @@ export default function AdminWeeklyPage() {
                             );
                           }}
                         >
-                          檢視並確認發布
+                                                      {detail.week.status === "published" ? "檢視並確認更新題目" : "檢視並確認發布"}
+
                         </Button>
                         <Button
                           size="sm"
@@ -452,6 +453,7 @@ export default function AdminWeeklyPage() {
                   <Select value={detail.week.status} onChange={(e) => patchWeek({ status: e.target.value })}>
                     <option value="draft">草稿</option>
                     <option value="published">發布</option>
+                    <option value="closed">關閉</option>
                     <option value="archived">封存</option>
                   </Select>
                 </Field>

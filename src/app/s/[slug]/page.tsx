@@ -31,7 +31,7 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
       <StarField count={26} />
       <div className="glass anim-pop relative z-10 w-full max-w-md p-6 text-center">
         <div className="flex justify-center">
-          <LogoMark size={54} />
+          <LogoMark size={66} />
         </div>
         <p className="mt-2 text-xs tracking-[0.2em] text-muted">STUDYNOVA AI · {KIND_LABEL[share.kind] ?? share.kind}</p>
         <h1 className="mt-2 text-xl font-bold">{share.title}</h1>

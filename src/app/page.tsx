@@ -4,16 +4,17 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LogoMark, NoviAvatar, StarField, Wordmark } from "@/components/brand";
 import { Badge, Button } from "@/components/ui";
+import { SymbolIcon, type SymbolName } from "@/components/Symbol";
 
-const FEATURES = [
-  { icon: "⌁", title: "成績管理與 AI 分析", desc: "輸入每次段考、小考成績，自動計算平均、趨勢與弱科，AI 只根據真實數據給建議。" },
-  { icon: "▧", title: "拍照 OCR 轉學習內容", desc: "課本、講義、考卷、手寫筆記拍照即可辨識，一鍵變成筆記、題目、記憶卡或複習計畫。" },
-  { icon: "✦", title: "Novi AI 學習助理", desc: "學習教練／解題／提示／考試／筆記／錯題／複習／快速八種模式，可讀取你授權的學習資料。" },
-  { icon: "▤", title: "AI 出題與錯題本", desc: "依教材與弱點自動出題，答錯自動進錯題本，間隔複習直到完全掌握。" },
-  { icon: "◌", title: "錄音分析與背誦測試", desc: "英文朗讀、國文背課文即時評分：流暢度、漏字、速度與完整度，附改善建議。" },
-  { icon: "▦", title: "每週小考", desc: "管理員上傳考卷與答案，AI 辨識整理後人工確認發布，週末開放快速背誦與模擬測驗。" },
-  { icon: "◇", title: "好友挑戰與讀書房", desc: "用 NOVA ID 加好友、單字 1v1、共享讀書房一起計時，排行榜即時更新。" },
-  { icon: "◎", title: "Nova 點數與 Novi 養成", desc: "學習就有 Nova 與 XP，升級 Novi、購買外觀特效，Nova Pro 學習獎勵雙倍。" },
+const FEATURES: Array<{ icon: SymbolName; title: string; desc: string }> = [
+  { icon: "grades", title: "成績管理與 AI 分析", desc: "輸入每次段考、小考成績，自動計算平均、趨勢與弱科，AI 只根據真實數據給建議。" },
+  { icon: "camera", title: "拍照 OCR 轉學習內容", desc: "課本、講義、考卷、手寫筆記拍照即可辨識，一鍵變成筆記、題目、記憶卡或複習計畫。" },
+  { icon: "nova", title: "Novi AI 學習助理", desc: "學習教練／解題／提示／考試／筆記／錯題／複習／快速八種模式，可讀取你授權的學習資料。" },
+  { icon: "question", title: "AI 出題與錯題本", desc: "依教材與弱點自動出題，答錯自動進錯題本，間隔複習直到完全掌握。" },
+  { icon: "audio", title: "錄音分析與背誦測試", desc: "英文朗讀、國文背課文即時評分：流暢度、漏字、速度與完整度，附改善建議。" },
+  { icon: "weekly", title: "每週小考", desc: "管理員上傳考卷與答案，AI 辨識整理後人工確認發布，週末開放快速背誦與模擬測驗。" },
+  { icon: "social", title: "好友挑戰與讀書房", desc: "用 NOVA ID 加好友、單字 1v1、共享讀書房一起計時，排行榜即時更新。" },
+  { icon: "shop", title: "Nova 點數與 Novi 養成", desc: "學習就有 Nova 與 XP，升級 Novi、購買外觀特效，Nova Pro 學習獎勵雙倍。" },
 ];
 
 export default function LandingPage() {
@@ -53,7 +54,7 @@ export default function LandingPage() {
       </div>
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Wordmark size={20} />
+        <Wordmark size={26} />
         <nav className="flex items-center gap-2">
           <Link href="/login" className="focus-ring rounded-xl border border-[var(--line)] px-3 py-2 text-sm hover:bg-white/5">
             登入
@@ -120,7 +121,7 @@ export default function LandingPage() {
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((f, i) => (
             <article key={f.title} className="glass anim-in p-4" style={{ animationDelay: `${i * 60}ms` }}>
-              <span className="text-2xl">{f.icon}</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#37d3ff]/25 bg-[#37d3ff]/8 text-[#b8efff]"><SymbolIcon name={f.icon} size={22} /></span>
               <h3 className="mt-2 text-sm font-semibold">{f.title}</h3>
               <p className="mt-1 text-xs leading-relaxed text-muted">{f.desc}</p>
             </article>
@@ -128,7 +129,7 @@ export default function LandingPage() {
         </section>
 
         <section className="glass mt-8 flex flex-col items-center gap-3 p-8 text-center">
-          <LogoMark size={56} />
+          <LogoMark size={68} />
           <h2 className="text-xl font-bold sm:text-2xl">今天就開始，讓每一分鐘的努力都被看見</h2>
           <p className="max-w-xl text-sm text-muted">
             註冊只需要 Email、密碼與顯示名稱，系統會立即產生你的專屬 NOVA ID，把它分享給同學就能一起挑戰。

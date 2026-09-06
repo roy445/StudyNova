@@ -1090,7 +1090,7 @@ export const weeklyExamWeeks = pgTable(
     weekCode: text("week_code").notNull(), // 2026-W35
     title: text("title").notNull(),
     note: text("note").notNull().default(""),
-    status: text("status").notNull().default("draft"), // draft | published | archived
+    status: text("status").notNull().default("draft"), // draft | published | closed | archived
     openMode: text("open_mode").notNull().default("schedule"), // schedule | manual_open | manual_close
     openDays: jsonb("open_days").$type<number[]>().notNull().default([6, 0]),
     openTime: text("open_time").notNull().default("08:00"),

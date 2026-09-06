@@ -6,6 +6,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Progress, Skeleton, Stat, 
 import { LineChart } from "@/components/charts";
 import { NoviAvatar } from "@/components/brand";
 import { apiPost, useApi } from "@/lib/api";
+import { NovaCostNotice } from "@/components/NovaCostNotice";
 import { WordsPanel } from "@/features/study/panels-c";
 import { DAILY_SUBJECTS, dailyKnowledgeBySubject } from "@/data/daily-knowledge";
 
@@ -41,7 +42,7 @@ type Dashboard = {
   activities: Array<{ id: string; title: string; cover: string; goalValue: number; progress: number; rewardNova: number; endsAt: string }>;
   announcements: Array<{ id: string; title: string; body: string; link: string; pinned: boolean }>;
   marquee: Array<{ id: string; title: string }>;
-  openWeek: { id: string; weekCode: string; title: string } | null;
+  openWeek: { id: string; weekCode: string; title: string; novaCost: number } | null;
   isPro: boolean;
   aiEnabled: boolean;
 };
@@ -307,9 +308,9 @@ export default function DashboardPage() {
 
         <Card title="▤ 公告與每週小考">
           {data.openWeek && (
-            <Link href="/weekly" className="glass-soft focus-ring mb-2 flex items-center justify-between px-3 py-2.5 text-sm hover:bg-white/5">
-              <span>▦ {data.openWeek.title} 開放中</span>
-              <span className="text-[#37d3ff]">前往 →</span>
+            <Link href="/weekly" className="glass-soft focus-ring mb-2 block px-3 py-2.5 text-sm hover:bg-white/5">
+              <div className="flex items-center justify-between gap-2"><span>▦ {data.openWeek.title} 開放中</span><span className="text-[#37d3ff]">前往 →</span></div>
+              <NovaCostNotice cost={data.openWeek.novaCost} action="開始本週小考" className="mt-2" />
             </Link>
           )}
           {data.announcements.length ? (

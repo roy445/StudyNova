@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -341,6 +342,8 @@ type VoiceRecord = {
 export function VoicePanel() {
   const toast = useToast();
   const { data, loading, error, reload } = useApi<{ records: VoiceRecord[] }>("/voice");
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const voiceCost = quotas.data?.quotas.find((item) => item.feature === "ai_speech")?.novaCost ?? null;
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -390,7 +393,7 @@ export function VoicePanel() {
   }
 
   async function upload() {
-    if (!blob) return;
+    if (!blob || !confirmNovaSpend("AI 口說分析", voiceCost)) return;
     setUploading(true);
     try {
       const fd = new FormData();
@@ -414,6 +417,7 @@ export function VoicePanel() {
 
   return (
     <Card title="🎤 錄音分析・背誦測試・AI 口說" subtitle="英文朗讀、國文背課文、口說練習，AI 會比對逐字稿並評分">
+      <NovaCostNotice cost={voiceCost} action="AI 口說分析" className="mb-3" />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="模式">
           <Select value={mode} onChange={(e) => setMode(e.target.value)}>

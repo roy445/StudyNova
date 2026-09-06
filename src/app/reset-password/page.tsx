@@ -58,7 +58,7 @@ function ResetInner() {
       <StarField count={20} />
       <div className="glass anim-pop relative z-10 w-full max-w-md p-6">
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
-          <Wordmark size={20} />
+          <Wordmark size={26} />
           <p className="text-xs text-muted">{token ? "設定新密碼" : "提交密碼重設申請給管理員"}</p>
         </div>
 

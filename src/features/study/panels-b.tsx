@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, useToast } from "@/components/ui";
 import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
+import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -15,6 +16,8 @@ export function QuizPanel() {
   const toast = useToast();
   const list = useApi<{ quizzes: Quiz[]; attempts: Attempt[] }>("/quizzes");
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const quizGenerateCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
   const [genOpen, setGenOpen] = useState(false);
   const [form, setForm] = useState({ subject: "英文", topic: "", materialId: "", sourceText: "", count: 5, difficulty: "normal", type: "single", timeLimitSec: 600 });
   const [active, setActive] = useState<{ quiz: Quiz; questions: QuizQuestion[]; attemptId: string } | null>(null);
@@ -60,6 +63,7 @@ export function QuizPanel() {
   }, [active, submit]);
 
   async function generate() {
+    if (!confirmNovaSpend("AI 產生測驗", quizGenerateCost)) return;
     setBusy(true);
     try {
       const payload: Record<string, unknown> = {
@@ -240,6 +244,7 @@ export function QuizPanel() {
 
       <Modal open={genOpen} onClose={() => setGenOpen(false)} title="AI 出題">
         <div className="space-y-3">
+          <NovaCostNotice cost={quizGenerateCost} action="AI 產生測驗" />
           <div className="grid grid-cols-2 gap-3">
             <Field label="科目">
               <Select value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>

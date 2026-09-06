@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Progress, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
+import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 type WeekSummary = {
   id: string;
@@ -340,8 +341,11 @@ export default function WeeklyPage() {
                       </p>
                     </div>
                   ) : !attemptId ? (
-                    <Button
+                    <div className="space-y-2">
+                      <NovaCostNotice cost={detail.week.novaCost} action="開始本週測驗" />
+                      <Button
                       onClick={async () => {
+                        if (!confirmNovaSpend("開始本週測驗", detail.week.novaCost)) return;
                         try {
                           const res = await apiPost<{ attempt: { id: string; responses: Record<string, string[]> }; resumed: boolean }>(`/weekly/${detail.week.id}/start`);
                           setAttemptId(res.attempt.id);
@@ -351,9 +355,10 @@ export default function WeeklyPage() {
                           toast.push("error", errorMessage(err));
                         }
                       }}
-                    >
-                      開始本週測驗（{detail.questions.length} 題）
-                    </Button>
+                      >
+                        開始本週測驗（{detail.questions.length} 題）
+                      </Button>
+                    </div>
                   ) : null}
 
                   {attemptId && !detail.result && (

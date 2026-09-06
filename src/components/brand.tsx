@@ -32,7 +32,7 @@ const STATE_FACE: Record<NoviState, string> = {
 };
 
 /** StudyNova square logo supplied by the product owner. The source art is intentionally kept intact. */
-export function LogoMark({ size = 40, glow = true }: { size?: number; glow?: boolean }) {
+export function LogoMark({ size = 48, glow = true }: { size?: number; glow?: boolean }) {
   return (
     <Image
       src="/brand/studynova-logo-square.png"
@@ -46,7 +46,7 @@ export function LogoMark({ size = 40, glow = true }: { size?: number; glow?: boo
   );
 }
 
-export function Wordmark({ size = 22 }: { size?: number }) {
+export function Wordmark({ size = 26 }: { size?: number }) {
   return (
     <Image
       src="/brand/studynova-logo-horizontal.webp"

@@ -25,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2.5 sm:px-5">
           <Link href="/admin" className="focus-ring flex items-center gap-2">
-            <LogoMark size={28} />
+            <LogoMark size={36} />
             <span className="text-sm font-bold">StudyNova 管理中心</span>
           </Link>
           <nav className="no-scrollbar -mx-1 flex flex-1 gap-1 overflow-x-auto px-1">

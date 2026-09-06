@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -11,6 +12,8 @@ type Material = { id: string; title: string; subject: string; kind: string; stat
 export function MaterialsPanel() {
   const toast = useToast();
   const { data, loading, error, reload } = useApi<{ materials: Material[] }>("/materials");
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const materialCost = quotas.data?.quotas.find((item) => item.feature === "material_organize")?.novaCost ?? null;
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("英文");
@@ -48,6 +51,7 @@ export function MaterialsPanel() {
   }
 
   async function analyze(m: Material) {
+    if (!confirmNovaSpend(`AI 整理教材「${m.title}」`, materialCost)) return;
     setAnalyzing(true);
     setAnalysis(null);
     try {
@@ -68,6 +72,7 @@ export function MaterialsPanel() {
       subtitle="支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理重點、單字與題目"
       action={<Button size="sm" onClick={() => setOpen(true)}>＋ 新增教材</Button>}
     >
+      <NovaCostNotice cost={materialCost} action="AI 整理教材" className="mb-3" />
       {loading && <Skeleton lines={4} />}
       {error && <ErrorState message={error} onRetry={reload} />}
       {!loading && !error && !data?.materials.length && <EmptyState icon="📁" title="還沒有教材" hint="上傳課本講義 PDF 或貼上文字，AI 就能幫你整理。" />}
@@ -226,6 +231,12 @@ export function OcrPanel() {
   const history = useApi<{ documents: Array<{ id: string; title: string; subject: string; analysis_kind: string }> }>(searchTerm.trim() ? `/ocr/search?q=${encodeURIComponent(searchTerm.trim())}` : null, [searchTerm]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const detail = useApi<{ document: OcrDoc; pages: OcrPage[] }>(activeId ? `/ocr/documents/${activeId}` : null, [activeId]);
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const imageOcrCost = quotas.data?.quotas.find((item) => item.feature === "image_ocr")?.novaCost ?? null;
+  const multiImageOcrCost = quotas.data?.quotas.find((item) => item.feature === "multi_image_ocr")?.novaCost ?? null;
+  const visionPreflightCost = quotas.data?.quotas.find((item) => item.feature === "camera_vision_preflight")?.novaCost ?? null;
+  const visionAnalysisCost = quotas.data?.quotas.find((item) => item.feature === "camera_vision_analysis")?.novaCost ?? null;
+  const aiContextCost = quotas.data?.quotas.find((item) => item.feature === "ai_context")?.novaCost ?? null;
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"highlight" | "crop">("highlight");
   const [analysisMode, setAnalysisMode] = useState<"auto" | "vocabulary" | "sentences" | "questions">("auto");
@@ -347,6 +358,12 @@ export function OcrPanel() {
 
   async function runOcr() {
     if (!activeId) return;
+    const pageCount = latestBatchIds.length || detail.data?.pages.length || 0;
+    let cost: number | null = null;
+    if (typeof imageOcrCost === "number" && (pageCount <= 1 || typeof multiImageOcrCost === "number")) {
+      cost = imageOcrCost * pageCount + (pageCount > 1 ? (multiImageOcrCost ?? 0) : 0);
+    }
+    if (!confirmNovaSpend(`AI OCR（${pageCount} 頁）`, cost)) return;
     setBusy(true);
     try {
       await apiPost(`/ocr/documents/${activeId}/run`, { pageIds: latestBatchIds.length ? latestBatchIds : undefined });
@@ -361,6 +378,7 @@ export function OcrPanel() {
 
   async function transform(action: string) {
     if (!activeId) return;
+    if (!confirmNovaSpend("AI 轉換學習內容", aiContextCost)) return;
     setBusy(true);
     setResult(null);
     try {
@@ -425,6 +443,8 @@ export function OcrPanel() {
 
   async function vision(stage: "preflight" | "analyze", force = false) {
     if (!activeId) return;
+    const cost = stage === "preflight" ? visionPreflightCost : visionAnalysisCost;
+    if (!confirmNovaSpend(stage === "preflight" ? "圖片品質預檢" : "影像理解分析", cost)) return;
     setBusy(true);
     try {
       const res = await apiPost<{ stage: string; preflight?: Record<string, unknown>; analysis?: Record<string, unknown>; retakeMessage?: string | null }>(`/ocr/documents/${activeId}/vision-analysis`, {
@@ -505,8 +525,16 @@ export function OcrPanel() {
       <div className="space-y-2 rounded-xl bg-black/15 p-2"><Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="搜尋分析紀錄，例如 environment、二次函數…" />{searchTerm.trim() && <div className="max-h-32 space-y-1 overflow-y-auto scroll-thin">{history.loading && <p className="text-xs text-muted">搜尋中…</p>}{history.data?.documents.map((d) => <button key={d.id} onClick={() => { setActiveId(d.id); setSearchTerm(""); }} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs hover:bg-white/10"><span className="truncate">{d.title}・{d.subject}</span><span className="text-muted">{d.analysis_kind}</span></button>)}{!history.loading && !history.data?.documents.length && <p className="text-xs text-muted">找不到符合的私人分析紀錄。</p>}</div>}</div>
       {!activeId && <EmptyState icon="📷" title="建立一份辨識文件開始" hint="可一次上傳多張課本、考卷或黑板照片。" />}
 
-      {activeId && (
+                {activeId && (
         <div className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <NovaCostNotice cost={imageOcrCost} action="AI OCR（每頁）" />
+            <NovaCostNotice cost={multiImageOcrCost} action="多頁 OCR 額外費用" />
+            <NovaCostNotice cost={visionPreflightCost} action="圖片品質預檢" />
+            <NovaCostNotice cost={visionAnalysisCost} action="影像理解分析" />
+            <NovaCostNotice cost={aiContextCost} action="AI 轉換學習內容" />
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <label className="focus-ring cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-xs hover:bg-white/5">
               📁 選擇圖片（可多選）

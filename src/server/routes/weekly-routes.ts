@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   weeklyExamWeeks,
@@ -336,7 +336,7 @@ export const routes: RouteDef[] = [
         z.object({
           title: z.string().min(1).max(80).optional(),
           note: z.string().max(1000).optional(),
-          status: z.enum(["draft", "published", "archived"]).optional(),
+          status: z.enum(["draft", "published", "closed", "archived"]).optional(),
           openMode: z.enum(["schedule", "manual_open", "manual_close"]).optional(),
           openDays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
           openTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
@@ -643,12 +643,25 @@ export const routes: RouteDef[] = [
       const draft = (await db.select().from(weeklyExamDrafts).where(eq(weeklyExamDrafts.id, ctx.params.draftId)).limit(1))[0];
       if (!draft) throw fail("WEEK_DRAFT_NOT_FOUND");
       if (draft.status !== "draft") throw fail("WEEK_DRAFT_HANDLED");
+      const week = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, draft.weekId)).limit(1))[0];
+      if (!week) throw fail("WEEK_NOT_FOUND");
+      const updatingPublished = week.status === "published";
 
       await db.transaction(async (tx) => {
+        if (updatingPublished && body.questions.length) {
+          await tx.update(weeklyExamQuestions).set({ published: false }).where(and(eq(weeklyExamQuestions.weekId, draft.weekId), notInArray(weeklyExamQuestions.orderIndex, body.questions.map((q) => q.orderIndex))));
+        }
+        if (updatingPublished && body.words.length) {
+          await tx.update(weeklyExamWords).set({ published: false }).where(and(eq(weeklyExamWords.weekId, draft.weekId), notInArray(weeklyExamWords.word, body.words.map((w) => w.word))));
+        }
+        if (updatingPublished && body.sentences.length) {
+          await tx.update(weeklyExamSentences).set({ published: false }).where(and(eq(weeklyExamSentences.weekId, draft.weekId), notInArray(weeklyExamSentences.en, body.sentences.map((s) => s.en))));
+        }
         for (const q of body.questions) {
-          await tx.insert(weeklyExamQuestions).values({
-            weekId: draft.weekId,
-            orderIndex: q.orderIndex,
+          const current = updatingPublished
+            ? (await tx.select().from(weeklyExamQuestions).where(and(eq(weeklyExamQuestions.weekId, draft.weekId), eq(weeklyExamQuestions.orderIndex, q.orderIndex))).limit(1))[0]
+            : null;
+          const values = {
             stem: q.stem,
             options: q.options,
             answer: q.answer,
@@ -656,13 +669,25 @@ export const routes: RouteDef[] = [
             aiConfidence: q.confidence,
             needsReview: q.confidence < 0.6,
             published: body.publish,
-          });
+          };
+          if (current) await tx.update(weeklyExamQuestions).set(values).where(eq(weeklyExamQuestions.id, current.id));
+          else await tx.insert(weeklyExamQuestions).values({ weekId: draft.weekId, orderIndex: q.orderIndex, ...values });
         }
         for (const w of body.words) {
-          await tx.insert(weeklyExamWords).values({ weekId: draft.weekId, word: w.word, meaning: w.meaning, example: w.example, highlightColor: w.highlightColor, published: body.publish });
+          const current = updatingPublished
+            ? (await tx.select().from(weeklyExamWords).where(and(eq(weeklyExamWords.weekId, draft.weekId), eq(weeklyExamWords.word, w.word))).limit(1))[0]
+            : null;
+          const values = { meaning: w.meaning, example: w.example, highlightColor: w.highlightColor, published: body.publish };
+          if (current) await tx.update(weeklyExamWords).set(values).where(eq(weeklyExamWords.id, current.id));
+          else await tx.insert(weeklyExamWords).values({ weekId: draft.weekId, word: w.word, ...values });
         }
         for (const s of body.sentences) {
-          await tx.insert(weeklyExamSentences).values({ weekId: draft.weekId, en: s.en, zh: s.zh, highlightColor: s.highlightColor, published: body.publish });
+          const current = updatingPublished
+            ? (await tx.select().from(weeklyExamSentences).where(and(eq(weeklyExamSentences.weekId, draft.weekId), eq(weeklyExamSentences.en, s.en))).limit(1))[0]
+            : null;
+          const values = { zh: s.zh, highlightColor: s.highlightColor, published: body.publish };
+          if (current) await tx.update(weeklyExamSentences).set(values).where(eq(weeklyExamSentences.id, current.id));
+          else await tx.insert(weeklyExamSentences).values({ weekId: draft.weekId, en: s.en, ...values });
         }
         await tx.update(weeklyExamDrafts).set({ status: "confirmed" }).where(eq(weeklyExamDrafts.id, draft.id));
       });
@@ -672,10 +697,10 @@ export const routes: RouteDef[] = [
         action: "weekly.draft.confirm",
         targetType: "week",
         targetId: draft.weekId,
-        after: { questions: body.questions.length, words: body.words.length, sentences: body.sentences.length, publish: body.publish },
+        after: { questions: body.questions.length, words: body.words.length, sentences: body.sentences.length, publish: body.publish, mode: updatingPublished ? "update" : "publish" },
         ip: ctx.ip,
       });
-      return { confirmed: true, counts: { questions: body.questions.length, words: body.words.length, sentences: body.sentences.length } };
+      return { confirmed: true, updated: updatingPublished, counts: { questions: body.questions.length, words: body.words.length, sentences: body.sentences.length } };
     },
   }),
 

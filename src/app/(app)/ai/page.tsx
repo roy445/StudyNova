@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { NoviAvatar, type NoviState } from "@/components/brand";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
 type Message = { id: string; conversationId?: string; role: string; content: string; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
@@ -40,6 +41,9 @@ export default function AiPage() {
   const convs = useApi<{ conversations: Conversation[]; aiEnabled: boolean }>("/ai/conversations");
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
   const memory = useApi<{ memory: Array<{ id: string; key: string; value: string }> }>("/ai/memory");
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const aiContextCost = quotas.data?.quotas.find((item) => item.feature === "ai_context")?.novaCost ?? null;
+  const aiPracticeCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conv, setConv] = useState<Conversation | null>(null);
@@ -87,6 +91,7 @@ export default function AiPage() {
   async function send() {
     if (!activeId || !input.trim()) return;
     const content = input.trim();
+    if (!confirmNovaSpend("Novi 回覆", aiContextCost)) return;
     setInput("");
     setSending(true);
     setNoviState("thinking");
@@ -106,6 +111,8 @@ export default function AiPage() {
   }
 
   async function resolveAction(messageId: string, confirm: boolean) {
+    const action = messages.find((item) => item.id === messageId)?.action;
+    if (confirm && action?.type === "create_quiz" && !confirmNovaSpend("Novi 建立測驗", aiPracticeCost)) return;
     try {
       await apiPost(`/ai/messages/${messageId}/action`, { confirm });
       setMessages((m) => m.map((x) => (x.id === messageId ? { ...x, actionStatus: confirm ? "applied" : "rejected" } : x)));
@@ -244,6 +251,7 @@ export default function AiPage() {
                       <div className="mt-2 rounded-xl border border-[#ffc857]/40 bg-[#ffc857]/10 p-2.5 text-xs">
                         <p className="font-medium text-[#ffd98a]">✦ Novi 想要：{ACTION_LABEL[m.action.type] ?? m.action.type} {m.action.type === "create_note" && <Badge tone="gold">Nova Pro 專屬</Badge>}</p>
                         {m.action.type === "create_note" && <p className="mt-0.5 text-[11px] text-amber-100/80">AI 建立筆記需要有效的 Nova Pro 資格，系統會在執行時再次驗證。</p>}
+                        {m.action.type === "create_quiz" && <NovaCostNotice cost={aiPracticeCost} action="Novi 建立測驗" className="mt-2" />}
                         {m.action.preview && <p className="mt-0.5 text-muted">{m.action.preview}</p>}
                         <pre className="mt-1 max-h-28 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[10px]">{JSON.stringify(m.action.payload ?? {}, null, 2)}</pre>
                         {m.actionStatus === "pending" ? (
@@ -272,7 +280,9 @@ export default function AiPage() {
               <div ref={bottom} />
             </div>
 
-            <div className="mt-3 flex gap-2 border-t border-[var(--line)] pt-3">
+            <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
+              <NovaCostNotice cost={aiContextCost} action="Novi 回覆" />
+              <div className="flex gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -288,6 +298,7 @@ export default function AiPage() {
               <Button loading={sending} onClick={send} disabled={!input.trim()}>
                 送出
               </Button>
+              </div>
             </div>
           </>
         )}

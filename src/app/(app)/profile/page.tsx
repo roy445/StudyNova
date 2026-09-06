@@ -5,7 +5,8 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
-import { apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
+import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 type Novi = {
   profile: { name: string; level: number; xp: number; skin: string; core: string; effect: string; float: string; voice: string; title: string; badge: string; frame: string } | null;
@@ -314,6 +315,8 @@ function ProfileInner() {
                         size="sm"
                         className="mt-2"
                         onClick={async () => {
+                          const nextLevel = novi.data?.nextLevel;
+                          if (!nextLevel || !confirmNovaSpend(`升級 Novi 到 Lv.${nextLevel.level}`, nextLevel.upgradeCostNova, nova.data?.account.balance ?? null)) return;
                           try {
                             await apiPost("/novi/upgrade");
                             toast.push("success", "Novi 升級成功！");
@@ -376,7 +379,7 @@ function ProfileInner() {
 
       {tab === "shop" && (
         <Card title="▧ Novi 商店" subtitle={`目前 Nova 餘額：${novi.data?.balance ?? 0}`} action={<Button size="sm" variant="ghost" onClick={() => void novi.reload()}>重新整理商品</Button>}>
-          <div className="mb-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 px-3 py-2 text-xs text-muted">商品下架後會立即從這裡消失；PRO 商品會先顯示資格要求，購買時後端也會再次驗證。</div>
+          <div className="mb-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 px-3 py-2 text-xs text-muted">商品下架後會立即從這裡消失；PRO 商品會先顯示資格要求，購買時後端也會再次驗證。每件商品的 Nova 價格會在購買前再次確認。</div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {novi.data?.items.map((item) => (
               <div key={item.id} className="glass-soft p-3">
@@ -397,6 +400,7 @@ function ProfileInner() {
                           disabled={Boolean(item.proOnly && !novi.data?.isPro)}
                           onClick={async () => {
                             if (item.proOnly && !novi.data?.isPro) return toast.push("error", "這是 Nova Pro 專屬商品，請先升級資格");
+                            if (!confirmNovaSpend(`購買「${item.name}」`, item.priceNova, novi.data?.balance ?? null)) return;
                             try {
                               await apiPost(`/novi/shop/${item.id}/buy`);
                               toast.push("success", `已購買 ${item.name}`);
@@ -516,9 +520,10 @@ function ProfileInner() {
             </div>
             <div className="mt-4 rounded-2xl border border-[#ffc857]/25 bg-[#ffc857]/5 p-3">
               <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-[#ffd98a]">用 Nova 點數兌換 Nova Pro</p><Badge tone="gold">最多 30 天</Badge></div>
-              <p className="mt-1 text-xs text-muted">天數越長總價越高，30 天方案提供最多使用天數但價格也最高。</p>
+              <p className="mt-1 text-xs text-muted">天數越長總價越高，30 天方案提供最多使用天數但價格也最高。按下兌換前會先顯示扣除的 Nova。</p>
+              <p className="mt-2 rounded-xl border border-[#ffc857]/25 bg-[#ffc857]/8 px-3 py-2 text-xs text-[#ffe4a3]">每個方案按鈕都會先顯示本次實際扣除的 Nova，確認後才會兌換。</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {proPlans.data?.plans.map((plan) => <Button key={plan.id} disabled={membership.data?.isPro === true} variant={plan.days === 30 ? "gold" : "ghost"} onClick={async () => { try { const res = await apiPost<{ plan: { days: number; priceNova: number }; balance: number }>("/membership/pro-exchange", { planId: plan.id, requestId: crypto.randomUUID() }); toast.push("success", `已兌換 Nova Pro ${res.plan.days} 天，剩餘 ${res.balance} Nova`); await Promise.all([nova.reload(), membership.reload(), me.reload()]); } catch (err) { toast.push("error", errorMessage(err)); } }}>{membership.data?.isPro ? "目前為 Pro" : `${plan.days} 天・✦ ${plan.priceNova} Nova`}</Button>)}
+                {proPlans.data?.plans.map((plan) => <Button key={plan.id} disabled={membership.data?.isPro === true} variant={plan.days === 30 ? "gold" : "ghost"} onClick={async () => { if (!confirmNovaSpend(`兌換 Nova Pro ${plan.days} 天`, plan.priceNova, nova.data?.account.balance ?? null)) return; try { const res = await apiPost<{ plan: { days: number; priceNova: number }; balance: number }>("/membership/pro-exchange", { planId: plan.id, requestId: crypto.randomUUID() }); toast.push("success", `已兌換 Nova Pro ${res.plan.days} 天，剩餘 ${res.balance} Nova`); await Promise.all([nova.reload(), membership.reload(), me.reload()]); } catch (err) { toast.push("error", errorMessage(err)); } }}>{membership.data?.isPro ? "目前為 Pro" : `${plan.days} 天・✦ ${plan.priceNova} Nova`}</Button>)}
               </div>
             </div>
             <div className="mt-3">
