@@ -275,6 +275,8 @@ export const questions = pgTable(
     id: id(),
     ownerId: uuid("owner_id").references(() => users.userId, { onDelete: "cascade" }),
     origin: text("origin").notNull().default("ai"), // ai | bank | admin | user
+    bankCategory: text("bank_category").notNull().default("general"),
+    sourceLabel: text("source_label").notNull().default(""),
     subject: text("subject").notNull(),
     topic: text("topic").notNull().default(""),
     level: text("level").notNull().default("junior"),
@@ -1208,6 +1210,7 @@ export const activities = pgTable(
     goalValue: integer("goal_value").notNull().default(60),
     rewardNova: integer("reward_nova").notNull().default(50),
     rewardXp: integer("reward_xp").notNull().default(100),
+    questionSources: jsonb("question_sources").$type<string[]>().notNull().default(["activity"]),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     published: boolean("published").notNull().default(false),

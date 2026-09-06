@@ -46,7 +46,7 @@ export default function AdminOpsPage() {
   const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string }> }>("/admin/announcements");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
   const coupons = useApi<{ coupons: Array<{ id: string; code: string; kind: string; value: number; maxRedemptions: number; redeemedCount: number; enabled: boolean }> }>("/admin/coupons");
-  const bank = useApi<{ questions: Array<{ id: string; subject: string; topic: string; origin: string; type: string; stem: string; difficulty: string; appearedCount: number }>; total: number }>("/admin/questions");
+  const bank = useApi<{ questions: Array<{ id: string; subject: string; topic: string; bankCategory: string; sourceLabel: string; origin: string; type: string; stem: string; difficulty: string; appearedCount: number }>; total: number }>("/admin/questions");
   const usage = useApi<{ usage: Array<{ feature: string; total: number; users: number }> }>("/admin/usage");
   const shop = useApi<{ items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; enabled: boolean }> }>("/admin/shop/items");
 
@@ -64,6 +64,7 @@ export default function AdminOpsPage() {
     goalValue: 60,
     rewardNova: 50,
     rewardXp: 100,
+    questionSources: ["activity"] as string[],
     startsAt: DEFAULT_ACTIVITY_START,
     endsAt: DEFAULT_ACTIVITY_END,
     published: true,
@@ -522,7 +523,7 @@ export default function AdminOpsPage() {
             value={importJson}
             onChange={(e) => setImportJson(e.target.value)}
             className="!min-h-[180px] font-mono text-[11px]"
-            placeholder='[{"subject":"英文","topic":"時態","level":"junior","difficulty":"normal","type":"single","stem":"...","options":["A","B","C","D"],"answer":["A"],"explanation":"..."}]'
+            placeholder='[{"subject":"英文","topic":"時態","bankCategory":"高中英文","sourceLabel":"高一週考 PDF","level":"senior","difficulty":"normal","type":"single","stem":"...","options":["A","B","C","D"],"answer":["A"],"explanation":"..."}]'
           />
           <div className="mt-2 flex gap-2">
             <Button
@@ -546,7 +547,7 @@ export default function AdminOpsPage() {
             {bank.data?.questions.map((q) => (
               <div key={q.id} className="glass-soft flex items-center justify-between gap-2 px-2 py-1.5">
                 <span className="min-w-0 truncate">
-                  [{q.subject}・{q.topic || "未分類"}・{q.type}] {q.stem}
+                  [{q.subject}・{q.bankCategory || "一般"}・{q.sourceLabel || q.origin}・{q.topic || "未分類"}・{q.type}] {q.stem}
                 </span>
                 <span className="shrink-0 text-muted">出現 {q.appearedCount} 次</span>
                 <button
@@ -667,6 +668,13 @@ export default function AdminOpsPage() {
           <Field label="XP 獎勵">
             <Input type="number" value={actForm.rewardXp} onChange={(e) => setActForm({ ...actForm, rewardXp: Number(e.target.value) })} />
           </Field>
+          <div className="sm:col-span-2 rounded-xl border border-[var(--line)] p-3">
+            <p className="mb-2 text-sm font-semibold">出題範圍（可複選）</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[['activity', '專屬活動題庫'], ['general_bank', '一般題庫'], ['imported_files', '已匯入檔案題目（PDF／圖片）'], ['weekly_exams', '歷屆／每週小考題目']].map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={actForm.questionSources.includes(key)} onChange={(e) => setActForm({ ...actForm, questionSources: e.target.checked ? [...actForm.questionSources, key] : actForm.questionSources.filter((source) => source !== key) })} className="accent-[#7c5cff]" />{label}</label>)}
+            </div>
+            <p className="mt-2 text-xs text-muted">建立活動時會將選定來源整合成活動專屬題目；建立後仍可在活動題庫追加或刪除。</p>
+          </div>
           <Field label="開始">
             <Input type="datetime-local" value={actForm.startsAt} onChange={(e) => setActForm({ ...actForm, startsAt: e.target.value })} />
           </Field>

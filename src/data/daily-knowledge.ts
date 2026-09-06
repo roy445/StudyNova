@@ -94,3 +94,11 @@ export function dailyKnowledge(date: string): DailyKnowledge {
   const index = [...date].reduce((sum, char) => sum + char.charCodeAt(0), 0) % DAILY_KNOWLEDGE.length;
   return DAILY_KNOWLEDGE[index];
 }
+
+export const DAILY_SUBJECTS: DailyKnowledge["subject"][] = ["國文", "英文", "數學", "自然", "社會"];
+
+export function dailyKnowledgeBySubject(date: string, subject: DailyKnowledge["subject"]): DailyKnowledge {
+  const items = DAILY_KNOWLEDGE.filter((item) => item.subject === subject);
+  const seed = [...date].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return items[seed % items.length] ?? dailyKnowledge(date);
+}

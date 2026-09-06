@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, ilike, or, sql, gte } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, sql, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   users,
@@ -24,6 +24,7 @@ import {
   gradeRecords,
   weeklyExamResults,
   weeklyExamWeeks,
+  weeklyExamQuestions,
   answers,
   passwordResetTokens,
   studyRecords,
@@ -509,6 +510,7 @@ export const routes: RouteDef[] = [
           goalValue: z.number().int().min(1).max(100000),
           rewardNova: z.number().int().min(0).max(10000),
           rewardXp: z.number().int().min(0).max(100000),
+          questionSources: z.array(z.enum(["activity", "general_bank", "imported_files", "weekly_exams"])).min(1).max(4).default(["activity"]),
           startsAt: z.string().datetime(),
           endsAt: z.string().datetime(),
           published: z.boolean().default(false),
@@ -519,6 +521,18 @@ export const routes: RouteDef[] = [
         .insert(activities)
         .values({ ...body, startsAt: new Date(body.startsAt), endsAt: new Date(body.endsAt) })
         .returning();
+      const activityId = rows[0].id;
+      const sourceQuestions = [] as Array<{ activityId: string; subject: string; type: string; stem: string; options: string[]; answer: string[]; explanation: string; orderIndex: number }>;
+      if (body.questionSources.includes("general_bank") || body.questionSources.includes("imported_files")) {
+        const origins = body.questionSources.includes("general_bank") && body.questionSources.includes("imported_files") ? ["bank", "admin"] : body.questionSources.includes("imported_files") ? ["bank"] : ["admin"];
+        const imported = await db.select().from(questions).where(inArray(questions.origin, origins)).limit(500);
+        sourceQuestions.push(...imported.map((q, index) => ({ activityId, subject: q.subject, type: q.type, stem: q.stem, options: q.options, answer: q.answer, explanation: q.explanation, orderIndex: index })));
+      }
+      if (body.questionSources.includes("weekly_exams")) {
+        const weekly = await db.select().from(weeklyExamQuestions).where(eq(weeklyExamQuestions.published, true)).limit(500);
+        sourceQuestions.push(...weekly.map((q, index) => ({ activityId, subject: "英文", type: "single", stem: q.stem, options: q.options, answer: q.answer, explanation: q.explanation, orderIndex: sourceQuestions.length + index })));
+      }
+      if (sourceQuestions.length) await db.insert(activityQuestions).values(sourceQuestions);
       await adminLog({ actorId: admin.userId, action: "activity.create", targetType: "activity", targetId: rows[0].id, after: { title: body.title }, ip: ctx.ip });
       return { activity: rows[0] };
     },
@@ -712,6 +726,8 @@ export const routes: RouteDef[] = [
       const schema = z.object({
         subject: z.string().min(1).max(20),
         topic: z.string().max(80).default(""),
+        bankCategory: z.string().max(40).default("general"),
+        sourceLabel: z.string().max(120).default("匯入題庫"),
         level: z.enum(["junior", "senior"]).default("junior"),
         difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).default("normal"),
         type: z.enum(["single", "multiple", "fill", "truefalse", "short", "reading"]).default("single"),

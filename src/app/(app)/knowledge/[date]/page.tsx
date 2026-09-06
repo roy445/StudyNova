@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Badge, Button, Card } from "@/components/ui";
-import { dailyKnowledge } from "@/data/daily-knowledge";
+import { dailyKnowledge, dailyKnowledgeBySubject, DAILY_SUBJECTS } from "@/data/daily-knowledge";
 
 export default function DailyKnowledgePage({ params }: { params: { date: string } }) {
-  const item = dailyKnowledge(params.date);
+  const searchParams = useSearchParams();
+  const subject = searchParams.get("subject") as typeof DAILY_SUBJECTS[number] | null;
+  const item = subject && DAILY_SUBJECTS.includes(subject) ? dailyKnowledgeBySubject(params.date, subject) : dailyKnowledge(params.date);
   const [selected, setSelected] = useState<number | null>(null);
   const answered = selected !== null;
   return (

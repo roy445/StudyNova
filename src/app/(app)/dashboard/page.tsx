@@ -7,7 +7,7 @@ import { LineChart } from "@/components/charts";
 import { NoviAvatar } from "@/components/brand";
 import { apiPost, useApi } from "@/lib/api";
 import { WordsPanel } from "@/features/study/panels-c";
-import { dailyKnowledge } from "@/data/daily-knowledge";
+import { DAILY_SUBJECTS, dailyKnowledgeBySubject } from "@/data/daily-knowledge";
 
 type SubjectStat = {
   subject: string;
@@ -156,14 +156,17 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <WordsPanel />
-        <Card title="💡 每日小知識" subtitle={dailyKnowledge(data.today).tag}>
-          <div className="glass-soft min-h-[180px] p-4">
-            <p className="text-base font-semibold text-[#37d3ff]">{dailyKnowledge(data.today).title}</p>
-            <p className="mt-3 text-sm leading-7 text-muted">{dailyKnowledge(data.today).body}</p>
-            <div className="mt-4 flex flex-wrap gap-3 text-xs">
-              <Link href={`/knowledge/${data.today}`} className="text-[#37d3ff] underline">看完整解析與素養測驗 →</Link>
-              <a href={dailyKnowledge(data.today).sourceUrl} target="_blank" rel="noreferrer" className="text-muted underline">來源：{dailyKnowledge(data.today).sourceName} ↗</a>
-            </div>
+        <Card title="💡 每日小知識" subtitle="國文・英文・數學・自然・社會，每天各一則">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {DAILY_SUBJECTS.map((subject) => {
+              const item = dailyKnowledgeBySubject(data.today, subject);
+              return <article key={subject} className="glass-soft min-h-[180px] p-4">
+                <div className="flex items-center justify-between gap-2"><Badge tone="cyan">{item.subject}</Badge><span className="text-[11px] text-muted">{item.tag}</span></div>
+                <p className="mt-3 text-base font-semibold text-[#37d3ff]">{item.title}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-7 text-muted">{item.body}</p>
+                <div className="mt-3 flex flex-wrap gap-3 text-xs"><Link href={`/knowledge/${data.today}?subject=${encodeURIComponent(subject)}`} className="text-[#37d3ff] underline">完整解析與測驗 →</Link><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="text-muted underline">來源 ↗</a></div>
+              </article>;
+            })}
           </div>
         </Card>
       </div>
