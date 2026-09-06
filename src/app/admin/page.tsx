@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { BarChart } from "@/components/charts";
-import { apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
 
 type AdminUser = {
   userId: string;
@@ -21,6 +21,28 @@ type AdminUser = {
   nova: number | null;
   level: number | null;
   xp: number | null;
+};
+type ChristmasTheme = {
+  enabled: boolean;
+  snow: boolean;
+  decorations: boolean;
+  novi: boolean;
+  particles: boolean;
+  sound: boolean;
+  intensity: "soft" | "balanced" | "festive";
+  title: string;
+  subtitle: string;
+};
+const DEFAULT_CHRISTMAS_THEME: ChristmasTheme = {
+  enabled: true,
+  snow: true,
+  decorations: true,
+  novi: true,
+  particles: true,
+  sound: false,
+  intensity: "balanced",
+  title: "StudyNova Winter Festival",
+  subtitle: "今年冬天，一起把知識裝進聖誕禮物裡。",
 };
 
 const ACTIONS = [
@@ -46,13 +68,21 @@ export default function AdminOverviewPage() {
   const logs = useApi<{ logs: Array<{ id: string; action: string; targetType: string; targetId: string; reason: string; createdAt: string; actor: string | null }> }>("/admin/logs?kind=admin");
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string }> }>("/admin/features");
   const challengeAdmin = useApi<{ challenges: Array<{ id: string; title: string; kind: string; status: string; expiresAt: string; createdAt: string; creatorName: string; participants: number }> }>("/admin/challenges");
+  const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
 
   const [selected, setSelected] = useState<string[]>([]);
   const [actionOpen, setActionOpen] = useState(false);
   const [form, setForm] = useState({ action: "gift_nova", reason: "", amount: 100, days: 30, feature: "", role: "student", title: "🎁 StudyNova 最新通知", message: "Novi 有一則新消息想告訴你！", link: "/dashboard" });
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [themeForm, setThemeForm] = useState<ChristmasTheme>(DEFAULT_CHRISTMAS_THEME);
 
   const currentAction = ACTIONS.find((a) => a.key === form.action);
+  useEffect(() => {
+    const saved = settings.data?.settings.find((setting) => setting.key === "christmas_theme")?.value;
+    if (!saved) return;
+    const timer = window.setTimeout(() => setThemeForm({ ...DEFAULT_CHRISTMAS_THEME, ...saved } as ChristmasTheme), 0);
+    return () => window.clearTimeout(timer);
+  }, [settings.data]);
 
   async function runBulk() {
     if (!selected.length) return toast.push("error", "請先選擇使用者");
@@ -88,6 +118,7 @@ export default function AdminOverviewPage() {
           { key: "users", label: "使用者管理", icon: "◎" },
           { key: "logs", label: "Audit Log", icon: "▤" },
           { key: "challenges", label: "挑戰管理", icon: "⚔️" },
+          { key: "appearance", label: "外觀・NOVA", icon: "✦" },
         ]}
         active={tab}
         onChange={setTab}
@@ -232,6 +263,27 @@ export default function AdminOverviewPage() {
               </div>
             ))}
             {!challengeAdmin.loading && !challengeAdmin.data?.challenges.length && <EmptyState icon="⚔️" title="目前沒有挑戰" />}
+          </div>
+        </Card>
+      )}
+
+      {tab === "appearance" && (
+        <Card title="✦ 節慶外觀與 NOVA 助理" subtitle="只有管理員可以修改；儲存後全站立即套用，操作會寫入 Audit Log。">
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[["enabled", "Christmas Theme"], ["novi", "聖誕 NOVA 外觀"], ["snow", "雪花效果"], ["decorations", "聖誕裝飾"]].map(([key, label]) => (
+                <label key={key} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={themeForm[key as keyof ChristmasTheme] as boolean} onChange={(e) => setThemeForm({ ...themeForm, [key]: e.target.checked })} className="accent-[#37d3ff]" /></label>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="主題強度"><Select value={themeForm.intensity} onChange={(e) => setThemeForm({ ...themeForm, intensity: e.target.value as ChristmasTheme["intensity"] })}><option value="soft">柔和</option><option value="balanced">平衡</option><option value="festive">節慶</option></Select></Field>
+              <Field label="Hero 標題"><Input value={themeForm.title} onChange={(e) => setThemeForm({ ...themeForm, title: e.target.value })} /></Field>
+              <Field label="Hero 副標題"><Input value={themeForm.subtitle} onChange={(e) => setThemeForm({ ...themeForm, subtitle: e.target.value })} /></Field>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs text-muted">
+              <span>{themeForm.enabled ? "目前套用午夜藍、冰藍、金色光暈與低負載雪花。" : "目前維持原本 StudyNova 科技主題。"}</span>
+              <Button onClick={async () => { try { await apiPut("/admin/settings/christmas_theme", { value: themeForm }); await settings.reload(); window.dispatchEvent(new Event("studynova:theme-refresh")); toast.push("success", "節慶主題與 NOVA 外觀已更新"); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存並套用</Button>
+            </div>
           </div>
         </Card>
       )}

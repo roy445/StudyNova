@@ -2,6 +2,7 @@
 
 
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 export type NoviState = "idle" | "thinking" | "happy" | "cheer" | "analyze" | "speak" | "success" | "error" | "remind" | "levelup";
 
@@ -32,7 +33,7 @@ const STATE_FACE: Record<NoviState, string> = {
 };
 
 /** StudyNova square logo supplied by the product owner. The source art is intentionally kept intact. */
-export function LogoMark({ size = 48, glow = true }: { size?: number; glow?: boolean }) {
+export function LogoMark({ size = 60, glow = true }: { size?: number; glow?: boolean }) {
   return (
     <Image
       src="/brand/studynova-logo-square.png"
@@ -53,8 +54,8 @@ export function Wordmark({ size = 26 }: { size?: number }) {
       alt="StudyNova"
       width={Math.round(size * 7.4)}
       height={Math.round(size * 4.95)}
-      sizes="(max-width: 640px) 58vw, 220px"
-      className="h-auto max-h-16 w-auto max-w-[min(72vw,290px)] object-contain object-left"
+      sizes="(max-width: 640px) 72vw, 360px"
+      className="h-auto max-h-20 w-auto max-w-[min(78vw,360px)] object-contain object-left"
     />
   );
 }
@@ -79,9 +80,15 @@ export function NoviAvatar({
   float?: string;
   level?: number;
 }) {
+  const [festive, setFestive] = useState(false);
+  useEffect(() => {
+    const sync = () => setFestive(document.documentElement.dataset.christmasNovi === "on");
+    sync();
+    window.addEventListener("studynova:theme", sync);
+    return () => window.removeEventListener("studynova:theme", sync);
+  }, []);
   const skinColor = skin === "skin-aurora" ? "#22d3ee" : skin === "skin-nebula" ? "#a78bfa" : skin === "skin-gold" ? "#fbbf24" : "#66e0ff";
   const color = aura ?? (skin !== "core-classic" ? skinColor : "#66e0ff");
-  const face = STATE_FACE[state];
   const bodyId = `novi-body-${state}-${skin.replace(/[^a-z0-9-]/gi, "")}`;
   const panelId = `novi-panel-${state}-${skin.replace(/[^a-z0-9-]/gi, "")}`;
   return (
@@ -110,6 +117,14 @@ export function NoviAvatar({
         <path d="M50 17V7" stroke="#b9cde5" strokeWidth="3" strokeLinecap="round" />
         <circle cx="50" cy="6" r="5" fill="#dff7ff" stroke="#66e0ff" strokeWidth="2" className="anim-pulse" />
         <circle cx="50" cy="6" r="2" fill="#08bfff" />
+        {festive && <>
+          <path d="M28 20c7-10 25-15 43-7l-6 9H28Z" fill="#c83b4b" stroke="#ff7180" strokeWidth="1.2" />
+          <path d="M27 20c14 5 31 4 40 1" stroke="#fff7e7" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="72" cy="13" r="4" fill="#fff7e7" stroke="#ffc857" strokeWidth="1" />
+          <path d="M27 75c8 5 38 7 46 0v8c-12 8-34 8-46 0v-8Z" fill="#c83b4b" stroke="#ff7180" strokeWidth="1" />
+          <path d="M31 78c10 4 27 5 38 0" stroke="#ffc857" strokeWidth="1.4" opacity="0.9" />
+          <circle cx="17" cy="25" r="1.7" fill="#fff7e7" className="anim-pulse" /><circle cx="82" cy="25" r="1.7" fill="#fff7e7" className="anim-pulse" />
+        </>}
         <path d="M17 46C17 27 30 17 50 17s33 10 33 29v24c0 12-12 20-33 20S17 82 17 70V46Z" fill={`url(#${bodyId})`} stroke="#d8edff" strokeWidth="1.5" />
         <path d="M12 48c0-5 3-9 7-10l4 3v22l-4 3c-4-1-7-5-7-10V48Z" fill="#9db7d4" stroke="#66e0ff" strokeWidth="1.4" />
         <path d="M88 48c0-5-3-9-7-10l-4 3v22l4 3c4-1 7-5 7-10V48Z" fill="#9db7d4" stroke="#66e0ff" strokeWidth="1.4" />

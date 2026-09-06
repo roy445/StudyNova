@@ -47,14 +47,14 @@ export default function LandingPage() {
         aria-hidden
       >
         <div className={`flex flex-col items-center gap-3 transition-all duration-700 ${phase >= 1 ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}>
-          <LogoMark size={112} />
+          <LogoMark size={136} />
           <span className="neon-text text-2xl font-extrabold tracking-tight">StudyNova AI</span>
           <span className="text-xs tracking-[0.3em] text-muted">LOADING · 星軌同步中</span>
         </div>
       </div>
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Wordmark size={34} />
+        <Wordmark size={42} />
         <nav className="flex items-center gap-2">
           <Link href="/login" className="focus-ring rounded-xl border border-[var(--line)] px-3 py-2 text-sm hover:bg-white/5">
             登入
@@ -129,7 +129,7 @@ export default function LandingPage() {
         </section>
 
         <section className="glass mt-8 flex flex-col items-center gap-3 p-8 text-center">
-          <LogoMark size={84} />
+          <LogoMark size={102} />
           <h2 className="text-xl font-bold sm:text-2xl">今天就開始，讓每一分鐘的努力都被看見</h2>
           <p className="max-w-xl text-sm text-muted">
             註冊只需要 Email、密碼與顯示名稱，系統會立即產生你的專屬 NOVA ID，把它分享給同學就能一起挑戰。

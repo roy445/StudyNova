@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { pushSubscriptions, notifications, users, novaTransactions, questions, jobQueue, weeklyExamWeeks, storageObjects, featurePermissions } from "@/db/schema";
+import { pushSubscriptions, notifications, users, novaTransactions, questions, jobQueue, weeklyExamWeeks, storageObjects, featurePermissions, platformSettings } from "@/db/schema";
 import { route, type Ctx, type RouteDef } from "../router";
 import { badRequest, fail, hashPassword, verifyPassword, generateNovaId, toCsv, todayStr } from "../core";
 import { listNotifications, markRead, unreadCount, pushConfigured, sendPush } from "../notify";
@@ -39,6 +39,27 @@ async function handleCron(ctx: Ctx) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/theme/christmas",
+    auth: "none",
+    handler: async () => {
+      const row = (await db.select({ value: platformSettings.value }).from(platformSettings).where(eq(platformSettings.key, "christmas_theme")).limit(1))[0];
+      return {
+        theme: row?.value ?? {
+          enabled: true,
+          snow: true,
+          decorations: true,
+          novi: true,
+          particles: true,
+          sound: false,
+          intensity: "balanced",
+          title: "StudyNova Winter Festival",
+          subtitle: "今年冬天，一起把知識裝進聖誕禮物裡。",
+        },
+      };
+    },
+  }),
   /* ------------------------------------------------- notifications */
   route({
     method: "GET",

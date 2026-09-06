@@ -16,7 +16,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 py-2.5">
           <Link href="/" className="focus-ring rounded-lg">
-            <Wordmark size={34} />
+            <Wordmark size={42} />
           </Link>
           <nav className="ml-auto flex justify-end">
             <Link href="/dashboard" className="focus-ring shrink-0 rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-3 py-1.5 text-xs font-medium text-white">

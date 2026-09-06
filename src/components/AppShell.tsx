@@ -237,7 +237,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-[var(--line)] bg-black/20 px-3 py-4 lg:flex">
         <Link href="/dashboard" className="focus-ring mb-4 rounded-xl px-2 py-1">
-          <Wordmark size={34} />
+          <Wordmark size={42} />
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
           {SIDE_NAV.map((item) => {
@@ -279,7 +279,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/85 backdrop-blur-xl">
           <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5 sm:px-5">
             <Link href="/dashboard" className="focus-ring flex items-center gap-2 lg:hidden">
-              <LogoMark size={50} />
+              <LogoMark size={62} />
               <span className="neon-text text-base font-extrabold">StudyNova</span>
             </Link>
             <div className="flex-1" />
