@@ -27,6 +27,8 @@ type Issue = {
   reporterNovaId: string | null;
 };
 
+type Appeal = { id: string; ticketNo: string; contactEmail: string; blockedReason: string; knowsMistake: string; whyChance: string; correctivePlan: string; additionalEvidence: string; status: string; adminNote: string; createdAt: string; user: { novaId: string | null; displayName: string | null; status: string | null; blockedAt: string | null } | null };
+
 const STATUS = [
   ["all", "全部"],
   ["open", "待處理"],
@@ -51,6 +53,12 @@ export default function AdminSupportPage() {
   const [nextSeverity, setNextSeverity] = useState("normal");
   const [resetForm, setResetForm] = useState({ email: "", reason: "使用者申請重設密碼", expiresMinutes: "60" });
   const [resetResult, setResetResult] = useState<{ link: string; expiresAt: string; customerMessage: string } | null>(null);
+  const appeals = useApi<{ appeals: Appeal[] }>("/admin/account-appeals");
+  const [activeAppeal, setActiveAppeal] = useState<Appeal | null>(null);
+  const [appealNote, setAppealNote] = useState("");
+  const [sendAppealEmail, setSendAppealEmail] = useState(true);
+  const [emailForm, setEmailForm] = useState({ to: "", displayName: "", kind: "reactivate", link: "", note: "", expiresText: "" });
+  const [emailResult, setEmailResult] = useState<string | null>(null);
 
   const count = (s: string) => list.data?.counts.find((c) => c.status === s)?.c ?? 0;
 
@@ -75,6 +83,26 @@ export default function AdminSupportPage() {
           <div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.link)}>複製連結</Button><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.customerMessage)}>複製客服文字</Button></div>
           <pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-2 leading-relaxed text-muted">{resetResult.customerMessage}</pre>
         </div>}
+      </Card>
+
+      <Card title="✉ StudyNova 帳號通知信" subtitle="使用統一品牌排版寄送重啟、密碼重設、Pro 或獎勵連結。需先設定 RESEND_API_KEY 才會實際寄出。">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="收件 Email"><Input type="email" value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} /></Field>
+          <Field label="使用者名稱"><Input value={emailForm.displayName} onChange={(e) => setEmailForm({ ...emailForm, displayName: e.target.value })} /></Field>
+          <Field label="信件類型"><Select value={emailForm.kind} onChange={(e) => setEmailForm({ ...emailForm, kind: e.target.value })}><option value="reactivate">帳號重新啟動</option><option value="password_reset">密碼重設</option><option value="pro_reward">Pro／獎勵資格</option></Select></Field>
+          <Field label="連結"><Input type="url" value={emailForm.link} onChange={(e) => setEmailForm({ ...emailForm, link: e.target.value })} placeholder="https://study-nova-psi.vercel.app/..." /></Field>
+        </div>
+        <Field label="補充內容（選填）"><Textarea value={emailForm.note} onChange={(e) => setEmailForm({ ...emailForm, note: e.target.value })} className="!min-h-[80px]" /></Field>
+        <Button className="mt-3" onClick={async () => { try { const result = await apiPost<{ sent: boolean; reason?: string; subject: string; customerMessage: string }>("/admin/account-emails", emailForm); setEmailResult(result.customerMessage); toast.push("success", result.sent ? "已寄出品牌通知信" : `模板已建立；${result.reason ?? "尚未寄出"}`); } catch (err) { toast.push("error", errorMessage(err)); } }}>產生並寄送信件</Button>
+        {emailResult && <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-black/20 p-3 text-xs leading-6 text-muted">{emailResult}</pre>}
+      </Card>
+
+      <Card title="⚖ 封鎖申訴案件" subtitle="查看完整回答、審核解封，並以 StudyNova 正式版型寄送通知信。">
+        {appeals.loading && <Skeleton lines={3} />}
+        {!appeals.loading && !appeals.data?.appeals.length && <EmptyState icon="⚖" title="目前沒有申訴案件" />}
+        <div className="space-y-2">
+          {appeals.data?.appeals.map((a) => <div key={a.id} className="glass-soft flex flex-wrap items-center justify-between gap-2 p-3"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-[#7dd3fc]">{a.ticketNo}</span><Badge tone={a.status === "approved" ? "green" : a.status === "rejected" ? "rose" : "gold"}>{a.status}</Badge></div><p className="mt-1 text-sm">{a.user?.displayName ?? "未知帳號"}・{a.contactEmail}</p><p className="text-[11px] text-muted">{new Date(a.createdAt).toLocaleString("zh-TW")}・原因：{a.blockedReason}</p></div><Button size="sm" variant="ghost" onClick={() => { setActiveAppeal(a); setAppealNote(a.adminNote); }}>查看與審核</Button></div>)}
+        </div>
       </Card>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -196,6 +224,15 @@ export default function AdminSupportPage() {
             </Button>
           </div>
         )}
+      </Modal>
+
+      <Modal open={Boolean(activeAppeal)} onClose={() => setActiveAppeal(null)} title={activeAppeal ? `審核 ${activeAppeal.ticketNo}` : ""} wide>
+        {activeAppeal && <div className="space-y-3">
+          <div className="glass-soft space-y-2 p-3 text-sm leading-7"><p>封鎖原因：{activeAppeal.blockedReason}</p><p>知道錯在哪裡嗎：{activeAppeal.knowsMistake}</p><p>為什麼應再給一次機會：{activeAppeal.whyChance}</p><p>修正計畫：{activeAppeal.correctivePlan}</p><p>補充：{activeAppeal.additionalEvidence || "—"}</p></div>
+          <Field label="管理員備註"><Textarea value={appealNote} onChange={(e) => setAppealNote(e.target.value)} className="!min-h-[110px]" /></Field>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={sendAppealEmail} onChange={(e) => setSendAppealEmail(e.target.checked)} />核准解封後寄送正式通知 Email</label>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={async () => { try { await apiPatch(`/admin/account-appeals/${activeAppeal.id}`, { status: "rejected", adminNote: appealNote }); toast.push("success", "已標記不受理"); setActiveAppeal(null); await appeals.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>不受理</Button><Button onClick={async () => { try { const result = await apiPatch<{ subject: string; customerMessage: string; email: { sent: boolean; configured: boolean; reason?: string } }>(`/admin/account-appeals/${activeAppeal.id}`, { status: "approved", adminNote: appealNote, sendEmail: sendAppealEmail, baseUrl: window.location.origin }); toast.push("success", result.email.sent ? "已解封並寄出通知信" : `已解封；${result.email.reason ?? "尚未寄信"}`); setActiveAppeal(null); await appeals.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>核准解封</Button></div>
+        </div>}
       </Modal>
     </div>
   );

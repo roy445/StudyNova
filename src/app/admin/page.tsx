@@ -12,6 +12,8 @@ type AdminUser = {
   displayName: string;
   role: string;
   status: string;
+  blockedReason: string;
+  blockedAt: string | null;
   createdAt: string;
   lastLoginAt: string | null;
   tier: string | null;
@@ -171,7 +173,7 @@ export default function AdminOverviewPage() {
                     <td className="max-w-[160px] truncate py-2 text-muted">{u.email}</td>
                     <td className="py-2">{u.role}</td>
                     <td className="py-2">
-                      <Badge tone={u.status === "active" ? "green" : "rose"}>{u.status}</Badge>
+                      <span title={u.status === "blocked" ? `原因：${u.blockedReason || "未填寫"}｜日期：${u.blockedAt ? new Date(u.blockedAt).toLocaleString("zh-TW") : "—"}` : "帳號正常"}><Badge tone={u.status === "active" ? "green" : "rose"}>{u.status}</Badge></span>
                     </td>
                     <td className="py-2 text-right tabular-nums">{u.nova ?? 0}</td>
                     <td className="py-2 text-right tabular-nums">

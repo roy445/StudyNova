@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import { db } from "@/db";
-import { users, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems } from "@/db/schema";
+import { users, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems, accountAppeals } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import {
   fail,
@@ -103,7 +103,12 @@ export const routes: RouteDef[] = [
         throw generic;
       }
       if (!verifyPassword(body.password, user.passwordHash)) throw generic;
-      if (user.status === "blocked") throw fail("AUTH_ACCOUNT_BLOCKED");
+      if (user.status === "blocked") {
+        throw fail("AUTH_ACCOUNT_BLOCKED", {
+          message: "很抱歉，此帳號已被封鎖",
+          details: { userId: user.userId, novaId: user.novaId, email: user.email, reason: user.blockedReason || "未提供具體原因", blockedAt: user.blockedAt?.toISOString?.() ?? null },
+        });
+      }
 
       await ensureUserEconomy(user.userId);
       await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.userId, user.userId));
@@ -362,6 +367,28 @@ export const routes: RouteDef[] = [
       const m = (await db.select().from(memberships).where(eq(memberships.userId, rows[0].userId)).limit(1))[0];
       const isPro = m?.tier === "pro" && (!m.expiresAt || new Date(m.expiresAt) > new Date());
       return { profile: { ...rows[0], ...novi, level: novi?.level ?? 1, xp: novi?.xp ?? 0, isPro: Boolean(isPro), inventory } };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/auth/block-appeals",
+    auth: "none",
+    rate: { limit: 3, windowSec: 86400, key: "block-appeal" },
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({
+        userId: z.string().uuid().optional(), identifier: z.string().min(3).max(180), contactEmail: emailSchema,
+        blockedReason: z.string().min(1).max(500), knowsMistake: z.string().min(20).max(3000),
+        whyChance: z.string().min(20).max(3000), correctivePlan: z.string().min(20).max(3000), additionalEvidence: z.string().max(3000).optional(),
+      }));
+      const identifier = body.identifier.trim();
+      const target = body.userId
+        ? (await db.select().from(users).where(eq(users.userId, body.userId)).limit(1))[0]
+        : (await db.select().from(users).where(identifier.includes("@") ? eq(users.email, identifier.toLowerCase()) : eq(users.novaId, identifier.toUpperCase())).limit(1))[0];
+      if (!target || target.status !== "blocked") throw badRequest("找不到可申訴的封鎖帳號");
+      const ticketNo = `AP-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${randomToken(5).toUpperCase()}`;
+      const row = await db.insert(accountAppeals).values({ ticketNo, userId: target.userId, contactEmail: body.contactEmail.toLowerCase().trim(), blockedReason: body.blockedReason, knowsMistake: body.knowsMistake, whyChance: body.whyChance, correctivePlan: body.correctivePlan, additionalEvidence: body.additionalEvidence ?? "" }).returning({ ticketNo: accountAppeals.ticketNo, createdAt: accountAppeals.createdAt });
+      return { ticketNo: row[0].ticketNo, createdAt: row[0].createdAt, message: "感謝您的耐心填寫，我們將在 10 日之內給您答覆，敬請留意您的聯絡信箱。" };
     },
   }),
 ];

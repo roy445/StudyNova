@@ -36,6 +36,8 @@ export const users = pgTable(
     displayName: text("display_name").notNull(),
     role: text("role").notNull().default("student"), // student | admin | owner
     status: text("status").notNull().default("active"), // active | blocked
+    blockedReason: text("blocked_reason").notNull().default(""),
+    blockedAt: timestamp("blocked_at", { withTimezone: true }),
     avatarSeed: text("avatar_seed").notNull().default("nova"),
     bio: text("bio").notNull().default(""),
     onboarded: boolean("onboarded").notNull().default(false),
@@ -1376,6 +1378,28 @@ export const issueReports = pgTable(
     index("issue_user_idx").on(t.userId),
     index("issue_code_idx").on(t.errorCode),
   ],
+);
+
+export const accountAppeals = pgTable(
+  "account_appeals",
+  {
+    id: id(),
+    ticketNo: text("ticket_no").notNull(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    contactEmail: text("contact_email").notNull(),
+    blockedReason: text("blocked_reason").notNull().default(""),
+    knowsMistake: text("knows_mistake").notNull(),
+    whyChance: text("why_chance").notNull(),
+    correctivePlan: text("corrective_plan").notNull(),
+    additionalEvidence: text("additional_evidence").notNull().default(""),
+    status: text("status").notNull().default("open"), // open | reviewing | approved | rejected
+    adminNote: text("admin_note").notNull().default(""),
+    handledBy: uuid("handled_by").references(() => users.userId, { onDelete: "set null" }),
+    handledAt: timestamp("handled_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("appeal_ticket_uq").on(t.ticketNo), index("appeal_status_idx").on(t.status, t.createdAt), index("appeal_user_idx").on(t.userId)],
 );
 
 export const faqEntries = pgTable(

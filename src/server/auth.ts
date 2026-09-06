@@ -84,7 +84,11 @@ export async function getSession(): Promise<SessionInfo | null> {
 
   const row = rows[0];
   if (!row) return null;
-  if (row.status === "blocked") return null;
+  if (row.status === "blocked") {
+    await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash));
+    try { store.set(SESSION_COOKIE, "", cookieOptions(0)); } catch { /* render context */ }
+    return null;
+  }
 
   // 延長舊版本 cookie，讓已登入使用者不必因為舊的 14 天期限重新登入。
   try {

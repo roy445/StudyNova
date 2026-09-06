@@ -30,12 +30,15 @@ import {
   platformSettings,
   challenges,
   challengeParticipants,
+  accountAppeals,
+  sessions,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
 import { adminLog, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { providerMetrics, recentAiFailures, aiConfigured } from "../ai";
+import { accountEmailTemplate, sendAccountEmail } from "../email";
 
 function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
   return new Response(toCsv(rows), {
@@ -158,6 +161,8 @@ export const routes: RouteDef[] = [
           displayName: users.displayName,
           role: users.role,
           status: users.status,
+          blockedReason: users.blockedReason,
+          blockedAt: users.blockedAt,
           createdAt: users.createdAt,
           lastLoginAt: users.lastLoginAt,
           tier: memberships.tier,
@@ -208,7 +213,9 @@ export const routes: RouteDef[] = [
           switch (body.action) {
             case "block":
             case "unblock": {
-              await db.update(users).set({ status: body.action === "block" ? "blocked" : "active", updatedAt: new Date() }).where(eq(users.userId, userId));
+              const blocked = body.action === "block";
+              await db.update(users).set({ status: blocked ? "blocked" : "active", blockedReason: blocked ? body.reason : "", blockedAt: blocked ? new Date() : null, updatedAt: new Date() }).where(eq(users.userId, userId));
+              if (blocked) await db.delete(sessions).where(eq(sessions.userId, userId));
               break;
             }
             case "set_role": {
@@ -734,6 +741,52 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       await db.delete(questions).where(eq(questions.id, ctx.params.id));
       return { deleted: true };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/admin/account-appeals",
+    auth: "admin",
+    handler: async (ctx) => {
+      const status = ctx.query.get("status");
+      const rows = await db.select({ appeal: accountAppeals, user: { novaId: users.novaId, displayName: users.displayName, status: users.status, blockedAt: users.blockedAt } }).from(accountAppeals).leftJoin(users, eq(users.userId, accountAppeals.userId)).where(status ? eq(accountAppeals.status, status) : sql`true`).orderBy(desc(accountAppeals.createdAt)).limit(100);
+      return { appeals: rows.map((row) => ({ ...row.appeal, user: row.user })) };
+    },
+  }),
+
+  route({
+    method: "PATCH",
+    path: "/admin/account-appeals/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ status: z.enum(["open", "reviewing", "approved", "rejected"]), adminNote: z.string().max(3000).optional(), sendEmail: z.boolean().default(false), baseUrl: z.string().url().optional() }));
+      const appeal = (await db.select().from(accountAppeals).where(eq(accountAppeals.id, ctx.params.id)).limit(1))[0];
+      if (!appeal) throw notFound("找不到申訴案件");
+      const handledAt = ["approved", "rejected"].includes(body.status) ? new Date() : null;
+      await db.update(accountAppeals).set({ status: body.status, adminNote: body.adminNote ?? "", handledBy: admin.userId, handledAt, updatedAt: new Date() }).where(eq(accountAppeals.id, appeal.id));
+      if (body.status === "approved" && appeal.userId) {
+        await db.update(users).set({ status: "active", blockedReason: "", blockedAt: null, updatedAt: new Date() }).where(eq(users.userId, appeal.userId));
+        const target = (await db.select({ displayName: users.displayName }).from(users).where(eq(users.userId, appeal.userId)).limit(1))[0];
+        const link = `${body.baseUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://study-nova-psi.vercel.app"}/login`;
+        const message = accountEmailTemplate({ kind: "reactivate", displayName: target?.displayName ?? "StudyNova 使用者", link, note: body.adminNote });
+        const email = body.sendEmail ? await sendAccountEmail(appeal.contactEmail, message) : { sent: false, configured: Boolean(process.env.RESEND_API_KEY), reason: "未要求寄信" };
+        return { appealId: appeal.id, status: body.status, email, customerMessage: message.text, subject: message.subject };
+      }
+      return { appealId: appeal.id, status: body.status, email: { sent: false, configured: Boolean(process.env.RESEND_API_KEY), reason: "未解封" } };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/admin/account-emails",
+    auth: "admin",
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({ to: z.string().email(), displayName: z.string().min(1).max(80), kind: z.enum(["reactivate", "password_reset", "pro_reward"]), link: z.string().url(), expiresText: z.string().max(120).optional(), note: z.string().max(1000).optional() }));
+      const message = accountEmailTemplate(body);
+      const result = await sendAccountEmail(body.to, message);
+      return { ...result, subject: message.subject, customerMessage: message.text };
     },
   }),
 
