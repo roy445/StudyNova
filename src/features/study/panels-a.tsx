@@ -358,9 +358,10 @@ export function OcrPanel() {
     }
   }
 
-  async function runOcr() {
+  async function runOcr(allPages = false) {
     if (!activeId) return;
-    const pageCount = latestBatchIds.length || detail.data?.pages.length || 0;
+    const pageIds = allPages ? detail.data?.pages.map((p) => p.id) : latestBatchIds.length ? latestBatchIds : detail.data?.pages.map((p) => p.id);
+    const pageCount = pageIds?.length ?? 0;
     let cost: number | null = null;
     if (typeof imageOcrCost === "number" && (pageCount <= 1 || typeof multiImageOcrCost === "number")) {
       cost = imageOcrCost * pageCount + (pageCount > 1 ? (multiImageOcrCost ?? 0) : 0);
@@ -368,8 +369,10 @@ export function OcrPanel() {
     if (!confirmNovaSpend(`AI OCR（${pageCount} 頁）`, cost)) return;
     setBusy(true);
     try {
-      await apiPost(`/ocr/documents/${activeId}/run`, { pageIds: latestBatchIds.length ? latestBatchIds : undefined });
-      toast.push("success", "OCR 完成，可直接編輯文字");
+      const res = await apiPost<{ results?: Array<{ ok: boolean }> }>(`/ocr/documents/${activeId}/run`, { pageIds });
+      const ok = res.results?.filter((item) => item.ok).length ?? 0;
+      const failed = (res.results?.length ?? 0) - ok;
+      toast.push(failed ? "info" : "success", `OCR 完成：${ok} 張成功${failed ? `，${failed} 張失敗` : ""}`);
       await detail.reload();
     } catch (err) {
       toast.push("error", errorMessage(err));
@@ -407,9 +410,9 @@ export function OcrPanel() {
     if (!confirmNovaSpend("AI 整理並加入我的單字", aiContextCost)) return;
     setBusy(true);
     try {
-      const res = await apiPost<{ result: { vocabulary?: unknown[] } }>(`/ocr/documents/${activeId}/transform`, { action: "vocabulary" });
+      const res = await apiPost<{ result: { vocabulary?: unknown[] }; saved?: number; duplicates?: number }>(`/ocr/documents/${activeId}/transform`, { action: "vocabulary" });
       const count = Array.isArray(res.result?.vocabulary) ? res.result.vocabulary.length : 0;
-      toast.push("success", count ? `已加入 ${count} 個單字` : "沒有找到可加入的單字");
+      toast.push("success", count ? `已加入 ${res.saved ?? count} 個單字${res.duplicates ? `，${res.duplicates} 個已存在未重複加入` : ""}` : "沒有找到可加入的單字");
     } catch (err) {
       toast.push("error", errorMessage(err));
     } finally {
@@ -455,6 +458,17 @@ export function OcrPanel() {
     }
   }
 
+  async function saveLearningBatch(action: "vocabulary" | "note" | "sentence" | "question", items: Array<Record<string, unknown>>) {
+    if (!activeId || !items.length) return;
+    if (!window.confirm(`要將分析結果中的 ${items.length} 筆內容加入${action === "vocabulary" ? "我的單字" : action === "sentence" ? "句子庫" : action === "note" ? "我的重點／筆記" : "題目資料"}嗎？`)) return;
+    try {
+      const res = await apiPost<{ saved: number; duplicates: number }>(`/ocr/documents/${activeId}/learning-action`, { action, items });
+      toast.push("success", `已加入 ${res.saved} 筆${res.duplicates ? `，${res.duplicates} 筆已存在未重複加入` : ""}`);
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
+
   async function createCameraQuiz() {
     if (!activeId || !visionAnalysis) return;
     const sourceItems = Array.isArray(visionAnalysis.items) ? (visionAnalysis.items as Array<Record<string, unknown>>) : [];
@@ -482,7 +496,7 @@ export function OcrPanel() {
     }
   }
 
-  async function vision(stage: "preflight" | "analyze", force = false) {
+  async function vision(stage: "preflight" | "analyze", force = false, allPages = false) {
     if (!activeId) return;
     const cost = stage === "preflight" ? visionPreflightCost : visionAnalysisCost;
     if (!confirmNovaSpend(stage === "preflight" ? "圖片品質預檢" : "影像理解分析", cost)) return;
@@ -490,7 +504,7 @@ export function OcrPanel() {
     try {
       const res = await apiPost<{ stage: string; preflight?: Record<string, unknown>; analysis?: Record<string, unknown>; retakeMessage?: string | null }>(`/ocr/documents/${activeId}/vision-analysis`, {
         stage,
-        pageIds: latestBatchIds.length ? latestBatchIds : detail.data?.pages.map((p) => p.id),
+        pageIds: allPages ? detail.data?.pages.map((p) => p.id) : latestBatchIds.length ? latestBatchIds : detail.data?.pages.map((p) => p.id),
         itemIds: selectedVisionItems.length ? selectedVisionItems : undefined,
         analysisMode,
         // 不預設任何顏色，讓 AI 自己判斷圖片中是否真的有螢光筆與其語意。
@@ -588,6 +602,7 @@ export function OcrPanel() {
             <Button size="sm" loading={busy} onClick={runOcr}>
               ✨ 開始 AI 辨識{typeof ocrTotalCost === "number" ? `（扣 ${ocrTotalCost} Nova）` : ""}
             </Button>
+            {(detail.data?.pages.length ?? 0) > 1 && <Button size="sm" variant="outline" loading={busy} onClick={() => runOcr(true)}>辨識全部 {detail.data?.pages.length} 張</Button>}
             <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
               加入我的教材
             </Button>
@@ -640,9 +655,9 @@ export function OcrPanel() {
           {detail.loading && <Skeleton lines={4} />}
           {detail.error && <ErrorState message={detail.error} onRetry={detail.reload} />}
 
-          <div className="max-h-[70vh] grid gap-3 overflow-y-auto overscroll-contain scroll-thin pr-1 touch-pan-y sm:grid-cols-2">
+          <div className="max-h-[70vh] flex snap-x gap-3 overflow-x-auto overflow-y-auto overscroll-contain scroll-thin pr-1 touch-pan-x sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:touch-pan-y">
             {detail.data?.pages.map((p, idx) => (
-              <div key={p.id} className="glass-soft solid-data-surface p-2">
+              <div key={p.id} className="glass-soft solid-data-surface min-w-[86vw] snap-start p-2 sm:min-w-0">
                 <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted">
                   <span>
                     #{idx + 1}・{p.status}
@@ -796,10 +811,10 @@ export function OcrPanel() {
                       })}</div>}
                     </div>
                   ))}
-                  <div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={() => setSelectedVisionItems([])}>全部分析</Button><Button size="sm" loading={busy} onClick={() => vision("analyze", true)}>{selectedVisionItems.length ? `分析選取 ${selectedVisionItems.length} 項` : analysisMode === "vocabulary" ? "找單字與片語" : analysisMode === "sentences" ? "找句子與句型" : "開始智慧分析"}</Button></div>
+                  <div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={() => setSelectedVisionItems([])}>全部分析</Button><Button size="sm" loading={busy} onClick={() => vision("analyze", true)}>{selectedVisionItems.length ? `分析選取 ${selectedVisionItems.length} 項` : analysisMode === "vocabulary" ? "找單字與片語" : analysisMode === "sentences" ? "找句子與句型" : "開始智慧分析"}</Button><Button size="sm" variant="outline" loading={busy} onClick={() => vision("analyze", true, true)}>分析全部圖片</Button></div>
                 </div>
               )}
-              {visionAnalysis && <VisionAnalysisResult data={visionAnalysis} onAction={saveLearning} onBatchVocabulary={saveVocabularyBatch} onCreateQuiz={createCameraQuiz} />}
+              {visionAnalysis && <VisionAnalysisResult data={visionAnalysis} onAction={saveLearning} onBatchVocabulary={saveVocabularyBatch} onBatchLearning={saveLearningBatch} onCreateQuiz={createCameraQuiz} />}
             </div>
           ) : null}
         </div>
@@ -808,11 +823,20 @@ export function OcrPanel() {
   );
 }
 
-function VisionAnalysisResult({ data, onAction, onBatchVocabulary, onCreateQuiz }: { data: Record<string, unknown>; onAction: (action: "vocabulary" | "note" | "question", item: Record<string, unknown>) => void; onBatchVocabulary: (items: Array<Record<string, unknown>>) => void; onCreateQuiz: () => void }) {
+function VisionAnalysisResult({ data, onAction, onBatchVocabulary, onBatchLearning, onCreateQuiz }: { data: Record<string, unknown>; onAction: (action: "vocabulary" | "note" | "question", item: Record<string, unknown>) => void; onBatchVocabulary: (items: Array<Record<string, unknown>>) => void; onBatchLearning: (action: "vocabulary" | "note" | "sentence" | "question", items: Array<Record<string, unknown>>) => void; onCreateQuiz: () => void }) {
   const items = Array.isArray(data.items) ? (data.items as Array<Record<string, unknown>>) : [];
   const uncertainties = Array.isArray(data.uncertainties) ? (data.uncertainties as Array<Record<string, unknown>>) : [];
+  const vocabularyItems = items.flatMap((item) => {
+    const language = item.language && typeof item.language === "object" ? item.language as Record<string, unknown> : {};
+    const nested = Array.isArray(language.vocabulary) ? (language.vocabulary as Array<Record<string, unknown>>).map((v) => ({ ...v, sourcePageIds: item.sourcePageIds, subject: item.subject })) : [];
+    return item.kind === "vocabulary" ? [item, ...nested] : nested;
+  });
+  const sentenceItems = items.filter((item) => item.kind === "sentence").map((item) => ({ en: item.rawText, zh: (item.language as Record<string, unknown> | undefined)?.translationNatural ?? "", sourcePageIds: item.sourcePageIds }));
+  const noteItems = items.filter((item) => item.kind === "note" || item.kind === "article");
+  const questionItems = items.filter((item) => item.kind === "question");
+  const counts = { vocabulary: vocabularyItems.length, sentence: sentenceItems.length, note: noteItems.length, question: questionItems.length, article: items.filter((item) => item.kind === "article").length };
   return (
-      <div className="max-h-[55vh] space-y-2 overflow-y-auto scroll-thin text-xs"><div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={onCreateQuiz}>建立題目練習</Button>{items.some((item) => item.kind === "article") && <Button size="sm" variant="ghost" onClick={() => onBatchVocabulary(items.filter((item) => item.kind === "article").flatMap((item) => { const article = item.article && typeof item.article === "object" ? item.article as Record<string, unknown> : {}; return Array.isArray(article.importantVocabulary) ? (article.importantVocabulary as unknown[]).map((word) => ({ word: String(word), sourcePageIds: item.sourcePageIds, subject: item.subject })) : []; }))}>重要單字加入單字本</Button>}</div>
+      <div className="max-h-[55vh] space-y-2 overflow-y-auto scroll-thin text-xs"><div className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 p-3"><p className="font-semibold">本次分析結果</p><div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5"><span>單字／片語：<b>{counts.vocabulary}</b></span><span>句子：<b>{counts.sentence}</b></span><span>重點／筆記：<b>{counts.note}</b></span><span>題目：<b>{counts.question}</b></span><span>文章：<b>{counts.article}</b></span></div><div className="mt-3 flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" disabled={!counts.vocabulary} onClick={() => onBatchLearning("vocabulary", vocabularyItems)}>加入全部單字</Button><Button size="sm" variant="ghost" disabled={!counts.sentence} onClick={() => onBatchLearning("sentence", sentenceItems)}>加入全部句子</Button><Button size="sm" variant="ghost" disabled={!counts.note} onClick={() => onBatchLearning("note", noteItems)}>加入全部重點／筆記</Button><Button size="sm" variant="ghost" disabled={!counts.question} onClick={() => onBatchLearning("question", questionItems)}>加入全部題目</Button><Button size="sm" variant="ghost" onClick={onCreateQuiz}>建立題目練習</Button>{items.some((item) => item.kind === "article") && <Button size="sm" variant="ghost" onClick={() => onBatchVocabulary(items.filter((item) => item.kind === "article").flatMap((item) => { const article = item.article && typeof item.article === "object" ? item.article as Record<string, unknown> : {}; return Array.isArray(article.importantVocabulary) ? (article.importantVocabulary as unknown[]).map((word) => ({ word: String(word), sourcePageIds: item.sourcePageIds, subject: item.subject })) : []; }))}>重要單字加入單字本</Button>}</div><p className="mt-2 text-muted">完整 OCR 文字可使用上方「加入我的教材」，分析後再選擇要保存的類型。</p></div>
       <div className="rounded-xl bg-cyan-400/10 p-2"><p className="font-medium">分析摘要</p><p className="mt-1 whitespace-pre-wrap text-muted">{String(data.documentSummary ?? "未提供摘要")}</p><p className="mt-1 text-muted">內容類型：{Array.isArray(data.contentTypes) ? (data.contentTypes as unknown[]).map(String).join("、") || "未判斷" : "未判斷"}</p></div>
       {uncertainties.length > 0 && <div className="rounded-xl bg-amber-400/10 p-2"><p className="font-medium text-amber-200">需要確認的內容</p>{uncertainties.map((u, i) => <p key={i} className="mt-1 text-muted">{String(u.location ?? "未知位置")}：{String(u.text ?? "")} {Array.isArray(u.alternatives) ? `（可能是：${(u.alternatives as unknown[]).map(String).join("／")}）` : ""}</p>)}</div>}
       {!items.length && <p className="rounded-xl bg-black/20 p-3 text-muted">沒有取得可確認的內容，請檢查圖片或重新拍攝。</p>}

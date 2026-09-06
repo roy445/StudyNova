@@ -14,6 +14,7 @@ import {
   tasks,
   questions,
   quizzes,
+  sentences,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, sanitizeText, slugToken, todayStr, fingerprint } from "../core";
@@ -603,7 +604,7 @@ export const contentRoutes: RouteDef[] = [
     rate: { limit: 80, windowSec: 3600 },
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ action: z.enum(["vocabulary", "note", "question", "quiz"]), items: z.array(z.record(z.string(), z.unknown())).min(1).max(100) }));
+      const body = await ctx.json(z.object({ action: z.enum(["vocabulary", "note", "sentence", "question", "quiz"]), items: z.array(z.record(z.string(), z.unknown())).min(1).max(100) }));
       const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
       if (doc.userId !== user.userId) throw forbidden();
@@ -629,6 +630,12 @@ export const contentRoutes: RouteDef[] = [
           const bodyText = String(item.organizedNotes ?? item.summary ?? item.rawText ?? JSON.stringify(item)).slice(0, 30000);
           await db.insert(notes).values({ userId: user.userId, title, subject: String(item.subject ?? doc.subject).slice(0, 20), body: bodyText, source: "camera_analysis" });
           saved += 1;
+        } else if (body.action === "sentence") {
+          const en = String(item.en ?? item.rawText ?? "").trim().slice(0, 3000);
+          const zh = String(item.zh ?? item.translation ?? "").trim().slice(0, 3000);
+          if (!en) continue;
+          const inserted = await db.insert(sentences).values({ en, zh, level: String(item.level ?? "A2").slice(0, 20), keywords: Array.isArray(item.keywords) ? item.keywords.map(String).slice(0, 20) : [] }).onConflictDoNothing().returning({ id: sentences.id });
+          if (inserted.length) saved += 1; else duplicates += 1;
         } else {
           const stem = String(item.rawText ?? item.prompt ?? "").trim().slice(0, 10000);
           if (!stem) continue;
@@ -664,6 +671,8 @@ export const contentRoutes: RouteDef[] = [
         }),
       );
       const action = body.action;
+      let vocabularySaved = 0;
+      let vocabularyDuplicates = 0;
 
       const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
@@ -712,7 +721,7 @@ export const contentRoutes: RouteDef[] = [
         for (const item of (data.vocabulary as Array<Record<string, unknown>>).slice(0, 100)) {
           const word = String(item.word ?? "").trim().slice(0, 200);
           if (!word) continue;
-          await db.insert(userVocabularies).values({
+          const inserted = await db.insert(userVocabularies).values({
             userId: user.userId,
             word,
             normalizedWord: word.toLocaleLowerCase("en-US"),
@@ -724,15 +733,47 @@ export const contentRoutes: RouteDef[] = [
             analysis: item,
             sourceDocumentId: doc.id,
             sourceObjectId: null,
-          }).onConflictDoNothing();
+          }).onConflictDoNothing().returning({ id: userVocabularies.id });
+          if (inserted.length) vocabularySaved += 1; else vocabularyDuplicates += 1;
         }
       }
       await db.update(ocrDocuments).set({ aiResult: { ...(doc.aiResult ?? {}), [action]: data }, updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
-      return { action, result: data };
+      return { action, result: data, saved: vocabularySaved, duplicates: vocabularyDuplicates };
     },
   }),
 
   /* ---------------------------------------------------- my vocabulary */
+  route({
+    method: "POST",
+    path: "/my-vocabulary",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        word: z.string().min(1).max(200),
+        meaning: z.string().max(1000).default(""),
+        partOfSpeech: z.string().max(80).default(""),
+        phonetic: z.string().max(160).default(""),
+        example: z.string().max(1000).default(""),
+        exampleZh: z.string().max(1000).default(""),
+        analysis: z.record(z.string(), z.unknown()).optional(),
+      }));
+      const word = body.word.trim();
+      const inserted = await db.insert(userVocabularies).values({
+        userId: user.userId,
+        word,
+        normalizedWord: word.toLocaleLowerCase("en-US"),
+        meaning: body.meaning,
+        partOfSpeech: body.partOfSpeech,
+        phonetic: body.phonetic,
+        example: body.example,
+        exampleZh: body.exampleZh,
+        analysis: body.analysis ?? {},
+      }).onConflictDoNothing().returning();
+      if (!inserted[0]) throw fail("SYS_CONFLICT", { message: `「${word}」已經在我的單字中` });
+      return { item: inserted[0] };
+    },
+  }),
   route({
     method: "GET",
     path: "/my-vocabulary",
