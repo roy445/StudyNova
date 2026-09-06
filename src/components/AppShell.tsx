@@ -21,6 +21,7 @@ const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/study", label: "學習", icon: "study" },
   { href: "/ai", label: "AI", icon: "nova" },
   { href: "/essay", label: "作文批改", icon: "pen" },
+  { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/challenge", label: "挑戰", icon: "challenge" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
@@ -50,7 +51,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/essay", label: "英文作文批改", icon: "pen" },
-  { href: "/compress", label: "智慧壓縮", icon: "study" },
+  { href: "/compress", label: "智慧壓縮", icon: "archive" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
   { href: "/challenge", label: "好友・活動", icon: "challenge" },
@@ -374,17 +375,18 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
       {/* Mobile bottom nav */}
       <nav className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
-        <ul className="mx-auto flex max-w-lg items-stretch justify-between px-2 py-1.5">
+        <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
           {NAV.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <li key={item.href} className="flex-1">
                 <Link
                   href={item.href}
-                  className={`focus-ring flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[11px] ${active ? "text-[#37d3ff]" : "text-muted"}`}
+                  aria-label={item.label}
+                  className={`focus-ring flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"}`}
                 >
-                  <span className="text-lg leading-none">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" />
+                  <span className="max-w-full truncate">{item.label}</span>
                 </Link>
               </li>
             );

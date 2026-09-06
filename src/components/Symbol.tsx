@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type SymbolName = "home" | "study" | "nova" | "challenge" | "profile" | "grades" | "weekly" | "report" | "admin" | "search" | "bell" | "settings" | "pen" | "camera" | "question" | "book" | "shop" | "badge" | "audio" | "math" | "science" | "social" | "spark";
+export type SymbolName = "home" | "study" | "nova" | "challenge" | "profile" | "grades" | "weekly" | "report" | "admin" | "search" | "bell" | "settings" | "pen" | "camera" | "question" | "book" | "shop" | "badge" | "audio" | "math" | "science" | "social" | "spark" | "archive";
 
 type Props = SVGProps<SVGSVGElement> & { name: SymbolName; size?: number; active?: boolean };
 
@@ -28,6 +28,7 @@ const paths: Record<SymbolName, string> = {
   science: "M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3M7 16h10",
   social: "M4 5h16v14H4zM4 9h16M8 5v14M16 5v14",
   spark: "M12 3l1.2 6.8L20 12l-6.8 1.2L12 20l-1.2-6.8L4 12l6.8-2.2L12 3Z",
+  archive: "M4 7h16v13H4zM3 4h18v3H3zM9 11h6",
 };
 
 export function SymbolIcon({ name, size = 20, active, className, ...props }: Props) {
