@@ -1,7 +1,7 @@
 ALTER TABLE "questions" ADD COLUMN IF NOT EXISTS "target_bank" text NOT NULL DEFAULT 'general';
 CREATE TABLE IF NOT EXISTS "question_import_jobs" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "admin_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "admin_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "status" text NOT NULL DEFAULT 'created',
   "total_files" integer NOT NULL DEFAULT 0,
   "processed_files" integer NOT NULL DEFAULT 0,
