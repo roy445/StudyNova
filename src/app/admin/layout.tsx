@@ -2,15 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/auth";
 import { LogoMark } from "@/components/brand";
+import { SymbolIcon, type SymbolName } from "@/components/Symbol";
 
 export const dynamic = "force-dynamic";
 
-const NAV = [
-  { href: "/admin", label: "總覽・使用者", icon: "◒" },
-  { href: "/admin/weekly", label: "每週小考", icon: "▤" },
-  { href: "/admin/ops", label: "AI・會員・內容", icon: "✦" },
-  { href: "/admin/support", label: "問題回報", icon: "◇" },
-  { href: "/admin/system", label: "系統・測試・匯出", icon: "▣" },
+const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
+  { href: "/admin", label: "總覽・使用者", icon: "home" },
+  { href: "/admin/weekly", label: "每週小考", icon: "weekly" },
+  { href: "/admin/ops", label: "AI・會員・內容", icon: "nova" },
+  { href: "/admin/support", label: "問題回報", icon: "challenge" },
+  { href: "/admin/system", label: "系統・測試・匯出", icon: "admin" },
+  { href: "/admin/performance", label: "系統效能", icon: "grades" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <nav className="no-scrollbar -mx-1 flex flex-1 gap-1 overflow-x-auto px-1">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} className="focus-ring shrink-0 rounded-xl border border-[var(--line)] px-3 py-1.5 text-xs hover:bg-white/5">
-                {n.icon} {n.label}
+                <SymbolIcon name={n.icon} size={17} /> <span>{n.label}</span>
               </Link>
             ))}
           </nav>

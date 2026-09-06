@@ -81,7 +81,6 @@ export function DonutChart({ data, size = 150 }: { data: Array<{ label: string; 
   const total = data.reduce((a, b) => a + b.value, 0);
   const palette = ["#7c5cff", "#37d3ff", "#ffc857", "#4ade80", "#fb7185", "#a78bfa", "#22d3ee"];
   if (!total) return <p className="py-6 text-center text-xs text-muted">尚無資料</p>;
-  let offset = 0;
   const r = 38;
   const c = 2 * Math.PI * r;
   return (
@@ -90,7 +89,8 @@ export function DonutChart({ data, size = 150 }: { data: Array<{ label: string; 
         {data.map((d, i) => {
           const frac = d.value / total;
           const dash = frac * c;
-          const el = (
+          const offset = data.slice(0, i).reduce((sum, item) => sum + (item.value / total) * c, 0);
+          return (
             <circle
               key={d.label}
               cx="50"
@@ -103,8 +103,6 @@ export function DonutChart({ data, size = 150 }: { data: Array<{ label: string; 
               strokeDashoffset={-offset}
             />
           );
-          offset += dash;
-          return el;
         })}
       </svg>
       <ul className="flex-1 space-y-1 text-xs">

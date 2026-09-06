@@ -736,6 +736,40 @@ export const routes: RouteDef[] = [
     },
   }),
   route({
+    method: "PATCH",
+    path: "/admin/question-imports/:id/items",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        index: z.number().int().min(0).max(2000).optional(),
+        indexes: z.array(z.number().int().min(0).max(2000)).max(2000).optional(),
+        patch: z.record(z.string(), z.unknown()).optional(),
+        action: z.enum(["include", "exclude", "duplicate", "review"]).optional(),
+        field: z.enum(["subject", "level", "difficulty", "type", "topic"]).optional(),
+        value: z.string().max(200).optional(),
+      }));
+      const job = (await db.select().from(questionImportJobs).where(and(eq(questionImportJobs.id, ctx.params.id), eq(questionImportJobs.adminId, admin.userId))).limit(1))[0];
+      if (!job) throw notFound("找不到匯入工作");
+      if (!["uploading", "analyzing", "ready"].includes(job.status)) throw badRequest("這個匯入工作已不能編輯");
+      const indexes = body.indexes ?? (body.index === undefined ? [] : [body.index]);
+      if (!indexes.length) throw badRequest("請選擇至少一題");
+      const next = job.preview.map((item, index) => {
+        if (!indexes.includes(index)) return item;
+        const patch = body.patch ?? {};
+        const updated = { ...item, ...patch } as Record<string, unknown>;
+        if (body.field && body.value !== undefined) updated[body.field] = body.value;
+        if (body.action === "exclude") updated.importAction = "exclude";
+        if (body.action === "include") updated.importAction = "include";
+        if (body.action === "duplicate") updated.status = "DUPLICATE";
+        if (body.action === "review") updated.status = "NEEDS_REVIEW";
+        return updated;
+      });
+      const rows = await db.update(questionImportJobs).set({ preview: next, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id)).returning();
+      return { job: rows[0] };
+    },
+  }),
+  route({
     method: "POST",
     path: "/admin/question-imports/:id/confirm",
     auth: "admin",
@@ -746,10 +780,12 @@ export const routes: RouteDef[] = [
       if (job.status !== "ready") throw badRequest("題目尚未分析完成，不能確認匯入");
       let imported = 0;
       for (const item of job.preview) {
-        const subject = String(item.subject || "英文");
+        if (item.importAction === "exclude" || item.status === "DUPLICATE") continue;
+        const subject = String(item.subject || "其他");
         const stem = String(item.stem || "");
+        if (!stem) continue;
         const answer = Array.isArray(item.answer) ? item.answer.map(String) : [];
-        const rows = await db.insert(questions).values({ ownerId: null, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), fingerprint: fingerprint(subject, stem, answer.join("|")) }).onConflictDoNothing().returning({ id: questions.id });
+        const rows = await db.insert(questions).values({ ownerId: null, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), metadata: item.metadata && typeof item.metadata === "object" ? item.metadata as Record<string, unknown> : {}, fingerprint: fingerprint(subject, stem, answer.join("|")) }).onConflictDoNothing().returning({ id: questions.id });
         if (rows[0]) imported += 1;
       }
       await db.update(questionImportJobs).set({ status: "confirmed", acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));

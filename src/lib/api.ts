@@ -29,6 +29,7 @@ export class ApiRequestError extends Error {
 
 const GET_CACHE_TTL_MS = 10_000;
 const GET_CACHE = new Map<string, { expiresAt: number; value: unknown }>();
+const GET_INFLIGHT = new Map<string, Promise<unknown>>();
 
 async function parse<T>(res: Response): Promise<T> {
   const contentType = res.headers.get("content-type") ?? "";
@@ -57,10 +58,20 @@ export async function apiGet<T>(path: string): Promise<T> {
   const cached = GET_CACHE.get(path);
   if (cached && cached.expiresAt > Date.now()) return cached.value as T;
   if (cached) GET_CACHE.delete(path);
-  const res = await fetch(`/api/v1${path}`, { credentials: "same-origin", cache: "no-store" });
-  const value = await parse<T>(res);
-  GET_CACHE.set(path, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
-  return value;
+  const inflight = GET_INFLIGHT.get(path);
+  if (inflight) return inflight as Promise<T>;
+  const request = (async () => {
+    const res = await fetch(`/api/v1${path}`, { credentials: "same-origin", cache: "no-store" });
+    const value = await parse<T>(res);
+    GET_CACHE.set(path, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
+    return value;
+  })();
+  GET_INFLIGHT.set(path, request);
+  try {
+    return await request;
+  } finally {
+    if (GET_INFLIGHT.get(path) === request) GET_INFLIGHT.delete(path);
+  }
 }
 
 export async function apiSend<T>(path: string, method: "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown): Promise<T> {

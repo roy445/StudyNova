@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
+import { SymbolIcon, type SymbolName } from "./Symbol";
 import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
 import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
 
@@ -15,12 +16,13 @@ export type ShellUser = {
   isPro: boolean;
 };
 
-const NAV = [
-  { href: "/dashboard", label: "首頁", icon: "⌂" },
-  { href: "/study", label: "學習", icon: "▦" },
-  { href: "/ai", label: "AI", icon: "✦" },
-  { href: "/challenge", label: "挑戰", icon: "◇" },
-  { href: "/profile", label: "我的", icon: "◎" },
+const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
+  { href: "/dashboard", label: "首頁", icon: "home" },
+  { href: "/study", label: "學習", icon: "study" },
+  { href: "/ai", label: "AI", icon: "nova" },
+  { href: "/essay", label: "作文批改", icon: "pen" },
+  { href: "/challenge", label: "挑戰", icon: "challenge" },
+  { href: "/profile", label: "我的", icon: "profile" },
 ];
 
 const PAGE_PROMPTS: Record<string, string> = {
@@ -43,15 +45,16 @@ const ENCOURAGEMENTS: Array<{ text: string; state: NoviState }> = [
   { text: "學而不思則罔，思而不學則殆。今天也留一點時間動手練習吧。", state: "remind" },
 ];
 
-const SIDE_NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: "⌂" },
-  { href: "/study", label: "學習中心", icon: "▦" },
-  { href: "/ai", label: "Novi AI", icon: "✦" },
-  { href: "/grades", label: "成績分析", icon: "⌁" },
-  { href: "/weekly", label: "每週小考", icon: "▤" },
-  { href: "/challenge", label: "好友・活動", icon: "◇" },
-  { href: "/report", label: "學習報告", icon: "◒" },
-  { href: "/profile", label: "我的 Nova", icon: "◎" },
+const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
+  { href: "/dashboard", label: "Dashboard", icon: "home" },
+  { href: "/study", label: "學習中心", icon: "study" },
+  { href: "/ai", label: "Novi AI", icon: "nova" },
+  { href: "/essay", label: "英文作文批改", icon: "pen" },
+  { href: "/grades", label: "成績分析", icon: "grades" },
+  { href: "/weekly", label: "每週小考", icon: "weekly" },
+  { href: "/challenge", label: "好友・活動", icon: "challenge" },
+  { href: "/report", label: "學習報告", icon: "report" },
+  { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
 
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
@@ -127,6 +130,28 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       clearTimeout(timer);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
+    const send = (name: "FCP" | "LCP" | "CLS" | "TBT" | "TTI", value: number) => { void apiPost("/performance/vitals", { name, value, route: pathname, navigationType: performance.getEntriesByType("navigation")[0]?.entryType ?? "navigation" }).catch(() => {}); };
+    const observers: PerformanceObserver[] = [];
+    try {
+      const paint = new PerformanceObserver((list) => { const entry = list.getEntries().find((item) => item.name === "first-contentful-paint"); if (entry) send("FCP", entry.startTime); });
+      paint.observe({ type: "paint", buffered: true }); observers.push(paint);
+    } catch {}
+    try {
+      const lcp = new PerformanceObserver((list) => { const entry = list.getEntries().at(-1); if (entry) send("LCP", entry.startTime); });
+      lcp.observe({ type: "largest-contentful-paint", buffered: true }); observers.push(lcp);
+    } catch {}
+    try {
+      let cls = 0;
+      const layout = new PerformanceObserver((list) => { for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) if (!entry.hadRecentInput) cls += entry.value ?? 0; send("CLS", cls); });
+      layout.observe({ type: "layout-shift", buffered: true }); observers.push(layout);
+    } catch {}
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.domInteractive) send("TTI", nav.domInteractive);
+    return () => observers.forEach((observer) => observer.disconnect());
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -225,14 +250,14 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                   active ? "bg-gradient-to-r from-[#7c5cff]/30 to-[#37d3ff]/10 text-[var(--text)] shadow-inner" : "text-muted hover:bg-white/5 hover:text-[var(--text)]"
                 }`}
               >
-                <span>{item.icon}</span>
+                <SymbolIcon name={item.icon} size={19} active={active} />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
           {(user.role === "admin" || user.role === "owner") && (
             <Link href="/admin" className="focus-ring mt-2 flex items-center gap-3 rounded-xl border border-[#ffc857]/30 px-3 py-2.5 text-sm text-[#ffd98a] hover:bg-[#ffc857]/10">
-              <span>▣</span> 管理後台
+              <SymbolIcon name="admin" size={19} /> <span>管理後台</span>
             </Link>
           )}
         </nav>
@@ -259,13 +284,13 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
             </Link>
             <div className="flex-1" />
             <button onClick={() => setSearchOpen(true)} aria-label="搜尋" className="focus-ring rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
-              ⌕
+              <SymbolIcon name="search" size={18} />
             </button>
             <Link href="/profile?tab=nova" className="focus-ring hidden items-center gap-1 rounded-xl border border-[#ffc857]/30 px-2.5 py-2 text-xs text-[#ffd98a] sm:flex">
-              ✦ {nova}
+              <SymbolIcon name="nova" size={15} /> {nova}
             </Link>
             <button onClick={() => setNotifOpen(true)} aria-label="通知" className="focus-ring relative rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
-              ◌
+              <SymbolIcon name="bell" size={18} />
               {unread > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
             </button>
             <div className="relative">

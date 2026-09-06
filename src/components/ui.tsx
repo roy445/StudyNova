@@ -293,7 +293,7 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
   );
 }
 
-export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; label: string; icon?: string }>; active: string; onChange: (key: string) => void }) {
+export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; label: string; icon?: ReactNode }>; active: string; onChange: (key: string) => void }) {
   return (
     <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
       {tabs.map((t) => (

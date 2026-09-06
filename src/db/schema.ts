@@ -287,6 +287,7 @@ export const questions = pgTable(
     options: jsonb("options").$type<string[]>().notNull().default([]),
     answer: jsonb("answer").$type<string[]>().notNull().default([]),
     explanation: text("explanation").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     fingerprint: text("fingerprint").notNull(),
     createdAt: created(),
   },
@@ -315,7 +316,26 @@ export const questionImportJobs = pgTable(
     createdAt: created(),
     updatedAt: updated(),
   },
-  (t) => [index("question_import_jobs_admin_idx").on(t.adminId, t.createdAt)],
+    (t) => [index("question_import_jobs_admin_idx").on(t.adminId, t.createdAt)],
+);
+
+export const essayGradingJobs = pgTable(
+  "essay_grading_jobs",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    objectId: uuid("object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    status: text("status").notNull().default("created"), // created | processing | completed | failed | deleted
+    originalText: text("original_text").notNull().default(""),
+    ocrText: text("ocr_text").notNull().default(""),
+    result: jsonb("result").$type<Record<string, unknown> | null>(),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("essay_grading_idem_uq").on(t.idempotencyKey), index("essay_grading_user_idx").on(t.userId, t.createdAt)],
 );
 
 export const quizzes = pgTable(

@@ -72,7 +72,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         toast.push("info", "今天的單字已完成，你仍可繼續回看與重練這 10 個單字。");
       }
     },
-    [current, index, mode, reload, startedAt, stats, toast, words.length],
+    [current, index, mode, startedAt, stats, toast, words.length],
   );
 
   if (loading) return <Card title="▤ 每日單字"><Skeleton lines={4} /></Card>;

@@ -3,10 +3,32 @@
 import { useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
+import { SymbolIcon } from "@/components/Symbol";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 const DEFAULT_ACTIVITY_START = new Date().toISOString().slice(0, 16);
 const DEFAULT_ACTIVITY_END = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16);
+async function prepareQuestionFile(file: File) {
+  if (!file.type.startsWith("image/") || file.size <= 3 * 1024 * 1024 || typeof createImageBitmap === "undefined") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 2600 / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1) { bitmap.close(); return file; }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.92));
+    return blob ? new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: "image/webp", lastModified: file.lastModified }) : file;
+  } catch { return file; }
+}
+
+async function uploadQuestionFiles(files: File[], uploadOne: (file: File) => Promise<void>, concurrency = 3) {
+  let cursor = 0;
+  const worker = async () => { while (cursor < files.length) { const index = cursor; cursor += 1; await uploadOne(await prepareQuestionFile(files[index])); } };
+  await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, () => worker()));
+}
+
 const ANNOUNCEMENT_TEMPLATES = [
   { key: "weekly", label: "每週小考開放", title: "每週小考已開放！", body: "本週單字、句子與多元題型測驗已上線，現在就開始挑戰。", link: "/weekly", marquee: true },
   { key: "knowledge", label: "每日知識更新", title: "今日課外知識已更新", body: "前往每日知識，閱讀跨學科內容並完成素養小測驗。", link: "/dashboard#daily-knowledge", marquee: false },
@@ -50,6 +72,7 @@ export default function AdminOpsPage() {
   const bank = useApi<{ questions: Array<{ id: string; subject: string; topic: string; bankCategory: string; sourceLabel: string; origin: string; type: string; stem: string; difficulty: string; appearedCount: number }>; total: number }>("/admin/questions");
   const usage = useApi<{ usage: Array<{ feature: string; total: number; users: number }> }>("/admin/usage");
   const shop = useApi<{ items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; enabled: boolean }> }>("/admin/shop/items");
+  const essayService = useApi<{ service: { status: "ENABLED" | "PAUSED" | "DISABLED"; proOnly: boolean; novaCost: number; dailyLimit: number; monthlyLimit: number; maintenanceNotice: string; showScores: boolean } }>("/admin/essay-service");
 
   const [annOpen, setAnnOpen] = useState(false);
   const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false });
@@ -76,6 +99,15 @@ export default function AdminOpsPage() {
   const [bankUploadBusy, setBankUploadBusy] = useState(false);
   const [bankUploadMeta, setBankUploadMeta] = useState({ category: "高中英文", source: "線上上傳題目檔案", target: "general" });
   const [importJob, setImportJob] = useState<{ id: string; status: string; progress: number; processedFiles: number; totalFiles: number; totalQuestions: number; preview: Array<Record<string, unknown>>; errorMessage: string } | null>(null);
+  async function patchImportItem(indexes: number[], payload: Record<string, unknown>) {
+    if (!importJob) return;
+    try {
+      const result = await apiPatch<{ job: typeof importJob }>(`/admin/question-imports/${importJob.id}/items`, { indexes, ...payload });
+      setImportJob({ ...result.job, id: importJob.id, progress: importJob.progress });
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
 
   async function watchImport(jobId: string) {
     for (let attempt = 0; attempt < 90; attempt += 1) {
@@ -91,13 +123,14 @@ export default function AdminOpsPage() {
     <div className="space-y-4">
       <Tabs
         tabs={[
-          { key: "ai", label: "AI Health", icon: "✦" },
-          { key: "features", label: "功能權限", icon: "⌁" },
-          { key: "shop", label: "商城管理", icon: "▧" },
-          { key: "ann", label: "公告", icon: "▤" },
-          { key: "act", label: "活動", icon: "◇" },
-          { key: "coupon", label: "優惠碼", icon: "▧" },
-          { key: "bank", label: "題庫匯入", icon: "▦" },
+          { key: "ai", label: "AI Health", icon: <SymbolIcon name="nova" size={15} /> },
+          { key: "features", label: "功能權限", icon: <SymbolIcon name="settings" size={15} /> },
+          { key: "essay", label: "作文服務", icon: <SymbolIcon name="pen" size={15} /> },
+          { key: "shop", label: "商城管理", icon: <SymbolIcon name="shop" size={15} /> },
+          { key: "ann", label: "公告", icon: <SymbolIcon name="report" size={15} /> },
+          { key: "act", label: "活動", icon: <SymbolIcon name="challenge" size={15} /> },
+          { key: "coupon", label: "優惠碼", icon: <SymbolIcon name="badge" size={15} /> },
+          { key: "bank", label: "題庫匯入", icon: <SymbolIcon name="question" size={15} /> },
         ]}
         active={tab}
         onChange={setTab}
@@ -321,6 +354,14 @@ export default function AdminOpsPage() {
         </Card>
       )}
 
+      {tab === "essay" && (
+        <Card title="英文作文批改服務設定" subtitle="服務狀態、PRO 限制、Nova 消耗與配額由 Backend 驗證；前端只負責顯示與提交設定。">
+          {essayService.loading && <Skeleton lines={4} />}
+          {essayService.error && <ErrorState message={essayService.error} onRetry={essayService.reload} />}
+          {essayService.data?.service && <EssayServiceEditor value={essayService.data.service} onSaved={essayService.reload} toast={toast} />}
+        </Card>
+      )}
+
       {tab === "shop" && (
         <Card title="▧ Novi 商城管理" subtitle="調整 Nova 價格與上架狀態；下架或重新上架時會自動建立公告並通知使用者。">
           {shop.loading && <Skeleton lines={5} />}
@@ -533,11 +574,11 @@ export default function AdminOpsPage() {
       {tab === "bank" && (
         <Card title={`▦ 題庫（目前 ${bank.data?.total ?? 0} 題）`} subtitle="可直接上傳 PDF／圖片，系統會在線上儲存、解析、去重並匯入題庫">
           <div className="mb-4 rounded-2xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">▤ 線上匯入題目檔案</p><p className="mt-1 text-xs leading-5 text-muted">PDF、PNG、JPG、WEBP，單檔最多 50MB。上傳後會由 AI 讀取清楚可辨識的題目，模糊內容不會自行猜測。</p></div><Badge tone="cyan">Vercel Blob ・ AI OCR</Badge></div>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">▤ 線上匯入題目檔案</p><p className="mt-1 text-xs leading-5 text-muted">PDF、PNG、JPG、WEBP、MP3、WAV、M4A，單檔最多 50MB。AI 會掃描整份文件與最後幾頁；無法確認的題目保留並標記 NEEDS_REVIEW。</p></div><Badge tone="cyan">Vercel Blob ・ AI OCR</Badge></div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3"><Field label="題庫分類"><Input value={bankUploadMeta.category} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, category: e.target.value })} placeholder="例如：高中英文" /></Field><Field label="來源名稱"><Input value={bankUploadMeta.source} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, source: e.target.value })} placeholder="例如：高一週考 PDF" /></Field><Field label="目標題庫"><Select value={bankUploadMeta.target} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, target: e.target.value })}><option value="general">一般題庫</option><option value="activity">活動題庫</option><option value="exclusive">專屬題庫</option><option value="weekly">每週小考題庫</option></Select></Field></div>
-            <label className={`mt-3 flex min-h-24 cursor-pointer items-center justify-center rounded-xl border border-dashed transition ${bankUploadBusy ? "cursor-wait border-white/10 opacity-60" : "border-[#37d3ff]/50 hover:bg-white/5"}`}><input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple disabled={bankUploadBusy} className="sr-only" onChange={async (e) => { const files = Array.from(e.target.files ?? []); if (!files.length) return; setBankUploadBusy(true); try { const created = await apiPost<{ jobId: string }>("/admin/question-imports", { totalFiles: files.length, bankCategory: bankUploadMeta.category, sourceLabel: bankUploadMeta.source, targetBank: bankUploadMeta.target }); setImportJob({ id: created.jobId, status: "uploading", progress: 0, processedFiles: 0, totalFiles: files.length, totalQuestions: 0, preview: [], errorMessage: "" }); for (const file of files) { await upload(file.name, file, { access: "private", handleUploadUrl: "/api/blob/question-bank-upload", clientPayload: JSON.stringify({ jobId: created.jobId, bankCategory: bankUploadMeta.category, sourceLabel: bankUploadMeta.source }), multipart: file.size > 5 * 1024 * 1024 }); } setBankUploadBusy(false); void watchImport(created.jobId); } catch (err) { setBankUploadBusy(false); toast.push("error", errorMessage(err)); } finally { e.target.value = ""; } }} /><span className="text-center text-sm">{bankUploadBusy ? "正在上傳檔案…" : "點擊選擇 PDF 或圖片（可多選）"}<span className="mt-1 block text-xs text-muted">上傳後會顯示逐檔分析進度，完成後先預覽再確認匯入</span></span></label>
+            <label className={`mt-3 flex min-h-24 cursor-pointer items-center justify-center rounded-xl border border-dashed transition ${bankUploadBusy ? "cursor-wait border-white/10 opacity-60" : "border-[#37d3ff]/50 hover:bg-white/5"}`}><input type="file" accept="application/pdf,image/png,image/jpeg,image/webp,audio/mpeg,audio/mp3,audio/wav,audio/mp4,audio/ogg,audio/webm" multiple disabled={bankUploadBusy} className="sr-only" onChange={async (e) => { const files = Array.from(e.target.files ?? []); if (!files.length) return; setBankUploadBusy(true); try { const created = await apiPost<{ jobId: string }>("/admin/question-imports", { totalFiles: files.length, bankCategory: bankUploadMeta.category, sourceLabel: bankUploadMeta.source, targetBank: bankUploadMeta.target }); setImportJob({ id: created.jobId, status: "uploading", progress: 0, processedFiles: 0, totalFiles: files.length, totalQuestions: 0, preview: [], errorMessage: "" }); await uploadQuestionFiles(files, async (file) => { await upload(file.name, file, { access: "private", handleUploadUrl: "/api/blob/question-bank-upload", clientPayload: JSON.stringify({ jobId: created.jobId, bankCategory: bankUploadMeta.category, sourceLabel: bankUploadMeta.source }), multipart: file.size > 5 * 1024 * 1024 }); }); setBankUploadBusy(false); void watchImport(created.jobId); } catch (err) { setBankUploadBusy(false); toast.push("error", errorMessage(err)); } finally { e.target.value = ""; } }} /><span className="text-center text-sm">{bankUploadBusy ? "正在上傳檔案…" : "點擊選擇 PDF 或圖片（可多選）"}<span className="mt-1 block text-xs text-muted">上傳後會顯示逐檔分析進度，完成後先預覽再確認匯入</span></span></label>
             {importJob && <div className="mt-3 rounded-xl bg-black/20 p-3"><div className="flex justify-between text-xs"><span>{importJob.status === "ready" ? "分析完成，等待確認" : importJob.status === "confirmed" ? "已確認匯入" : "AI 分析中…"}</span><span>{importJob.processedFiles}/{importJob.totalFiles} 個檔案・{importJob.totalQuestions} 題</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all" style={{ width: `${importJob.progress}%` }} /></div>{importJob.status === "ready" && <div className="mt-3 flex items-center justify-between gap-2"><span className="text-xs text-muted">請先檢查下方題目預覽，確認後才會正式寫入題庫。</span><Button size="sm" onClick={async () => { const result = await apiPost<{ imported: number }>(`/admin/question-imports/${importJob.id}/confirm`, {}); setImportJob({ ...importJob, status: "confirmed" }); toast.push("success", `已確認匯入 ${result.imported} 題`); await bank.reload(); }}>確認匯入</Button></div>}{importJob.errorMessage && <p className="mt-2 text-xs text-amber-300">{importJob.errorMessage}</p>}</div>}
-            {importJob?.preview.length ? <div className="mt-3 max-h-72 space-y-2 overflow-y-auto rounded-xl bg-black/20 p-2 text-xs">{importJob.preview.slice(0, 100).map((item, index) => <div key={`${String(item.stem)}-${index}`} className="rounded-lg border border-[var(--line)] p-2"><div className="font-semibold">{index + 1}. {String(item.stem)}</div><div className="mt-1 text-muted">{String(item.subject)}・{String(item.topic || "未分類")}・{String(item.type)}・答案：{Array.isArray(item.answer) ? item.answer.join("／") : String(item.answer)}</div>{Array.isArray(item.options) && item.options.length > 0 && <div className="mt-1 text-muted">選項：{item.options.join("｜")}</div>}{Boolean(item.explanation) && <div className="mt-1 leading-5 text-sky-200/80">解析：{String(item.explanation)}</div>}</div>)}</div> : null}
+            {importJob?.preview.length ? <div className="mt-3 max-h-[34rem] space-y-2 overflow-y-auto rounded-xl bg-black/20 p-2 text-xs">{importJob.preview.slice(0, 100).map((item, index) => { const status = String(item.status || "NEEDS_REVIEW"); const excluded = item.importAction === "exclude"; const confidence = Number(item.confidence || (item.metadata as Record<string, unknown> | undefined)?.confidence || 0); const reasons = Array.isArray(item.reviewReasons) ? item.reviewReasons.map(String) : []; return <div key={`${String(item.stem)}-${index}`} className={`rounded-lg border p-3 ${excluded ? "border-white/10 opacity-50" : status === "READY" ? "border-[#9ff3c9]/30" : "border-amber-300/40"}`}><div className="flex flex-wrap items-start justify-between gap-2"><div className="font-semibold">{index + 1}. {String(item.stem)}</div><Badge tone={status === "READY" ? "cyan" : status === "DUPLICATE" ? "rose" : "gold"}>{excluded ? "EXCLUDED" : status}</Badge></div><div className="mt-1 text-muted">{String(item.subject || "其他")}・{String(item.topic || "未分類")}・{String(item.type || "short")}・信心：{confidence ? `${Math.round(confidence * 100)}%` : "未提供"}</div><div className="mt-1 text-muted">AI答案：{Array.isArray(item.answer) && item.answer.length ? item.answer.join("／") : "答案無法確認"}・來源：{String(item.answerSource || "待人工確認")}{item.sourcePage ? `・第 ${String(item.sourcePage)} 頁` : ""}</div>{Array.isArray(item.options) && item.options.length > 0 && <div className="mt-1 text-muted">選項：{item.options.join("｜")}</div>}{Boolean(item.explanation) && <div className="mt-1 leading-5 text-sky-200/80">解析：{String(item.explanation)}</div>}{reasons.length > 0 && <p className="mt-2 rounded-lg bg-amber-300/10 p-2 text-amber-100">{reasons.join("；")}</p>}<div className="mt-2 flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => { const next = window.prompt("修改題目文字", String(item.stem || "")); if (next !== null) void patchImportItem([index], { patch: { stem: next } }); }}>編輯題目</Button><Button size="sm" variant="ghost" onClick={() => void patchImportItem([index], { action: excluded ? "include" : "exclude" })}>{excluded ? "納入匯入" : "排除本題"}</Button><Button size="sm" variant="ghost" onClick={() => void patchImportItem([index], { action: "review" })}>標記待審核</Button></div></div>; })}</div> : null}
           </div>
           <Textarea
             value={importJson}
@@ -728,6 +769,28 @@ export default function AdminOpsPage() {
           建立活動
         </Button>
       </Modal>
+    </div>
+  );
+}
+
+
+type EssayServiceValue = { status: "ENABLED" | "PAUSED" | "DISABLED"; proOnly: boolean; novaCost: number; dailyLimit: number; monthlyLimit: number; maintenanceNotice: string; showScores: boolean };
+
+function EssayServiceEditor({ value, onSaved, toast }: { value: EssayServiceValue; onSaved: () => Promise<void>; toast: ReturnType<typeof useToast> }) {
+  const [form, setForm] = useState(value);
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="服務狀態"><Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as EssayServiceValue["status"] })}><option value="ENABLED">開放 ENABLED</option><option value="PAUSED">暫停 PAUSED</option><option value="DISABLED">關閉 DISABLED</option></Select></Field>
+        <Field label="Nova 消耗／次"><Input type="number" min={0} value={form.novaCost} onChange={(e) => setForm({ ...form, novaCost: Number(e.target.value) })} /></Field>
+        <Field label="每日上限（-1 無限）"><Input type="number" min={-1} value={form.dailyLimit} onChange={(e) => setForm({ ...form, dailyLimit: Number(e.target.value) })} /></Field>
+        <Field label="每月上限（-1 無限）"><Input type="number" min={-1} value={form.monthlyLimit} onChange={(e) => setForm({ ...form, monthlyLimit: Number(e.target.value) })} /></Field>
+        <label className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><input type="checkbox" checked={form.proOnly} onChange={(e) => setForm({ ...form, proOnly: e.target.checked })} className="accent-[#7c5cff]" /> Nova Pro 專屬</label>
+        <label className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><input type="checkbox" checked={form.showScores} onChange={(e) => setForm({ ...form, showScores: e.target.checked })} className="accent-[#7c5cff]" /> 顯示 AI 分數</label>
+      </div>
+      <Field label="維護公告"><Textarea value={form.maintenanceNotice} onChange={(e) => setForm({ ...form, maintenanceNotice: e.target.value })} placeholder="服務暫停時顯示給學生的說明" /></Field>
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] p-3 text-xs text-muted"><span>設定保存後，Backend 下一次請求立即檢查新狀態，不依賴前端隱藏按鈕。</span><Button disabled={saving} onClick={async () => { setSaving(true); try { await apiPatch("/admin/essay-service", form); await onSaved(); toast.push("success", "英文作文服務設定已更新"); } catch (error) { toast.push("error", errorMessage(error)); } finally { setSaving(false); } }}>{saving ? "保存中…" : "保存設定"}</Button></div>
     </div>
   );
 }

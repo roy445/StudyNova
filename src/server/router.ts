@@ -92,6 +92,8 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/admin-routes"),
     import("./routes/system-routes"),
     import("./routes/support-routes"),
+    import("./routes/essay-routes"),
+    import("./routes/performance-routes"),
   ]);
   compiledRoutes = compile(mods.flatMap((m) => m.routes));
   return compiledRoutes;
@@ -146,9 +148,11 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
       },
     };
 
+    const startedAt = Date.now();
     const result = await def.handler(ctx);
-    if (result instanceof Response) return result;
-    return jsonResponse(result ?? null);
+    const response = result instanceof Response ? result : jsonResponse(result ?? null);
+    void logApiPerformance({ route: def.path, method: def.method, status: response.status, durationMs: Date.now() - startedAt, requestId: response.headers.get("x-request-id") ?? newRequestId() });
+    return response;
   } catch (err) {
     if (err instanceof AppError) {
       if (err.status >= 500) {
@@ -160,6 +164,14 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     const internal = fail("SYS_INTERNAL", { details: { requestId } });
     await logSystemError(`api:${def.method} ${def.path}`, safeErrorMessage(err), { ip, code: internal.code, requestId: internal.requestId });
     return errorResponse(internal);
+  }
+}
+
+async function logApiPerformance(meta: { route: string; method: string; status: number; durationMs: number; requestId: string }) {
+  try {
+    await db.insert(systemLogs).values({ level: "perf", scope: "api", message: `${meta.method} ${meta.route}`, meta: { ...meta, timestamp: new Date().toISOString() } });
+  } catch {
+    /* performance logging must never affect the request */
   }
 }
 

@@ -74,10 +74,7 @@ function SupportInner() {
 
   useEffect(() => {
     const code = form.errorCode.trim().toUpperCase();
-    if (code.length < 6) {
-      setCodeInfo(null);
-      return;
-    }
+    if (code.length < 6) return;
     let alive = true;
     apiGet<{ definition: { message: string; hint: string } | null }>(`/support/error-codes?code=${encodeURIComponent(code)}`)
       .then((r) => alive && setCodeInfo(r.definition))

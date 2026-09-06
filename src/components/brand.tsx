@@ -1,6 +1,7 @@
 "use client";
 
 
+import Image from "next/image";
 
 export type NoviState = "idle" | "thinking" | "happy" | "cheer" | "analyze" | "speak" | "success" | "error" | "remind" | "levelup";
 
@@ -33,12 +34,13 @@ const STATE_FACE: Record<NoviState, string> = {
 /** StudyNova square logo supplied by the product owner. The source art is intentionally kept intact. */
 export function LogoMark({ size = 40, glow = true }: { size?: number; glow?: boolean }) {
   return (
-    <img
+    <Image
       src="/brand/studynova-logo-square.png"
       width={size}
       height={size}
       alt=""
       aria-hidden="true"
+      sizes={`${size}px`}
       className={glow ? "rounded-full shadow-[0_0_24px_rgba(55,211,255,0.22)]" : "rounded-full"}
     />
   );
@@ -46,11 +48,12 @@ export function LogoMark({ size = 40, glow = true }: { size?: number; glow?: boo
 
 export function Wordmark({ size = 22 }: { size?: number }) {
   return (
-    <img
+    <Image
       src="/brand/studynova-logo-horizontal.webp"
       alt="StudyNova"
       width={Math.round(size * 7.4)}
       height={Math.round(size * 4.95)}
+      sizes="(max-width: 640px) 58vw, 220px"
       className="h-auto max-h-11 w-auto max-w-[min(58vw,220px)] object-contain object-left"
     />
   );

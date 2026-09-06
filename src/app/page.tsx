@@ -22,8 +22,8 @@ export default function LandingPage() {
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduced";
     if (reduce) {
-      setPhase(3);
-      return;
+      const timer = setTimeout(() => setPhase(3), 0);
+      return () => clearTimeout(timer);
     }
     const t1 = setTimeout(() => setPhase(1), 380);
     const t2 = setTimeout(() => setPhase(2), 900);
