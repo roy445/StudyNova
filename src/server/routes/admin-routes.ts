@@ -24,6 +24,7 @@ import {
   gradeRecords,
   weeklyExamResults,
   weeklyExamWeeks,
+  answers,
   passwordResetTokens,
   studyRecords,
   platformSettings,
@@ -700,13 +701,28 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const subject = ctx.query.get("subject");
+      const origin = ctx.query.get("origin");
       const rows = await db
-        .select()
+        .select({
+          id: questions.id,
+          origin: questions.origin,
+          subject: questions.subject,
+          topic: questions.topic,
+          level: questions.level,
+          difficulty: questions.difficulty,
+          type: questions.type,
+          stem: questions.stem,
+          options: questions.options,
+          answer: questions.answer,
+          explanation: questions.explanation,
+          createdAt: questions.createdAt,
+          appearedCount: sql<number>`(select count(*) from ${answers} where ${answers.questionId} = ${questions.id})::int`,
+        })
         .from(questions)
-        .where(and(eq(questions.origin, "bank"), subject ? eq(questions.subject, subject) : sql`true`))
+        .where(and(origin ? eq(questions.origin, origin) : sql`true`, subject ? eq(questions.subject, subject) : sql`true`))
         .orderBy(desc(questions.createdAt))
         .limit(100);
-      const [count] = await db.select({ c: sql<number>`count(*)::int` }).from(questions).where(eq(questions.origin, "bank"));
+      const [count] = await db.select({ c: sql<number>`count(*)::int` }).from(questions).where(origin ? eq(questions.origin, origin) : sql`true`);
       return { questions: rows, total: count?.c ?? 0 };
     },
   }),

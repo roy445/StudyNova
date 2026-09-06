@@ -66,7 +66,16 @@ function renderMarkdown(body: string) {
 export async function LegalDocument({ slug }: { slug: "privacy" | "terms" }) {
   await ensureSeeded().catch(() => undefined);
   const rows = await db.select().from(legalDocuments).where(eq(legalDocuments.slug, slug)).limit(1);
-  const doc = rows[0];
+  const doc = rows[0] ?? {
+    slug,
+    title: slug === "privacy" ? "StudyNova 隱私權政策" : "StudyNova 服務條款",
+    version: "1.0",
+    effectiveAt: new Date("2026-01-01"),
+    updatedAt: new Date(),
+    body: slug === "privacy"
+      ? "## 我們如何使用資料\nStudyNova 只會在提供學習功能所需的範圍內處理帳號、學習紀錄、教材與測驗資料。\n\n## 資料控制\n你的個人學習資料預設為私人，除非你主動使用分享或好友功能。你可以從個人設定或支援中心提出查詢、更正與刪除要求。\n\n## 第三方服務\n圖片分析、檔案儲存與 AI 服務只會接收完成對應功能所需的資料，我們不會將資料出售給廣告商。\n\n## 聯絡我們\n如對隱私有疑問，請透過回報問題頁面聯絡 StudyNova。"
+      : "## 使用資格\nStudyNova 提供國中、高中學生使用學習與測驗工具。請提供真實且不冒用他人的帳號資訊。\n\n## 合理使用\n請勿嘗試繞過權限、濫用 AI、上傳違法內容，或干擾其他使用者的學習與活動。\n\n## 內容與帳號\n你保有自己上傳內容的權利；你授權 StudyNova 為提供 OCR、分析、儲存與測驗功能而處理這些內容。\n\n## 服務調整\n我們可能因安全性、維護或功能更新調整服務，重要變更會在平台公告。\n\n## 聯絡我們\n如對服務條款有疑問，請透過回報問題頁面聯絡 StudyNova。",
+  };
 
   if (!doc) {
     return (

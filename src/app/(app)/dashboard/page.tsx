@@ -160,7 +160,10 @@ export default function DashboardPage() {
           <div className="glass-soft min-h-[180px] p-4">
             <p className="text-base font-semibold text-[#37d3ff]">{dailyKnowledge(data.today).title}</p>
             <p className="mt-3 text-sm leading-7 text-muted">{dailyKnowledge(data.today).body}</p>
-            <Link href="/study?tab=words" className="mt-4 inline-flex text-xs text-[#37d3ff] underline">用今日單字練習 →</Link>
+            <div className="mt-4 flex flex-wrap gap-3 text-xs">
+              <Link href={`/knowledge/${data.today}`} className="text-[#37d3ff] underline">看完整解析與素養測驗 →</Link>
+              <a href={dailyKnowledge(data.today).sourceUrl} target="_blank" rel="noreferrer" className="text-muted underline">來源：{dailyKnowledge(data.today).sourceName} ↗</a>
+            </div>
           </div>
         </Card>
       </div>

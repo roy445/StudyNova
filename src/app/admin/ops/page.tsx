@@ -39,7 +39,7 @@ export default function AdminOpsPage() {
   const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string }> }>("/admin/announcements");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
   const coupons = useApi<{ coupons: Array<{ id: string; code: string; kind: string; value: number; maxRedemptions: number; redeemedCount: number; enabled: boolean }> }>("/admin/coupons");
-  const bank = useApi<{ questions: Array<{ id: string; subject: string; stem: string; difficulty: string }>; total: number }>("/admin/questions");
+  const bank = useApi<{ questions: Array<{ id: string; subject: string; topic: string; origin: string; type: string; stem: string; difficulty: string; appearedCount: number }>; total: number }>("/admin/questions");
   const usage = useApi<{ usage: Array<{ feature: string; total: number; users: number }> }>("/admin/usage");
   const shop = useApi<{ items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; enabled: boolean }> }>("/admin/shop/items");
 
@@ -534,8 +534,9 @@ export default function AdminOpsPage() {
             {bank.data?.questions.map((q) => (
               <div key={q.id} className="glass-soft flex items-center justify-between gap-2 px-2 py-1.5">
                 <span className="min-w-0 truncate">
-                  [{q.subject}] {q.stem}
+                  [{q.subject}・{q.topic || "未分類"}・{q.type}] {q.stem}
                 </span>
+                <span className="shrink-0 text-muted">出現 {q.appearedCount} 次</span>
                 <button
                   className="text-rose-300"
                   onClick={async () => {

@@ -31,6 +31,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const [tip, setTip] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
   const [detailWord, setDetailWord] = useState<Word | null>(null);
+  const touchStartX = useRef<number | null>(null);
 
   const words = data?.words ?? [];
   const current = words[index];
@@ -124,7 +125,18 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         ))}
       </ol>
 
-      <div className="glass-soft flex min-h-[190px] flex-col items-center justify-center gap-2 p-5 text-center">
+      <div
+        className="glass-soft flex min-h-[190px] touch-pan-y select-none flex-col items-center justify-center gap-2 p-5 text-center"
+        onTouchStart={(event) => { touchStartX.current = event.changedTouches[0]?.clientX ?? null; }}
+        onTouchEnd={(event) => {
+          const start = touchStartX.current;
+          const end = event.changedTouches[0]?.clientX ?? null;
+          touchStartX.current = null;
+          if (start === null || end === null || Math.abs(end - start) < 55) return;
+          setFlipped(false); setTip(null); setDetailWord(null);
+          setIndex((value) => end < start ? Math.min(value + 1, words.length - 1) : Math.max(value - 1, 0));
+        }}
+      >
         {mode === "zh2en" ? (
           <>
             <p className="text-lg font-semibold">{current.meaning}</p>
