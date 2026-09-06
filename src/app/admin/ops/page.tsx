@@ -8,6 +8,12 @@ import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/li
 
 const DEFAULT_ACTIVITY_START = new Date().toISOString().slice(0, 16);
 const DEFAULT_ACTIVITY_END = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16);
+const FEATURE_GUIDE: Record<string, string> = {
+  essay_grading: "上傳英文作文後進行 AI 批改與評語",
+  smart_compressor: "圖片與 PDF 壓縮，支援批次 ZIP",
+  ai_chat: "Novi AI 對話與學習解題",
+  question_generation: "產生練習題與學習素材",
+};
 async function prepareQuestionFile(file: File) {
   if (!file.type.startsWith("image/") || file.size <= 3 * 1024 * 1024 || typeof createImageBitmap === "undefined") return file;
   try {
@@ -121,20 +127,15 @@ export default function AdminOpsPage() {
 
   return (
     <div className="space-y-4">
-      <Tabs
-        tabs={[
-          { key: "ai", label: "AI Health", icon: <SymbolIcon name="nova" size={15} /> },
-          { key: "features", label: "功能權限", icon: <SymbolIcon name="settings" size={15} /> },
-          { key: "essay", label: "作文服務", icon: <SymbolIcon name="pen" size={15} /> },
-          { key: "shop", label: "商城管理", icon: <SymbolIcon name="shop" size={15} /> },
-          { key: "ann", label: "公告", icon: <SymbolIcon name="report" size={15} /> },
-          { key: "act", label: "活動", icon: <SymbolIcon name="challenge" size={15} /> },
-          { key: "coupon", label: "優惠碼", icon: <SymbolIcon name="badge" size={15} /> },
-          { key: "bank", label: "題庫匯入", icon: <SymbolIcon name="question" size={15} /> },
-        ]}
-        active={tab}
-        onChange={setTab}
-      />
+      <div className="rounded-2xl border border-[#37d3ff]/20 bg-gradient-to-r from-[#37d3ff]/10 via-white/[0.03] to-[#7c5cff]/10 p-4">
+        <p className="text-sm font-semibold">管理中心</p>
+        <p className="mt-1 text-xs leading-5 text-muted">請先依照目的選擇分類，再調整該分類內的設定。涉及使用權限的項目，請到「功能與權限」逐項決定是否需要 Pro、每日額度，以及每次是否支付 Nova。</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#37d3ff]">系統與權限</p><Tabs tabs={[{ key: "ai", label: "AI 服務", icon: <SymbolIcon name="nova" size={15} /> }, { key: "features", label: "功能與權限", icon: <SymbolIcon name="settings" size={15} /> }, { key: "essay", label: "作文服務", icon: <SymbolIcon name="pen" size={15} /> }]} active={tab} onChange={setTab} /></div>
+        <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#7c5cff]">內容與營運</p><Tabs tabs={[{ key: "ann", label: "公告", icon: <SymbolIcon name="report" size={15} /> }, { key: "act", label: "活動", icon: <SymbolIcon name="challenge" size={15} /> }, { key: "bank", label: "題庫匯入", icon: <SymbolIcon name="question" size={15} /> }]} active={tab} onChange={setTab} /></div>
+        <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#ffc857]">商業化與獎勵</p><Tabs tabs={[{ key: "shop", label: "商城管理", icon: <SymbolIcon name="shop" size={15} /> }, { key: "coupon", label: "優惠碼", icon: <SymbolIcon name="badge" size={15} /> }]} active={tab} onChange={setTab} /></div>
+      </div>
 
       {tab === "ai" && (
         <>
@@ -268,7 +269,12 @@ export default function AdminOpsPage() {
       )}
 
       {tab === "features" && (
-        <Card title="⌁ 功能權限與額度" subtitle="所有免費／Nova Pro 額度都可在此調整，立即生效">
+        <Card title="⌁ 功能與權限" subtitle="逐項決定功能是否開放、是否需要 Pro，以及是否收取 Nova；修改後立即生效">
+          <div className="mb-4 grid gap-2 text-xs leading-5 text-muted sm:grid-cols-3">
+            <div className="rounded-xl border border-[var(--line)] bg-white/[0.03] p-3"><strong className="text-[var(--text)]">啟用</strong><br />關閉後所有使用者都不能使用此功能，適合暫停維護中的服務。</div>
+            <div className="rounded-xl border border-[#ffc857]/20 bg-[#ffc857]/5 p-3"><strong className="text-[#ffd98a]">Pro 專屬</strong><br />開啟後免費會員會被擋下，只有有效 Pro 會員可以使用。</div>
+            <div className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3"><strong className="text-[#7dd3fc]">Nova 消耗</strong><br />填入 0 代表免費；填入正整數代表每次成功使用會支付該數量 Nova。</div>
+          </div>
           {features.loading && <Skeleton lines={5} />}
           <div className="overflow-x-auto scroll-thin">
             <table className="w-full min-w-[760px] text-xs">
@@ -277,15 +283,15 @@ export default function AdminOpsPage() {
                   <th className="pb-2">功能</th>
                   <th className="pb-2">啟用</th>
                   <th className="pb-2">Pro 專屬</th>
-                  <th className="pb-2 text-right">免費／日</th>
-                  <th className="pb-2 text-right">Pro／日</th>
-                  <th className="pb-2 text-right">Nova 消耗</th>
+                  <th className="pb-2 text-right">免費／日<br /><span className="font-normal">-1 為不限</span></th>
+                  <th className="pb-2 text-right">Pro／日<br /><span className="font-normal">-1 為不限</span></th>
+                  <th className="pb-2 text-right">每次 Nova</th>
                 </tr>
               </thead>
               <tbody>
                 {features.data?.features.map((f) => (
                   <tr key={f.id} className="border-t border-[var(--line)]">
-                    <td className="py-2">{f.label}</td>
+                    <td className="py-2"><p className="font-medium">{f.label}</p><p className="mt-0.5 text-[10px] text-muted">{FEATURE_GUIDE[f.feature] ?? "可依會員等級與 Nova 成本彈性設定"}</p></td>
                     <td className="py-2">
                       <input
                         type="checkbox"
@@ -311,6 +317,7 @@ export default function AdminOpsPage() {
                     <td className="py-2 text-right">
                       <input
                         type="number"
+                        min={-1}
                         defaultValue={f.freeDailyLimit}
                         onBlur={async (e) => {
                           await apiPatch(`/admin/features/${f.id}`, { freeDailyLimit: Number(e.target.value) });
@@ -322,6 +329,7 @@ export default function AdminOpsPage() {
                     <td className="py-2 text-right">
                       <input
                         type="number"
+                        min={-1}
                         defaultValue={f.proDailyLimit}
                         onBlur={async (e) => {
                           await apiPatch(`/admin/features/${f.id}`, { proDailyLimit: Number(e.target.value) });
@@ -333,6 +341,7 @@ export default function AdminOpsPage() {
                     <td className="py-2 text-right">
                       <input
                         type="number"
+                        min={0}
                         defaultValue={f.novaCost}
                         onBlur={async (e) => {
                           await apiPatch(`/admin/features/${f.id}`, { novaCost: Number(e.target.value) });
