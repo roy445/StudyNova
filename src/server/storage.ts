@@ -14,6 +14,7 @@ export const ALLOWED_MIME: Record<string, string[]> = {
   pdf: ["application/pdf"],
   text: ["text/plain", "text/markdown", "application/json"],
   audio: ["audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav", "audio/mp3"],
+  archive: ["application/zip"],
 };
 
 export function s3Configured(): boolean {
@@ -30,7 +31,7 @@ function extensionOf(filename: string) {
 }
 
 const EXT_WHITELIST = new Set([
-  "png", "jpg", "jpeg", "webp", "avif", "heic", "pdf", "txt", "md", "json", "webm", "ogg", "mp3", "m4a", "wav",
+  "png", "jpg", "jpeg", "webp", "avif", "heic", "pdf", "txt", "md", "json", "webm", "ogg", "mp3", "m4a", "wav", "zip",
 ]);
 
 async function s3Client() {

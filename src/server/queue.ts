@@ -26,7 +26,8 @@ export type JobName =
   | "inactive_reminder"
   | "session_cleanup"
   | "study_reminder"
-  | "compression_process";
+  | "compression_process"
+  | "compression_batch";
 
 export type JobPayload = Record<string, unknown>;
 
@@ -215,6 +216,14 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     if (!jobId) throw new Error("缺少壓縮工作 ID");
     await processCompressionJob(jobId, (payload.settings ?? {}) as Record<string, number>);
     return `已完成壓縮工作 ${jobId}`;
+  },
+
+  async compression_batch(payload) {
+    const { processCompressionBatch } = await import("./compression");
+    const batchId = typeof payload.batchId === "string" ? payload.batchId : "";
+    if (!batchId) throw new Error("缺少批次 ID");
+    await processCompressionBatch(batchId, (payload.settings ?? {}) as Record<string, number>);
+    return `已完成批次 ZIP ${batchId}`;
   },
 };
 

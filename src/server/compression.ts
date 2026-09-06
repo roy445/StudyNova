@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { compressionJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { putObject, readObject } from "./storage";
+import JSZip from "jszip";
 
 export type CompressionMode = "precise" | "best" | "fast" | "custom";
 export type CompressionSettings = {
@@ -80,4 +81,25 @@ export async function processCompressionJob(jobId: string, settings: Partial<Com
     const [code, ...rest] = message.split(":");
     await db.update(compressionJobs).set({ status: "failed", stage: "FAILED", errorCode: code, errorMessage: rest.join(":") || "壓縮失敗，請確認檔案完整且格式受支援。", updatedAt: new Date(), completedAt: new Date() }).where(eq(compressionJobs.id, jobId));
   }
+}
+
+export async function processCompressionBatch(batchId: string, settings: Partial<CompressionSettings> = {}) {
+  const jobs = await db.select().from(compressionJobs).where(eq(compressionJobs.batchId, batchId));
+  for (const job of jobs) await processCompressionJob(job.id, settings);
+  const completed = await db.select().from(compressionJobs).where(eq(compressionJobs.batchId, batchId));
+  const zip = new JSZip();
+  let included = 0;
+  for (const job of completed) {
+    if (!job.resultObjectId || !["completed", "completed_with_warning"].includes(job.status)) continue;
+    const result = await readObject(job.resultObjectId);
+    zip.file(job.originalFilename.replace(/[\\/:*?"<>|]/g, "_"), result.data);
+    included += 1;
+  }
+  if (!included) throw new Error("COMPRESSION_BATCH_EMPTY:沒有可加入 ZIP 的完成檔案");
+  const zipData = Buffer.from(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } }));
+  const owner = completed[0]?.userId;
+  if (!owner) throw new Error("COMPRESSION_BATCH_OWNER_MISSING");
+  const stored = await putObject({ userId: owner, filename: `studynova-compressed-${batchId.slice(0, 8)}.zip`, mimeType: "application/zip", data: zipData, allow: ["archive"] });
+  await db.update(compressionJobs).set({ zipObjectId: stored.id, updatedAt: new Date() }).where(eq(compressionJobs.batchId, batchId));
+  return { zipObjectId: stored.id, included, size: stored.sizeBytes };
 }

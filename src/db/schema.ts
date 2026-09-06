@@ -186,6 +186,9 @@ export const compressionJobs = pgTable(
     userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
     sourceObjectId: uuid("source_object_id").notNull().references(() => storageObjects.id, { onDelete: "cascade" }),
     resultObjectId: uuid("result_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    batchId: uuid("batch_id"),
+    zipObjectId: uuid("zip_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    batchName: text("batch_name").notNull().default(""),
     originalFilename: text("original_filename").notNull(),
     mimeType: text("mime_type").notNull(),
     originalSize: integer("original_size").notNull(),
@@ -204,7 +207,7 @@ export const compressionJobs = pgTable(
     updatedAt: updated(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
-  (t) => [index("compression_user_idx").on(t.userId, t.createdAt), index("compression_status_idx").on(t.status, t.createdAt)],
+  (t) => [index("compression_user_idx").on(t.userId, t.createdAt), index("compression_status_idx").on(t.status, t.createdAt), index("compression_batch_idx").on(t.batchId)],
 );
 
 /* ------------------------------------------------------------ MATERIALS */

@@ -294,6 +294,7 @@ export default function AdminOverviewPage() {
         <>
         <Card title="✦ 節慶外觀與 NOVA 助理" subtitle="只有管理員可以修改；儲存後全站立即套用，操作會寫入 Audit Log。">
           <div className="space-y-4">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs text-muted">目前聖誕主題透過全站共用的 <span className="font-mono text-[#37d3ff]">christmas_theme</span> 設定同步；智慧壓縮中心會自動沿用相同的主色、輔色與節慶背景，不需要另外設定。</div>
             <div className="grid gap-3 sm:grid-cols-2">
               {[["enabled", "Christmas Theme"], ["novi", "聖誕 NOVA 外觀"], ["snow", "雪花效果"], ["particles", "NOVA 閃爍粒子"], ["decorations", "進階聖誕裝飾"], ["sound", "馴鹿鈴聲"], ["reindeer", "隨機馴鹿事件"]].map(([key, label]) => (
                 <label key={key} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={themeForm[key as keyof ChristmasTheme] as boolean} onChange={(e) => setThemeForm({ ...themeForm, [key]: e.target.checked })} className="accent-[#37d3ff]" /></label>
@@ -324,6 +325,7 @@ export default function AdminOverviewPage() {
               <Field label="最大原始檔案（MB）" hint="範例：100，允許 1–500"><Input type="number" min={1} max={500} value={Math.round(compressionForm.maxOriginalBytes / 1024 / 1024)} onChange={(e) => setCompressionForm({ ...compressionForm, maxOriginalBytes: Number(e.target.value) * 1024 * 1024 })} /></Field>
               <Field label="最大處理時間（秒）"><Input type="number" min={10} max={600} value={compressionForm.maxProcessingSeconds} onChange={(e) => setCompressionForm({ ...compressionForm, maxProcessingSeconds: Number(e.target.value) })} /></Field>
               <Field label="最大 PDF 頁數"><Input type="number" min={1} max={500} value={compressionForm.maxPdfPages} onChange={(e) => setCompressionForm({ ...compressionForm, maxPdfPages: Number(e.target.value) })} /></Field>
+              <Field label="批次最多檔案"><Input type="number" min={1} max={100} value={compressionForm.maxBatchFiles} onChange={(e) => setCompressionForm({ ...compressionForm, maxBatchFiles: Number(e.target.value) })} /></Field>
               <Field label="最大壓縮迭代"><Input type="number" min={1} max={12} value={compressionForm.maxIterations} onChange={(e) => setCompressionForm({ ...compressionForm, maxIterations: Number(e.target.value) })} /></Field>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
