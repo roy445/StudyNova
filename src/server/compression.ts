@@ -7,6 +7,7 @@ import { putObject, readObject } from "./storage";
 import JSZip from "jszip";
 
 export type CompressionMode = "precise" | "best" | "fast" | "custom";
+export type CompressionOutputFormat = "original" | "webp" | "jpeg" | "avif" | "pdf";
 export type CompressionSettings = {
   minImageQuality: number;
   maxIterations: number;
@@ -26,13 +27,13 @@ function qualityLabel(original: number, compressed: number) {
   return ratio > 0.7 ? "極佳" : ratio > 0.45 ? "良好" : ratio > 0.25 ? "可接受" : "可能影響細節";
 }
 
-async function compressImage(input: Buffer, mime: string, target: number, settings: CompressionSettings, jobId: string) {
+async function compressImage(input: Buffer, mime: string, target: number, settings: CompressionSettings, jobId: string, outputFormat: CompressionOutputFormat = "original") {
   const metadata = await sharp(input).metadata();
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
   if (!width || !height || width * height > settings.maxImagePixels) throw new Error("IMAGE_PROCESSING_FAILED:圖片解析度超過管理員限制");
   await stage(jobId, "ANALYZING");
-  const outputMime = mime === "image/png" ? "image/webp" : mime === "image/avif" ? "image/avif" : "image/jpeg";
+  const outputMime = outputFormat === "webp" ? "image/webp" : outputFormat === "avif" ? "image/avif" : outputFormat === "jpeg" ? "image/jpeg" : mime === "image/png" ? "image/webp" : mime === "image/avif" ? "image/avif" : "image/jpeg";
   let scale = 1;
   let best = input;
   let iterations = 0;
@@ -71,7 +72,7 @@ export async function processCompressionJob(jobId: string, settings: Partial<Com
     await db.update(compressionJobs).set({ status: "processing", stage: "ANALYZING", updatedAt: new Date() }).where(eq(compressionJobs.id, jobId));
     const source = await readObject(job.sourceObjectId);
     if (Date.now() - started > limits.maxProcessingSeconds * 1000) throw new Error("COMPRESSION_TIMEOUT");
-    const result = source.mimeType === "application/pdf" ? await compressPdf(source.data, job.targetSize, limits, jobId) : await compressImage(source.data, source.mimeType, job.targetSize, limits, jobId);
+    const result = source.mimeType === "application/pdf" ? await compressPdf(source.data, job.targetSize, limits, jobId) : await compressImage(source.data, source.mimeType, job.targetSize, limits, jobId, (job.outputFormat as CompressionOutputFormat) ?? "original");
     const stored = await putObject({ userId: job.userId, filename: result.filename, mimeType: result.mimeType, data: result.data, allow: [result.mimeType === "application/pdf" ? "pdf" : "image"] });
     const ratio = Math.max(0, (1 - stored.sizeBytes / Math.max(1, job.originalSize)) * 100);
     const reached = stored.sizeBytes <= job.targetSize;

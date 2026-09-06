@@ -53,8 +53,10 @@ export const routes = [
       if (data.length > Number(config.maxOriginalBytes)) throw fail("FILE_TOO_LARGE", { message: `原始檔案不可超過 ${(Number(config.maxOriginalBytes) / 1024 / 1024).toFixed(0)} MB` });
       const targetSize = safeTarget(String(form.get("targetSize") ?? "5"), String(form.get("targetUnit") ?? "MB"));
       const mode = z.enum(["precise", "best", "fast", "custom"]).parse(String(form.get("mode") ?? "precise"));
+      const outputFormat = z.enum(["original", "webp", "jpeg", "avif", "pdf"]).parse(String(form.get("outputFormat") ?? "original"));
+      if (outputFormat === "pdf" && !isPdf) throw fail("REQ_VALIDATION", { message: "只有 PDF 檔案可以輸出為 PDF" });
       const stored = await putObject({ userId: user.userId, filename, mimeType: isPdf ? "application/pdf" : (IMAGE_MIMES.has(mime) ? mime : "image/jpeg"), data, allow: [isPdf ? "pdf" : "image"] });
-      const rows = await db.insert(compressionJobs).values({ userId: user.userId, sourceObjectId: stored.id, originalFilename: filename, mimeType: isPdf ? "application/pdf" : (IMAGE_MIMES.has(mime) ? mime : "image/jpeg"), originalSize: data.length, targetSize, mode }).returning();
+      const rows = await db.insert(compressionJobs).values({ userId: user.userId, sourceObjectId: stored.id, originalFilename: filename, mimeType: isPdf ? "application/pdf" : (IMAGE_MIMES.has(mime) ? mime : "image/jpeg"), originalSize: data.length, targetSize, mode, outputFormat }).returning();
       const job = rows[0];
       await queue().enqueue({ name: "compression_process", payload: { jobId: job.id, settings: config }, uniqueKey: `compression:${job.id}` });
       void queue().drain(1);
@@ -78,15 +80,17 @@ export const routes = [
       if ((count ?? 0) + files.length > dailyLimit) throw fail("QUOTA_EXHAUSTED", { message: `本批次會超過今日額度（剩餘 ${Math.max(0, dailyLimit - (count ?? 0))} 次）` });
       const targetSize = safeTarget(String(form.get("targetSize") ?? "5"), String(form.get("targetUnit") ?? "MB"));
       const mode = z.enum(["precise", "best", "fast", "custom"]).parse(String(form.get("mode") ?? "precise"));
+      const outputFormat = z.enum(["original", "webp", "jpeg", "avif", "pdf"]).parse(String(form.get("outputFormat") ?? "original"));
       const batchId = randomUUID(); const batchName = String(form.get("batchName") ?? `批次壓縮 ${new Date().toLocaleDateString("zh-TW")}`).slice(0, 120); const jobs = [];
       for (const file of files) {
         const extension = ext(file.name); const mime = (file.type || "").split(";")[0].toLowerCase(); const isPdf = mime === "application/pdf" || PDF_EXTS.has(extension); const isImage = IMAGE_MIMES.has(mime) || IMAGE_EXTS.has(extension);
         if ((!isPdf && !isImage) || (isPdf && !config.allowPdf) || (isImage && !config.allowImages)) throw fail("FILE_MIME_UNSUPPORTED", { message: `不支援的檔案格式：${file.name}` });
+        if (outputFormat === "pdf" && !isPdf) throw fail("REQ_VALIDATION", { message: "只有 PDF 檔案可以輸出為 PDF" });
         const data = Buffer.from(await file.arrayBuffer());
         if (!data.length) throw fail("FILE_EMPTY", { message: `檔案內容為空：${file.name}` });
         if (data.length > Number(config.maxOriginalBytes)) throw fail("FILE_TOO_LARGE", { message: `檔案過大：${file.name}` });
         const stored = await putObject({ userId: user.userId, filename: file.name.slice(0, 180), mimeType: isPdf ? "application/pdf" : (IMAGE_MIMES.has(mime) ? mime : "image/jpeg"), data, allow: [isPdf ? "pdf" : "image"] });
-        const [job] = await db.insert(compressionJobs).values({ userId: user.userId, sourceObjectId: stored.id, batchId, batchName, originalFilename: file.name.slice(0, 180), mimeType: isPdf ? "application/pdf" : (IMAGE_MIMES.has(mime) ? mime : "image/jpeg"), originalSize: data.length, targetSize, mode }).returning(); jobs.push(job);
+        const [job] = await db.insert(compressionJobs).values({ userId: user.userId, sourceObjectId: stored.id, batchId, batchName, originalFilename: file.name.slice(0, 180), mimeType: isPdf ? "application/pdf" : (IMAGE_MIMES.has(mime) ? mime : "image/jpeg"), originalSize: data.length, targetSize, mode, outputFormat }).returning(); jobs.push(job);
       }
       await queue().enqueue({ name: "compression_batch", payload: { batchId, settings: config }, uniqueKey: `compression-batch:${batchId}` });
       void queue().drain(1);

@@ -81,7 +81,7 @@ export default function AdminOpsPage() {
   const essayService = useApi<{ service: { status: "ENABLED" | "PAUSED" | "DISABLED"; proOnly: boolean; novaCost: number; dailyLimit: number; monthlyLimit: number; maintenanceNotice: string; showScores: boolean } }>("/admin/essay-service");
 
   const [annOpen, setAnnOpen] = useState(false);
-  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false });
+  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false, startsAt: "", endsAt: "" });
   const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard", audience: "all" });
   const [pushResult, setPushResult] = useState<{ targets: number; notified: number; pushSent: number; configured: boolean } | null>(null);
   const [actOpen, setActOpen] = useState(false);
@@ -98,6 +98,7 @@ export default function AdminOpsPage() {
     startsAt: DEFAULT_ACTIVITY_START,
     endsAt: DEFAULT_ACTIVITY_END,
     published: true,
+    notifyOnStart: true,
   });
   const [couponForm, setCouponForm] = useState({ code: "", kind: "nova", value: 100, maxRedemptions: 50 });
   const [importJson, setImportJson] = useState("");
@@ -657,6 +658,8 @@ export default function AdminOpsPage() {
             <Field label="公告分類"><Select value={annForm.category} onChange={(e) => setAnnForm({ ...annForm, category: e.target.value })}><option value="general">一般公告</option><option value="exam">考試／每週小考</option><option value="challenge">挑戰與競賽</option><option value="activity">活動</option><option value="reward">獎勵與 Pro</option><option value="system">系統與維護</option><option value="knowledge">每日知識</option><option value="policy">規則與政策</option></Select></Field>
             <Field label="自訂標籤" hint="以逗號分隔，例如：高中,重要,限時"><Input value={annForm.tags} onChange={(e) => setAnnForm({ ...annForm, tags: e.target.value })} placeholder="高中,重要,限時" /></Field>
           </div>
+          <div className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">排程說明：開始時間前不會顯示公告，也不會發送通知；留空代表立即發布。結束時間後公告會自動隱藏。Web Push／Email 會在開始時間到達時送出。</div>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="開始時間" hint="留空＝立即發布"><Input type="datetime-local" value={annForm.startsAt} onChange={(e) => setAnnForm({ ...annForm, startsAt: e.target.value })} /></Field><Field label="結束時間" hint="留空＝不自動結束"><Input type="datetime-local" value={annForm.endsAt} onChange={(e) => setAnnForm({ ...annForm, endsAt: e.target.value })} /></Field></div>
           <Field label="對象">
             <Select value={annForm.audience} onChange={(e) => setAnnForm({ ...annForm, audience: e.target.value })}>
               <option value="all">全體學生</option>
@@ -686,7 +689,7 @@ export default function AdminOpsPage() {
             full
             onClick={async () => {
               try {
-                const res = await apiPost<{ notified: number }>("/admin/announcements", annForm);
+                const res = await apiPost<{ notified: number; scheduled: boolean }>("/admin/announcements", { ...annForm, startsAt: annForm.startsAt ? new Date(annForm.startsAt).toISOString() : undefined, endsAt: annForm.endsAt ? new Date(annForm.endsAt).toISOString() : null });
                 toast.push("success", `公告已發布，通知 ${res.notified} 位學生`);
                 setAnnOpen(false);
                 await anns.reload();
@@ -757,6 +760,7 @@ export default function AdminOpsPage() {
           <Field label="結束">
             <Input type="datetime-local" value={actForm.endsAt} onChange={(e) => setActForm({ ...actForm, endsAt: e.target.value })} />
           </Field>
+          <label className="flex items-center gap-2 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 px-3 py-2 text-xs sm:col-span-2"><input type="checkbox" checked={actForm.notifyOnStart} onChange={(e) => setActForm({ ...actForm, notifyOnStart: e.target.checked })} className="accent-[#37d3ff]" />活動開始時發送站內通知與 Web Push（排程會依開始時間執行）</label>
         </div>
         <Button
           full

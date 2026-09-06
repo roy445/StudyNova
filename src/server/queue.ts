@@ -7,6 +7,7 @@ import {
   memberships,
   weeklyExamWeeks,
   activities,
+  announcements,
   studyRecords,
   focusSessions,
   notifications,
@@ -14,6 +15,7 @@ import {
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
+import { sendAccountEmail, systemAnnouncementEmailTemplate } from "./email";
 import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core";
 
 export type JobName =
@@ -27,7 +29,9 @@ export type JobName =
   | "session_cleanup"
   | "study_reminder"
   | "compression_process"
-  | "compression_batch";
+  | "compression_batch"
+  | "announcement_publish"
+  | "activity_promote";
 
 export type JobPayload = Record<string, unknown>;
 
@@ -224,6 +228,41 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     if (!batchId) throw new Error("缺少批次 ID");
     await processCompressionBatch(batchId, (payload.settings ?? {}) as Record<string, number>);
     return `已完成批次 ZIP ${batchId}`;
+  },
+
+  async announcement_publish(payload) {
+    const id = typeof payload.announcementId === "string" ? payload.announcementId : "";
+    const announcement = id ? (await db.select().from(announcements).where(eq(announcements.id, id)).limit(1))[0] : null;
+    if (!announcement) throw new Error("找不到排程公告");
+    const allUsers = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
+    const proUsers = await db.select({ userId: memberships.userId, expiresAt: memberships.expiresAt }).from(memberships).where(eq(memberships.tier, "pro"));
+    const proIds = new Set(proUsers.filter((row) => !row.expiresAt || new Date(row.expiresAt) > new Date()).map((row) => row.userId));
+    const audienceIds = new Set(Array.isArray(announcement.audienceIds) ? announcement.audienceIds : []);
+    const targets = allUsers.filter((row) => announcement.audience === "all" || (announcement.audience === "pro" && proIds.has(row.userId)) || (announcement.audience === "users" && audienceIds.has(row.userId)) || (announcement.audience === "group" && audienceIds.has(row.userId)));
+    let sent = 0;
+    for (const target of targets) {
+      const created = await notify({ userId: target.userId, kind: "announcement", title: `📢 ${announcement.title}`, body: announcement.body.slice(0, 200), link: announcement.link, dedupeKey: `ann:${announcement.id}:${target.userId}`, push: announcement.push });
+      if (created) sent += 1;
+      if (announcement.email) {
+        const profile = (await db.select({ email: users.email, displayName: users.displayName }).from(users).where(eq(users.userId, target.userId)).limit(1))[0];
+        if (profile?.email) await sendAccountEmail(profile.email, systemAnnouncementEmailTemplate({ displayName: profile.displayName, title: announcement.title, body: announcement.body, link: announcement.link, category: announcement.category, tags: announcement.tags }));
+      }
+    }
+    return `已推播公告 ${announcement.title}，通知 ${sent} 位使用者`;
+  },
+
+  async activity_promote(payload) {
+    const id = typeof payload.activityId === "string" ? payload.activityId : "";
+    const activity = id ? (await db.select().from(activities).where(eq(activities.id, id)).limit(1))[0] : null;
+    if (!activity) throw new Error("找不到排程活動");
+    if (!activity.notifyOnStart) return `活動 ${activity.title} 已設定不發送開始推播`;
+    const allUsers = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
+    let sent = 0;
+    for (const target of allUsers) {
+      const created = await notify({ userId: target.userId, kind: "activity", title: `◇ 活動開始：${activity.title}`, body: activity.description || "新的學習活動已開始，快來參加吧！", link: "/activities", dedupeKey: `activity-start:${activity.id}:${target.userId}`, push: true });
+      if (created) sent += 1;
+    }
+    return `已推播活動 ${activity.title}，通知 ${sent} 位使用者`;
   },
 };
 

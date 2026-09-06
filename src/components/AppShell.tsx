@@ -22,6 +22,7 @@ const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/ai", label: "AI", icon: "nova" },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
+  { href: "/export", label: "匯出", icon: "archive" },
   { href: "/challenge", label: "挑戰", icon: "challenge" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
@@ -52,6 +53,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/essay", label: "英文作文批改", icon: "pen" },
   { href: "/compress", label: "智慧壓縮", icon: "archive" },
+  { href: "/export", label: "資料匯出", icon: "archive" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
   { href: "/challenge", label: "好友・活動", icon: "challenge" },
@@ -374,7 +376,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
+      <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
           {NAV.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -383,7 +385,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
                 <Link
                   href={item.href}
                   aria-label={item.label}
-                  className={`focus-ring flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"}`}
+                  className={`mobile-nav-item focus-ring flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"}`}
                 >
                   <SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" />
                   <span className="max-w-full truncate">{item.label}</span>
@@ -395,7 +397,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       </nav>
 
       {/* Novi dock */}
-      <div className="novi-dock fixed right-3 z-[60] flex flex-col items-end gap-2 sm:right-5">
+      <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5">
         {!noviOpen && encouragement && (
           <button type="button" onClick={() => setNoviOpen(true)} className="glass anim-pop max-w-[min(82vw,300px)] p-3 text-left text-xs leading-relaxed text-[#e8edff] shadow-[0_0_28px_rgba(55,211,255,0.18)]">
             <span className="mb-1 block text-[10px] font-semibold tracking-wider text-[#37d3ff]">Novi 給你的話</span>
@@ -403,7 +405,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
           </button>
         )}
         {noviOpen && (
-          <div className="glass anim-pop w-[min(92vw,340px)] p-3">
+          <div className="glass novi-mobile-panel anim-pop w-[min(92vw,340px)] p-3">
             <div className="flex items-start gap-2">
               <NoviAvatar size={54} state={noviState} level={level} />
               <div className="min-w-0 flex-1">
@@ -418,7 +420,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
             <div className="mt-2 max-h-40 overflow-y-auto scroll-thin rounded-xl bg-black/25 p-2.5 text-xs leading-relaxed">
               {adviceLoading ? <Skeleton lines={2} /> : encouragement?.text || advice || pagePrompt || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <div role="menu" aria-label="Novi 快速功能" className="mt-2 grid grid-cols-2 gap-1.5">
               <Button size="sm" variant="ghost" onClick={() => askQuick("today_advice")}>
                 今日建議
               </Button>

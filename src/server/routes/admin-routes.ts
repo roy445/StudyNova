@@ -39,6 +39,7 @@ import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
 import { adminLog, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
+import { queue } from "../queue";
 import { providerMetrics, recentAiFailures, aiConfigured } from "../ai";
 import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured, systemAnnouncementEmailTemplate } from "../email";
 
@@ -417,15 +418,18 @@ export const routes: RouteDef[] = [
           marquee: body.marquee,
           notify: body.notify,
           push: body.push,
+          email: body.email,
           sortOrder: body.sortOrder,
           startsAt: body.startsAt ? new Date(body.startsAt) : new Date(),
           endsAt: body.endsAt ? new Date(body.endsAt) : null,
           createdBy: admin.userId,
         })
         .returning();
+      const scheduled = Boolean(body.startsAt && new Date(body.startsAt) > new Date());
+      if (scheduled) await queue().enqueue({ name: "announcement_publish", payload: { announcementId: rows[0].id }, uniqueKey: `announcement-publish:${rows[0].id}`, runAt: new Date(body.startsAt!) });
       let notified = 0;
       let emailSent = 0;
-      if (body.notify) {
+      if (body.notify && !scheduled) {
         const targets = await resolveAudience(body.audience, body.audienceIds);
         for (const userId of targets) {
           const created = await notify({
@@ -440,7 +444,7 @@ export const routes: RouteDef[] = [
           if (created) notified += 1;
         }
       }
-      if (body.email) {
+      if (body.email && !scheduled) {
         const targets = await resolveAudience(body.audience, body.audienceIds);
         for (const userId of targets) {
           const target = (await db.select({ email: users.email, displayName: users.displayName }).from(users).where(eq(users.userId, userId)).limit(1))[0];
@@ -450,7 +454,7 @@ export const routes: RouteDef[] = [
         }
       }
       await adminLog({ actorId: admin.userId, action: "announcement.create", targetType: "announcement", targetId: rows[0].id, after: { title: body.title, notified, emailSent }, ip: ctx.ip });
-      return { announcement: rows[0], notified, emailSent };
+      return { announcement: rows[0], notified, emailSent, scheduled };
     },
   }),
 
@@ -515,6 +519,7 @@ export const routes: RouteDef[] = [
           startsAt: z.string().datetime(),
           endsAt: z.string().datetime(),
           published: z.boolean().default(false),
+          notifyOnStart: z.boolean().default(true),
           sortOrder: z.number().int().min(0).max(999).default(0),
         }),
       );
@@ -523,6 +528,7 @@ export const routes: RouteDef[] = [
         .values({ ...body, startsAt: new Date(body.startsAt), endsAt: new Date(body.endsAt) })
         .returning();
       const activityId = rows[0].id;
+      if (body.published && new Date(body.startsAt) > new Date()) await queue().enqueue({ name: "activity_promote", payload: { activityId }, uniqueKey: `activity-promote:${activityId}`, runAt: new Date(body.startsAt) });
       const sourceQuestions = [] as Array<{ activityId: string; subject: string; type: string; stem: string; options: string[]; answer: string[]; explanation: string; orderIndex: number }>;
       if (body.questionSources.includes("general_bank") || body.questionSources.includes("imported_files")) {
         const origins = body.questionSources.includes("general_bank") && body.questionSources.includes("imported_files") ? ["bank", "admin"] : body.questionSources.includes("imported_files") ? ["bank"] : ["admin"];

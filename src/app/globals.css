@@ -299,6 +299,11 @@ html[data-motion="reduced"] *::after {
 .novi-dock {
   bottom: calc(84px + env(safe-area-inset-bottom));
 }
+.mobile-nav-item { -webkit-tap-highlight-color: transparent; transition: transform .18s ease, background-color .18s ease, color .18s ease; }
+.mobile-nav-item:active { transform: translateY(1px) scale(.96); }
+.novi-mobile-panel { transform-origin: bottom right; animation: novi-mobile-in .28s cubic-bezier(.22,1,.36,1) both; }
+@keyframes novi-mobile-in { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 420px) { .novi-dock { right: .75rem; } .novi-mobile-panel { width: min(94vw, 340px); } .mobile-nav-item span { max-width: 3.6rem; font-size: 9px; } }
 
 @media (min-width: 1024px) {
   .novi-dock {
