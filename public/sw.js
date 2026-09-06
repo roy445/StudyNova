@@ -3,7 +3,7 @@ const CACHE = "studynova-v1";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/icon.svg", "/manifest.webmanifest"]).catch(() => undefined)));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/icon.png", "/manifest.webmanifest", "/brand/studynova-logo-square.png", "/brand/studynova-logo-horizontal.webp"]).catch(() => undefined)));
 });
 
 self.addEventListener("activate", (event) => {
@@ -22,8 +22,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/icon.png",
+      badge: "/icon.png",
       vibrate: payload.vibrate || [120, 60, 120],
       tag: payload.tag || payload.title,
       data: { link: payload.link || "/dashboard" },

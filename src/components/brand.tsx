@@ -30,21 +30,29 @@ const STATE_FACE: Record<NoviState, string> = {
   levelup: "★ ★",
 };
 
-/** StudyNova study mark supplied by the new brand lockup. */
+/** StudyNova square logo supplied by the product owner. The source art is intentionally kept intact. */
 export function LogoMark({ size = 40, glow = true }: { size?: number; glow?: boolean }) {
   return (
-    <span className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      {glow && <span className="absolute inset-0 rounded-full bg-[#27c4bd]/15 blur-md" />}
-      <img src="/studynova-mark.png" alt="" aria-hidden className="relative h-full w-full object-contain" />
-    </span>
+    <img
+      src="/brand/studynova-logo-square.png"
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden="true"
+      className={glow ? "rounded-full shadow-[0_0_24px_rgba(55,211,255,0.22)]" : "rounded-full"}
+    />
   );
 }
 
 export function Wordmark({ size = 22 }: { size?: number }) {
   return (
-    <span className="inline-flex items-center justify-center overflow-hidden" style={{ width: size * 2.5, height: size * 2.15 }}>
-      <img src="/studynova-logo.png" alt="StudyNova" className="h-full w-full object-contain" />
-    </span>
+    <img
+      src="/brand/studynova-logo-horizontal.webp"
+      alt="StudyNova"
+      width={Math.round(size * 7.4)}
+      height={Math.round(size * 4.95)}
+      className="h-auto max-h-11 w-auto max-w-[min(58vw,220px)] object-contain object-left"
+    />
   );
 }
 
