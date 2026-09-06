@@ -446,15 +446,16 @@ export const contentRoutes: RouteDef[] = [
 
       await db.update(ocrDocuments).set({ status: "processing", updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
       const results: Array<{ pageId: string; ok: boolean; error?: string }> = [];
-      // 逐張送出影像，避免多張圖片同時呼叫 AI 時觸發供應商併發限制，導致只有前幾張完成。
-      for (const page of pages) {
-        if (!page.objectId) {
+      // 有限併發送出影像：同時最多 3 張，兼顧速度與供應商併發限制。
+      const processPage = async (page: typeof pages[number]) => {
+        const objectId = page.objectId;
+        if (!objectId) {
           results.push({ pageId: page.id, ok: false, error: "找不到圖片檔案" });
-          continue;
+          return;
         }
         try {
           await db.update(ocrPages).set({ status: "processing" }).where(eq(ocrPages.id, page.id));
-          const obj = await readObject(page.objectId);
+          const obj = await readObject(objectId);
           const hints = page.highlights.length
             ? `圖片上的螢光筆標記區域（相對座標 0-1）：${JSON.stringify(page.highlights)}。請特別標示這些區域內的文字，於輸出時以 [顏色] 前綴標註。`
             : "";
@@ -482,6 +483,10 @@ export const contentRoutes: RouteDef[] = [
           await db.update(ocrPages).set({ status: "failed" }).where(eq(ocrPages.id, page.id));
           results.push({ pageId: page.id, ok: false, error: err instanceof Error ? err.message : "辨識失敗" });
         }
+      };
+      const concurrency = Math.min(3, pages.length);
+      for (let i = 0; i < pages.length; i += concurrency) {
+        await Promise.all(pages.slice(i, i + concurrency).map(processPage));
       }
       const fresh = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
       const combined = fresh.map((p) => p.text).join("\n\n");
