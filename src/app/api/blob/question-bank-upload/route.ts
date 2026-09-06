@@ -1,5 +1,5 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { head } from "@vercel/blob";
+import { get, head } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -33,9 +33,9 @@ export async function POST(request: Request) {
         const object = (await db.insert(storageObjects).values({ userId: payload.userId, driver: "blob", storageKey: blob.pathname, bucket: "vercel-blob", mimeType: blob.contentType, sizeBytes: metadata.size, filename: blob.pathname.split("/").pop()?.slice(0, 180) || blob.pathname, visibility: "private", data: null }).returning({ id: storageObjects.id }))[0];
         try {
           if (metadata.size > 12 * 1024 * 1024) throw new Error("檔案超過 AI 單次解析上限 12MB，請拆成較小檔案再上傳");
-          const fileResponse = await fetch(blob.url);
-          if (!fileResponse.ok) throw new Error(`無法讀取 Blob 檔案：HTTP ${fileResponse.status}`);
-          const base64 = Buffer.from(await fileResponse.arrayBuffer()).toString("base64");
+          const privateBlob = await get(blob.pathname, { access: "private" });
+          if (!privateBlob?.stream) throw new Error("無法讀取 Blob 私有檔案內容");
+          const base64 = Buffer.from(await new Response(privateBlob.stream).arrayBuffer()).toString("base64");
           const ai = await runAi({ userId: payload.userId, feature: "admin_question_file_import", json: true, temperature: 0.1, maxOutputTokens: 8192, system: "你是 StudyNova 題庫整理器。只根據檔案中清楚看見的內容建立題目，不要猜測模糊文字。請回傳 JSON：{items:[{subject,topic,level,difficulty,type,stem,options,answer,explanation}]}。每一題 answer 必須是可驗證的答案；看不清楚或沒有完整答案的內容不要建立。type 只能是 single,multiple,fill,truefalse,short,reading。", parts: [{ kind: "text", text: `請解析這份${payload.sourceLabel}，整理成可用於國高中素養測驗的題目。題庫分類：${payload.bankCategory}。中英對照、選擇題、填空題與片語都要保留原意。` }, { kind: "image", mimeType: blob.contentType, base64 }] });
           const parsed = JSON.parse(ai.text.replace(/^```json\s*/i, "").replace(/```\s*$/, "")) as { items?: Array<Record<string, unknown>> };
           const items = Array.isArray(parsed.items) ? parsed.items.slice(0, 500) : [];
