@@ -50,6 +50,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/essay", label: "英文作文批改", icon: "pen" },
+  { href: "/compress", label: "智慧壓縮", icon: "study" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
   { href: "/challenge", label: "好友・活動", icon: "challenge" },

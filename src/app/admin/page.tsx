@@ -56,6 +56,8 @@ const DEFAULT_CHRISTMAS_THEME: ChristmasTheme = {
   accent: "#ffc857",
   red: "#c83b4b",
 };
+type CompressionSettings = { enabled: boolean; maxOriginalBytes: number; maxBatchFiles: number; maxProcessingSeconds: number; maxPdfPages: number; maxImagePixels: number; minImageQuality: number; maxIterations: number; allowPdf: boolean; allowImages: boolean; allowBatch: boolean; proOnly: boolean; dailyFree: number; dailyPro: number };
+const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = { enabled: true, maxOriginalBytes: 100 * 1024 * 1024, maxBatchFiles: 20, maxProcessingSeconds: 120, maxPdfPages: 100, maxImagePixels: 144000000, minImageQuality: 35, maxIterations: 8, allowPdf: true, allowImages: true, allowBatch: true, proOnly: false, dailyFree: 10, dailyPro: 100 };
 
 const ACTIONS = [
   { key: "gift_nova", label: "贈送 Nova", needAmount: true },
@@ -87,6 +89,7 @@ export default function AdminOverviewPage() {
   const [form, setForm] = useState({ action: "gift_nova", reason: "", amount: 100, days: 30, feature: "", role: "student", title: "🎁 StudyNova 最新通知", message: "Novi 有一則新消息想告訴你！", link: "/dashboard" });
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [themeForm, setThemeForm] = useState<ChristmasTheme>(DEFAULT_CHRISTMAS_THEME);
+  const [compressionForm, setCompressionForm] = useState<CompressionSettings>(DEFAULT_COMPRESSION_SETTINGS);
 
   const currentAction = ACTIONS.find((a) => a.key === form.action);
   useEffect(() => {
@@ -94,6 +97,14 @@ export default function AdminOverviewPage() {
     if (!saved) return;
     const timer = window.setTimeout(() => setThemeForm({ ...DEFAULT_CHRISTMAS_THEME, ...saved } as ChristmasTheme), 0);
     return () => window.clearTimeout(timer);
+  }, [settings.data]);
+  useEffect(() => {
+    const saved = settings.data?.settings.find((setting) => setting.key === "compression_settings")?.value;
+    if (saved) {
+      const timer = window.setTimeout(() => setCompressionForm({ ...DEFAULT_COMPRESSION_SETTINGS, ...saved } as CompressionSettings), 0);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
   }, [settings.data]);
 
   async function runBulk() {
@@ -280,6 +291,7 @@ export default function AdminOverviewPage() {
       )}
 
       {tab === "appearance" && (
+        <>
         <Card title="✦ 節慶外觀與 NOVA 助理" subtitle="只有管理員可以修改；儲存後全站立即套用，操作會寫入 Audit Log。">
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -303,6 +315,27 @@ export default function AdminOverviewPage() {
             </div>
           </div>
         </Card>
+        <Card title="▣ 智慧檔案壓縮設定" subtitle="控制檔案大小、品質下限、PDF 限制與每日使用額度。">
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[["enabled", "啟用智慧壓縮"], ["allowImages", "允許圖片壓縮"], ["allowPdf", "允許 PDF 壓縮"], ["allowBatch", "允許批次壓縮"], ["proOnly", "僅限 Nova Pro"]].map(([key, label]) => <label key={key} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={compressionForm[key as keyof CompressionSettings] as boolean} onChange={(e) => setCompressionForm({ ...compressionForm, [key]: e.target.checked })} className="accent-[#37d3ff]" /></label>)}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="最大原始檔案（MB）" hint="範例：100，允許 1–500"><Input type="number" min={1} max={500} value={Math.round(compressionForm.maxOriginalBytes / 1024 / 1024)} onChange={(e) => setCompressionForm({ ...compressionForm, maxOriginalBytes: Number(e.target.value) * 1024 * 1024 })} /></Field>
+              <Field label="最大處理時間（秒）"><Input type="number" min={10} max={600} value={compressionForm.maxProcessingSeconds} onChange={(e) => setCompressionForm({ ...compressionForm, maxProcessingSeconds: Number(e.target.value) })} /></Field>
+              <Field label="最大 PDF 頁數"><Input type="number" min={1} max={500} value={compressionForm.maxPdfPages} onChange={(e) => setCompressionForm({ ...compressionForm, maxPdfPages: Number(e.target.value) })} /></Field>
+              <Field label="最大壓縮迭代"><Input type="number" min={1} max={12} value={compressionForm.maxIterations} onChange={(e) => setCompressionForm({ ...compressionForm, maxIterations: Number(e.target.value) })} /></Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="最低圖片品質" hint="JPEG/WebP/AVIF，35–90"><Input type="number" min={20} max={90} value={compressionForm.minImageQuality} onChange={(e) => setCompressionForm({ ...compressionForm, minImageQuality: Number(e.target.value) })} /></Field>
+              <Field label="最大圖片解析度（MP）"><Input type="number" min={1} max={300} value={Math.round(compressionForm.maxImagePixels / 1000000)} onChange={(e) => setCompressionForm({ ...compressionForm, maxImagePixels: Number(e.target.value) * 1000000 })} /></Field>
+              <Field label="Free 每日次數"><Input type="number" min={0} max={1000} value={compressionForm.dailyFree} onChange={(e) => setCompressionForm({ ...compressionForm, dailyFree: Number(e.target.value) })} /></Field>
+              <Field label="Pro 每日次數"><Input type="number" min={0} max={10000} value={compressionForm.dailyPro} onChange={(e) => setCompressionForm({ ...compressionForm, dailyPro: Number(e.target.value) })} /></Field>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs text-muted"><span>{compressionForm.enabled ? "智慧壓縮已開啟：目標大小導向、保留學習文件可讀性。" : "智慧壓縮目前關閉，使用者無法建立新的壓縮工作。"}</span><Button onClick={async () => { try { await apiPut("/admin/settings/compression_settings", { value: compressionForm }); await settings.reload(); toast.push("success", "智慧壓縮設定已更新"); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存壓縮設定</Button></div>
+          </div>
+        </Card>
+        </>
       )}
 
       <Modal open={actionOpen} onClose={() => setActionOpen(false)} title={`批次操作（${selected.length} 位使用者）`}>

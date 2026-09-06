@@ -179,6 +179,34 @@ export const storageObjects = pgTable(
   (t) => [uniqueIndex("storage_key_uq").on(t.storageKey), index("storage_user_idx").on(t.userId)],
 );
 
+export const compressionJobs = pgTable(
+  "compression_jobs",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    sourceObjectId: uuid("source_object_id").notNull().references(() => storageObjects.id, { onDelete: "cascade" }),
+    resultObjectId: uuid("result_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    originalFilename: text("original_filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    originalSize: integer("original_size").notNull(),
+    targetSize: integer("target_size").notNull(),
+    mode: text("mode").notNull().default("precise"),
+    status: text("status").notNull().default("queued"),
+    stage: text("stage").notNull().default("QUEUED"),
+    compressedSize: integer("compressed_size"),
+    compressionRatio: real("compression_ratio"),
+    qualityScore: text("quality_score"),
+    iterations: integer("iterations").notNull().default(0),
+    preview: jsonb("preview").$type<Record<string, unknown>>().notNull().default({}),
+    errorCode: text("error_code").notNull().default(""),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [index("compression_user_idx").on(t.userId, t.createdAt), index("compression_status_idx").on(t.status, t.createdAt)],
+);
+
 /* ------------------------------------------------------------ MATERIALS */
 
 export const studyMaterials = pgTable(

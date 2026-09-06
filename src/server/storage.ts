@@ -10,7 +10,7 @@ export type StorageDriver = "db" | "s3";
 const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024);
 
 export const ALLOWED_MIME: Record<string, string[]> = {
-  image: ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic"],
+  image: ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/avif", "image/heic"],
   pdf: ["application/pdf"],
   text: ["text/plain", "text/markdown", "application/json"],
   audio: ["audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav", "audio/mp3"],
@@ -30,7 +30,7 @@ function extensionOf(filename: string) {
 }
 
 const EXT_WHITELIST = new Set([
-  "png", "jpg", "jpeg", "webp", "heic", "pdf", "txt", "md", "json", "webm", "ogg", "mp3", "m4a", "wav",
+  "png", "jpg", "jpeg", "webp", "avif", "heic", "pdf", "txt", "md", "json", "webm", "ogg", "mp3", "m4a", "wav",
 ]);
 
 async function s3Client() {

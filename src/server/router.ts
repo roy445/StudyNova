@@ -94,6 +94,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/support-routes"),
     import("./routes/essay-routes"),
     import("./routes/performance-routes"),
+    import("./routes/compression-routes"),
   ]);
   compiledRoutes = compile(mods.flatMap((m) => m.routes));
   return compiledRoutes;

@@ -25,7 +25,8 @@ export type JobName =
   | "activity_reminder"
   | "inactive_reminder"
   | "session_cleanup"
-  | "study_reminder";
+  | "study_reminder"
+  | "compression_process";
 
 export type JobPayload = Record<string, unknown>;
 
@@ -206,6 +207,14 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     await purgeExpiredSessions();
     await db.delete(notifications).where(sql`${notifications.createdAt} < now() - interval '90 days'`);
     return "已清理過期 session 與 90 天前通知";
+  },
+
+  async compression_process(payload) {
+    const { processCompressionJob } = await import("./compression");
+    const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
+    if (!jobId) throw new Error("缺少壓縮工作 ID");
+    await processCompressionJob(jobId, (payload.settings ?? {}) as Record<string, number>);
+    return `已完成壓縮工作 ${jobId}`;
   },
 };
 
