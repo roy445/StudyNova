@@ -92,7 +92,7 @@ export function NoviAvatar({
   const bodyId = `novi-body-${state}-${skin.replace(/[^a-z0-9-]/gi, "")}`;
   const panelId = `novi-panel-${state}-${skin.replace(/[^a-z0-9-]/gi, "")}`;
   return (
-    <div className={`relative select-none ${float === "float-hover" ? "anim-float" : ""}`} style={{ width: size, height: size * 1.16, animationDuration: float === "float-hover" ? "2.6s" : undefined }} aria-label={`Novi 狀態：${state}，外觀：${skin}`}>
+    <div className={`relative select-none ${float === "float-hover" ? "anim-float" : ""} ${festive ? "novi-festive" : ""}`} style={{ width: size, height: size * 1.16, animationDuration: float === "float-hover" ? "2.6s" : undefined }} aria-label={`Novi 狀態：${state}，外觀：${skin}`}>
       <div
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl opacity-60"
         style={{ width: size * 0.95, height: size * 0.95, background: color }}
@@ -124,6 +124,12 @@ export function NoviAvatar({
           <path d="M27 75c8 5 38 7 46 0v8c-12 8-34 8-46 0v-8Z" fill="#c83b4b" stroke="#ff7180" strokeWidth="1" />
           <path d="M31 78c10 4 27 5 38 0" stroke="#ffc857" strokeWidth="1.4" opacity="0.9" />
           <circle cx="17" cy="25" r="1.7" fill="#fff7e7" className="anim-pulse" /><circle cx="82" cy="25" r="1.7" fill="#fff7e7" className="anim-pulse" />
+          <circle cx="69" cy="84" r="3.8" fill="#ffc857" stroke="#fff7e7" strokeWidth="1" className="anim-pulse" />
+          <path d="M66 87c2 2 5 2 7 0" stroke="#ffc857" strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M24 31l3-3 3 3-3 3-3-3ZM74 32l3-3 3 3-3 3-3-3ZM12 58l2-2 2 2-2 2-2-2Z" fill="#66e0ff" stroke="#dff7ff" strokeWidth="0.7" className="anim-pulse" />
+          <path d="M35 22c2-4 6-5 9-2-3 0-5 2-6 5M43 20c3-3 7-2 9 1-3-1-5 0-7 2" fill="none" stroke="#2f9d63" strokeWidth="1.6" strokeLinecap="round" />
+          <circle cx="41" cy="22" r="1.8" fill="#c83b4b" /><circle cx="46" cy="23" r="1.8" fill="#c83b4b" />
+          <path d="M86 71c5 4 6 9 2 13" stroke="#c83b4b" strokeWidth="2" strokeLinecap="round" /><path d="M87 71c-2 3-2 6 0 8" stroke="#ffc857" strokeWidth="1" strokeLinecap="round" />
         </>}
         <path d="M17 46C17 27 30 17 50 17s33 10 33 29v24c0 12-12 20-33 20S17 82 17 70V46Z" fill={`url(#${bodyId})`} stroke="#d8edff" strokeWidth="1.5" />
         <path d="M12 48c0-5 3-9 7-10l4 3v22l-4 3c-4-1-7-5-7-10V48Z" fill="#9db7d4" stroke="#66e0ff" strokeWidth="1.4" />

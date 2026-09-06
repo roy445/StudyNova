@@ -388,9 +388,12 @@ html[data-festival-intensity="festive"] .christmas-snowfall { opacity: 0.82; }
 .christmas-reindeer-glow { position: absolute; left: 18px; top: 24px; width: 150px; height: 48px; border-radius: 50%; background: var(--christmas-primary); filter: blur(24px); opacity: .3; }
 .christmas-reindeer-label { display: block; margin: -2px auto 0; width: max-content; border: 1px solid color-mix(in srgb, var(--christmas-accent) 55%, transparent); border-radius: 999px; background: rgba(4, 19, 35, .88); padding: 3px 9px; font-size: 10px; color: var(--christmas-accent); }
 .christmas-reward-toast { position: fixed; right: 18px; bottom: 112px; z-index: 80; border: 1px solid color-mix(in srgb, var(--christmas-accent) 60%, transparent); border-radius: 16px; background: rgba(4, 19, 35, .92); padding: 10px 14px; color: var(--christmas-accent); box-shadow: 0 0 24px rgba(255, 200, 87, .18); animation: nova-pop .35s ease-out both; font-size: 12px; }
-.christmas-corner-decor { position: fixed; right: 16px; bottom: 18px; z-index: 55; width: 76px; opacity: .9; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--christmas-primary) 35%, transparent)); pointer-events: none; }
-.christmas-corner-decor svg { width: 76px; }
-.christmas-corner-star { position: absolute; top: -9px; left: 34px; color: var(--christmas-accent); font-size: 22px; filter: drop-shadow(0 0 6px var(--christmas-accent)); }
+.novi-festive { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--christmas-primary) 34%, transparent)); }
+.novi-festive::before,
+.novi-festive::after { position: absolute; z-index: 3; color: var(--christmas-primary); font-size: 11px; animation: christmas-novi-sparkle 2.8s ease-in-out infinite; pointer-events: none; }
+.novi-festive::before { content: "✦  ·  ✧"; left: -7px; top: 23%; }
+.novi-festive::after { content: "·  ✧  ✦"; right: -10px; top: 57%; animation-delay: 1.2s; color: var(--christmas-accent); }
+@keyframes christmas-novi-sparkle { 0%, 100% { opacity: .25; transform: translateY(3px) scale(.88); } 50% { opacity: 1; transform: translateY(-4px) scale(1.08); } }
 @keyframes christmas-reindeer-flight { 0% { transform: translate3d(0, 0, 0) rotate(-2deg); opacity: 0; } 8% { opacity: 1; } 48% { transform: translate3d(58vw, -18px, 0) rotate(2deg); } 92% { opacity: 1; } 100% { transform: translate3d(calc(100vw + 260px), 18px, 0) rotate(-1deg); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .christmas-snowfall, .christmas-snowfall::before, .christmas-snowfall::after, .christmas-reindeer { animation: none; }

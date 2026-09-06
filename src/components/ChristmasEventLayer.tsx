@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiGet, apiPost } from "@/lib/api";
 
-type Props = { enabled: boolean; decorations: boolean; reindeer: boolean };
+type Props = { enabled: boolean; reindeer: boolean };
 type EventState = { token: string; durationMs: number } | null;
 
 function playBell() {
@@ -29,7 +29,7 @@ function playBell() {
   }
 }
 
-export default function ChristmasEventLayer({ enabled, decorations, reindeer }: Props) {
+export default function ChristmasEventLayer({ enabled, reindeer }: Props) {
   const [event, setEvent] = useState<EventState>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -90,9 +90,5 @@ export default function ChristmasEventLayer({ enabled, decorations, reindeer }: 
       <span className="christmas-reindeer-label">點我接住聖誕獎勵</span>
     </button>}
     {message && <div className="christmas-reward-toast" role="status">✦ {message}</div>}
-    {enabled && decorations && <div className="christmas-corner-decor" aria-hidden="true">
-      <span className="christmas-corner-star">✦</span>
-      <svg viewBox="0 0 100 120"><path d="M50 8 76 48H64l20 28H62l16 29H22l16-29H16l20-28H24L50 8Z" fill="#0e6b62" stroke="#66e0ff" strokeWidth="2" /><path d="M50 78v27M38 78h24" stroke="#b77947" strokeWidth="7" strokeLinecap="round" /><path d="M18 108h64" stroke="#dff7ff" strokeWidth="5" strokeLinecap="round" /><circle cx="38" cy="57" r="3" fill="#ff7180" /><circle cx="62" cy="67" r="3" fill="#ffc857" /><circle cx="51" cy="38" r="3" fill="#66e0ff" /></svg>
-    </div>}
   </>;
 }
