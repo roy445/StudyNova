@@ -59,6 +59,8 @@ export default function AdminSupportPage() {
   const [sendAppealEmail, setSendAppealEmail] = useState(true);
   const [emailForm, setEmailForm] = useState({ to: "", displayName: "", kind: "reactivate", link: "", note: "", expiresText: "" });
   const [emailResult, setEmailResult] = useState<string | null>(null);
+  const [linkForm, setLinkForm] = useState({ kind: "password_reset", email: "", value: "30", expiresMinutes: "60" });
+  const [linkResult, setLinkResult] = useState<{ link: string; code?: string; label: string; expiresAt?: string | null } | null>(null);
 
   const count = (s: string) => list.data?.counts.find((c) => c.status === s)?.c ?? 0;
 
@@ -83,6 +85,17 @@ export default function AdminSupportPage() {
           <div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.link)}>複製連結</Button><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.customerMessage)}>複製客服文字</Button></div>
           <pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-2 leading-relaxed text-muted">{resetResult.customerMessage}</pre>
         </div>}
+      </Card>
+
+      <Card title="🔗 管理員連結中心" subtitle="集中產生各類可複製連結：密碼重設、帳號申訴、重新啟動、Pro 與 Nova 獎勵。">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="連結分類"><Select value={linkForm.kind} onChange={(e) => setLinkForm({ ...linkForm, kind: e.target.value })}><option value="password_reset">密碼重設</option><option value="appeal">帳號申訴</option><option value="reactivate">帳號重新啟動</option><option value="pro_reward">Pro 資格</option><option value="nova_reward">Nova 獎勵</option></Select></Field>
+          {linkForm.kind === "password_reset" && <Field label="使用者 Email"><Input type="email" value={linkForm.email} onChange={(e) => setLinkForm({ ...linkForm, email: e.target.value })} placeholder="student@example.com" /></Field>}
+          {(linkForm.kind === "pro_reward" || linkForm.kind === "nova_reward") && <Field label={linkForm.kind === "pro_reward" ? "Pro 天數" : "Nova 數量"}><Input type="number" min={1} value={linkForm.value} onChange={(e) => setLinkForm({ ...linkForm, value: e.target.value })} /></Field>}
+          <Field label="有效時間（分鐘）"><Input type="number" min={10} value={linkForm.expiresMinutes} onChange={(e) => setLinkForm({ ...linkForm, expiresMinutes: e.target.value })} /></Field>
+        </div>
+        <Button className="mt-3" onClick={async () => { try { const result = await apiPost<{ link: string; code?: string; label: string; expiresAt?: string | null }>("/admin/action-links", { kind: linkForm.kind, email: linkForm.email || undefined, value: Number(linkForm.value), expiresMinutes: Number(linkForm.expiresMinutes), baseUrl: window.location.origin }); setLinkResult(result); toast.push("success", `已產生${result.label}`); } catch (err) { toast.push("error", errorMessage(err)); } }}>產生分類連結</Button>
+        {linkResult && <div className="mt-3 space-y-2 rounded-xl border border-[#7dd3fc]/30 bg-[#7dd3fc]/5 p-3"><p className="text-sm font-semibold text-[#b8edff]">{linkResult.label}</p><Input readOnly value={linkResult.link} /><div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.link)}>複製連結</Button>{linkResult.code && <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.code ?? "")}>複製兌換碼</Button>}</div>{linkResult.expiresAt && <p className="text-xs text-muted">有效期限：{new Date(linkResult.expiresAt).toLocaleString("zh-TW")}</p>}</div>}
       </Card>
 
       <Card title="✉ StudyNova 帳號通知信" subtitle="使用統一品牌排版寄送重啟、密碼重設、Pro 或獎勵連結。需先設定 Gmail SMTP 與 16 位應用程式密碼才會實際寄出。">

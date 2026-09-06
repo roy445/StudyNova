@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
@@ -31,9 +31,21 @@ function ProfileInner() {
 
   const [displayName, setDisplayName] = useState("");
   const [coupon, setCoupon] = useState("");
+  const autoRedeemed = useRef(false);
   const [pwd, setPwd] = useState({ current: "", next: "" });
 
   const profile = novi.data?.profile;
+
+  useEffect(() => {
+    const linkedCoupon = params.get("coupon");
+    if (!linkedCoupon || autoRedeemed.current) return;
+    autoRedeemed.current = true;
+    setCoupon(linkedCoupon.toUpperCase());
+    void apiPost<{ kind: string; value: number }>("/coupons/redeem", { code: linkedCoupon }).then(async (res) => {
+      toast.push("success", `連結兌換成功：${res.kind === "pro" ? `Nova Pro ${res.value} 天` : `${res.value} ${res.kind.toUpperCase()}`}`);
+      await Promise.all([nova.reload(), membership.reload(), me.reload()]);
+    }).catch((err) => toast.push("error", errorMessage(err)));
+  }, [params, toast, nova, membership, me]);
 
   async function enablePush() {
     try {

@@ -114,6 +114,34 @@ export const routes: RouteDef[] = [
   }),
 
   route({
+    method: "POST",
+    path: "/admin/action-links",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ kind: z.enum(["password_reset", "appeal", "reactivate", "pro_reward", "nova_reward"]), email: z.string().email().optional(), value: z.number().int().min(1).max(3650).optional(), expiresMinutes: z.number().int().min(10).max(10080).default(60), baseUrl: z.string().url().optional() }));
+      const origin = body.baseUrl ?? new URL(ctx.req.url).origin;
+      if (body.kind === "password_reset") {
+        if (!body.email) throw badRequest("密碼重設連結需要使用者 Email");
+        const target = (await db.select({ userId: users.userId, displayName: users.displayName, email: users.email }).from(users).where(eq(users.email, body.email.toLowerCase().trim())).limit(1))[0];
+        if (!target) throw notFound("找不到這個 Email 對應的使用者");
+        const token = randomToken(32);
+        const expiresAt = new Date(Date.now() + body.expiresMinutes * 60_000);
+        await db.insert(passwordResetTokens).values({ userId: target.userId, tokenHash: sha256(token), expiresAt });
+        const link = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
+        await adminLog({ actorId: admin.userId, action: "action-link.password-reset", targetType: "user", targetId: target.userId, reason: "管理員連結中心", after: { expiresMinutes: body.expiresMinutes }, ip: ctx.ip });
+        return { kind: body.kind, link, expiresAt: expiresAt.toISOString(), label: "密碼重設連結" };
+      }
+      if (body.kind === "appeal") return { kind: body.kind, link: `${origin}/login?appeal=1`, label: "帳號申訴入口" };
+      if (body.kind === "reactivate") return { kind: body.kind, link: `${origin}/login`, label: "帳號重新啟動入口" };
+      const code = `SN-${body.kind === "pro_reward" ? "PRO" : "NOVA"}-${randomToken(8).toUpperCase()}`;
+      const coupon = await db.insert(coupons).values({ code, kind: body.kind === "pro_reward" ? "pro" : "nova", value: body.value ?? (body.kind === "pro_reward" ? 30 : 100), maxRedemptions: 1, endsAt: new Date(Date.now() + body.expiresMinutes * 60_000), createdBy: admin.userId }).returning({ id: coupons.id, code: coupons.code, endsAt: coupons.endsAt, value: coupons.value });
+      await adminLog({ actorId: admin.userId, action: `action-link.${body.kind}`, targetType: "coupon", targetId: coupon[0].id, reason: "管理員連結中心", after: coupon[0], ip: ctx.ip });
+      return { kind: body.kind, link: `${origin}/profile?tab=pass&coupon=${encodeURIComponent(code)}`, code, value: coupon[0].value, expiresAt: coupon[0].endsAt?.toISOString?.() ?? null, label: body.kind === "pro_reward" ? "Pro 資格連結" : "Nova 獎勵連結" };
+    },
+  }),
+
+  route({
     method: "GET",
     path: "/admin/overview",
     auth: "admin",
