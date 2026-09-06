@@ -669,11 +669,16 @@ export default function AdminOpsPage() {
             <Input type="number" value={actForm.rewardXp} onChange={(e) => setActForm({ ...actForm, rewardXp: Number(e.target.value) })} />
           </Field>
           <div className="sm:col-span-2 rounded-xl border border-[var(--line)] p-3">
-            <p className="mb-2 text-sm font-semibold">出題範圍（可複選）</p>
+            <div className="mb-3 flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">出題範圍</p><p className="mt-1 text-xs text-muted">可複選，系統會在建立活動時自動整合題目。</p></div><Badge tone="cyan">已選 {actForm.questionSources.length} 個來源</Badge></div>
             <div className="grid gap-2 sm:grid-cols-2">
-              {[['activity', '專屬活動題庫'], ['general_bank', '一般題庫'], ['imported_files', '已匯入檔案題目（PDF／圖片）'], ['weekly_exams', '歷屆／每週小考題目']].map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={actForm.questionSources.includes(key)} onChange={(e) => setActForm({ ...actForm, questionSources: e.target.checked ? [...actForm.questionSources, key] : actForm.questionSources.filter((source) => source !== key) })} className="accent-[#7c5cff]" />{label}</label>)}
+              {[
+                ["activity", "專屬活動題庫", "只供本活動使用的題目", "✦"],
+                ["general_bank", "一般題庫", "國英數自社的共用題目", "▦"],
+                ["imported_files", "檔案匯入題庫", "之前 PDF／圖片／OCR 題目", "▤"],
+                ["weekly_exams", "每週小考與歷屆題目", "已分析並發布的考卷題目", "◇"],
+              ].map(([key, label, description, icon]) => { const selected = actForm.questionSources.includes(key); return <label key={key} className={`group flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${selected ? "border-[#37d3ff]/70 bg-[#37d3ff]/10 shadow-[0_0_20px_rgba(55,211,255,0.12)]" : "border-[var(--line)] hover:bg-white/5"}`}><input type="checkbox" checked={selected} onChange={(e) => setActForm({ ...actForm, questionSources: e.target.checked ? [...actForm.questionSources, key] : actForm.questionSources.filter((source) => source !== key) })} className="mt-1 accent-[#7c5cff]" /><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#37d3ff]/20 text-[#b8edff]" : "bg-white/5 text-muted"}`}>{icon}</span><span className="min-w-0"><span className="block text-sm font-semibold">{label}</span><span className="mt-1 block text-xs leading-5 text-muted">{description}</span></span>{selected && <span className="ml-auto text-[#37d3ff]">✓</span>}</label>; })}
             </div>
-            <p className="mt-2 text-xs text-muted">建立活動時會將選定來源整合成活動專屬題目；建立後仍可在活動題庫追加或刪除。</p>
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs"><span className="text-muted">建立後仍可在活動題庫追加或刪除。</span><button type="button" className="text-[#37d3ff] underline" onClick={() => setActForm({ ...actForm, questionSources: ["activity", "general_bank", "imported_files", "weekly_exams"] })}>全選來源</button></div>
           </div>
           <Field label="開始">
             <Input type="datetime-local" value={actForm.startsAt} onChange={(e) => setActForm({ ...actForm, startsAt: e.target.value })} />
