@@ -1,0 +1,7 @@
+{
+  "task_kind": "new-document",
+  "output": "pdf",
+  "signals": [],
+  "hard_constraints": ["three separate PDFs", "Traditional Chinese"],
+  "content_features": {"code_blocks": 12, "defined_terms": 18, "portrait_images": 0}
+}
