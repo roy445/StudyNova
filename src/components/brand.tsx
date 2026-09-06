@@ -54,7 +54,7 @@ export function Wordmark({ size = 26 }: { size?: number }) {
       width={Math.round(size * 7.4)}
       height={Math.round(size * 4.95)}
       sizes="(max-width: 640px) 58vw, 220px"
-      className="h-auto max-h-11 w-auto max-w-[min(58vw,220px)] object-contain object-left"
+      className="h-auto max-h-16 w-auto max-w-[min(72vw,290px)] object-contain object-left"
     />
   );
 }
@@ -79,49 +79,49 @@ export function NoviAvatar({
   float?: string;
   level?: number;
 }) {
-  const skinColor = skin === "skin-aurora" ? "#22d3ee" : skin === "skin-nebula" ? "#a78bfa" : skin === "skin-gold" ? "#fbbf24" : "#eef3ff";
-  const color = aura ?? (skin !== "core-classic" ? skinColor : STATE_COLOR[state]);
+  const skinColor = skin === "skin-aurora" ? "#22d3ee" : skin === "skin-nebula" ? "#a78bfa" : skin === "skin-gold" ? "#fbbf24" : "#66e0ff";
+  const color = aura ?? (skin !== "core-classic" ? skinColor : "#66e0ff");
   const face = STATE_FACE[state];
   const bodyId = `novi-body-${state}-${skin.replace(/[^a-z0-9-]/gi, "")}`;
+  const panelId = `novi-panel-${state}-${skin.replace(/[^a-z0-9-]/gi, "")}`;
   return (
     <div className={`relative select-none ${float === "float-hover" ? "anim-float" : ""}`} style={{ width: size, height: size * 1.16, animationDuration: float === "float-hover" ? "2.6s" : undefined }} aria-label={`Novi 狀態：${state}，外觀：${skin}`}>
       <div
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-xl opacity-60"
         style={{ width: size * 0.95, height: size * 0.95, background: color }}
       />
-      <svg width={size} height={size * 1.16} viewBox="0 0 100 116" fill="none">
+      <svg width={size} height={size * 1.16} viewBox="0 0 100 116" fill="none" role="img" aria-label="Novi AI 機器人">
         <defs>
-          <radialGradient id={bodyId} cx="38%" cy="30%" r="75%">
-            <stop offset="0%" stopColor={skin === "skin-gold" ? "#fff7cf" : skin === "skin-nebula" ? "#f5edff" : "#ffffff"} />
-            <stop offset="62%" stopColor={skin === "skin-aurora" ? "#d8fbff" : skin === "skin-nebula" ? "#e9ddff" : skin === "skin-gold" ? "#ffe9a3" : "#eef3ff"} />
-            <stop offset="100%" stopColor={skinColor === "#eef3ff" ? "#c3ccec" : skinColor} />
+          <radialGradient id={bodyId} cx="35%" cy="22%" r="82%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="55%" stopColor="#e8f4ff" />
+            <stop offset="83%" stopColor="#b9cde5" />
+            <stop offset="100%" stopColor="#7895b8" />
           </radialGradient>
+          <linearGradient id={panelId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#172b45" />
+            <stop offset="50%" stopColor="#061020" />
+            <stop offset="100%" stopColor="#020711" />
+          </linearGradient>
         </defs>
-        {(effect === "effect-orbit" || level >= 4) && (
-          <ellipse className="anim-orbit" cx="50" cy="50" rx="46" ry="17" stroke={color} strokeOpacity="0.5" strokeWidth="1.6" fill="none" />
-        )}
-        <ellipse cx="50" cy="106" rx="21" ry="5" fill={color} opacity="0.28" />
-        <ellipse cx="50" cy="100" rx="13" ry="3" fill={color} opacity="0.5" />
-        <path d="M50 9V2" stroke={color} strokeWidth="2.4" strokeLinecap="round" />
-        <circle className="anim-pulse" cx="50" cy="2" r="3.2" fill={color} stroke="#eef3ff" strokeWidth="1.2" />
-        <circle cx="50" cy="48" r="36" fill={`url(#${bodyId})`} />
-        <circle cx="50" cy="48" r="36" stroke={color} strokeOpacity="0.75" strokeWidth="2.4" fill="none" />
-        <path d="M25 30C33 20 67 20 75 30" stroke="#ffffff" strokeOpacity="0.8" strokeWidth="2" strokeLinecap="round" />
-        <ellipse cx="50" cy="46" rx="25" ry="19" fill="#0b1226" />
-        <text x="50" y="52" textAnchor="middle" fontSize="15" fill={color} fontFamily="monospace" letterSpacing="1.5">
-          {face}
-        </text>
-        <rect x="6" y="41" width="9" height="16" rx="4.5" fill={color} opacity="0.9" />
-        <rect x="85" y="41" width="9" height="16" rx="4.5" fill={color} opacity="0.9" />
-        <circle className="anim-pulse novi-core-glow" cx="50" cy="82" r={core === "core-pulse" ? 6.4 : 4.2} fill={color} />
-        {core === "core-pulse" && <circle className="anim-pulse" cx="50" cy="82" r="11" stroke={color} strokeOpacity="0.45" strokeWidth="1.4" fill="none" />}
-        {(effect === "effect-sparkle" || state === "cheer" || state === "levelup") && (
-          <>
-            <circle className="anim-pulse" cx="18" cy="20" r="2.4" fill="#ffc857" />
-            <circle className="anim-pulse" cx="82" cy="24" r="2" fill="#37d3ff" />
-            <circle className="anim-pulse" cx="76" cy="88" r="1.8" fill="#a78bfa" />
-          </>
-        )}
+        <ellipse cx="50" cy="111" rx="23" ry="3.5" fill="#159cff" opacity="0.18" />
+        <ellipse cx="50" cy="103" rx="16" ry="4" fill="#061a32" stroke="#66e0ff" strokeWidth="1.5" />
+        <ellipse cx="50" cy="102" rx="10" ry="2.3" fill="#66e0ff" opacity="0.9" className="anim-pulse" />
+        <path d="M50 17V7" stroke="#b9cde5" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="50" cy="6" r="5" fill="#dff7ff" stroke="#66e0ff" strokeWidth="2" className="anim-pulse" />
+        <circle cx="50" cy="6" r="2" fill="#08bfff" />
+        <path d="M17 46C17 27 30 17 50 17s33 10 33 29v24c0 12-12 20-33 20S17 82 17 70V46Z" fill={`url(#${bodyId})`} stroke="#d8edff" strokeWidth="1.5" />
+        <path d="M12 48c0-5 3-9 7-10l4 3v22l-4 3c-4-1-7-5-7-10V48Z" fill="#9db7d4" stroke="#66e0ff" strokeWidth="1.4" />
+        <path d="M88 48c0-5-3-9-7-10l-4 3v22l4 3c4-1 7-5 7-10V48Z" fill="#9db7d4" stroke="#66e0ff" strokeWidth="1.4" />
+        <rect x="23" y="35" width="54" height="38" rx="17" fill={`url(#${panelId})`} stroke="#66e0ff" strokeOpacity="0.72" strokeWidth="1.8" />
+        <path d="M29 42C40 36 60 36 71 42" stroke="#ffffff" strokeOpacity="0.3" strokeWidth="2" strokeLinecap="round" />
+        <ellipse cx="38" cy="53" rx="4.2" ry="8" fill="#66e0ff" className="anim-pulse" />
+        <ellipse cx="62" cy="53" rx="4.2" ry="8" fill="#66e0ff" className="anim-pulse" />
+        <path d="M44 63c4 3 8 3 12 0" stroke="#66e0ff" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M35 80h30" stroke="#7592b3" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="50" cy="86" r="5" fill="#06213c" stroke="#66e0ff" strokeWidth="1.8" />
+        <circle cx="50" cy="86" r="2" fill="#66e0ff" className="anim-pulse" />
+        <path d="M25 80 19 91M75 80l6 11" stroke="#a9c9e6" strokeWidth="3" strokeLinecap="round" />
       </svg>
     </div>
   );

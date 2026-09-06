@@ -46,7 +46,7 @@ export default function LoginPage() {
       <StarField count={22} />
       <div className="glass anim-pop relative z-10 w-full max-w-md p-6">
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
-          <Wordmark size={28} />
+          <Wordmark size={36} />
           <p className="text-xs text-muted">用 NOVA ID 或 Email 登入你的學習宇宙</p>
         </div>
 
