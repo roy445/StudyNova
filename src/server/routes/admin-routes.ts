@@ -629,6 +629,19 @@ export const routes: RouteDef[] = [
 
   route({
     method: "POST",
+    path: "/admin/coupons/generate",
+    auth: "admin",
+    handler: async () => {
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const code = `SN-${randomToken(8).replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase()}`;
+        const exists = await db.select({ id: coupons.id }).from(coupons).where(eq(coupons.code, code)).limit(1);
+        if (!exists[0]) return { code };
+      }
+      throw fail("SYS_CONFLICT", { message: "暫時無法產生唯一優惠碼，請稍後再試" });
+    },
+  }),
+  route({
+    method: "POST",
     path: "/admin/coupons",
     auth: "admin",
     handler: async (ctx) => {

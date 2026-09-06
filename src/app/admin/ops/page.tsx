@@ -514,9 +514,10 @@ export default function AdminOpsPage() {
 
       {tab === "coupon" && (
         <Card title="▧ 優惠碼">
+          <div className="mb-3 rounded-xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs text-muted">你可以直接輸入自訂優惠碼，也可以讓系統產生唯一的 <span className="font-mono text-[#37d3ff]">SN-XXXXXXXX</span> 代碼；產生後仍可手動修改，再按下建立。</div>
           <div className="grid gap-2 sm:grid-cols-4">
             <Field label="代碼">
-              <Input value={couponForm.code} onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} />
+              <div className="flex gap-2"><Input className="min-w-0 flex-1 font-mono uppercase" placeholder="例如：WELCOME100" value={couponForm.code} onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} /><Button type="button" size="sm" variant="ghost" onClick={async () => { try { const result = await apiPost<{ code: string }>("/admin/coupons/generate"); setCouponForm((current) => ({ ...current, code: result.code })); toast.push("success", "已產生唯一優惠碼"); } catch (err) { toast.push("error", errorMessage(err)); } }}>自動生成</Button></div>
             </Field>
             <Field label="類型">
               <Select value={couponForm.kind} onChange={(e) => setCouponForm({ ...couponForm, kind: e.target.value })}>
