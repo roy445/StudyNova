@@ -445,8 +445,12 @@ export const contentRoutes: RouteDef[] = [
 
       await db.update(ocrDocuments).set({ status: "processing", updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
       const results: Array<{ pageId: string; ok: boolean; error?: string }> = [];
-      await Promise.all(pages.map(async (page) => {
-        if (!page.objectId) return;
+      // 逐張送出影像，避免多張圖片同時呼叫 AI 時觸發供應商併發限制，導致只有前幾張完成。
+      for (const page of pages) {
+        if (!page.objectId) {
+          results.push({ pageId: page.id, ok: false, error: "找不到圖片檔案" });
+          continue;
+        }
         try {
           await db.update(ocrPages).set({ status: "processing" }).where(eq(ocrPages.id, page.id));
           const obj = await readObject(page.objectId);
@@ -477,7 +481,7 @@ export const contentRoutes: RouteDef[] = [
           await db.update(ocrPages).set({ status: "failed" }).where(eq(ocrPages.id, page.id));
           results.push({ pageId: page.id, ok: false, error: err instanceof Error ? err.message : "辨識失敗" });
         }
-      }));
+      }
       const fresh = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
       const combined = fresh.map((p) => p.text).join("\n\n");
       const anyOk = results.some((r) => r.ok);
@@ -656,7 +660,7 @@ export const contentRoutes: RouteDef[] = [
       const user = ctx.requireUser();
       const body = await ctx.json(
         z.object({
-          action: z.enum(["notes", "questions", "solve", "keypoints", "flashcards", "translate", "wrong", "plan"]),
+          action: z.enum(["notes", "questions", "solve", "keypoints", "flashcards", "vocabulary", "translate", "wrong", "plan"]),
         }),
       );
       const action = body.action;
@@ -673,6 +677,7 @@ export const contentRoutes: RouteDef[] = [
         solve: '逐題解題並說明步驟。JSON：{"title":"","body":"markdown"}',
         keypoints: '抓出重點條列。JSON：{"title":"重點整理","body":"markdown"}',
         flashcards: '製作記憶卡。JSON：{"cards":[{"front":"","back":""}]}',
+        vocabulary: '找出文字中的重要英文單字與片語。JSON：{"vocabulary":[{"word":"","meaning":"","partOfSpeech":"","phonetic":"","example":"","exampleZh":""}]}',
         translate: '翻譯成中英對照。JSON：{"title":"翻譯","body":"markdown"}',
         wrong: '找出可能的易錯點與陷阱。JSON：{"title":"易錯提醒","body":"markdown"}',
         plan: '建立 3 天複習計畫。JSON：{"title":"複習計畫","body":"markdown","tasks":["任務"]}',
@@ -701,6 +706,25 @@ export const contentRoutes: RouteDef[] = [
       if (action === "plan" && Array.isArray(data.tasks)) {
         for (const t of (data.tasks as string[]).slice(0, 8)) {
           await db.insert(tasks).values({ userId: user.userId, title: String(t).slice(0, 120), source: "ocr_plan" });
+        }
+      }
+      if (action === "vocabulary" && Array.isArray(data.vocabulary)) {
+        for (const item of (data.vocabulary as Array<Record<string, unknown>>).slice(0, 100)) {
+          const word = String(item.word ?? "").trim().slice(0, 200);
+          if (!word) continue;
+          await db.insert(userVocabularies).values({
+            userId: user.userId,
+            word,
+            normalizedWord: word.toLocaleLowerCase("en-US"),
+            partOfSpeech: String(item.partOfSpeech ?? "").slice(0, 80),
+            meaning: String(item.meaning ?? "").slice(0, 1000),
+            phonetic: String(item.phonetic ?? "").slice(0, 160),
+            example: String(item.example ?? "").slice(0, 1000),
+            exampleZh: String(item.exampleZh ?? "").slice(0, 1000),
+            analysis: item,
+            sourceDocumentId: doc.id,
+            sourceObjectId: null,
+          }).onConflictDoNothing();
         }
       }
       await db.update(ocrDocuments).set({ aiResult: { ...(doc.aiResult ?? {}), [action]: data }, updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));

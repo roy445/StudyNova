@@ -8,7 +8,7 @@ import { BarChart, LineChart } from "@/components/charts";
 type Job = { id: string; originalFilename: string; mimeType: string; outputFormat?: string; originalSize: number; targetSize: number; status: string; stage: string; compressedSize: number | null; compressionRatio: number | null; qualityScore: string | null; errorMessage: string; resultUrl: string | null; progress: number; preview: Record<string, unknown> };
 type Batch = { batchId: string; batchName: string; total: number; completed: number; failed: number; progress: number; zipUrl: string | null; jobs: Job[] };
 const pretty = (bytes: number | null) => bytes == null ? "—" : bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(2)} MB` : `${(bytes / 1024).toFixed(1)} KB`;
-const stageText: Record<string, string> = { QUEUED: "等待處理", ANALYZING: "正在分析檔案", COMPRESSING: "正在最佳化檔案", VERIFYING: "正在驗證檔案", COMPLETED: "壓縮完成", FAILED: "壓縮失敗" };
+const stageText: Record<string, string> = { QUEUED: "排隊中", ANALYZING: "分析", COMPRESSING: "最佳化", VERIFYING: "驗證", COMPLETED: "完成", FAILED: "失敗" };
 
 export default function CompressPage() {
   const toast = useToast();
@@ -36,7 +36,7 @@ export default function CompressPage() {
   async function submit() {
     if (!files.length) { toast.push("error", "請先選擇檔案"); return; }
     setBusy(true);
-    try { const form = new FormData(); files.forEach((file) => form.append(files.length > 1 ? "files" : "file", file)); form.set("targetSize", target); form.set("targetUnit", unit); form.set("mode", mode); form.set("outputFormat", outputFormat); if (files.length > 1) { const data = await apiPost<Batch>("/compress/batches", form); setBatch(data); toast.push("success", `已建立 ${files.length} 個檔案的批次壓縮`); } else { const data = await apiPost<{ job: Job }>("/compress/jobs", form); setJob(data.job); toast.push("success", "已建立壓縮工作，正在背景處理"); } } catch (err) { toast.push("error", errorMessage(err)); } finally { setBusy(false); }
+    try { const form = new FormData(); files.forEach((file) => form.append(files.length > 1 ? "files" : "file", file)); form.set("targetSize", target); form.set("targetUnit", unit); form.set("mode", mode); form.set("outputFormat", outputFormat); if (files.length > 1) { const data = await apiPost<Batch>("/compress/batches", form); setBatch(data); toast.push("success", `已建立 ${files.length} 個檔案的批次壓縮`); } else { const data = await apiPost<{ job: Job }>("/compress/jobs", form); setJob(data.job); toast.push("success", "壓縮工作已建立"); } } catch (err) { toast.push("error", errorMessage(err)); } finally { setBusy(false); }
   }
   return <main className="container space-y-5 py-6 sm:py-8">
     <div><p className="text-xs uppercase tracking-[.24em] text-[#37d3ff]">SMART COMPRESSOR</p><h1 className="mt-1 text-2xl font-bold sm:text-3xl">智慧檔案壓縮中心</h1><p className="mt-2 max-w-2xl text-sm text-muted">輸入目標檔案大小，系統會以目標大小導向策略自動調整品質、解析度與編碼；如果安全品質下無法達成，會誠實告知最佳結果。</p></div>

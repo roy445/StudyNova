@@ -376,6 +376,45 @@ export function OcrPanel() {
     }
   }
 
+  async function addOcrToMaterial() {
+    if (!activeId || !detail.data?.document.combinedText.trim()) {
+      toast.push("info", "請先完成 OCR 辨識");
+      return;
+    }
+    if (!window.confirm("要將這份 OCR 全文加入「我的教材」嗎？")) return;
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.set("title", `OCR・${detail.data.document.title}`);
+      form.set("subject", detail.data.document.subject);
+      form.set("content", detail.data.document.combinedText);
+      await apiPost("/materials", form);
+      toast.push("success", "已加入我的教材");
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addOcrVocabulary() {
+    if (!activeId || !detail.data?.document.combinedText.trim()) {
+      toast.push("info", "請先完成 OCR 辨識");
+      return;
+    }
+    if (!confirmNovaSpend("AI 整理並加入我的單字", aiContextCost)) return;
+    setBusy(true);
+    try {
+      const res = await apiPost<{ result: { vocabulary?: unknown[] } }>(`/ocr/documents/${activeId}/transform`, { action: "vocabulary" });
+      const count = Array.isArray(res.result?.vocabulary) ? res.result.vocabulary.length : 0;
+      toast.push("success", count ? `已加入 ${count} 個單字` : "沒有找到可加入的單字");
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function transform(action: string) {
     if (!activeId) return;
     if (!confirmNovaSpend("AI 轉換學習內容", aiContextCost)) return;
@@ -546,6 +585,12 @@ export function OcrPanel() {
             </label>
             <Button size="sm" loading={busy} onClick={runOcr}>
               ✨ 開始 AI 辨識
+            </Button>
+            <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
+              加入我的教材
+            </Button>
+            <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrVocabulary}>
+              AI 整理並加入單字
             </Button>
             {latestBatchNumber && <Badge tone="cyan">目前分析第 {latestBatchNumber} 批（{latestBatchIds.length} 張）</Badge>}
             <Select value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value as typeof analysisMode)} className="!w-auto !py-1.5 text-xs" aria-label="AI 分析模式">
