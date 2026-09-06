@@ -2,13 +2,12 @@ import type { ReactNode } from "react";
 
 type Props = { cost: number | null | undefined; action?: string; balance?: number | null; className?: string; children?: ReactNode };
 
-export function NovaCostNotice({ cost, action = "此操作", balance, className = "", children }: Props) {
-  return (
-    <div className={`rounded-xl border border-[#ffc857]/25 bg-[#ffc857]/8 px-3 py-2 text-xs text-[#ffe4a3] ${className}`}>
-      {typeof cost !== "number" ? <strong>正在取得「{action}」的實際 Nova 費用，請稍候</strong> : cost > 0 ? <><strong>{action}將扣除 {cost} Nova</strong>{typeof balance === "number" && <span className="ml-2 text-[#fff1c7]/75">目前餘額 {balance} Nova</span>}</> : <strong>{action}免費，不會扣除 Nova</strong>}
-      {children && <span className="ml-2 text-[#fff1c7]/75">{children}</span>}
-    </div>
-  );
+/**
+ * 費用不再以黃色提示框常駐顯示，改由實際操作按鈕與必要確認視窗呈現，避免干擾主畫面。
+ * 保留元件介面，讓既有功能可以安全逐步改成按鈕內顯示費用。
+ */
+export function NovaCostNotice(_props: Props) {
+  return null;
 }
 
 export function confirmNovaSpend(action: string, cost: number | null | undefined, balance?: number | null) {

@@ -249,6 +249,8 @@ export function OcrPanel() {
   const [selectedVisionItems, setSelectedVisionItems] = useState<string[]>([]);
   const [latestBatchIds, setLatestBatchIds] = useState<string[]>([]);
   const [latestBatchNumber, setLatestBatchNumber] = useState<number | null>(null);
+  const currentOcrPages = latestBatchIds.length || detail.data?.pages.length || 0;
+  const ocrTotalCost = typeof imageOcrCost === "number" ? imageOcrCost * currentOcrPages + (currentOcrPages > 1 ? (multiImageOcrCost ?? 0) : 0) : null;
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
   const [torchOn, setTorchOn] = useState(false);
@@ -584,7 +586,7 @@ export function OcrPanel() {
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => uploadImages(e.target.files)} />
             </label>
             <Button size="sm" loading={busy} onClick={runOcr}>
-              ✨ 開始 AI 辨識
+              ✨ 開始 AI 辨識{typeof ocrTotalCost === "number" ? `（扣 ${ocrTotalCost} Nova）` : ""}
             </Button>
             <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
               加入我的教材
@@ -754,7 +756,7 @@ export function OcrPanel() {
                 ["plan", "複習計畫"],
               ].map(([action, label]) => (
                 <Button key={action} size="sm" variant="ghost" loading={busy} onClick={() => transform(action)}>
-                  {label}
+                  {label}{typeof aiContextCost === "number" ? `（扣 ${aiContextCost} Nova）` : ""}
                 </Button>
               ))}
             </div>
