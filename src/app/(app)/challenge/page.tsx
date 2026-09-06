@@ -24,15 +24,16 @@ type Challenge = {
 type ChallengeMode = "choice" | "listening" | "handwriting" | "confusable";
 type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string; direction?: "zh2en" | "en2zh"; challengeMode?: ChallengeMode; options?: string[]; answer?: string };
 
-type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; challengeMode?: ChallengeMode; onFinish: (score: number, total: number, durationSec: number) => Promise<void> };
+type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; challengeMode?: ChallengeMode; onFinish: (score: number, total: number, durationSec: number) => Promise<void>; onExit: () => void };
 
-function QuizRunner({ title, words, direction, difficulty, challengeMode = "choice", onFinish }: QuizRunnerProps) {
+function QuizRunner({ title, words, direction, difficulty, challengeMode = "choice", onFinish, onExit }: QuizRunnerProps) {
   const [index, setIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [startedAt] = useState(() => Date.now());
   const [selected, setSelected] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [typed, setTyped] = useState("");
+  const [summary, setSummary] = useState<{ score: number; total: number; durationSec: number } | null>(null);
   const current = words[index];
   const actualDirection = current?.direction ?? (direction === "mixed" ? (index % 2 === 0 ? "zh2en" : "en2zh") : direction);
   const mode = current?.challengeMode ?? challengeMode;
@@ -44,6 +45,7 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
     return [answer, ...pool].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
   }, [actualDirection, current, words]);
 
+  if (summary) return <Card title="🎉 挑戰完成" subtitle={title}><div className="space-y-4 text-center"><div className="grid grid-cols-3 gap-2"><div className="glass-soft rounded-xl p-3"><p className="text-xs text-muted">總分</p><p className="mt-1 text-2xl font-black text-[#7dd3fc]">{summary.score}</p></div><div className="glass-soft rounded-xl p-3"><p className="text-xs text-muted">答對</p><p className="mt-1 text-2xl font-black text-emerald-300">{correct}/{summary.total}</p></div><div className="glass-soft rounded-xl p-3"><p className="text-xs text-muted">用時</p><p className="mt-1 text-2xl font-black">{summary.durationSec}s</p></div></div><p className="text-sm text-muted">{summary.score >= 90 ? "表現非常好，繼續保持！" : summary.score >= 60 ? "做得不錯，再複習錯題會更穩。" : "先整理錯題，再挑戰一次看看。"}</p><Button full onClick={onExit}>返回挑戰專區</Button></div></Card>;
   if (!current) return <EmptyState icon="✓" title="題目準備中" />;
   async function choose(answer: string) {
     if (selected || submitting) return;
@@ -65,7 +67,10 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
         return;
       }
       setSubmitting(true);
-      await onFinish(Math.round((nextCorrect / words.length) * 100), words.length, Math.round((Date.now() - startedAt) / 1000));
+      const score = Math.round((nextCorrect / words.length) * 100);
+      const durationSec = Math.round((Date.now() - startedAt) / 1000);
+      await onFinish(score, words.length, durationSec);
+      setSummary({ score, total: words.length, durationSec });
       setSubmitting(false);
     }, 550);
   }
@@ -114,7 +119,8 @@ function ChallengeInner() {
       const sourceWords: ChallengeWord[] = selfForm.source === "mine"
         ? (await apiGet<{ items: ChallengeWord[] }>(`/my-vocabulary?limit=${selfForm.questionCount}`)).items
         : (await apiGet<{ words: ChallengeWord[] }>(`/words/all?track=${selfForm.track}&limit=${selfForm.questionCount}`)).words;
-      const words = selfForm.shuffle ? [...sourceWords].sort(() => Math.random() - 0.5) : sourceWords;
+      const distinctWords = sourceWords.filter((word, index, all) => all.findIndex((candidate) => candidate.word.trim().toLocaleLowerCase("en-US") === word.word.trim().toLocaleLowerCase("en-US")) === index);
+      const words = selfForm.shuffle ? [...distinctWords].sort(() => Math.random() - 0.5) : distinctWords;
       if (!words.length) throw new Error("目前沒有可用的題目");
       const nextSession = { title: `自我挑戰・${selfForm.source === "mine" ? "我的單字" : selfForm.track === "junior" ? "國中" : "高中"}`, words: words.slice(0, selfForm.questionCount).map((word) => ({ ...word, challengeMode: selfForm.challengeMode })), direction: selfForm.direction, difficulty: selfForm.difficulty, challengeMode: selfForm.challengeMode } as const;
       setCountdown(3);
@@ -127,7 +133,7 @@ function ChallengeInner() {
   }
 
   if (countdown !== null) return <Card title="⚔️ 雙方已準備" subtitle="題目與選項已鎖定，所有參與者完全相同"><div className="flex min-h-[260px] flex-col items-center justify-center"><p className="text-sm text-muted">挑戰即將開始</p><p className="mt-3 text-8xl font-black text-[#37d3ff]">{countdown}</p></div></Card>;
-  if (quizSession) return <div className="space-y-4"><QuizRunner {...quizSession} onFinish={async (score, total, durationSec) => { if (quizSession.challengeId) await apiPost(`/challenges/${quizSession.challengeId}/submit`, { score, durationSec }); else await apiPost("/words/session-complete", { correct: Math.round((score / 100) * total), total, seconds: durationSec }); toast.push("success", `挑戰完成！得分 ${score} 分`); setQuizSession(null); await challenges.reload(); }} /><Button variant="ghost" onClick={() => setQuizSession(null)}>離開挑戰</Button></div>;
+  if (quizSession) return <div className="space-y-4"><QuizRunner {...quizSession} onExit={() => setQuizSession(null)} onFinish={async (score, total, durationSec) => { if (quizSession.challengeId) await apiPost(`/challenges/${quizSession.challengeId}/submit`, { score, durationSec }); else await apiPost("/words/session-complete", { correct: Math.round((score / 100) * total), total, seconds: durationSec }); toast.push("success", `挑戰完成！得分 ${score} 分`); await challenges.reload(); }} /><Button variant="ghost" onClick={() => setQuizSession(null)}>離開挑戰</Button></div>;
 
   return (
     <div className="space-y-4">

@@ -254,17 +254,21 @@ export const routes: RouteDef[] = [
         const pool = body.source === "mine"
           ? await db.select({ id: userVocabularies.id, word: userVocabularies.word, meaning: userVocabularies.meaning, partOfSpeech: userVocabularies.partOfSpeech, example: userVocabularies.example, exampleZh: userVocabularies.exampleZh, level: sql<string>`'mine'` }).from(userVocabularies).where(eq(userVocabularies.userId, user.userId)).orderBy(sql`random()`).limit(200)
           : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, body.track)).orderBy(sql`random()`).limit(Math.min(800, count * 4));
+        const distinctPool = pool.filter((item, index, all) => {
+          const normalized = item.word.trim().toLocaleLowerCase("en-US");
+          return normalized && all.findIndex((candidate) => candidate.word.trim().toLocaleLowerCase("en-US") === normalized) === index;
+        });
         if (body.source === "mine") {
-          for (let i = 0; i < Math.min(count, pool.length); i += 1) {
-            const current = pool[i];
+          for (let i = 0; i < Math.min(count, distinctPool.length); i += 1) {
+            const current = distinctPool[i];
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
             const answer = direction === "zh2en" ? current.word : current.meaning;
-            const options = [answer, ...pool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
+            const options = [answer, ...distinctPool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
             challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, options: options.sort(() => Math.random() - 0.5), answer });
           }
         } else {
-          for (let i = 0; i < Math.min(count, Math.floor(pool.length / 4)); i += 1) {
-            const group = pool.slice(i * 4, i * 4 + 4);
+          for (let i = 0; i < Math.min(count, Math.floor(distinctPool.length / 4)); i += 1) {
+            const group = distinctPool.slice(i * 4, i * 4 + 4);
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
             const answer = direction === "zh2en" ? group[0].word : group[0].meaning;
             const options = group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
