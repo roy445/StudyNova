@@ -21,6 +21,7 @@ import {
   aiProviderHealth,
   aiUsageLogs,
   questions,
+  questionImportJobs,
   gradeRecords,
   weeklyExamResults,
   weeklyExamWeeks,
@@ -712,6 +713,49 @@ export const routes: RouteDef[] = [
   }),
 
   /* ----------------------------------------------------- question bank */
+  route({
+    method: "POST",
+    path: "/admin/question-imports",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ totalFiles: z.number().int().min(1).max(50), bankCategory: z.string().min(1).max(40), sourceLabel: z.string().min(1).max(120), targetBank: z.enum(["general", "activity", "exclusive", "weekly"]) }));
+      const job = (await db.insert(questionImportJobs).values({ adminId: admin.userId, totalFiles: body.totalFiles, bankCategory: body.bankCategory, sourceLabel: body.sourceLabel, targetBank: body.targetBank, status: "uploading" }).returning())[0];
+      return { jobId: job.id, status: job.status };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/question-imports/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const job = (await db.select().from(questionImportJobs).where(and(eq(questionImportJobs.id, ctx.params.id), eq(questionImportJobs.adminId, admin.userId))).limit(1))[0];
+      if (!job) throw notFound("找不到匯入工作");
+      return { ...job, progress: job.totalFiles ? Math.min(100, Math.round((job.processedFiles / job.totalFiles) * 100)) : 0 };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/question-imports/:id/confirm",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const job = (await db.select().from(questionImportJobs).where(and(eq(questionImportJobs.id, ctx.params.id), eq(questionImportJobs.adminId, admin.userId))).limit(1))[0];
+      if (!job) throw notFound("找不到匯入工作");
+      if (job.status !== "ready") throw badRequest("題目尚未分析完成，不能確認匯入");
+      let imported = 0;
+      for (const item of job.preview) {
+        const subject = String(item.subject || "英文");
+        const stem = String(item.stem || "");
+        const answer = Array.isArray(item.answer) ? item.answer.map(String) : [];
+        const rows = await db.insert(questions).values({ ownerId: null, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), fingerprint: fingerprint(subject, stem, answer.join("|")) }).onConflictDoNothing().returning({ id: questions.id });
+        if (rows[0]) imported += 1;
+      }
+      await db.update(questionImportJobs).set({ status: "confirmed", acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
+      return { jobId: job.id, imported };
+    },
+  }),
   route({
     method: "POST",
     path: "/admin/questions/import",

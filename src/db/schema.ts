@@ -275,6 +275,7 @@ export const questions = pgTable(
     id: id(),
     ownerId: uuid("owner_id").references(() => users.userId, { onDelete: "cascade" }),
     origin: text("origin").notNull().default("ai"), // ai | bank | admin | user
+    targetBank: text("target_bank").notNull().default("general"),
     bankCategory: text("bank_category").notNull().default("general"),
     sourceLabel: text("source_label").notNull().default(""),
     subject: text("subject").notNull(),
@@ -293,6 +294,28 @@ export const questions = pgTable(
     uniqueIndex("questions_fingerprint_uq").on(t.fingerprint),
     index("questions_subject_idx").on(t.subject, t.difficulty),
   ],
+);
+
+export const questionImportJobs = pgTable(
+  "question_import_jobs",
+  {
+    id: id(),
+    adminId: uuid("admin_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    status: text("status").notNull().default("created"),
+    totalFiles: integer("total_files").notNull().default(0),
+    processedFiles: integer("processed_files").notNull().default(0),
+    totalQuestions: integer("total_questions").notNull().default(0),
+    acceptedQuestions: integer("accepted_questions").notNull().default(0),
+    duplicateQuestions: integer("duplicate_questions").notNull().default(0),
+    bankCategory: text("bank_category").notNull().default("匯入題庫"),
+    sourceLabel: text("source_label").notNull().default("線上上傳檔案"),
+    targetBank: text("target_bank").notNull().default("general"),
+    preview: jsonb("preview").$type<Array<Record<string, unknown>>>().notNull().default([]),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: created(),
+  },
+  (t) => [index("question_import_jobs_admin_idx").on(t.adminId, t.createdAt)],
 );
 
 export const quizzes = pgTable(
