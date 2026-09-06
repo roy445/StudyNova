@@ -22,6 +22,7 @@ import {
   novaAccounts,
   announcements,
   dailyWords,
+  userVocabularies,
   userSettings,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
@@ -231,6 +232,7 @@ export const routes: RouteDef[] = [
           direction: z.enum(["zh2en", "en2zh", "mixed"]).default("mixed"),
           difficulty: z.enum(["easy", "normal", "hard"]).default("normal"),
           challengeMode: z.enum(["choice", "listening", "handwriting", "confusable"]).default("choice"),
+          source: z.enum(["catalog", "mine"]).default("catalog"),
         }),
       );
       if (body.kind === "quiz") {
@@ -249,19 +251,25 @@ export const routes: RouteDef[] = [
         const count = Math.max(5, Math.min(200, body.questionCount));
         // 題目在建立挑戰時一次抽好並寫入 payload，所有參與者讀到完全相同的題目。
         // 每一題的選項也預先洗牌，且同一輪不重複使用選項文字。
-        const pool = await db
-          .select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level })
-          .from(dailyWords)
-          .where(eq(dailyWords.level, body.track))
-          .orderBy(sql`random()`)
-          .limit(Math.min(800, count * 4));
-        for (let i = 0; i < Math.min(count, Math.floor(pool.length / 4)); i += 1) {
-          const group = pool.slice(i * 4, i * 4 + 4);
-          const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
-          const answer = direction === "zh2en" ? group[0].word : group[0].meaning;
-          const options = group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
-          const shuffled = [...options].sort(() => Math.random() - 0.5);
-          challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, options: shuffled, answer });
+        const pool = body.source === "mine"
+          ? await db.select({ id: userVocabularies.id, word: userVocabularies.word, meaning: userVocabularies.meaning, partOfSpeech: userVocabularies.partOfSpeech, example: userVocabularies.example, exampleZh: userVocabularies.exampleZh, level: sql<string>`'mine'` }).from(userVocabularies).where(eq(userVocabularies.userId, user.userId)).orderBy(sql`random()`).limit(200)
+          : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, body.track)).orderBy(sql`random()`).limit(Math.min(800, count * 4));
+        if (body.source === "mine") {
+          for (let i = 0; i < Math.min(count, pool.length); i += 1) {
+            const current = pool[i];
+            const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
+            const answer = direction === "zh2en" ? current.word : current.meaning;
+            const options = [answer, ...pool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
+            challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, options: options.sort(() => Math.random() - 0.5), answer });
+          }
+        } else {
+          for (let i = 0; i < Math.min(count, Math.floor(pool.length / 4)); i += 1) {
+            const group = pool.slice(i * 4, i * 4 + 4);
+            const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
+            const answer = direction === "zh2en" ? group[0].word : group[0].meaning;
+            const options = group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
+            challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, options: [...options].sort(() => Math.random() - 0.5), answer });
+          }
         }
         if (challengeItems.length < 5) throw badRequest("目前題庫不足，請稍後再試");
       }
@@ -278,6 +286,7 @@ export const routes: RouteDef[] = [
             direction: body.direction,
             difficulty: body.difficulty,
             challengeMode: body.challengeMode,
+            source: body.source,
             items: challengeItems,
             readyUserIds: [user.userId],
           } : {},
