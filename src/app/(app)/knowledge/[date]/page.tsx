@@ -13,7 +13,7 @@ export default function DailyKnowledgePage({ params }: { params: { date: string 
     <div className="mx-auto max-w-3xl space-y-4">
       <Link href="/dashboard" className="text-xs text-muted underline">← 回到首頁</Link>
       <Card>
-        <Badge tone="cyan">{item.tag}</Badge>
+        <div className="flex flex-wrap items-center gap-2"><Badge tone="cyan">{item.subject}</Badge><Badge tone="muted">{item.tag}</Badge><span className="text-xs text-muted">命題方向：{item.trend}</span></div>
         <h1 className="mt-3 text-2xl font-bold">{item.title}</h1>
         <p className="mt-4 text-base leading-8 text-muted">{item.body}</p>
         <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-cyan-400/5 p-4">
