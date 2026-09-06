@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiGet } from "@/lib/api";
+import ChristmasEventLayer from "@/components/ChristmasEventLayer";
 
 type ChristmasTheme = {
   enabled: boolean;
@@ -12,6 +13,12 @@ type ChristmasTheme = {
   intensity: "soft" | "balanced" | "festive";
   title: string;
   subtitle: string;
+  reindeer: boolean;
+  reindeerNova: number;
+  reindeerXp: number;
+  primary: string;
+  accent: string;
+  red: string;
 };
 
 const DEFAULT_THEME: ChristmasTheme = {
@@ -24,6 +31,12 @@ const DEFAULT_THEME: ChristmasTheme = {
   intensity: "balanced",
   title: "StudyNova Winter Festival",
   subtitle: "今年冬天，一起把知識裝進聖誕禮物裡。",
+  reindeer: true,
+  reindeerNova: 8,
+  reindeerXp: 12,
+  primary: "#66e0ff",
+  accent: "#ffc857",
+  red: "#c83b4b",
 };
 
 export default function ThemeLayer() {
@@ -50,9 +63,16 @@ export default function ThemeLayer() {
     root.dataset.christmasDecorations = active && theme.decorations ? "on" : "off";
     root.dataset.christmasParticles = active && theme.particles ? "on" : "off";
     root.dataset.christmasSnow = active && theme.snow ? "on" : "off";
+    root.style.setProperty("--christmas-primary", theme.primary);
+    root.style.setProperty("--christmas-accent", theme.accent);
+    root.style.setProperty("--christmas-red", theme.red);
     window.dispatchEvent(new Event("studynova:theme"));
   }, [theme]);
-  return theme?.enabled && theme.snow ? <div className="christmas-snowfall" aria-hidden="true" /> : null;
+  if (!theme) return null;
+  return <>
+    {theme.enabled && theme.snow && <div className="christmas-snowfall" aria-hidden="true" />}
+    <ChristmasEventLayer enabled={theme.enabled} decorations={theme.decorations} reindeer={theme.reindeer} />
+  </>;
 }
 
 export type { ChristmasTheme };

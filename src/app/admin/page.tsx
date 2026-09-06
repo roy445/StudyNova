@@ -32,6 +32,12 @@ type ChristmasTheme = {
   intensity: "soft" | "balanced" | "festive";
   title: string;
   subtitle: string;
+  reindeer: boolean;
+  reindeerNova: number;
+  reindeerXp: number;
+  primary: string;
+  accent: string;
+  red: string;
 };
 const DEFAULT_CHRISTMAS_THEME: ChristmasTheme = {
   enabled: true,
@@ -43,6 +49,12 @@ const DEFAULT_CHRISTMAS_THEME: ChristmasTheme = {
   intensity: "balanced",
   title: "StudyNova Winter Festival",
   subtitle: "今年冬天，一起把知識裝進聖誕禮物裡。",
+  reindeer: true,
+  reindeerNova: 8,
+  reindeerXp: 12,
+  primary: "#66e0ff",
+  accent: "#ffc857",
+  red: "#c83b4b",
 };
 
 const ACTIONS = [
@@ -271,7 +283,7 @@ export default function AdminOverviewPage() {
         <Card title="✦ 節慶外觀與 NOVA 助理" subtitle="只有管理員可以修改；儲存後全站立即套用，操作會寫入 Audit Log。">
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              {[["enabled", "Christmas Theme"], ["novi", "聖誕 NOVA 外觀"], ["snow", "雪花效果"], ["decorations", "聖誕裝飾"]].map(([key, label]) => (
+              {[["enabled", "Christmas Theme"], ["novi", "聖誕 NOVA 外觀"], ["snow", "雪花效果"], ["decorations", "聖誕裝飾"], ["reindeer", "隨機馴鹿事件"]].map(([key, label]) => (
                 <label key={key} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={themeForm[key as keyof ChristmasTheme] as boolean} onChange={(e) => setThemeForm({ ...themeForm, [key]: e.target.checked })} className="accent-[#37d3ff]" /></label>
               ))}
             </div>
@@ -279,6 +291,11 @@ export default function AdminOverviewPage() {
               <Field label="主題強度"><Select value={themeForm.intensity} onChange={(e) => setThemeForm({ ...themeForm, intensity: e.target.value as ChristmasTheme["intensity"] })}><option value="soft">柔和</option><option value="balanced">平衡</option><option value="festive">節慶</option></Select></Field>
               <Field label="Hero 標題"><Input value={themeForm.title} onChange={(e) => setThemeForm({ ...themeForm, title: e.target.value })} /></Field>
               <Field label="Hero 副標題"><Input value={themeForm.subtitle} onChange={(e) => setThemeForm({ ...themeForm, subtitle: e.target.value })} /></Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="馴鹿 Nova 獎勵"><Input type="number" min={1} max={100} value={themeForm.reindeerNova} onChange={(e) => setThemeForm({ ...themeForm, reindeerNova: Number(e.target.value) })} /></Field>
+              <Field label="馴鹿 XP 獎勵"><Input type="number" min={1} max={200} value={themeForm.reindeerXp} onChange={(e) => setThemeForm({ ...themeForm, reindeerXp: Number(e.target.value) })} /></Field>
+              <div className="flex items-end gap-3 rounded-xl border border-[var(--line)] px-3 py-2"><label className="flex items-center gap-2 text-xs"><span>主色</span><input type="color" value={themeForm.primary} onChange={(e) => setThemeForm({ ...themeForm, primary: e.target.value })} /></label><label className="flex items-center gap-2 text-xs"><span>金色</span><input type="color" value={themeForm.accent} onChange={(e) => setThemeForm({ ...themeForm, accent: e.target.value })} /></label><label className="flex items-center gap-2 text-xs"><span>紅色</span><input type="color" value={themeForm.red} onChange={(e) => setThemeForm({ ...themeForm, red: e.target.value })} /></label></div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs text-muted">
               <span>{themeForm.enabled ? "目前套用午夜藍、冰藍、金色光暈與低負載雪花。" : "目前維持原本 StudyNova 科技主題。"}</span>

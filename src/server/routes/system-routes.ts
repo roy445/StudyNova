@@ -56,6 +56,12 @@ export const routes: RouteDef[] = [
           intensity: "balanced",
           title: "StudyNova Winter Festival",
           subtitle: "今年冬天，一起把知識裝進聖誕禮物裡。",
+          reindeer: true,
+          reindeerNova: 8,
+          reindeerXp: 12,
+          primary: "#66e0ff",
+          accent: "#ffc857",
+          red: "#c83b4b",
         },
       };
     },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -17,13 +18,59 @@ import {
   coupons,
   couponRedemptions,
   featurePermissions,
+  platformSettings,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { badRequest, conflict, fail, notFound } from "../core";
-import { allFeatureStates, grantMembership, grantNova, grantXp, isProUser } from "../economy";
+import { badRequest, conflict, fail, notFound, randomToken } from "../core";
+import { allFeatureStates, grantLearningReward, grantMembership, grantNova, grantXp, isProUser } from "../economy";
 import { notify } from "../notify";
 
+function reindeerSignature(payload: string) {
+  return createHmac("sha256", process.env.JWT_SECRET ?? "studynova-reindeer-dev-secret").update(payload).digest("base64url");
+}
+
+function christmasSetting(value: Record<string, unknown> | undefined) {
+  return { enabled: true, reindeer: true, reindeerNova: 8, reindeerXp: 12, ...(value ?? {}) };
+}
+
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/christmas/reindeer/event",
+    auth: "user",
+    rate: { limit: 2, windowSec: 30, key: "christmas-reindeer-event" },
+    handler: async () => {
+      const setting = christmasSetting((await db.select({ value: platformSettings.value }).from(platformSettings).where(eq(platformSettings.key, "christmas_theme")).limit(1))[0]?.value);
+      if (setting.enabled !== true || setting.reindeer !== true || Math.random() > 0.24) return { event: null };
+      const issuedAt = Date.now();
+      const payload = `${issuedAt}.${randomToken(12)}`;
+      return { event: { token: `${payload}.${reindeerSignature(payload)}`, durationMs: 10500 } };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/christmas/reindeer/claim",
+    auth: "user",
+    rate: { limit: 8, windowSec: 60, key: "christmas-reindeer-claim" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ token: z.string().min(40).max(400) }));
+      const parts = body.token.split(".");
+      if (parts.length !== 3) throw fail("CHRISTMAS_REINDEER_TOKEN_INVALID");
+      const [issued, nonce, signature] = parts;
+      const payload = `${issued}.${nonce}`;
+      const expected = reindeerSignature(payload);
+      if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw fail("CHRISTMAS_REINDEER_TOKEN_INVALID");
+      const issuedAt = Number(issued);
+      if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > 15_000 || issuedAt > Date.now() + 5_000) throw fail("CHRISTMAS_REINDEER_TOKEN_EXPIRED");
+      const setting = christmasSetting((await db.select({ value: platformSettings.value }).from(platformSettings).where(eq(platformSettings.key, "christmas_theme")).limit(1))[0]?.value);
+      if (setting.enabled !== true || setting.reindeer !== true) throw fail("CHRISTMAS_REINDEER_DISABLED");
+      const nova = Math.max(1, Math.min(100, Number(setting.reindeerNova ?? 8)));
+      const xp = Math.max(1, Math.min(200, Number(setting.reindeerXp ?? 12)));
+      const reward = await grantLearningReward({ userId: user.userId, nova, xp, reason: "聖誕馴鹿飛越獎勵", idempotencyKey: `christmas-reindeer:${nonce}` });
+      return { claimed: true, reward };
+    },
+  }),
   route({
     method: "GET",
     path: "/nova",
