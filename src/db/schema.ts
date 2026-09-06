@@ -313,7 +313,7 @@ export const questionImportJobs = pgTable(
     preview: jsonb("preview").$type<Array<Record<string, unknown>>>().notNull().default([]),
     errorMessage: text("error_message").notNull().default(""),
     createdAt: created(),
-    updatedAt: created(),
+    updatedAt: updated(),
   },
   (t) => [index("question_import_jobs_admin_idx").on(t.adminId, t.createdAt)],
 );
