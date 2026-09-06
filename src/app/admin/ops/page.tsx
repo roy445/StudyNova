@@ -6,6 +6,13 @@ import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 const DEFAULT_ACTIVITY_START = new Date().toISOString().slice(0, 16);
 const DEFAULT_ACTIVITY_END = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16);
+const ANNOUNCEMENT_TEMPLATES = [
+  { key: "weekly", label: "每週小考開放", title: "每週小考已開放！", body: "本週單字、句子與多元題型測驗已上線，現在就開始挑戰。", link: "/weekly", marquee: true },
+  { key: "knowledge", label: "每日知識更新", title: "今日課外知識已更新", body: "前往每日知識，閱讀跨學科內容並完成素養小測驗。", link: "/dashboard#daily-knowledge", marquee: false },
+  { key: "challenge", label: "好友挑戰開放", title: "好友挑戰等你來戰！", body: "邀請同學一起進行公平對戰，題目與選項將保持一致。", link: "/challenges", marquee: true },
+  { key: "activity", label: "限時活動開始", title: "StudyNova 限時活動開始", body: "活動題庫已開放，完成任務即可獲得 Nova 與 XP 獎勵。", link: "/activities", marquee: true },
+  { key: "maintenance", label: "系統維護通知", title: "系統維護通知", body: "StudyNova 將進行例行維護，請提前保存學習進度。", link: "/dashboard", marquee: false },
+] as const;
 
 type Provider = {
   provider: string;
@@ -36,7 +43,7 @@ export default function AdminOpsPage() {
     "/admin/ai/health",
   );
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; novaCost: number }> }>("/admin/features");
-  const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string }> }>("/admin/announcements");
+  const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string }> }>("/admin/announcements");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
   const coupons = useApi<{ coupons: Array<{ id: string; code: string; kind: string; value: number; maxRedemptions: number; redeemedCount: number; enabled: boolean }> }>("/admin/coupons");
   const bank = useApi<{ questions: Array<{ id: string; subject: string; topic: string; origin: string; type: string; stem: string; difficulty: string; appearedCount: number }>; total: number }>("/admin/questions");
@@ -44,7 +51,7 @@ export default function AdminOpsPage() {
   const shop = useApi<{ items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; enabled: boolean }> }>("/admin/shop/items");
 
   const [annOpen, setAnnOpen] = useState(false);
-  const [annForm, setAnnForm] = useState({ title: "", body: "", audience: "all", pinned: false, marquee: false, notify: true, push: false });
+  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", audience: "all", pinned: false, marquee: false, notify: true, push: false });
   const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard", audience: "all" });
   const [pushResult, setPushResult] = useState<{ targets: number; notified: number; pushSent: number; configured: boolean } | null>(null);
   const [actOpen, setActOpen] = useState(false);
@@ -349,6 +356,11 @@ export default function AdminOpsPage() {
           <Button size="sm" className="mt-2" onClick={async () => { try { const result = await apiPost<{ targets: number; notified: number; pushSent: number; configured: boolean }>("/admin/push/test", pushForm); setPushResult(result); toast.push("success", `已通知 ${result.notified} 人，Web Push 發送 ${result.pushSent} 台裝置`); } catch (err) { toast.push("error", errorMessage(err)); } }}>立即發送給選定身分組</Button>
           {pushResult && <p className="mt-2 text-xs text-muted">最近一次：目標 {pushResult.targets} 人・站內通知 {pushResult.notified} 人・Web Push {pushResult.pushSent} 台・VAPID {pushResult.configured ? "已設定" : "未設定（僅站內通知）"}</p>}
         </Card>
+        <Card title="▤ 公告範例" subtitle="以下範例尚未發布；可在發布視窗快速套用並修改。">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ANNOUNCEMENT_TEMPLATES.map((preset) => <button key={preset.key} type="button" className="glass-soft text-left p-3 transition hover:bg-white/10" onClick={() => { setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.link, marquee: preset.marquee }); setAnnOpen(true); }}><p className="text-sm font-semibold">{preset.title}</p><p className="mt-1 text-xs text-muted">{preset.body}</p><p className="mt-1 text-[11px] text-[#7dd3fc]">點擊跳轉：{preset.link}</p></button>)}
+          </div>
+        </Card>
         <Card title="▤ 公告" action={<Button size="sm" onClick={() => setAnnOpen(true)}>＋ 發布公告</Button>}>
           {anns.loading && <Skeleton lines={3} />}
           <div className="space-y-2">
@@ -554,11 +566,20 @@ export default function AdminOpsPage() {
 
       <Modal open={annOpen} onClose={() => setAnnOpen(false)} title="發布公告">
         <div className="space-y-3">
+          <Field label="快速套用範例">
+            <Select value="" onChange={(e) => { const preset = ANNOUNCEMENT_TEMPLATES.find((item) => item.key === e.target.value); if (preset) setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.link, marquee: preset.marquee }); }}>
+              <option value="">選擇公告範例…</option>
+              {ANNOUNCEMENT_TEMPLATES.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
+            </Select>
+          </Field>
           <Field label="標題" required>
             <Input value={annForm.title} onChange={(e) => setAnnForm({ ...annForm, title: e.target.value })} />
           </Field>
           <Field label="內容">
             <Textarea value={annForm.body} onChange={(e) => setAnnForm({ ...annForm, body: e.target.value })} />
+          </Field>
+          <Field label="點擊後跳轉頁面" hint="例如 /weekly、/dashboard、/activities">
+            <Input value={annForm.link} onChange={(e) => setAnnForm({ ...annForm, link: e.target.value })} placeholder="/weekly" />
           </Field>
           <Field label="對象">
             <Select value={annForm.audience} onChange={(e) => setAnnForm({ ...annForm, audience: e.target.value })}>

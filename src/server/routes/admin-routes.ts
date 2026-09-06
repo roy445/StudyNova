@@ -381,6 +381,7 @@ export const routes: RouteDef[] = [
         z.object({
           title: z.string().min(1).max(120),
           body: z.string().max(4000).default(""),
+          link: z.string().max(300).default("/dashboard"),
           image: z.string().max(400).default(""),
           audience: z.enum(["all", "pro", "users", "group"]).default("all"),
           audienceIds: z.array(z.string().uuid()).max(500).default([]),
@@ -398,6 +399,7 @@ export const routes: RouteDef[] = [
         .values({
           title: body.title,
           body: body.body,
+          link: body.link,
           image: body.image,
           audience: body.audience,
           audienceIds: body.audienceIds,
@@ -420,7 +422,7 @@ export const routes: RouteDef[] = [
             kind: "announcement",
             title: `📢 ${body.title}`,
             body: body.body.slice(0, 200),
-            link: "/dashboard",
+            link: body.link,
             dedupeKey: `ann:${rows[0].id}:${userId}`,
             push: body.push,
           });
@@ -438,7 +440,7 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const body = await ctx.json(
-        z.object({ pinned: z.boolean().optional(), marquee: z.boolean().optional(), sortOrder: z.number().int().min(0).max(999).optional(), title: z.string().min(1).max(120).optional(), body: z.string().max(4000).optional() }),
+        z.object({ pinned: z.boolean().optional(), marquee: z.boolean().optional(), sortOrder: z.number().int().min(0).max(999).optional(), title: z.string().min(1).max(120).optional(), body: z.string().max(4000).optional(), link: z.string().max(300).optional() }),
       );
       const rows = await db.update(announcements).set(body).where(eq(announcements.id, ctx.params.id)).returning();
       if (!rows[0]) throw notFound("找不到公告");

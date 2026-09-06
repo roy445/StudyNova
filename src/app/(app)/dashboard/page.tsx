@@ -39,7 +39,7 @@ type Dashboard = {
   nova: number;
   novi: { level: number; xp: number } | null;
   activities: Array<{ id: string; title: string; cover: string; goalValue: number; progress: number; rewardNova: number; endsAt: string }>;
-  announcements: Array<{ id: string; title: string; body: string; pinned: boolean }>;
+  announcements: Array<{ id: string; title: string; body: string; link: string; pinned: boolean }>;
   marquee: Array<{ id: string; title: string }>;
   openWeek: { id: string; weekCode: string; title: string } | null;
   isPro: boolean;
@@ -312,13 +312,14 @@ export default function DashboardPage() {
           {data.announcements.length ? (
             <div className="space-y-2">
               {data.announcements.slice(0, 4).map((a) => (
-                <div key={a.id} className="glass-soft px-3 py-2.5">
+                <Link key={a.id} href={a.link || "/dashboard"} className="glass-soft focus-ring block px-3 py-2.5 hover:bg-white/5">
                   <p className="text-sm font-medium">
                     {a.pinned && "• "}
                     {a.title}
                   </p>
                   {a.body && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{a.body}</p>}
-                </div>
+                  <span className="mt-1 inline-block text-[11px] text-[#37d3ff]">快速前往 →</span>
+                </Link>
               ))}
             </div>
           ) : (

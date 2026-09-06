@@ -1266,6 +1266,7 @@ export const announcements = pgTable(
     id: id(),
     title: text("title").notNull(),
     body: text("body").notNull().default(""),
+    link: text("link").notNull().default("/dashboard"),
     image: text("image").notNull().default(""),
     audience: text("audience").notNull().default("all"), // all | pro | users | group
     audienceIds: jsonb("audience_ids").$type<string[]>().notNull().default([]),
