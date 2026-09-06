@@ -29,7 +29,7 @@ const ACTIONS = [
   { key: "grant_pro", label: "授予 Nova Pro", needDays: true },
   { key: "extend_pro", label: "延長 Nova Pro", needDays: true },
   { key: "revoke_pro", label: "回收 Nova Pro" },
-  { key: "block", label: "封鎖帳號" },
+  { key: "block", label: "封鎖帳號", needDays: true },
   { key: "unblock", label: "解除封鎖" },
   { key: "reset_quota", label: "重設今日額度" },
   { key: "set_unlimited", label: "設定功能無限", needFeature: true },
@@ -253,7 +253,7 @@ export default function AdminOverviewPage() {
             </Field>
           )}
           {currentAction?.needDays && (
-            <Field label="天數">
+            <Field label={form.action === "block" ? "封鎖天數（留空或 0 代表永久）" : "天數"}>
               <Input type="number" value={form.days} onChange={(e) => setForm({ ...form, days: Number(e.target.value) })} />
             </Field>
           )}

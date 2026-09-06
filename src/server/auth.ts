@@ -72,6 +72,7 @@ export async function getSession(): Promise<SessionInfo | null> {
       displayName: users.displayName,
       role: users.role,
       status: users.status,
+      blockedUntil: users.blockedUntil,
       onboarded: users.onboarded,
       tier: memberships.tier,
       expiresAt: memberships.expiresAt,
@@ -84,6 +85,10 @@ export async function getSession(): Promise<SessionInfo | null> {
 
   const row = rows[0];
   if (!row) return null;
+  if (row.status === "blocked" && row.blockedUntil && new Date(row.blockedUntil) <= new Date()) {
+    await db.update(users).set({ status: "active", blockedReason: "", blockedAt: null, blockedUntil: null, updatedAt: new Date() }).where(eq(users.userId, row.userId));
+    row.status = "active";
+  }
   if (row.status === "blocked") {
     await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash));
     try { store.set(SESSION_COOKIE, "", cookieOptions(0)); } catch { /* render context */ }

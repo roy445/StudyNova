@@ -59,8 +59,8 @@ export default function AdminSupportPage() {
   const [sendAppealEmail, setSendAppealEmail] = useState(true);
   const [emailForm, setEmailForm] = useState({ to: "", displayName: "", kind: "reactivate", link: "", note: "", expiresText: "" });
   const [emailResult, setEmailResult] = useState<string | null>(null);
-  const [linkForm, setLinkForm] = useState({ kind: "password_reset", email: "", value: "30", expiresMinutes: "60" });
-  const [linkResult, setLinkResult] = useState<{ link: string; code?: string; label: string; expiresAt?: string | null } | null>(null);
+  const [linkForm, setLinkForm] = useState({ kind: "password_reset", email: "", value: "30", expiresMinutes: "60", reason: "" });
+  const [linkResult, setLinkResult] = useState<{ link: string; code?: string; label: string; expiresAt?: string | null; customerMessage: string } | null>(null);
 
   const count = (s: string) => list.data?.counts.find((c) => c.status === s)?.c ?? 0;
 
@@ -94,8 +94,9 @@ export default function AdminSupportPage() {
           {(linkForm.kind === "pro_reward" || linkForm.kind === "nova_reward") && <Field label={linkForm.kind === "pro_reward" ? "Pro 天數" : "Nova 數量"}><Input type="number" min={1} value={linkForm.value} onChange={(e) => setLinkForm({ ...linkForm, value: e.target.value })} /></Field>}
           <Field label="有效時間（分鐘）"><Input type="number" min={10} value={linkForm.expiresMinutes} onChange={(e) => setLinkForm({ ...linkForm, expiresMinutes: e.target.value })} /></Field>
         </div>
-        <Button className="mt-3" onClick={async () => { try { const result = await apiPost<{ link: string; code?: string; label: string; expiresAt?: string | null }>("/admin/action-links", { kind: linkForm.kind, email: linkForm.email || undefined, value: Number(linkForm.value), expiresMinutes: Number(linkForm.expiresMinutes), baseUrl: window.location.origin }); setLinkResult(result); toast.push("success", `已產生${result.label}`); } catch (err) { toast.push("error", errorMessage(err)); } }}>產生分類連結</Button>
-        {linkResult && <div className="mt-3 space-y-2 rounded-xl border border-[#7dd3fc]/30 bg-[#7dd3fc]/5 p-3"><p className="text-sm font-semibold text-[#b8edff]">{linkResult.label}</p><Input readOnly value={linkResult.link} /><div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.link)}>複製連結</Button>{linkResult.code && <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.code ?? "")}>複製兌換碼</Button>}</div>{linkResult.expiresAt && <p className="text-xs text-muted">有效期限：{new Date(linkResult.expiresAt).toLocaleString("zh-TW")}</p>}</div>}
+        <Field label="發放／封鎖原因"><Input value={linkForm.reason} onChange={(e) => setLinkForm({ ...linkForm, reason: e.target.value })} placeholder="例如：完成學習活動獎勵、申訴審核通過" /></Field>
+        <Button className="mt-3" onClick={async () => { try { const result = await apiPost<{ link: string; code?: string; label: string; expiresAt?: string | null; customerMessage: string }>("/admin/action-links", { kind: linkForm.kind, email: linkForm.email || undefined, value: Number(linkForm.value), expiresMinutes: Number(linkForm.expiresMinutes), reason: linkForm.reason || undefined, baseUrl: window.location.origin }); setLinkResult(result); toast.push("success", `已產生${result.label}與客服文字`); } catch (err) { toast.push("error", errorMessage(err)); } }}>產生分類連結</Button>
+        {linkResult && <div className="mt-3 space-y-2 rounded-xl border border-[#7dd3fc]/30 bg-[#7dd3fc]/5 p-3"><p className="text-sm font-semibold text-[#b8edff]">{linkResult.label}</p><Input readOnly value={linkResult.link} /><div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.link)}>複製連結</Button>{linkResult.code && <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.code ?? "")}>複製兌換碼</Button>}<Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.customerMessage)}>複製客服文字</Button></div>{linkResult.expiresAt && <p className="text-xs text-muted">有效期限：{new Date(linkResult.expiresAt).toLocaleString("zh-TW")}</p>}<pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-3 text-xs leading-6 text-muted">{linkResult.customerMessage}</pre></div>}
       </Card>
 
       <Card title="✉ StudyNova 帳號通知信" subtitle="使用統一品牌排版寄送重啟、密碼重設、Pro 或獎勵連結。需先設定 Gmail SMTP 與 16 位應用程式密碼才會實際寄出。">

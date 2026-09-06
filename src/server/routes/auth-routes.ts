@@ -104,6 +104,10 @@ export const routes: RouteDef[] = [
         throw generic;
       }
       if (!verifyPassword(body.password, user.passwordHash)) throw generic;
+      if (user.status === "blocked" && user.blockedUntil && new Date(user.blockedUntil) <= new Date()) {
+        await db.update(users).set({ status: "active", blockedReason: "", blockedAt: null, blockedUntil: null, updatedAt: new Date() }).where(eq(users.userId, user.userId));
+        user.status = "active";
+      }
       if (user.status === "blocked") {
         throw fail("AUTH_ACCOUNT_BLOCKED", {
           message: "很抱歉，此帳號已被封鎖",

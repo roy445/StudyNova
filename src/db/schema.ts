@@ -38,6 +38,7 @@ export const users = pgTable(
     status: text("status").notNull().default("active"), // active | blocked
     blockedReason: text("blocked_reason").notNull().default(""),
     blockedAt: timestamp("blocked_at", { withTimezone: true }),
+    blockedUntil: timestamp("blocked_until", { withTimezone: true }),
     avatarSeed: text("avatar_seed").notNull().default("nova"),
     bio: text("bio").notNull().default(""),
     onboarded: boolean("onboarded").notNull().default(false),
@@ -1267,6 +1268,8 @@ export const announcements = pgTable(
     title: text("title").notNull(),
     body: text("body").notNull().default(""),
     link: text("link").notNull().default("/dashboard"),
+    category: text("category").notNull().default("general"),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     image: text("image").notNull().default(""),
     audience: text("audience").notNull().default("all"), // all | pro | users | group
     audienceIds: jsonb("audience_ids").$type<string[]>().notNull().default([]),

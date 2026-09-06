@@ -51,7 +51,7 @@ export default function AdminOpsPage() {
   const shop = useApi<{ items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; enabled: boolean }> }>("/admin/shop/items");
 
   const [annOpen, setAnnOpen] = useState(false);
-  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", audience: "all", pinned: false, marquee: false, notify: true, push: false });
+  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false });
   const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard", audience: "all" });
   const [pushResult, setPushResult] = useState<{ targets: number; notified: number; pushSent: number; configured: boolean } | null>(null);
   const [actOpen, setActOpen] = useState(false);
@@ -581,6 +581,10 @@ export default function AdminOpsPage() {
           <Field label="點擊後跳轉頁面" hint="例如 /weekly、/dashboard、/activities">
             <Input value={annForm.link} onChange={(e) => setAnnForm({ ...annForm, link: e.target.value })} placeholder="/weekly" />
           </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="公告分類"><Select value={annForm.category} onChange={(e) => setAnnForm({ ...annForm, category: e.target.value })}><option value="general">一般公告</option><option value="exam">考試／每週小考</option><option value="challenge">挑戰與競賽</option><option value="activity">活動</option><option value="reward">獎勵與 Pro</option><option value="system">系統與維護</option><option value="knowledge">每日知識</option><option value="policy">規則與政策</option></Select></Field>
+            <Field label="自訂標籤" hint="以逗號分隔，例如：高中,重要,限時"><Input value={annForm.tags} onChange={(e) => setAnnForm({ ...annForm, tags: e.target.value })} placeholder="高中,重要,限時" /></Field>
+          </div>
           <Field label="對象">
             <Select value={annForm.audience} onChange={(e) => setAnnForm({ ...annForm, audience: e.target.value })}>
               <option value="all">全體學生</option>
@@ -593,6 +597,7 @@ export default function AdminOpsPage() {
               ["marquee", "首頁跑馬燈"],
               ["notify", "站內通知"],
               ["push", "Web Push"],
+              ["email", "Email 通知"],
             ] as const).map(([key, label]) => (
               <label key={key} className="flex items-center gap-1.5">
                 <input

@@ -38,7 +38,7 @@ import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, r
 import { adminLog, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { providerMetrics, recentAiFailures, aiConfigured } from "../ai";
-import { accountEmailTemplate, sendAccountEmail, smtpConfigured } from "../email";
+import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured, systemAnnouncementEmailTemplate } from "../email";
 
 function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
   return new Response(toCsv(rows), {
@@ -119,7 +119,7 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ kind: z.enum(["password_reset", "appeal", "reactivate", "pro_reward", "nova_reward"]), email: z.string().email().optional(), value: z.number().int().min(1).max(3650).optional(), expiresMinutes: z.number().int().min(10).max(10080).default(60), baseUrl: z.string().url().optional() }));
+      const body = await ctx.json(z.object({ kind: z.enum(["password_reset", "appeal", "reactivate", "pro_reward", "nova_reward"]), email: z.string().email().optional(), value: z.number().int().min(1).max(3650).optional(), expiresMinutes: z.number().int().min(10).max(10080).default(60), reason: z.string().max(300).optional(), baseUrl: z.string().url().optional() }));
       const origin = body.baseUrl ?? new URL(ctx.req.url).origin;
       if (body.kind === "password_reset") {
         if (!body.email) throw badRequest("密碼重設連結需要使用者 Email");
@@ -130,14 +130,15 @@ export const routes: RouteDef[] = [
         await db.insert(passwordResetTokens).values({ userId: target.userId, tokenHash: sha256(token), expiresAt });
         const link = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
         await adminLog({ actorId: admin.userId, action: "action-link.password-reset", targetType: "user", targetId: target.userId, reason: "管理員連結中心", after: { expiresMinutes: body.expiresMinutes }, ip: ctx.ip });
-        return { kind: body.kind, link, expiresAt: expiresAt.toISOString(), label: "密碼重設連結" };
+        return { kind: body.kind, link, expiresAt: expiresAt.toISOString(), label: "密碼重設連結", customerMessage: accountLinkCopy({ kind: body.kind, link, expiresText: `${body.expiresMinutes} 分鐘`, reason: body.reason }) };
       }
-      if (body.kind === "appeal") return { kind: body.kind, link: `${origin}/login?appeal=1`, label: "帳號申訴入口" };
-      if (body.kind === "reactivate") return { kind: body.kind, link: `${origin}/login`, label: "帳號重新啟動入口" };
+      if (body.kind === "appeal") { const link = `${origin}/login?appeal=1`; return { kind: body.kind, link, label: "帳號申訴入口", customerMessage: accountLinkCopy({ kind: body.kind, link, reason: body.reason }) }; }
+      if (body.kind === "reactivate") { const link = `${origin}/login`; return { kind: body.kind, link, label: "帳號重新啟動入口", customerMessage: accountLinkCopy({ kind: body.kind, link, reason: body.reason }) }; }
       const code = `SN-${body.kind === "pro_reward" ? "PRO" : "NOVA"}-${randomToken(8).toUpperCase()}`;
       const coupon = await db.insert(coupons).values({ code, kind: body.kind === "pro_reward" ? "pro" : "nova", value: body.value ?? (body.kind === "pro_reward" ? 30 : 100), maxRedemptions: 1, endsAt: new Date(Date.now() + body.expiresMinutes * 60_000), createdBy: admin.userId }).returning({ id: coupons.id, code: coupons.code, endsAt: coupons.endsAt, value: coupons.value });
       await adminLog({ actorId: admin.userId, action: `action-link.${body.kind}`, targetType: "coupon", targetId: coupon[0].id, reason: "管理員連結中心", after: coupon[0], ip: ctx.ip });
-      return { kind: body.kind, link: `${origin}/profile?tab=pass&coupon=${encodeURIComponent(code)}`, code, value: coupon[0].value, expiresAt: coupon[0].endsAt?.toISOString?.() ?? null, label: body.kind === "pro_reward" ? "Pro 資格連結" : "Nova 獎勵連結" };
+      const link = `${origin}/profile?tab=pass&coupon=${encodeURIComponent(code)}`;
+      return { kind: body.kind, link, code, value: coupon[0].value, expiresAt: coupon[0].endsAt?.toISOString?.() ?? null, label: body.kind === "pro_reward" ? "Pro 資格連結" : "Nova 獎勵連結", customerMessage: accountLinkCopy({ kind: body.kind, link, value: coupon[0].value, expiresText: `${body.expiresMinutes} 分鐘`, reason: body.reason }) };
     },
   }),
 
@@ -242,7 +243,9 @@ export const routes: RouteDef[] = [
             case "block":
             case "unblock": {
               const blocked = body.action === "block";
-              await db.update(users).set({ status: blocked ? "blocked" : "active", blockedReason: blocked ? body.reason : "", blockedAt: blocked ? new Date() : null, updatedAt: new Date() }).where(eq(users.userId, userId));
+              const blockedAt = blocked ? new Date() : null;
+              const blockedUntil = blocked && body.days ? new Date(blockedAt!.getTime() + body.days * 86400000) : null;
+              await db.update(users).set({ status: blocked ? "blocked" : "active", blockedReason: blocked ? body.reason : "", blockedAt, blockedUntil, updatedAt: new Date() }).where(eq(users.userId, userId));
               if (blocked) await db.delete(sessions).where(eq(sessions.userId, userId));
               break;
             }
@@ -382,6 +385,8 @@ export const routes: RouteDef[] = [
           title: z.string().min(1).max(120),
           body: z.string().max(4000).default(""),
           link: z.string().max(300).default("/dashboard"),
+          category: z.string().min(1).max(40).default("general"),
+          tags: z.union([z.array(z.string().max(30)), z.string()]).transform((value) => (Array.isArray(value) ? value : value.split(",")).map((tag) => tag.trim()).filter(Boolean).slice(0, 12)),
           image: z.string().max(400).default(""),
           audience: z.enum(["all", "pro", "users", "group"]).default("all"),
           audienceIds: z.array(z.string().uuid()).max(500).default([]),
@@ -389,6 +394,7 @@ export const routes: RouteDef[] = [
           marquee: z.boolean().default(false),
           notify: z.boolean().default(true),
           push: z.boolean().default(false),
+          email: z.boolean().default(false),
           sortOrder: z.number().int().min(0).max(999).default(0),
           startsAt: z.string().datetime().optional(),
           endsAt: z.string().datetime().nullable().optional(),
@@ -400,6 +406,8 @@ export const routes: RouteDef[] = [
           title: body.title,
           body: body.body,
           link: body.link,
+          category: body.category,
+          tags: body.tags,
           image: body.image,
           audience: body.audience,
           audienceIds: body.audienceIds,
@@ -414,6 +422,7 @@ export const routes: RouteDef[] = [
         })
         .returning();
       let notified = 0;
+      let emailSent = 0;
       if (body.notify) {
         const targets = await resolveAudience(body.audience, body.audienceIds);
         for (const userId of targets) {
@@ -429,8 +438,17 @@ export const routes: RouteDef[] = [
           if (created) notified += 1;
         }
       }
-      await adminLog({ actorId: admin.userId, action: "announcement.create", targetType: "announcement", targetId: rows[0].id, after: { title: body.title, notified }, ip: ctx.ip });
-      return { announcement: rows[0], notified };
+      if (body.email) {
+        const targets = await resolveAudience(body.audience, body.audienceIds);
+        for (const userId of targets) {
+          const target = (await db.select({ email: users.email, displayName: users.displayName }).from(users).where(eq(users.userId, userId)).limit(1))[0];
+          if (!target?.email) continue;
+          const result = await sendAccountEmail(target.email, systemAnnouncementEmailTemplate({ displayName: target.displayName, title: body.title, body: body.body, link: body.link, category: body.category, tags: body.tags }));
+          if (result.sent) emailSent += 1;
+        }
+      }
+      await adminLog({ actorId: admin.userId, action: "announcement.create", targetType: "announcement", targetId: rows[0].id, after: { title: body.title, notified, emailSent }, ip: ctx.ip });
+      return { announcement: rows[0], notified, emailSent };
     },
   }),
 
@@ -797,7 +815,7 @@ export const routes: RouteDef[] = [
       const handledAt = ["approved", "rejected"].includes(body.status) ? new Date() : null;
       await db.update(accountAppeals).set({ status: body.status, adminNote: body.adminNote ?? "", handledBy: admin.userId, handledAt, updatedAt: new Date() }).where(eq(accountAppeals.id, appeal.id));
       if (body.status === "approved" && appeal.userId) {
-        await db.update(users).set({ status: "active", blockedReason: "", blockedAt: null, updatedAt: new Date() }).where(eq(users.userId, appeal.userId));
+        await db.update(users).set({ status: "active", blockedReason: "", blockedAt: null, blockedUntil: null, updatedAt: new Date() }).where(eq(users.userId, appeal.userId));
         const target = (await db.select({ displayName: users.displayName }).from(users).where(eq(users.userId, appeal.userId)).limit(1))[0];
         const link = `${body.baseUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://study-nova-psi.vercel.app"}/login`;
         const message = accountEmailTemplate({ kind: "reactivate", displayName: target?.displayName ?? "StudyNova 使用者", link, note: body.adminNote });
