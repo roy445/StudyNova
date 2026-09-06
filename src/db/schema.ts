@@ -1347,6 +1347,7 @@ export const announcements = pgTable(
     title: text("title").notNull(),
     body: text("body").notNull().default(""),
     link: text("link").notNull().default("/dashboard"),
+    targetFeature: text("target_feature").notNull().default("all"),
     category: text("category").notNull().default("general"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     image: text("image").notNull().default(""),

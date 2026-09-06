@@ -405,6 +405,7 @@ export const routes: RouteDef[] = [
           title: z.string().min(1).max(120),
           body: z.string().max(4000).default(""),
           link: z.string().max(300).default("/dashboard"),
+          targetFeature: z.string().min(1).max(60).default("all"),
           category: z.string().min(1).max(40).default("general"),
           tags: z.union([z.array(z.string().max(30)), z.string()]).transform((value) => (Array.isArray(value) ? value : value.split(",")).map((tag) => tag.trim()).filter(Boolean).slice(0, 12)),
           image: z.string().max(400).default(""),
@@ -426,6 +427,7 @@ export const routes: RouteDef[] = [
           title: body.title,
           body: body.body,
           link: body.link,
+          targetFeature: body.targetFeature,
           category: body.category,
           tags: body.tags,
           image: body.image,
@@ -481,9 +483,10 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const body = await ctx.json(
-        z.object({ pinned: z.boolean().optional(), marquee: z.boolean().optional(), sortOrder: z.number().int().min(0).max(999).optional(), title: z.string().min(1).max(120).optional(), body: z.string().max(4000).optional(), link: z.string().max(300).optional() }),
+        z.object({ pinned: z.boolean().optional(), marquee: z.boolean().optional(), sortOrder: z.number().int().min(0).max(999).optional(), title: z.string().min(1).max(120).optional(), body: z.string().max(4000).optional(), link: z.string().max(300).optional(), targetFeature: z.string().min(1).max(60).optional(), endsAt: z.string().datetime().nullable().optional() }),
       );
-      const rows = await db.update(announcements).set(body).where(eq(announcements.id, ctx.params.id)).returning();
+      const { endsAt, ...patch } = body;
+      const rows = await db.update(announcements).set({ ...patch, ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}) }).where(eq(announcements.id, ctx.params.id)).returning();
       if (!rows[0]) throw notFound("找不到公告");
       return { announcement: rows[0] };
     },

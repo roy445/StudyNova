@@ -72,7 +72,7 @@ export default function AdminOpsPage() {
     "/admin/ai/health",
   );
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number }> }>("/admin/features");
-  const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string }> }>("/admin/announcements");
+  const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string; endsAt: string | null; targetFeature: string }> }>("/admin/announcements");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
   const coupons = useApi<{ coupons: Array<{ id: string; code: string; kind: string; value: number; maxRedemptions: number; redeemedCount: number; enabled: boolean }> }>("/admin/coupons");
   const bank = useApi<{ questions: Array<{ id: string; subject: string; topic: string; bankCategory: string; sourceLabel: string; origin: string; type: string; stem: string; difficulty: string; appearedCount: number }>; total: number }>("/admin/questions");
@@ -81,7 +81,7 @@ export default function AdminOpsPage() {
   const essayService = useApi<{ service: { status: "ENABLED" | "PAUSED" | "DISABLED"; proOnly: boolean; novaCost: number; dailyLimit: number; monthlyLimit: number; maintenanceNotice: string; showScores: boolean } }>("/admin/essay-service");
 
   const [annOpen, setAnnOpen] = useState(false);
-  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false, startsAt: "", endsAt: "" });
+  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", targetFeature: "all", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false, startsAt: "", endsAt: "" });
   const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard", audience: "all" });
   const [pushResult, setPushResult] = useState<{ targets: number; notified: number; pushSent: number; configured: boolean } | null>(null);
   const [actOpen, setActOpen] = useState(false);
@@ -459,6 +459,7 @@ export default function AdminOpsPage() {
                   <div className="flex gap-1.5">
                     <Badge tone="muted">{a.audience}</Badge>
                     {a.marquee && <Badge tone="cyan">跑馬燈</Badge>}
+                    <Badge tone="violet">{a.targetFeature === "all" ? "全站" : `功能：${a.targetFeature}`}</Badge>
                     <button
                       className="text-xs underline"
                       onClick={async () => {
@@ -468,6 +469,7 @@ export default function AdminOpsPage() {
                     >
                       {a.pinned ? "取消置頂" : "置頂"}
                     </button>
+                    <button className="text-xs text-amber-200 underline" onClick={async () => { await apiPatch(`/admin/announcements/${a.id}`, { endsAt: new Date().toISOString() }); await anns.reload(); }}>撤銷</button>
                     <button
                       className="text-xs text-rose-300 underline"
                       onClick={async () => {
@@ -673,6 +675,9 @@ export default function AdminOpsPage() {
           </Field>
           <Field label="點擊後跳轉頁面" hint="例如 /weekly、/dashboard、/activities">
             <Input value={annForm.link} onChange={(e) => setAnnForm({ ...annForm, link: e.target.value })} placeholder="/weekly" />
+          </Field>
+          <Field label="顯示在哪個功能" hint="公告會固定顯示在該功能頁頂部">
+            <Select value={annForm.targetFeature} onChange={(e) => setAnnForm({ ...annForm, targetFeature: e.target.value })}><option value="all">全站所有功能</option><option value="dashboard">首頁</option><option value="ai">Novi AI</option><option value="compress">智慧壓縮</option><option value="export">資料匯出</option><option value="essay">作文批改</option><option value="study">學習中心</option><option value="weekly">每週小考</option><option value="challenge">好友挑戰</option><option value="grades">成績分析</option><option value="profile">個人設定</option></Select>
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="公告分類"><Select value={annForm.category} onChange={(e) => setAnnForm({ ...annForm, category: e.target.value })}><option value="general">一般公告</option><option value="exam">考試／每週小考</option><option value="challenge">挑戰與競賽</option><option value="activity">活動</option><option value="reward">獎勵與 Pro</option><option value="system">系統與維護</option><option value="knowledge">每日知識</option><option value="policy">規則與政策</option></Select></Field>

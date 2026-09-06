@@ -72,6 +72,19 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/report", label: "學習報告", icon: "report" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
+const FEATURE_BY_PATH: Record<string, string> = { "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/weekly": "weekly", "/challenge": "challenge", "/grades": "grades", "/profile": "profile", "/dashboard": "dashboard" };
+const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
+  dashboard: { title: "首頁使用提醒", text: "今日建議僅供參考，可依時間與狀態自由選擇，不需要全部完成。" },
+  ai: { title: "Novi AI 使用提醒", text: "切換模式後請查看用途說明；涉及成績、錯題、計畫或寫入資料時，請先確認授權與動作預覽。" },
+  compress: { title: "智慧壓縮使用提醒", text: "請確認原始檔案、目標大小與輸出格式；批次壓縮後請先預覽內容，再下載 ZIP。" },
+  export: { title: "資料匯出使用提醒", text: "只會匯出你的資料。請先查看樣本預覽，正式下載前會兩次確認並扣除對應 Nova。" },
+  essay: { title: "作文批改使用提醒", text: "AI 建議僅供學習參考，請自行檢查文意、引用與老師要求後再提交。" },
+  study: { title: "學習中心使用提醒", text: "複習與專注紀錄可依你的節奏調整；儲存前請確認日期、範圍與內容。" },
+  weekly: { title: "每週小考使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
+  challenge: { title: "挑戰功能使用提醒", text: "請確認挑戰對象、題目與截止時間；不要分享帳號、密碼或個人敏感資料。" },
+  grades: { title: "成績分析使用提醒", text: "分析結果是學習參考，不代表正式校務成績；請確認輸入資料正確。" },
+  profile: { title: "帳號與 Nova 使用提醒", text: "請妥善保管帳號與兌換碼；Nova 交易與會員變更以系統紀錄為準。" },
+};
 
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
@@ -93,6 +106,9 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [usageGuideOpen, setUsageGuideOpen] = useState(false);
+  const [inAppBrowser] = useState(() => typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|Line\/|Twitter|MicroMessenger|; wv\)|WebView/i.test(navigator.userAgent || ""));
+  const [androidDevice] = useState(() => typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || ""));
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
@@ -110,7 +126,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
   );
-  const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }> }>(
+  const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
     "/dashboard",
   );
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
@@ -124,7 +140,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     const standalone = window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-    const guideTimer = !standalone && !localStorage.getItem("sn-install-guide-seen") ? window.setTimeout(() => setInstallGuideOpen(true), 0) : undefined;
+    const guideTimer = !standalone && !localStorage.getItem("sn-install-guide-seen") ? window.setTimeout(() => setInstallGuideOpen(true), 0) : !localStorage.getItem("sn-usage-guide-seen") ? window.setTimeout(() => setUsageGuideOpen(true), 0) : undefined;
     const onInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", onInstall);
     return () => { if (guideTimer) window.clearTimeout(guideTimer); window.removeEventListener("beforeinstallprompt", onInstall); };
@@ -304,6 +320,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const unread = notif.data?.unread ?? 0;
   const nova = summary.data?.nova ?? 0;
   const level = summary.data?.novi?.level ?? 1;
+  const featureKey = Object.entries(FEATURE_BY_PATH).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "all";
+  const featureNotices = (summary.data?.announcements ?? []).filter((item) => item.targetFeature === "all" || item.targetFeature === featureKey).slice(0, 3);
 
   const kindLabel = useMemo(
     () => ({ material: "教材", note: "筆記", quiz: "測驗", question: "題目", activity: "活動" }) as Record<string, string>,
@@ -438,6 +456,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         </header>
 
         <main className="app-main mx-auto max-w-6xl px-3 py-4 sm:px-5 sm:py-6">
+          {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p><p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link && <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link>}</div></div></div>)}</section>}
+          {FEATURE_GUIDANCE[featureKey] && <div className="mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
           {children}
           <footer aria-label="網站資訊" className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
             <Link href="/faq" className="underline">常見問題</Link>
@@ -614,12 +634,14 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       </Modal>
 
       {/* First-login PWA and notification guide */}
-      <Modal open={installGuideOpen} onClose={() => { localStorage.setItem("sn-install-guide-seen", "1"); setInstallGuideOpen(false); }} title="先把 StudyNova 加到主畫面">
+      <Modal open={installGuideOpen} onClose={() => { localStorage.setItem("sn-install-guide-seen", "1"); setInstallGuideOpen(false); window.setTimeout(() => setUsageGuideOpen(true), 120); }} title="先把 StudyNova 加到主畫面">
         <div className="space-y-3 text-sm">
+          {inAppBrowser && <div className="rounded-xl border-2 border-rose-300/70 bg-rose-400/15 p-3 text-xs leading-5 text-rose-50"><p className="font-black">目前是在 App 內建瀏覽器中</p><p className="mt-1">為了避免安裝失敗或被誤判，請點右上角／右下角的「⋯」或分享按鈕，選擇「在 Chrome／Safari 開啟」，再回到這裡安裝。StudyNova 不會要求下載任何不明檔案。</p></div>}
+          {androidDevice && <div className="rounded-xl border-2 border-[#ffc857]/70 bg-[#ffc857]/10 p-3 text-xs leading-5 text-[#fff1c7]"><p className="font-black">Android 安裝提醒</p><p className="mt-1">若 Chrome 顯示安全警告，請先點「了解詳細」，確認網址是你的 StudyNova 網站，再按「仍要安裝」。請勿在網址不正確或來源不明時繼續。</p></div>}
           <p className="text-muted">為了即時收到限定功能、每週小考與 Novi 提醒，請先開啟通知，再把網站安裝到手機主畫面。</p>
           <Button full onClick={async () => {
             if (installPrompt) { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); }
-            else toast.push("info", "請使用瀏覽器選單的「加入主畫面／安裝應用程式」");
+            else toast.push("info", androidDevice ? "請在 Chrome 選單點「安裝應用程式」；若出現警告，點「了解詳細」確認網址後再按「仍要安裝」。" : "請使用瀏覽器選單的「加入主畫面／安裝應用程式」");
           }}>安裝到主畫面</Button>
           <Button full variant="ghost" onClick={async () => {
             if ("Notification" in window) { const permission = await Notification.requestPermission(); toast.push(permission === "granted" ? "success" : "info", permission === "granted" ? "通知已開啟" : "請在瀏覽器設定允許通知"); }
@@ -629,6 +651,14 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
             <div className="glass-soft p-3"><p className="font-semibold text-white">Android</p><p className="mt-1">使用 Chrome 開啟網站 → 點右上角 ⋮ → 選「安裝應用程式」或「加到主畫面」→ 確認安裝。出現通知提示時請選「允許」。</p></div>
           </div>
           <p className="text-[11px] text-muted">你也可以稍後在個人設定重新查看教學。網站會在開啟期間每 10 秒同步公告與通知。</p>
+        </div>
+      </Modal>
+
+      <Modal open={usageGuideOpen} onClose={() => { localStorage.setItem("sn-usage-guide-seen", "1"); setUsageGuideOpen(false); }} title="StudyNova 使用方法與重要注意事項">
+        <div className="max-h-[68vh] space-y-3 overflow-y-auto pr-1 text-sm">
+          <div className="rounded-xl border-2 border-[#ffc857]/60 bg-[#ffc857]/10 p-3"><p className="font-black text-[#ffe7ad]">先記住：StudyNova 是你的學習助手，不是壓力來源。</p><p className="mt-1 text-xs leading-5 text-muted">每日建議都可以跳過、調整或重新安排；請依自己的時間與狀態使用。</p></div>
+          {[['首頁／讀書計畫','查看今日建議、學習進度、弱點與 AI 安排的讀書區塊。可勾選完成，也可以只挑一個最適合現在的項目。'],['學習中心','複習單字、錯題、專注計時與學習紀錄；日期與範圍請確認後再儲存。'],['Novi AI','可切換學習教練、解題、提示、考試、筆記、錯題與複習模式。涉及讀取或寫入資料時，請先確認授權與預覽。'],['智慧壓縮','上傳前確認檔案類型、大小與目標尺寸；批次處理前請確認 ZIP 內容與下載位置。'],['資料匯出','先選資料並查看樣本預覽，再進行兩次確認；正式匯出會依格式扣除 Nova，請確認點數餘額。'],['每週小考／挑戰','提交答案前確認題目與答案；活動獎勵、優惠碼與 Nova 交易紀錄請以系統結果為準。'],['公告與注意事項','醒目公告會固定在相關功能頂部；若公告已撤銷或超過結束時間，畫面會自動隱藏。']].map(([title, text]) => <div key={title} className="glass-soft border border-[var(--line)] p-3"><p className="font-bold text-[#7dd3fc]">{title}</p><p className="mt-1 text-xs leading-5 text-muted">{text}</p></div>)}
+          <p className="text-[11px] text-muted">你可以在個人設定重新查看本說明；遇到異常請保留畫面與錯誤代碼，再到「回報問題」提交。</p>
         </div>
       </Modal>
 
