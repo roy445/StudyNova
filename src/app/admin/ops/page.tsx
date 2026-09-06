@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
@@ -72,6 +73,8 @@ export default function AdminOpsPage() {
   const [couponForm, setCouponForm] = useState({ code: "", kind: "nova", value: 100, maxRedemptions: 50 });
   const [importJson, setImportJson] = useState("");
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
+  const [bankUploadBusy, setBankUploadBusy] = useState(false);
+  const [bankUploadMeta, setBankUploadMeta] = useState({ category: "高中英文", source: "線上上傳題目檔案" });
 
 
   return (
@@ -518,7 +521,12 @@ export default function AdminOpsPage() {
       )}
 
       {tab === "bank" && (
-        <Card title={`▦ 題庫（目前 ${bank.data?.total ?? 0} 題）`} subtitle="JSON 陣列格式匯入，無效題目不會阻擋有效題目">
+        <Card title={`▦ 題庫（目前 ${bank.data?.total ?? 0} 題）`} subtitle="可直接上傳 PDF／圖片，系統會在線上儲存、解析、去重並匯入題庫">
+          <div className="mb-4 rounded-2xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">▤ 線上匯入題目檔案</p><p className="mt-1 text-xs leading-5 text-muted">PDF、PNG、JPG、WEBP，單檔最多 50MB。上傳後會由 AI 讀取清楚可辨識的題目，模糊內容不會自行猜測。</p></div><Badge tone="cyan">Vercel Blob ・ AI OCR</Badge></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2"><Field label="題庫分類"><Input value={bankUploadMeta.category} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, category: e.target.value })} placeholder="例如：高中英文" /></Field><Field label="來源名稱"><Input value={bankUploadMeta.source} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, source: e.target.value })} placeholder="例如：高一週考 PDF" /></Field></div>
+            <label className={`mt-3 flex min-h-24 cursor-pointer items-center justify-center rounded-xl border border-dashed transition ${bankUploadBusy ? "cursor-wait border-white/10 opacity-60" : "border-[#37d3ff]/50 hover:bg-white/5"}`}><input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple disabled={bankUploadBusy} className="sr-only" onChange={async (e) => { const files = Array.from(e.target.files ?? []); if (!files.length) return; setBankUploadBusy(true); try { for (const file of files) { await upload(file.name, file, { access: "private", handleUploadUrl: "/api/blob/question-bank-upload", clientPayload: JSON.stringify({ bankCategory: bankUploadMeta.category, sourceLabel: bankUploadMeta.source }), multipart: file.size > 5 * 1024 * 1024 }); toast.push("success", `${file.name} 已上傳，正在自動解析`); } await new Promise((resolve) => setTimeout(resolve, 1500)); await bank.reload(); } catch (err) { toast.push("error", errorMessage(err)); } finally { setBankUploadBusy(false); e.target.value = ""; } }} /><span className="text-center text-sm">{bankUploadBusy ? "正在上傳與解析…" : "點擊選擇 PDF 或圖片（可多選）"}<span className="mt-1 block text-xs text-muted">解析完成後重新整理題庫列表</span></span></label>
+          </div>
           <Textarea
             value={importJson}
             onChange={(e) => setImportJson(e.target.value)}
