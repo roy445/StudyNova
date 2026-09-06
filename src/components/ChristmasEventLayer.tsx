@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { apiGet, apiPost } from "@/lib/api";
 
 type Props = { enabled: boolean; reindeer: boolean };
@@ -77,16 +78,7 @@ export default function ChristmasEventLayer({ enabled, reindeer }: Props) {
   return <>
     {event && <button type="button" aria-label="點擊馴鹿領取聖誕獎勵" className="christmas-reindeer" onClick={() => void claim()} disabled={busy}>
       <span className="christmas-reindeer-glow" />
-      <svg viewBox="0 0 180 80" aria-hidden="true">
-        <path d="M18 43c18-23 43-22 62-8 12-12 34-15 49-5 10 7 19 17 30 19-4 11-14 17-28 17H53C35 66 20 57 18 43Z" fill="#7c3f32" stroke="#ffc857" strokeWidth="2" />
-        <path d="M116 31c8-15 4-24-2-29M128 31c13-12 14-20 11-27M120 30c-6-10-14-14-20-15" fill="none" stroke="#8c604d" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="134" cy="48" r="18" fill="#9c573f" stroke="#ffd98a" strokeWidth="2" />
-        <circle cx="129" cy="44" r="2.5" fill="#061323" /><circle cx="140" cy="44" r="2.5" fill="#061323" />
-        <circle cx="143" cy="54" r="5" fill="#c83b4b" stroke="#fff7e7" strokeWidth="1.5" />
-        <path d="M35 37c-8-9-17-9-23-3 5 8 13 12 23 11M67 36c-4-11-1-18 7-23 5 10 4 18-2 26" fill="#c83b4b" stroke="#ff7180" strokeWidth="2" />
-        <path d="M45 56h52" stroke="#ffc857" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="104" cy="59" r="4" fill="#ffc857" /><circle cx="116" cy="61" r="4" fill="#ffc857" />
-      </svg>
+      <Image src="/brand/christmas-reindeer-sleigh-b.png" width={2688} height={1152} sizes="190px" alt="" aria-hidden="true" draggable={false} />
       <span className="christmas-reindeer-label">點我接住聖誕獎勵</span>
     </button>}
     {message && <div className="christmas-reward-toast" role="status">✦ {message}</div>}
