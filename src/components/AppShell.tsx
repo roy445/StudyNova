@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
 import { SymbolIcon, type SymbolName } from "./Symbol";
 import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
-import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 export type ShellUser = {
   userId: string;
@@ -23,12 +23,13 @@ const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
+  { href: "/weekly", label: "小考", icon: "weekly" },
   { href: "/challenge", label: "挑戰", icon: "challenge" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
 
-const PAGE_PROMPTS: Record<string, string> = {
-  "/dashboard": "今天想先從每日單字、今日小知識，還是讀書計畫開始？",
+  const PAGE_PROMPTS: Record<string, string> = {
+  "/dashboard": "如果今天不知道要做什麼，不妨參考看看：單字、小知識或讀書計畫都可以，照你的步調就好。",
   "/study": "需要我陪你複習錯題、練單字，或安排一段專注時間嗎？",
   "/weekly": "這裡可以查看每週小考、單字與解析；要不要先看看本週重點？",
   "/challenge": "想和好友比一場嗎？可以選每日單字或已開放的每週小考。",
@@ -45,6 +46,17 @@ const ENCOURAGEMENTS: Array<{ text: string; state: NoviState }> = [
   { text: "相信累積的力量，你正在成為更好的自己。", state: "success" },
   { text: "千里之行，始於足下。先完成眼前這一步，Novi 陪你一起走。", state: "cheer" },
   { text: "學而不思則罔，思而不學則殆。今天也留一點時間動手練習吧。", state: "remind" },
+];
+
+const NOVI_MODES = [
+  { key: "teacher", label: "學習教練", description: "陪你規劃學習、拆解觀念，讓今天先完成一小步。" },
+  { key: "solve", label: "解題模式", description: "一步一步分析題目，不直接跳到答案。" },
+  { key: "hint", label: "提示模式", description: "只給剛剛好的提示，保留你自己思考的空間。" },
+  { key: "exam", label: "考試模式", description: "用考試節奏練習，先作答再看解析。" },
+  { key: "note", label: "筆記模式", description: "把重點整理成清楚、可複習的筆記。" },
+  { key: "wrong", label: "錯題模式", description: "找出錯題背後的觀念漏洞，安排補強。" },
+  { key: "review", label: "複習模式", description: "依照記憶曲線幫你回顧最容易忘記的內容。" },
+  { key: "quick", label: "快速模式", description: "用最短的回答，快速處理一個明確問題。" },
 ];
 
 const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
@@ -87,6 +99,13 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [redeemCode, setRedeemCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [quickChatId, setQuickChatId] = useState<string | null>(null);
+  const [quickChatMode, setQuickChatMode] = useState("teacher");
+  const [quickChatInput, setQuickChatInput] = useState("");
+  const [quickChatReply, setQuickChatReply] = useState("");
+  const [quickChatSending, setQuickChatSending] = useState(false);
+  const [noviPosition, setNoviPosition] = useState({ x: 0, y: 0 });
+  const noviDrag = useRef<{ startX: number; startY: number; x: number; y: number } | null>(null);
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
@@ -133,6 +152,30 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       cancelled = true;
       clearTimeout(timer);
     };
+  }, []);
+
+  const touchNovi = useCallback(() => {
+    setNoviMinimized(false);
+    setNoviOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setNoviOpen(false);
+      setNoviMinimized(true);
+    }, 90_000);
+    return () => window.clearTimeout(timer);
+  }, [noviOpen, quickChatReply, advice, encouragement]);
+
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      if (!noviDrag.current) return;
+      setNoviPosition({ x: noviDrag.current.x + event.clientX - noviDrag.current.startX, y: noviDrag.current.y + event.clientY - noviDrag.current.startY });
+    };
+    const up = () => { noviDrag.current = null; };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
   }, []);
 
   useEffect(() => {
@@ -198,6 +241,37 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
     },
     [toast],
   );
+
+  const sendQuickChat = useCallback(async () => {
+    const content = quickChatInput.trim();
+    if (!content || quickChatSending) return;
+    setQuickChatSending(true);
+    setNoviState("thinking");
+    setQuickChatInput("");
+    try {
+      let conversationId = quickChatId;
+      if (!conversationId) {
+        const created = await apiPost<{ conversation: { id: string } }>("/ai/conversations", { mode: quickChatMode, allowContext: ["settings", "grades", "wrong", "plan"] });
+        conversationId = created.conversation.id;
+        setQuickChatId(conversationId);
+      }
+      const result = await apiPost<{ message: { content: string } }>(`/ai/conversations/${conversationId}/messages`, { content });
+      setQuickChatReply(result.message.content);
+      setNoviState("happy");
+    } catch (err) {
+      setNoviState("error");
+      toast.push("error", errorMessage(err));
+    } finally {
+      setQuickChatSending(false);
+    }
+  }, [quickChatInput, quickChatSending, quickChatId, quickChatMode, toast]);
+
+  const changeQuickMode = useCallback(async (mode: string) => {
+    setQuickChatMode(mode);
+    const selected = NOVI_MODES.find((item) => item.key === mode);
+    if (selected) setQuickChatReply(`已切換至「${selected.label}」：${selected.description}`);
+    if (quickChatId) await apiPatch(`/ai/conversations/${quickChatId}`, { mode });
+  }, [quickChatId]);
 
   const logout = useCallback(async () => {
     setAccountMenuOpen(false);
@@ -397,7 +471,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       </nav>
 
       {/* Novi dock */}
-      <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5">
+      <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5" style={{ transform: `translate(${noviPosition.x}px, ${noviPosition.y}px)` }}>
         {!noviOpen && encouragement && (
           <button type="button" onClick={() => setNoviOpen(true)} className="glass anim-pop max-w-[min(82vw,300px)] p-3 text-left text-xs leading-relaxed text-[#e8edff] shadow-[0_0_28px_rgba(55,211,255,0.18)]">
             <span className="mb-1 block text-[10px] font-semibold tracking-wider text-[#37d3ff]">Novi 給你的話</span>
@@ -416,6 +490,20 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               <button onClick={() => setNoviOpen(false)} aria-label="收起 Novi" className="focus-ring rounded-lg px-1.5 text-muted hover:bg-white/10">
                 ✕
               </button>
+            </div>
+            <div className="mt-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-2.5">
+              <div className="flex items-center gap-2">
+                <label htmlFor="novi-quick-mode" className="shrink-0 text-[10px] font-semibold text-[#7dd3fc]">對話模式</label>
+                <select id="novi-quick-mode" value={quickChatMode} onChange={(event) => void changeQuickMode(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-black/25 px-2 py-1.5 text-xs text-[var(--text)]">
+                  {NOVI_MODES.map((mode) => <option key={mode.key} value={mode.key}>{mode.label}</option>)}
+                </select>
+              </div>
+              <p className="mt-1.5 text-[10px] leading-4 text-muted">{NOVI_MODES.find((mode) => mode.key === quickChatMode)?.description}</p>
+              {quickChatReply && <div className="mt-2 max-h-24 overflow-y-auto rounded-lg bg-black/25 p-2 text-xs leading-relaxed">{quickChatReply}</div>}
+              <div className="mt-2 flex gap-1.5">
+                <Input value={quickChatInput} onChange={(event) => setQuickChatInput(event.target.value)} onFocus={touchNovi} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendQuickChat(); } }} placeholder="直接問 Novi…" disabled={quickChatSending} className="min-w-0" />
+                <Button size="sm" onClick={() => void sendQuickChat()} loading={quickChatSending} disabled={!quickChatInput.trim()}>送出</Button>
+              </div>
             </div>
             <div className="mt-2 max-h-40 overflow-y-auto scroll-thin rounded-xl bg-black/25 p-2.5 text-xs leading-relaxed">
               {adviceLoading ? <Skeleton lines={2} /> : encouragement?.text || advice || pagePrompt || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
@@ -464,7 +552,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               >
                 －
               </button>
-              <button onClick={() => setNoviOpen((v) => !v)} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
+              <button onPointerDown={(event) => { noviDrag.current = { startX: event.clientX, startY: event.clientY, x: noviPosition.x, y: noviPosition.y }; }} onClick={() => { touchNovi(); setQuickChatReply((current) => current || "嗨！點下面的輸入框就能直接和我聊天。你不一定要完美，我們先完成下一步。\n\n拖曳我到你習慣的位置，太久沒有互動我會自動縮小。 "); }} className="focus-ring cursor-grab rounded-full active:cursor-grabbing" aria-label="開啟 Novi 小助理">
                 <NoviAvatar size={58} state={encouragement?.state ?? (noviOpen ? "happy" : "idle")} level={level} />
               </button>
             </>

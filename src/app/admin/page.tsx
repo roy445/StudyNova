@@ -67,7 +67,8 @@ const ACTIONS = [
   { key: "revoke_pro", label: "回收 Nova Pro" },
   { key: "block", label: "封鎖帳號", needDays: true },
   { key: "unblock", label: "解除封鎖" },
-  { key: "reset_quota", label: "重設今日額度" },
+  { key: "reset_quota", label: "重設今日／本月額度" },
+  { key: "logout", label: "一鍵登出" },
   { key: "set_unlimited", label: "設定功能無限", needFeature: true },
   { key: "set_role", label: "設定角色", needRole: true },
   { key: "send_notification", label: "發送通知／推播", needNotification: true },
@@ -180,6 +181,7 @@ export default function AdminOverviewPage() {
           action={
             <div className="flex flex-wrap gap-1.5">
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋 NOVA ID / Email / 名稱" className="!w-auto !py-1.5 text-xs" />
+              <Button size="sm" variant="ghost" onClick={async () => { const reason = window.prompt("請輸入重置全體使用量的原因"); if (!reason) return; try { await apiPost("/admin/usage/reset-all", { reason }); toast.push("success", "已重置全體使用量"); } catch (err) { toast.push("error", errorMessage(err)); } }}>重置全體使用量</Button>
               <Button size="sm" onClick={() => setActionOpen(true)} disabled={!selected.length}>
                 批次操作
               </Button>

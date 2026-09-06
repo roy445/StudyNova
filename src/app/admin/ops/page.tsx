@@ -71,7 +71,7 @@ export default function AdminOpsPage() {
   const ai = useApi<{ providers: Provider[]; failures: Array<{ id: string; provider: string; feature: string; failureCategory: string; createdAt: string }>; byFeature: Array<{ feature: string; c: number; ok: number }>; configured: boolean }>(
     "/admin/ai/health",
   );
-  const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; novaCost: number }> }>("/admin/features");
+  const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number }> }>("/admin/features");
   const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string }> }>("/admin/announcements");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
   const coupons = useApi<{ coupons: Array<{ id: string; code: string; kind: string; value: number; maxRedemptions: number; redeemedCount: number; enabled: boolean }> }>("/admin/coupons");
@@ -135,8 +135,24 @@ export default function AdminOpsPage() {
       <div className="grid gap-3 lg:grid-cols-3">
         <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#37d3ff]">系統與權限</p><Tabs tabs={[{ key: "ai", label: "AI 服務", icon: <SymbolIcon name="nova" size={15} /> }, { key: "features", label: "功能與權限", icon: <SymbolIcon name="settings" size={15} /> }, { key: "essay", label: "作文服務", icon: <SymbolIcon name="pen" size={15} /> }]} active={tab} onChange={setTab} /></div>
         <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#7c5cff]">內容與營運</p><Tabs tabs={[{ key: "ann", label: "公告", icon: <SymbolIcon name="report" size={15} /> }, { key: "act", label: "活動", icon: <SymbolIcon name="challenge" size={15} /> }, { key: "bank", label: "題庫匯入", icon: <SymbolIcon name="question" size={15} /> }]} active={tab} onChange={setTab} /></div>
-        <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#ffc857]">商業化與獎勵</p><Tabs tabs={[{ key: "shop", label: "商城管理", icon: <SymbolIcon name="shop" size={15} /> }, { key: "coupon", label: "優惠碼", icon: <SymbolIcon name="badge" size={15} /> }]} active={tab} onChange={setTab} /></div>
+        <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#ffc857]">商業化與獎勵</p><Tabs tabs={[{ key: "promo", label: "促銷總覽", icon: <SymbolIcon name="spark" size={15} /> }, { key: "shop", label: "商城管理", icon: <SymbolIcon name="shop" size={15} /> }, { key: "coupon", label: "優惠碼", icon: <SymbolIcon name="badge" size={15} /> }]} active={tab} onChange={setTab} /></div>
       </div>
+
+      {tab === "promo" && (
+        <Card title="◇ 促銷活動與優惠碼總覽" subtitle="在這裡快速掌握活動成效、優惠碼使用狀況，並直接跳到對應管理區。">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Stat label="活動總數" value={acts.data?.activities.length ?? 0} tone="cyan" />
+            <Stat label="進行中／已發布" value={acts.data?.activities.filter((a) => a.published && new Date(a.startsAt) <= new Date() && new Date(a.endsAt) >= new Date()).length ?? 0} tone="cyan" />
+            <Stat label="啟用優惠碼" value={coupons.data?.coupons.filter((c) => c.enabled).length ?? 0} tone="gold" />
+            <Stat label="累計兌換次數" value={coupons.data?.coupons.reduce((sum, c) => sum + c.redeemedCount, 0) ?? 0} />
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <div className="glass-soft p-4"><div className="flex items-center justify-between gap-2"><div><p className="font-semibold">最近促銷活動</p><p className="mt-1 text-xs text-muted">查看期間、獎勵與參與成效。</p></div><Button size="sm" variant="ghost" onClick={() => setTab("act")}>管理活動</Button></div><div className="mt-3 space-y-2">{acts.data?.activities.slice(0, 3).map((a) => <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><span className="min-w-0 truncate">{a.cover} {a.title}</span><span className="shrink-0 text-muted">{a.participants} 人・{a.completed} 完成</span></div>)}</div></div>
+            <div className="glass-soft p-4"><div className="flex items-center justify-between gap-2"><div><p className="font-semibold">優惠碼使用狀況</p><p className="mt-1 text-xs text-muted">集中查看啟用狀態、使用上限與剩餘額度。</p></div><Button size="sm" variant="ghost" onClick={() => setTab("coupon")}>管理優惠碼</Button></div><div className="mt-3 space-y-2">{coupons.data?.coupons.slice(0, 3).map((c) => <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><span className="font-mono">{c.code}</span><span className="text-muted">{c.redeemedCount}/{c.maxRedemptions}・{c.enabled ? "啟用" : "停用"}</span></div>)}</div></div>
+          </div>
+          <div className="mt-4 rounded-xl border border-[#ffc857]/25 bg-[#ffc857]/5 p-3 text-xs leading-5 text-muted">建議流程：先建立活動與開始／結束時間，再建立優惠碼，最後到「公告」排程推播活動內容。活動開始時可自動通知使用者，優惠碼則由使用者在帳號選單兌換。</div>
+        </Card>
+      )}
 
       {tab === "ai" && (
         <>
@@ -286,6 +302,7 @@ export default function AdminOpsPage() {
                   <th className="pb-2">Pro 專屬</th>
                   <th className="pb-2 text-right">免費／日<br /><span className="font-normal">-1 為不限</span></th>
                   <th className="pb-2 text-right">Pro／日<br /><span className="font-normal">-1 為不限</span></th>
+                  <th className="pb-2 text-right">每月上限</th>
                   <th className="pb-2 text-right">每次 Nova</th>
                 </tr>
               </thead>
@@ -338,6 +355,9 @@ export default function AdminOpsPage() {
                         }}
                         className="w-16 rounded border border-[var(--line)] bg-black/20 px-1.5 py-1 text-right"
                       />
+                    </td>
+                    <td className="py-2 text-right">
+                      <input type="number" min={0} defaultValue={f.monthlyLimit} onBlur={async (e) => { await apiPatch(`/admin/features/${f.id}`, { monthlyLimit: Number(e.target.value) }); toast.push("success", "每月上限已更新"); }} className="w-16 rounded border border-[var(--line)] bg-black/20 px-1.5 py-1 text-right" />
                     </td>
                     <td className="py-2 text-right">
                       <input

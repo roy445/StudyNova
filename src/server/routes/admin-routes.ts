@@ -216,6 +216,19 @@ export const routes: RouteDef[] = [
 
   route({
     method: "POST",
+    path: "/admin/usage/reset-all",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ reason: z.string().min(1).max(300), feature: z.string().max(60).optional() }));
+      await db.delete(featureUsage).where(body.feature ? eq(featureUsage.feature, body.feature) : sql`true`);
+      await adminLog({ actorId: admin.userId, action: "usage.reset_all", targetType: "system", targetId: "feature_usage", reason: body.reason, ip: ctx.ip });
+      return { ok: true };
+    },
+  }),
+
+  route({
+    method: "POST",
     path: "/admin/users/bulk",
     auth: "admin",
     handler: async (ctx) => {
@@ -223,7 +236,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({
           userIds: z.array(z.string().uuid()).min(1).max(200),
-          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role", "send_notification"]),
+          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role", "send_notification", "logout"]),
           reason: z.string().min(1, "請填寫操作原因").max(300),
           amount: z.number().int().min(-100000).max(100000).optional(),
           days: z.number().int().min(1).max(3650).optional(),
@@ -286,6 +299,10 @@ export const routes: RouteDef[] = [
             }
             case "reset_quota": {
               await db.delete(featureUsage).where(and(eq(featureUsage.userId, userId), body.feature ? eq(featureUsage.feature, body.feature) : sql`true`));
+              break;
+            }
+            case "logout": {
+              await db.delete(sessions).where(eq(sessions.userId, userId));
               break;
             }
             case "send_notification": {

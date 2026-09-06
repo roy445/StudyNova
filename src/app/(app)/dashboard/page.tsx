@@ -120,7 +120,7 @@ export default function DashboardPage() {
             {data.countdowns?.some((countdown) => countdown.daysLeft < 5) && <p className="mt-2 rounded-lg bg-rose-400/10 px-2 py-1 text-xs font-semibold text-rose-200">距離重要考試不到 5 天，今天請優先完成複習任務。</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href="/study?tab=plan">
-                <Button size="sm">開始今日任務</Button>
+                <Button size="sm">看看今天可以做什麼</Button>
               </Link>
               <Link href="/ai">
                 <Button size="sm" variant="ghost">
@@ -196,7 +196,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <Card title="✓ 今日任務" subtitle="完成後可領取 Nova 與 XP">
+        <Card title="✓ 今天不知道做什麼？不妨參考看看" subtitle="挑一件適合現在狀態的事就好，不必追求一次完成全部">
           <div className="space-y-2">
             {data.tasks.map((t) => {
               const done = t.progress >= t.target;

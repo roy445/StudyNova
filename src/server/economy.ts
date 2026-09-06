@@ -171,6 +171,9 @@ export type QuotaState = {
   limit: number;
   used: number;
   remaining: number;
+  monthlyLimit: number;
+  monthlyUsed: number;
+  monthlyRemaining: number;
   unlimited: boolean;
   novaCost: number;
 };
@@ -179,12 +182,12 @@ export async function featureState(userId: string, feature: string): Promise<Quo
   const rows = await db.select().from(featurePermissions).where(eq(featurePermissions.feature, feature)).limit(1);
   const perm = rows[0];
   if (!perm) {
-    return { feature, label: feature, enabled: true, proOnly: false, limit: 0, used: 0, remaining: 0, unlimited: true, novaCost: 0 };
+    return { feature, label: feature, enabled: true, proOnly: false, limit: 0, used: 0, remaining: 0, monthlyLimit: 0, monthlyUsed: 0, monthlyRemaining: Number.MAX_SAFE_INTEGER, unlimited: true, novaCost: 0 };
   }
   const adminRows = await db.select({ role: users.role }).from(users).where(eq(users.userId, userId)).limit(1);
   const isAdmin = adminRows[0]?.role === "admin" || adminRows[0]?.role === "owner";
   if (isAdmin) {
-    return { feature, label: perm.label, enabled: perm.enabled, proOnly: false, limit: -1, used: 0, remaining: Number.MAX_SAFE_INTEGER, unlimited: true, novaCost: 0 };
+    return { feature, label: perm.label, enabled: perm.enabled, proOnly: false, limit: -1, used: 0, remaining: Number.MAX_SAFE_INTEGER, monthlyLimit: -1, monthlyUsed: 0, monthlyRemaining: Number.MAX_SAFE_INTEGER, unlimited: true, novaCost: 0 };
   }
   const pro = await isProUser(userId);
   const today = todayStr();
@@ -195,6 +198,12 @@ export async function featureState(userId: string, feature: string): Promise<Quo
     .limit(1);
   const usage = usageRows[0];
   const limit = pro ? perm.proDailyLimit : perm.freeDailyLimit;
+  const month = today.slice(0, 7);
+  const monthlyRows = await db.select({ total: sql<number>`coalesce(sum(${featureUsage.count}), 0)` }).from(featureUsage).where(and(eq(featureUsage.userId, userId), eq(featureUsage.feature, feature), sql`${featureUsage.usageDate} like ${month + "%"}`));
+  const monthlyUsed = Number(monthlyRows[0]?.total ?? 0);
+  // 舊資料可能尚未填 monthly_limit；對已有每日配額的功能採用 30 天預設，
+  // 管理員若填入明確月度上限則以後台設定為準。
+  const monthlyLimit = perm.monthlyLimit > 0 ? perm.monthlyLimit : limit > 0 ? limit * 30 : 0;
   const unlimited = Boolean(usage?.unlimited) || limit < 0;
   const used = usage?.count ?? 0;
   return {
@@ -205,6 +214,9 @@ export async function featureState(userId: string, feature: string): Promise<Quo
     limit,
     used,
     remaining: unlimited ? Number.MAX_SAFE_INTEGER : Math.max(0, limit - used),
+    monthlyLimit,
+    monthlyUsed,
+    monthlyRemaining: monthlyLimit <= 0 ? Number.MAX_SAFE_INTEGER : Math.max(0, monthlyLimit - monthlyUsed),
     unlimited,
     novaCost: perm.novaCost,
   };
@@ -218,6 +230,9 @@ export async function consumeFeature(userId: string, feature: string, units = 1)
   if (state.proOnly && !pro) throw fail("QUOTA_PRO_REQUIRED", { message: `「${state.label}」是 Nova Pro 專屬功能` });
   if (!state.unlimited && state.limit <= 0) {
     throw fail("QUOTA_NOT_IN_PLAN", { message: `「${state.label}」在你目前的方案中未開放` });
+  }
+  if (state.monthlyLimit > 0 && state.monthlyUsed + units > state.monthlyLimit) {
+    throw fail("QUOTA_EXHAUSTED", { message: `本月「${state.label}」已達上限（${state.monthlyLimit} 次）`, details: { feature, limit: state.monthlyLimit, period: "monthly" } });
   }
   const today = todayStr();
   await db

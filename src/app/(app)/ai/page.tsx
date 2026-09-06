@@ -10,14 +10,14 @@ type Conversation = { id: string; title: string; mode: string; archived: boolean
 type Message = { id: string; conversationId?: string; role: string; content: string; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
 
 const MODES = [
-  { key: "teacher", label: "學習教練模式" },
-  { key: "solve", label: "解題模式" },
-  { key: "hint", label: "提示模式" },
-  { key: "exam", label: "考試模式" },
-  { key: "note", label: "筆記模式" },
-  { key: "wrong", label: "錯題模式" },
-  { key: "review", label: "複習模式" },
-  { key: "quick", label: "快速模式" },
+  { key: "teacher", label: "學習教練模式", description: "陪你規劃學習、拆解觀念與建立可執行的下一步。" },
+  { key: "solve", label: "解題模式", description: "一步一步分析題目，不直接跳到答案。" },
+  { key: "hint", label: "提示模式", description: "只給剛剛好的提示，保留你自己思考的空間。" },
+  { key: "exam", label: "考試模式", description: "用考試節奏練習，先作答再看解析。" },
+  { key: "note", label: "筆記模式", description: "把重點整理成清楚、可複習的筆記。" },
+  { key: "wrong", label: "錯題模式", description: "找出錯題背後的觀念漏洞，安排補強。" },
+  { key: "review", label: "複習模式", description: "依照記憶曲線幫你回顧最容易忘記的內容。" },
+  { key: "quick", label: "快速模式", description: "用最短的回答，快速處理一個明確問題。" },
 ];
 
 const CONTEXT_OPTIONS = [
@@ -56,6 +56,7 @@ export default function AiPage() {
   const [renaming, setRenaming] = useState<Conversation | null>(null);
   const [renameText, setRenameText] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
+  const activeMode = MODES.find((mode) => mode.key === (conv?.mode ?? "teacher")) ?? MODES[0];
 
   useEffect(() => {
     if (!activeId) return;
@@ -202,6 +203,7 @@ export default function AiPage() {
                   </option>
                 ))}
               </Select>
+              <Badge tone="cyan">目前：{activeMode.label}</Badge>
               <Select
                 value={conv?.contextMaterialId ?? ""}
                 onChange={async (e) => {
@@ -239,6 +241,7 @@ export default function AiPage() {
                 })}
               </div>
             </div>
+            <div className="mb-3 rounded-xl border border-[#7c5cff]/25 bg-[#7c5cff]/8 px-3 py-2 text-xs leading-5 text-muted"><span className="font-semibold text-[#c4b5fd]">{activeMode.label}的用途：</span> {activeMode.description}</div>
 
             <div className="flex-1 space-y-3 overflow-y-auto scroll-thin pr-1">
               {loadingMsg && <Skeleton lines={4} />}

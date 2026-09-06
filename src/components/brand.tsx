@@ -131,6 +131,8 @@ export function NoviAvatar({
           <path d="M35 22c2-4 6-5 9-2-3 0-5 2-6 5M43 20c3-3 7-2 9 1-3-1-5 0-7 2" fill="none" stroke="#2f9d63" strokeWidth="1.6" strokeLinecap="round" />
           <circle cx="41" cy="22" r="1.8" fill="#c83b4b" /><circle cx="46" cy="23" r="1.8" fill="#c83b4b" />
           <path d="M86 71c5 4 6 9 2 13" stroke="#c83b4b" strokeWidth="2" strokeLinecap="round" /><path d="M87 71c-2 3-2 6 0 8" stroke="#ffc857" strokeWidth="1" strokeLinecap="round" />
+          <path d="M18 67c7-4 13-4 20 0s13 4 20 0 13-4 20 0" stroke="#ffc857" strokeWidth="1.2" strokeDasharray="2 3" className="novi-festive-lights" />
+          <path d="M78 40c5 3 7 7 5 12" stroke="#2f9d63" strokeWidth="2.2" strokeLinecap="round" /><circle cx="83" cy="52" r="2" fill="#c83b4b" />
           </g>
         </>}
         <path d="M17 46C17 27 30 17 50 17s33 10 33 29v24c0 12-12 20-33 20S17 82 17 70V46Z" fill={`url(#${bodyId})`} stroke="#d8edff" strokeWidth="1.5" />
@@ -138,9 +140,7 @@ export function NoviAvatar({
         <path d="M88 48c0-5-3-9-7-10l-4 3v22l4 3c4-1 7-5 7-10V48Z" fill="#9db7d4" stroke="#66e0ff" strokeWidth="1.4" />
         <rect x="23" y="35" width="54" height="38" rx="17" fill={`url(#${panelId})`} stroke="#66e0ff" strokeOpacity="0.72" strokeWidth="1.8" />
         <path d="M29 42C40 36 60 36 71 42" stroke="#ffffff" strokeOpacity="0.3" strokeWidth="2" strokeLinecap="round" />
-        <ellipse cx="38" cy="53" rx="4.2" ry="8" fill="#66e0ff" className="anim-pulse" />
-        <ellipse cx="62" cy="53" rx="4.2" ry="8" fill="#66e0ff" className="anim-pulse" />
-        <path d="M44 63c4 3 8 3 12 0" stroke="#66e0ff" strokeWidth="1.8" strokeLinecap="round" />
+        {state === "error" ? <><path d="M34 48l8 10M42 48l-8 10M58 48l8 10M66 48l-8 10" stroke="#fb7185" strokeWidth="2.4" strokeLinecap="round" /><path d="M43 67c5-4 9-4 14 0" stroke="#fb7185" strokeWidth="1.8" strokeLinecap="round" /></> : state === "thinking" || state === "analyze" ? <><ellipse cx="38" cy="53" rx="4.2" ry="5" fill="#7c5cff" className="anim-pulse" /><circle cx="62" cy="53" r="3" fill="#38bdf8" className="anim-pulse" /><path d="M44 63h12" stroke="#7c5cff" strokeWidth="1.8" strokeLinecap="round" /></> : state === "cheer" || state === "levelup" ? <><path d="M34 51c3-5 7-5 10 0M56 51c3-5 7-5 10 0" stroke="#ffc857" strokeWidth="2.2" strokeLinecap="round" /><ellipse cx="38" cy="55" rx="4" ry="6" fill="#ffc857" className="anim-pulse" /><ellipse cx="62" cy="55" rx="4" ry="6" fill="#ffc857" className="anim-pulse" /><path d="M42 61c5 7 11 7 16 0" stroke="#ffc857" strokeWidth="2" strokeLinecap="round" /></> : state === "remind" ? <><ellipse cx="38" cy="53" rx="4.2" ry="8" fill="#f59e0b" className="anim-pulse" /><ellipse cx="62" cy="53" rx="4.2" ry="8" fill="#f59e0b" className="anim-pulse" /><path d="M44 65c4-2 8-2 12 0" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round" /></> : <><ellipse cx="38" cy="53" rx="4.2" ry="8" fill="#66e0ff" className="anim-pulse" /><ellipse cx="62" cy="53" rx="4.2" ry="8" fill="#66e0ff" className="anim-pulse" /><path d="M44 63c4 3 8 3 12 0" stroke="#66e0ff" strokeWidth="1.8" strokeLinecap="round" /></>}
         <path d="M35 80h30" stroke="#7592b3" strokeWidth="2" strokeLinecap="round" />
         <circle cx="50" cy="86" r="5" fill="#06213c" stroke="#66e0ff" strokeWidth="1.8" />
         <circle cx="50" cy="86" r="2" fill="#66e0ff" className="anim-pulse" />
