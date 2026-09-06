@@ -26,7 +26,7 @@ type Kind = keyof typeof DATASETS;
 type Format = "json" | "csv" | "txt" | "md" | "pdf" | "docx" | "xlsx" | "zip";
 const KINDS = Object.keys(DATASETS) as Kind[];
 const FORMATS = ["json", "csv", "txt", "md", "pdf", "docx", "xlsx", "zip"] as Format[];
-const EXPORT_COST: Record<Format, number> = { json: 1, csv: 2, txt: 1, md: 1, pdf: 8, docx: 6, xlsx: 5, zip: 10 };
+const EXPORT_COST: Record<Format, number> = { json: 100, csv: 200, txt: 100, md: 100, pdf: 800, docx: 600, xlsx: 500, zip: 1000 };
 function safeKind(value: string): Kind[] { return value === "all" ? KINDS : value.split(",").filter((item): item is Kind => KINDS.includes(item as Kind)); }
 function jsonSafe(value: unknown): unknown { if (value instanceof Date) return value.toISOString(); if (Array.isArray(value)) return value.map(jsonSafe); if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, jsonSafe(item)])); return value; }
 function rowsToCsv(rows: Array<Record<string, unknown>>) { const keys = Array.from(new Set(rows.flatMap((row) => Object.keys(row)))); const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`; return `\uFEFF${keys.map(quote).join(",")}\n${rows.map((row) => keys.map((key) => quote(JSON.stringify(jsonSafe(row[key])) ?? "")).join(",")).join("\n")}`; }
