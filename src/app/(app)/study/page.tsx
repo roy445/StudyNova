@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Tabs } from "@/components/ui";
 import { MaterialsPanel, NotesPanel, OcrPanel } from "@/features/study/panels-a";
@@ -26,6 +26,17 @@ const TABS = [
 function StudyInner() {
   const params = useSearchParams();
   const [tab, setTab] = useState(params.get("tab") ?? "plan");
+  const contentRef = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [tab]);
 
   return (
     <div className="space-y-4">
@@ -36,19 +47,21 @@ function StudyInner() {
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === "plan" && <PlanPanel />}
-      {tab === "materials" && <MaterialsPanel />}
-      {tab === "ocr" && <OcrPanel />}
-      {tab === "quiz" && <QuizPanel />}
-      {tab === "wrong" && <WrongPanel />}
-      {tab === "words" && <WordsPanel />}
-      {tab === "word-library" && <WordLibraryPanel />}
-      {tab === "my-vocabulary" && <MyVocabularyPanel />}
-      {tab === "quick-memory" && <QuickMemoryPanel />}
-      {tab === "sentences" && <SentencesPanel />}
-      {tab === "voice" && <VoicePanel />}
-      {tab === "focus" && <FocusPanel />}
-      {tab === "notes" && <NotesPanel />}
+      <div ref={contentRef} className="scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+        {tab === "plan" && <PlanPanel />}
+        {tab === "materials" && <MaterialsPanel />}
+        {tab === "ocr" && <OcrPanel />}
+        {tab === "quiz" && <QuizPanel />}
+        {tab === "wrong" && <WrongPanel />}
+        {tab === "words" && <WordsPanel />}
+        {tab === "word-library" && <WordLibraryPanel />}
+        {tab === "my-vocabulary" && <MyVocabularyPanel />}
+        {tab === "quick-memory" && <QuickMemoryPanel />}
+        {tab === "sentences" && <SentencesPanel />}
+        {tab === "voice" && <VoicePanel />}
+        {tab === "focus" && <FocusPanel />}
+        {tab === "notes" && <NotesPanel />}
+      </div>
     </div>
   );
 }
