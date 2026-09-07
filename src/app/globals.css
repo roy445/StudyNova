@@ -408,3 +408,21 @@ html[data-christmas-particles="off"] .novi-festive-particles { display: none; }
   .christmas-snowfall, .christmas-snowfall::before, .christmas-snowfall::after, .christmas-reindeer { animation: none; }
   .christmas-reindeer { left: auto; right: 18px; top: 20%; opacity: 1; }
 }
+
+/* Vocabulary and personal-word reading surfaces intentionally escape the desktop content cap. */
+.study-vocabulary-fullbleed {
+  width: 100vw;
+  margin-left: calc((100% - 100vw) / 2);
+  padding: 1rem clamp(0.75rem, 3vw, 3rem) calc(5rem + env(safe-area-inset-bottom));
+  min-height: calc(100dvh - 8rem);
+  background: linear-gradient(135deg, rgba(55, 211, 255, 0.045), rgba(124, 92, 255, 0.055));
+}
+.study-vocabulary-fullbleed > * {
+  width: min(100%, 1200px);
+  margin-inline: auto;
+}
+@media (max-width: 640px) {
+  .study-vocabulary-fullbleed {
+    padding-inline: 0.75rem;
+  }
+}

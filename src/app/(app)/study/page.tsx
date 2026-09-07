@@ -47,7 +47,7 @@ function StudyInner() {
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      <div ref={contentRef} className="scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <div ref={contentRef} className={`scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))] ${tab === "words" || tab === "word-library" || tab === "my-vocabulary" ? "study-vocabulary-fullbleed" : ""}`}>
         {tab === "plan" && <PlanPanel />}
         {tab === "materials" && <MaterialsPanel />}
         {tab === "ocr" && <OcrPanel />}

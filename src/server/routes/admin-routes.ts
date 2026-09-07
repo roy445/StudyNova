@@ -386,6 +386,24 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "POST",
+    path: "/admin/features/bulk",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ enabled: z.boolean(), category: z.string().max(40).optional() }));
+      const all = await db.select().from(featurePermissions);
+      const selected = body.category ? all.filter((feature) => feature.feature.startsWith(`${body.category}:`)) : all;
+      if (!selected.length) return { updated: 0 };
+      for (const feature of selected) {
+        await db.update(featurePermissions).set({ enabled: body.enabled, updatedAt: new Date() }).where(eq(featurePermissions.id, feature.id));
+        await adminLog({ actorId: admin.userId, action: "feature.bulk_update", targetType: "feature", targetId: feature.feature, reason: body.enabled ? "bulk_enable" : "bulk_disable", before: feature, after: { ...feature, enabled: body.enabled }, ip: ctx.ip });
+      }
+      return { updated: selected.length, enabled: body.enabled, category: body.category ?? "all" };
+    },
+  }),
+
   /* -------------------------------------------------- announcements */
   route({
     method: "GET",
