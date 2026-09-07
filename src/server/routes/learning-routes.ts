@@ -920,8 +920,12 @@ export const routes: RouteDef[] = [
       const dayNumber = Math.floor(Date.now() / 86_400_000);
       const [{ total }] = await db.select({ total: count() }).from(dailyWords).where(eq(dailyWords.level, track));
       const totalWords = Number(total ?? 0);
-      if (!totalWords) return { words: [], level: track, track, count: 0, dailyTarget };
-      const offset = (dayNumber * dailyTarget) % totalWords;
+      const learningStart = Date.UTC(2026, 0, 1);
+      const learningDay = Math.max(1, Math.floor((Date.now() - learningStart) / 86_400_000) + 1);
+      const appearedCount = Math.min(totalWords, learningDay * dailyTarget);
+      const resetAt = "每天 00:00（台灣時間）";
+      if (!totalWords) return { words: [], level: track, track, count: 0, dailyTarget, appearedCount: 0, totalWords: 0, resetAt };
+      const offset = ((learningDay - 1) * dailyTarget) % totalWords;
       const fetchWords = (limit: number, skip: number) => db
         .select({
           id: dailyWords.id,
@@ -947,7 +951,7 @@ export const routes: RouteDef[] = [
       const first = await fetchWords(dailyTarget, offset);
       const remaining = dailyTarget - first.length;
       const rows = remaining > 0 ? [...first, ...(await fetchWords(remaining, 0))] : first;
-      return { words: rows, level: track, track, count: rows.length, dailyTarget };
+      return { words: rows, level: track, track, count: rows.length, dailyTarget, appearedCount, totalWords, resetAt };
     },
   }),
 
@@ -960,7 +964,14 @@ export const routes: RouteDef[] = [
       const requestedTrack = ctx.query.get("track");
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : null;
       const requestedLimit = Number(ctx.query.get("limit") ?? 500);
-      const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
+      const unlockedOnly = ctx.query.get("unlocked") === "true";
+      const baseLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
+      const [{ total: totalRow }] = await db.select({ total: count() }).from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined);
+      const totalWords = Number(totalRow ?? 0);
+      const learningStart = Date.UTC(2026, 0, 1);
+      const learningDay = Math.max(1, Math.floor((Date.now() - learningStart) / 86_400_000) + 1);
+      const unlockedCount = Math.min(totalWords, learningDay * 10);
+      const limit = unlockedOnly ? Math.min(baseLimit, Math.max(1, unlockedCount)) : baseLimit;
       const rows = await db.select({
         id: dailyWords.id,
         word: dailyWords.word,
@@ -973,7 +984,7 @@ export const routes: RouteDef[] = [
         level: dailyWords.level,
         familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
       }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(track ? eq(dailyWords.level, track) : undefined).orderBy(asc(dailyWords.word)).limit(limit);
-      return { words: rows };
+      return { words: rows, unlockedCount, totalWords, unlockedOnly };
     },
   }),
   route({

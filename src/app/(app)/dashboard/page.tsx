@@ -157,7 +157,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <WordsPanel />
-        <Card title="💡 每日小知識" subtitle="國文・英文・數學・自然・社會，每天各一則">
+        <Card title="💡 每日知識" subtitle="科普新知、跨科理解與學測重點；每天各一則，附解析與小測驗">
           <div className="grid gap-3 sm:grid-cols-2">
             {DAILY_SUBJECTS.map((subject) => {
               const item = dailyKnowledgeBySubject(data.today, subject);

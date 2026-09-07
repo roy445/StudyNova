@@ -593,7 +593,7 @@ export function OcrPanel() {
           <div className="flex flex-wrap items-center gap-2">
             <label className="focus-ring cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-xs hover:bg-white/5">
               📁 選擇圖片（可多選）
-              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => uploadImages(e.target.files)} />
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if ((e.target.files?.length ?? 0) > 5) toast.push("info", "建議每批最多 3–5 張；3 張通常是速度與辨識品質的最佳平衡。仍可分批上傳更多圖片。"); uploadImages(e.target.files); }} />
             </label>
             <label className="focus-ring cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-xs hover:bg-white/5">
               📸 拍照
@@ -603,6 +603,7 @@ export function OcrPanel() {
               ✨ 開始 AI 辨識{typeof ocrTotalCost === "number" ? `（扣 ${ocrTotalCost} Nova）` : ""}
             </Button>
             {(detail.data?.pages.length ?? 0) > 1 && <Button size="sm" variant="outline" loading={busy} onClick={() => runOcr(true)}>辨識全部 {detail.data?.pages.length} 張</Button>}
+            <span className="w-full text-[11px] text-muted">建議一次分析 3 張，最多一批 5 張最穩定；頁面太多或不相關內容，請分批並只選要分析的頁面。</span>
             <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
               加入我的教材
             </Button>
@@ -777,16 +778,7 @@ export function OcrPanel() {
             </div>
           ) : null}
 
-          {result && (
-            <div className="glass-soft max-h-72 overflow-y-auto scroll-thin p-3 text-xs">
-              <p className="mb-2 font-medium">AI 結果（{result.action}）</p>
-              {typeof result.result.body === "string" ? (
-                <pre className="whitespace-pre-wrap font-sans leading-relaxed">{result.result.body as string}</pre>
-              ) : (
-                <pre className="whitespace-pre-wrap font-mono text-[11px]">{JSON.stringify(result.result, null, 2)}</pre>
-              )}
-            </div>
-          )}
+          {result && <TransformResultView action={result.action} result={result.result} />}
           {activeId && detail.data?.pages.length ? (
             <div className="solid-data-surface space-y-3 rounded-2xl border border-cyan-300/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -821,6 +813,16 @@ export function OcrPanel() {
       )}
     </Card>
   );
+}
+
+function TransformResultView({ action, result }: { action: string; result: Record<string, unknown> }) {
+  const body = typeof result.body === "string" ? result.body : "";
+  const cards = Array.isArray(result.cards) ? result.cards as Array<Record<string, unknown>> : [];
+  const vocabulary = Array.isArray(result.vocabulary) ? result.vocabulary as Array<Record<string, unknown>> : [];
+  const questions = Array.isArray(result.questions) ? result.questions as Array<Record<string, unknown>> : [];
+  const tasks = Array.isArray(result.tasks) ? result.tasks as unknown[] : [];
+  const title = action === "flashcards" ? "記憶卡" : action === "questions" ? "練習題" : action === "notes" ? "整理筆記" : action === "keypoints" ? "重點整理" : action === "plan" ? "複習計畫" : "AI 學習結果";
+  return <div className="glass-soft max-h-[55vh] overflow-y-auto scroll-thin p-3 text-xs"><div className="mb-3 flex items-center justify-between"><p className="font-semibold">{title}</p><Badge tone="cyan">已整理成學習內容</Badge></div>{cards.length > 0 && <><p className="mb-2 text-muted">共分析 {cards.length} 張記憶卡</p><div className="grid gap-2 sm:grid-cols-2">{cards.map((card, index) => <article key={index} className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3"><p className="font-semibold">{String(card.front ?? `卡片 ${index + 1}`)}</p><p className="mt-2 text-muted">{String(card.back ?? "")}</p></article>)}</div></>}{vocabulary.length > 0 && <><p className="mb-2 text-muted">共分析 {vocabulary.length} 個單字／片語</p><div className="grid gap-2 sm:grid-cols-2">{vocabulary.map((item, index) => <article key={index} className="rounded-xl bg-white/5 p-2"><p className="font-semibold">{String(item.word ?? item.phrase ?? "")}</p><p className="mt-1 text-[#7dd3fc]">{String(item.meaning ?? "")}</p><p className="mt-1 text-muted">{String(item.example ?? "")}</p></article>)}</div></>}{questions.length > 0 && <><p className="mb-2 text-muted">共分析 {questions.length} 題</p>{questions.map((question, index) => <article key={index} className="mb-2 rounded-xl bg-white/5 p-3"><p className="font-semibold">{index + 1}. {String(question.stem ?? question.question ?? "")}</p><p className="mt-1 text-muted">答案：{String(question.answer ?? "待作答")}</p></article>)}</>}{tasks.length > 0 && <><p className="mb-2 text-muted">共整理 {tasks.length} 個複習步驟</p><ol className="list-decimal space-y-1 pl-5">{tasks.map((task, index) => <li key={index}>{String(task)}</li>)}</ol></>}{body && <div className="whitespace-pre-wrap leading-relaxed">{body}</div>}{!body && !cards.length && !vocabulary.length && !questions.length && !tasks.length && <p className="text-muted">這次沒有找到適合整理的內容，請改選其他功能或重新選擇頁面。</p>}</div>;
 }
 
 function VisionAnalysisResult({ data, onAction, onBatchVocabulary, onBatchLearning, onCreateQuiz }: { data: Record<string, unknown>; onAction: (action: "vocabulary" | "note" | "question", item: Record<string, unknown>) => void; onBatchVocabulary: (items: Array<Record<string, unknown>>) => void; onBatchLearning: (action: "vocabulary" | "note" | "sentence" | "question", items: Array<Record<string, unknown>>) => void; onCreateQuiz: () => void }) {

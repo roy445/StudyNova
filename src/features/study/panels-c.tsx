@@ -18,10 +18,14 @@ function speak(text: string, lang = "en-US") {
 
 type Word = { id: string; word: string; meaning: string; meanings?: string[]; phrases?: Array<{ en: string; zh: string }>; part_of_speech: string; example: string; example_zh: string; familiarity: number; memory_tip: string | null };
 
+function fallbackExample(word: string, level?: string) {
+  return level === "senior" ? `In the passage, the word “${word}” helps explain the writer's main idea.` : `I learned the word “${word}” in English class today.`;
+}
+
 export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const toast = useToast();
   const dailyPath = track ? `/words/daily?track=${track}` : "/words/daily";
-  const { data, loading, error, reload } = useApi<{ words: Word[]; level: string; track?: string; count: number; dailyTarget?: number }>(dailyPath, [track]);
+  const { data, loading, error, reload } = useApi<{ words: Word[]; level: string; track?: string; count: number; dailyTarget?: number; appearedCount?: number; totalWords?: number; resetAt?: string }>(dailyPath, [track]);
   const [index, setIndex] = useState(0);
   const [mode, setMode] = useState<"card" | "zh2en" | "en2zh" | "spell" | "timed">("card");
   const [flipped, setFlipped] = useState(false);
@@ -94,6 +98,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         </Select>
       }
     >
+      <div className="mb-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs"><div className="flex flex-wrap items-center justify-between gap-2"><span>已出現過 {data?.appearedCount ?? words.length} / 共 {data?.totalWords ?? words.length} 個單字</span><span className="text-muted">每日 {data?.resetAt ?? "00:00（台灣時間）"} 重置</span></div><Progress value={data?.appearedCount ?? words.length} max={data?.totalWords ?? words.length} tone="cyan" /><p className="mt-1 text-muted">已出現的單字會保留在「學習中心 → 字詞百科」，每天慢慢解鎖新單字。</p></div>
       {mode === "timed" && (
         <div className="mb-2 flex items-center gap-2 text-xs">
           <Badge tone={timeLeft < 15 ? "rose" : "cyan"}>剩餘 {timeLeft}s</Badge>
@@ -117,8 +122,8 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
                     <span className="text-xs text-muted">{word.part_of_speech}</span>
                     <span className="text-sm text-[#7dd3fc]">{word.meaning}</span>
                   </span>
-                  {word.example && <span className="mt-1 block text-xs leading-relaxed text-muted">{word.example}</span>}
-                  {word.example_zh && <span className="block text-xs leading-relaxed text-muted">{word.example_zh}</span>}
+                  <span className="mt-1 block text-xs leading-relaxed text-muted">{word.example || fallbackExample(word.word, data?.level)}</span>
+                  <span className="block text-xs leading-relaxed text-muted">{word.example_zh || "我今天在課堂上學會了這個單字。"}</span>
                 </span>
               </div>
             </button>
@@ -150,10 +155,10 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
             {(flipped || mode === "card") && mode !== "spell" && <p className="text-lg text-[#37d3ff]">{flipped ? current.meaning : "　"}</p>}
           </>
         )}
-        {flipped && current.example && (
+        {flipped && (current.example || current.word) && (
           <div className="mt-1 text-xs text-muted">
-            <p>{current.example}</p>
-            <p>{current.example_zh}</p>
+            <p>{current.example || fallbackExample(current.word, data?.level)}</p>
+            <p>{current.example_zh || "我今天在課堂上學會了這個單字。"}</p>
           </div>
         )}
         {tip && <p className="mt-2 whitespace-pre-wrap rounded-xl bg-black/30 p-2 text-left text-xs text-muted">{tip}</p>}
@@ -211,7 +216,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
                 </div>
               ) : <p className="rounded-xl bg-white/5 px-3 py-2 text-sm text-muted">這個單字目前沒有整理到常用片語。</p>}
             </section>
-            {(detailWord.example || detailWord.example_zh) && <section className="rounded-xl bg-black/20 p-3 text-sm"><p className="text-xs text-muted">例句</p>{detailWord.example && <p className="mt-1">{detailWord.example}</p>}{detailWord.example_zh && <p className="mt-0.5 text-muted">{detailWord.example_zh}</p>}</section>}
+            <section className="rounded-xl bg-black/20 p-3 text-sm"><p className="text-xs text-muted">例句</p><p className="mt-1">{detailWord.example || fallbackExample(detailWord.word, data?.level)}</p><p className="mt-0.5 text-muted">{detailWord.example_zh || "我今天在課堂上學會了這個單字。"}</p></section>
           </div>
         )}
       </Modal>
@@ -287,7 +292,7 @@ export function WordLibraryPanel() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "mastered" | "unmastered">("all");
   const [active, setActive] = useState<BrowseWord | null>(null);
-  const wordsApi = useApi<{ words: BrowseWord[] }>(`/words/all?track=${track}&limit=1000`, [track]);
+  const wordsApi = useApi<{ words: BrowseWord[]; unlockedCount?: number; totalWords?: number }>(`/words/all?track=${track}&limit=7000&unlocked=true`, [track]);
   const sentencesApi = useApi<{ sentences: Sentence[] }>("/sentences");
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const words = (wordsApi.data?.words ?? []).filter((word) => {
@@ -297,7 +302,7 @@ export function WordLibraryPanel() {
   const phrases = words.flatMap((word) => (word.phrases ?? []).map((phrase, index) => ({ ...phrase, id: `${word.id}-${index}`, word: word.word })));
   const sentences = (sentencesApi.data?.sentences ?? []).filter((sentence) => !normalizedQuery || `${sentence.en} ${sentence.zh}`.toLocaleLowerCase().includes(normalizedQuery));
   const filteredWords = words.filter((word) => status === "all" || status === "mastered" ? status === "all" || word.familiarity >= 80 : word.familiarity < 80);
-  return <Card title="📚 字詞百科" subtitle="像查單字網站一樣，搜尋單字、片語與句子，點擊即可查看完整內容。">
+  return <Card title="📚 字詞百科" subtitle={`像查單字網站一樣，搜尋單字、片語與句子，點擊即可查看完整內容。已出現 ${wordsApi.data?.unlockedCount ?? words.length} / 共 ${wordsApi.data?.totalWords ?? words.length} 個，每日慢慢解鎖。`}>
     <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
       <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜尋英文、中文、片語或例句…" />
       <Select value={track} onChange={(e) => setTrack(e.target.value as typeof track)}><option value="senior">高中詞庫</option><option value="junior">國中詞庫</option></Select>
@@ -307,11 +312,11 @@ export function WordLibraryPanel() {
       {([['words', '單字'], ['phrases', '片語'], ['sentences', '句子']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setCategory(key)} className={`rounded-full border px-3 py-1.5 text-xs transition ${category === key ? "border-[#37d3ff]/70 bg-[#37d3ff]/15 text-[#b9f2ff]" : "border-[var(--line)] text-muted hover:border-[#37d3ff]/40"}`}>{label}</button>)}
       <span className="ml-auto text-xs text-muted">{category === "words" ? words.length : category === "phrases" ? phrases.length : sentences.length} 筆</span>
     </div>
-    {category === "words" && <div className="mt-3 grid max-h-[560px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{wordsApi.loading && <Skeleton lines={5} />}{!wordsApi.loading && filteredWords.map((word) => <button key={word.id} type="button" onClick={() => setActive(word)} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{word.word}</p><p className="mt-0.5 text-xs text-[#7dd3fc]">{word.meaning}</p><p className="mt-1 text-[11px] text-muted">{word.partOfSpeech || "未分類"}・{word.level === "senior" ? "高中" : "國中"}・熟悉度 {word.familiarity}%</p></div><Badge tone={word.familiarity >= 80 ? "green" : "cyan"}>詳細</Badge></div><p className="mt-2 line-clamp-2 text-xs text-muted">{word.example || "點擊查看例句、片語與多重意思"}</p></button>)}</div>}
+    {category === "words" && <div className="mt-3 grid max-h-[560px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{wordsApi.loading && <Skeleton lines={5} />}{!wordsApi.loading && filteredWords.map((word) => <button key={word.id} type="button" onClick={() => setActive(word)} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{word.word}</p><p className="mt-0.5 text-xs text-[#7dd3fc]">{word.meaning}</p><p className="mt-1 text-[11px] text-muted">{word.partOfSpeech || "未分類"}・{word.level === "senior" ? "高中" : "國中"}・熟悉度 {word.familiarity}%</p></div><Badge tone={word.familiarity >= 80 ? "green" : "cyan"}>詳細</Badge></div><p className="mt-2 line-clamp-2 text-xs text-muted">{word.example || fallbackExample(word.word, word.level)}</p></button>)}</div>}
     {category === "phrases" && <div className="mt-3 grid max-h-[560px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{phrases.map((phrase) => <button key={phrase.id} type="button" onClick={() => { const source = words.find((word) => word.word === phrase.word); if (source) setActive(source); }} className="glass-soft rounded-xl p-3 text-left"><p className="font-semibold text-[#e8edff]">{phrase.en}</p><p className="mt-1 text-xs text-[#7dd3fc]">{phrase.zh}</p><p className="mt-2 text-[11px] text-muted">來源單字：{phrase.word}</p></button>)}</div>}
     {category === "sentences" && <div className="mt-3 space-y-2">{sentences.map((sentence) => <button key={sentence.id} type="button" onClick={() => { setQuery(sentence.en); toast.push("info", "已定位這個句子，可切換回單字或片語繼續查詢"); }} className="glass-soft w-full rounded-xl p-3 text-left"><p className="text-sm font-medium">{sentence.en}</p><p className="mt-1 text-xs text-muted">{sentence.zh}</p><p className="mt-2 text-[11px] text-muted">熟悉度 {sentence.familiarity}%</p></button>)}</div>}
     {category === "words" && !wordsApi.loading && !filteredWords.length && <EmptyState icon="⌕" title="找不到符合的內容" hint="試試其他英文、中文或片語關鍵字。" />}
-    <Modal open={Boolean(active)} onClose={() => setActive(null)} title={active?.word ?? "單字詳細資訊"}>{active && <div className="space-y-3"><div className="flex flex-wrap items-center gap-2"><Badge tone="cyan">{active.partOfSpeech || "單字"}</Badge><Button size="sm" variant="ghost" onClick={() => { if (!speak(active.word)) toast.push("error", "此瀏覽器不支援語音"); }}>🔊 朗讀</Button></div><section className="rounded-xl bg-[#37d3ff]/10 p-3"><p className="text-xs text-muted">主要意思</p><p className="mt-1 text-lg font-semibold text-[#7dd3fc]">{active.meaning}</p>{active.meanings?.filter(Boolean).map((meaning, index) => <p key={`${meaning}-${index}`} className="mt-1 text-sm">{meaning}</p>)}</section><section className="rounded-xl bg-white/5 p-3"><p className="text-xs font-semibold text-muted">例句</p><p className="mt-1 text-sm">{active.example || "尚未整理例句"}</p><p className="mt-1 text-sm text-muted">{active.exampleZh}</p></section><section><p className="mb-2 text-xs font-semibold text-muted">相關片語</p>{active.phrases?.length ? active.phrases.map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="mb-1.5 rounded-lg border border-[var(--line)] p-2"><p className="text-sm">{phrase.en}</p><p className="text-xs text-muted">{phrase.zh}</p></div>) : <p className="text-sm text-muted">目前沒有整理到相關片語。</p>}</section></div>}</Modal>
+    <Modal open={Boolean(active)} onClose={() => setActive(null)} title={active?.word ?? "單字詳細資訊"}>{active && <div className="space-y-3"><div className="flex flex-wrap items-center gap-2"><Badge tone="cyan">{active.partOfSpeech || "單字"}</Badge><Button size="sm" variant="ghost" onClick={() => { if (!speak(active.word)) toast.push("error", "此瀏覽器不支援語音"); }}>🔊 朗讀</Button></div><section className="rounded-xl bg-[#37d3ff]/10 p-3"><p className="text-xs text-muted">主要意思</p><p className="mt-1 text-lg font-semibold text-[#7dd3fc]">{active.meaning}</p>{active.meanings?.filter(Boolean).map((meaning, index) => <p key={`${meaning}-${index}`} className="mt-1 text-sm">{meaning}</p>)}</section><section className="rounded-xl bg-white/5 p-3"><p className="text-xs font-semibold text-muted">例句</p><p className="mt-1 text-sm">{active.example || fallbackExample(active.word, active.level)}</p><p className="mt-1 text-sm text-muted">{active.exampleZh || "我今天在課堂上學會了這個單字。"}</p></section><section><p className="mb-2 text-xs font-semibold text-muted">相關片語</p>{active.phrases?.length ? active.phrases.map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="mb-1.5 rounded-lg border border-[var(--line)] p-2"><p className="text-sm">{phrase.en}</p><p className="text-xs text-muted">{phrase.zh}</p></div>) : <p className="text-sm text-muted">目前沒有整理到相關片語。</p>}</section></div>}</Modal>
   </Card>;
 }
 
