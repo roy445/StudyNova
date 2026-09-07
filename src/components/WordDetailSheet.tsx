@@ -72,13 +72,15 @@ function HighlightedExample({ sentence, target }: { sentence: string; target: st
 }
 
 function SourceBadge({ sourceKind }: { sourceKind?: SourceKind }) {
-  return sourceKind === "ai" ? <Badge tone="violet">AI 補充</Badge> : <Badge tone="muted">教材內容</Badge>;
+  if (sourceKind === "ai") return <Badge tone="violet">AI 補充</Badge>;
+  if (sourceKind === "generated") return <Badge tone="gold">系統生成</Badge>;
+  return <Badge tone="muted">教材內容</Badge>;
 }
 
-function SpeakButton({ text, lang = "en-US", label = "朗讀" }: { text: string; lang?: string; label?: string }) {
+function SpeakButton({ text, lang = "en-US", label = "朗讀", spellFirst = false }: { text: string; lang?: string; label?: string; spellFirst?: boolean }) {
   const speak = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(spellFirst ? `${text.split("").join(", ")}. ${text}` : text);
     utterance.lang = lang;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
@@ -248,19 +250,19 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
     const pronunciation = detail.data?.word;
     if (!pronunciation) return;
     const audioUrl = pronunciation.audio[kind];
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      const utterance = new SpeechSynthesisUtterance(`${pronunciation.word.split("").join(", ")}. ${pronunciation.word}`);
+      utterance.lang = kind === "us" ? "en-US" : "en-GB";
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
     if (audioUrl) {
       const audio = new Audio(audioUrl);
       void audio.play().catch(() => toast.push("error", "目前無法播放發音"));
       return;
     }
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      toast.push("error", "此瀏覽器不支援語音播放");
-      return;
-    }
-    const utterance = new SpeechSynthesisUtterance(pronunciation.word);
-    utterance.lang = kind === "us" ? "en-US" : "en-GB";
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    toast.push("error", "此瀏覽器不支援語音播放");
   }
 
   const data = detail.data;
@@ -287,20 +289,20 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
   if (!wordId) return null;
 
   return (
-    <div className={`fixed inset-0 z-[120] transition-opacity duration-260 ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+    <div className={`fixed inset-0 z-[120] transition-opacity duration-200 ease-out motion-reduce:transition-none ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}>
       <button type="button" aria-label="關閉單字詳細資訊" className="absolute inset-0 bg-[#02040b]/70 backdrop-blur-[2px]" onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="word-detail-title"
         ref={dialogRef}
-        className={`absolute inset-x-0 bottom-0 flex h-[100dvh] flex-col border-t border-[#37d3ff]/25 bg-[var(--bg)] shadow-[0_-24px_80px_rgba(0,0,0,0.45)] transition-transform duration-260 ease-out motion-reduce:transition-none ${open ? "translate-y-0" : "translate-y-full"}`}
+        className={`absolute inset-x-0 bottom-0 flex h-[100dvh] flex-col border-t border-[#37d3ff]/25 bg-[var(--bg)] shadow-[0_-24px_80px_rgba(0,0,0,0.45)] transition-transform duration-220 ease-[cubic-bezier(0.23,1,0.32,1)] will-change-transform motion-reduce:transition-none ${open ? "translate-y-0" : "translate-y-full"}`}
       >
         <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--bg)]/95 px-4 py-3 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-center gap-4"><Wordmark size={15} /><span className="h-1.5 w-10 rounded-full bg-[#37d3ff]/40" /><p className="truncate text-xs text-muted">單字詳細資訊</p></div>
           <button ref={closeButton} type="button" onClick={close} aria-label="返回單字列表" className="focus-ring rounded-xl border border-[var(--line)] px-3 py-2 text-sm text-muted transition hover:border-[#37d3ff]/50 hover:text-[var(--text)]">返回</button>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-8">
+        <main className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain scroll-smooth px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 [-webkit-overflow-scrolling:touch] sm:px-8 sm:pt-5">
           <div className="mx-auto max-w-5xl space-y-6">
             {detail.loading && <DetailSkeleton />}
             {detail.error && <ErrorState message={detail.error} onRetry={detail.reload} />}
@@ -315,7 +317,7 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
                 </section>
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <Card title="基本資訊"><div className="space-y-3"><div><p className="text-xs text-muted">中文意思</p><div className="mt-1 flex items-center gap-2"><p className="min-w-0 flex-1 break-words text-xl font-semibold text-[#7dd3fc]">{data.word.meaning || "尚未補上中文釋義"}</p><SpeakButton text={data.word.meaning} label="朗讀意思" lang="zh-TW" /></div></div>{data.word.meanings.length > 1 && <div className="space-y-1.5"><p className="text-xs text-muted">其他意思</p>{data.word.meanings.map((meaning) => <div key={meaning} className="flex items-center gap-2 rounded-lg bg-white/5 px-2 py-1.5"><span className="min-w-0 flex-1 break-words text-sm">{meaning}</span><SpeakButton text={meaning} label="朗讀" lang="zh-TW" /></div>)}</div>}{data.word.englishDefinition && <div><p className="text-xs text-muted">English definition</p><div className="mt-1 flex items-start gap-2"><p className="min-w-0 flex-1 break-words text-sm leading-relaxed">{data.word.englishDefinition}</p><SpeakButton text={data.word.englishDefinition} label="朗讀定義" /></div></div>}</div></Card>
+                  <Card title="基本資訊"><div className="space-y-3"><div><p className="text-xs text-muted">中文意思・{data.word.partOfSpeech || previewPartOfSpeech || "n."}</p><div className="mt-1 flex items-center gap-2"><p className="min-w-0 flex-1 break-words text-xl font-semibold text-[#7dd3fc]">{data.word.meaning || "尚未補上中文釋義"}</p><SpeakButton text={data.word.meaning} label="朗讀意思" lang="zh-TW" /></div></div>{data.word.meanings.length > 1 && <div className="space-y-1.5"><p className="text-xs text-muted">其他意思・{data.word.partOfSpeech || previewPartOfSpeech || "n."}</p>{data.word.meanings.map((meaning) => <div key={meaning} className="flex items-center gap-2 rounded-lg bg-white/5 px-2 py-1.5"><span className="min-w-0 flex-1 break-words text-sm">{meaning}</span><SpeakButton text={meaning} label="朗讀" lang="zh-TW" /></div>)}</div>}{data.word.englishDefinition && <div><p className="text-xs text-muted">English definition・{data.word.partOfSpeech || previewPartOfSpeech || "n."}</p><div className="mt-1 flex items-start gap-2"><p className="min-w-0 flex-1 break-words text-sm leading-relaxed">{data.word.englishDefinition}</p><SpeakButton text={data.word.englishDefinition} label="朗讀定義" /></div></div>}</div></Card>
                   <Card title="學習操作"><div className="flex flex-wrap gap-2"><Button loading={progressBusy} onClick={() => updateProgress("mastered")}>標記為已掌握</Button><Button loading={progressBusy} variant="outline" onClick={() => updateProgress("review")}>加入複習</Button><Button loading={progressBusy} variant="ghost" onClick={() => updateProgress("mistake")}>加入錯題</Button></div><p className="mt-3 text-xs text-muted">這些狀態只會更新目前登入帳號，不會改變其他學生的學習進度。</p></Card>
                 </div>
 
@@ -323,13 +325,13 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
 
                 {allExplanations.length > 0 && <Section title="單字解釋"><div className="grid gap-2 sm:grid-cols-2">{allExplanations.map((item, index) => <div key={`${item.explanation}-${index}`} className="glass-soft flex items-start justify-between gap-3 p-3 text-sm"><span className="min-w-0 flex-1">{index + 1}. {item.explanation}</span><div className="flex shrink-0 items-center gap-2"><SpeakButton text={item.explanation} label="朗讀解釋" /><SourceBadge sourceKind={item.sourceKind} /></div></div>)}</div></Section>}
 
-                {synonyms.length > 0 && <Section title="相似字與近義字"><div className="grid gap-3 md:grid-cols-2">{synonyms.map((item, index) => <div key={`${item.word}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="break-words font-semibold text-[#b8efff]">{item.word}</p><p className="text-xs text-muted">{item.meaning}・{item.partOfSpeech}</p></div><div className="flex shrink-0 items-center gap-2"><SpeakButton text={`${item.word}。${item.meaning}`} label="朗讀" /><SourceBadge sourceKind={item.sourceKind} /></div></div>{item.difference && <p className="mt-2 text-sm leading-relaxed">差異：{item.difference}</p>}{item.usage && <p className="mt-1 text-xs text-muted">情境：{item.usage}</p>}</div>)}</div></Section>}
+                {synonyms.length > 0 && <Section title="相似字與近義字"><div className="grid gap-3 md:grid-cols-2">{synonyms.map((item, index) => <div key={`${item.word}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="break-words font-semibold text-[#b8efff]">{item.word}</p><p className="text-xs text-muted">{item.meaning}・{item.partOfSpeech}</p></div><div className="flex shrink-0 items-center gap-2"><SpeakButton text={item.word} label="朗讀單字" spellFirst /><SourceBadge sourceKind={item.sourceKind} /></div></div>{item.difference && <p className="mt-2 text-sm leading-relaxed">差異：{item.difference}</p>}{item.usage && <p className="mt-1 text-xs text-muted">情境：{item.usage}</p>}</div>)}</div></Section>}
 
                 {examples.length > 0 && <Section title="例句"><div className="space-y-3">{examples.map((item, index) => <div key={`${item.english}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="break-words text-sm leading-relaxed">{data.word.word ? <HighlightedExample sentence={item.english} target={data.word.word} /> : item.english}</p><div className="mt-1 flex items-start gap-2"><p className="min-w-0 flex-1 break-words text-sm text-muted">{item.chinese}</p><SpeakButton text={`${item.english}。${item.chinese}`} label="朗讀例句" /></div></div><Badge tone="muted">{item.level || "一般"}</Badge></div><div className="mt-1"><SourceBadge sourceKind={item.sourceKind} /></div></div>)}</div></Section>}
                 {examples.length === 0 && preview && (preview.example || previewExampleZh) && <Section title="例句"><div className="glass-soft p-3 text-sm"><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="break-words"><HighlightedExample sentence={preview.example ?? ""} target={data.word.word} /></p><p className="mt-1 break-words text-muted">{previewExampleZh}</p></div><SpeakButton text={`${preview.example ?? ""}。${previewExampleZh}`} label="朗讀例句" /></div></div></Section>}
 
                 {phrases.length > 0 && <Section title="常見搭配"><div className="grid gap-2 sm:grid-cols-2">{phrases.map((item, index) => <div key={`${item.phrase}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="break-words font-medium text-[#b8efff]">{item.phrase}</p>{item.meaning && <p className="mt-1 break-words text-xs text-muted">{item.meaning}</p>}</div><div className="flex shrink-0 items-center gap-2"><SpeakButton text={`${item.phrase}。${item.meaning}`} label="朗讀" /><SourceBadge sourceKind={item.sourceKind} /></div></div></div>)}</div></Section>}
-                {forms.length > 0 && <Section title="詞性變化"><div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">{forms.map((item, index) => <div key={`${item.form}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="break-words font-semibold">{item.form}</p><p className="break-words text-xs text-muted">{item.partOfSpeech}・{item.meaning}</p></div><div className="flex shrink-0 items-center gap-2"><SpeakButton text={`${item.form}。${item.partOfSpeech}。${item.meaning}`} label="朗讀" /><SourceBadge sourceKind={item.sourceKind} /></div></div></div>)}</div></Section>}
+                {forms.length > 0 && <Section title="詞性變化"><div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">{forms.map((item, index) => <div key={`${item.form}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="break-words font-semibold">{item.form}</p><p className="break-words text-xs text-muted">{item.partOfSpeech}・{item.meaning}</p></div><div className="flex shrink-0 items-center gap-2"><SpeakButton text={item.form} label="朗讀詞性" spellFirst /><SourceBadge sourceKind={item.sourceKind} /></div></div></div>)}</div></Section>}
 
                 <Section title="AI 補充">{!aiContent && !data.aiContent ? <NovaCostNotice cost={aiCost} action="產生 AI 單字補充" /> : <p className="mb-2 text-xs text-muted">這個單字的 AI 補充已快取，再次查看不會重複扣除 Nova。</p>}<div className="glass-soft p-4">{aiLoading && <div className="flex items-center gap-2 text-sm text-muted"><span className="h-2 w-2 animate-ping rounded-full bg-[#37d3ff]" />AI 正在整理這個單字……</div>}{aiErrorMessage && !aiLoading && <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm text-rose-200">AI 補充暫時無法取得</p><Button size="sm" variant="outline" onClick={generateAi}>重新產生</Button></div>}{!aiLoading && !aiErrorMessage && !aiContent && !data.aiContent && <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm text-muted">目前尚未產生 AI 補充；基本單字資料不受影響。</p><Button size="sm" onClick={generateAi}>產生 AI 補充</Button></div>}{!aiLoading && (aiContent || data.aiContent) && <div className="space-y-3">{ai.memoryTip && <div><p className="text-xs text-muted">記憶技巧</p><p className="mt-1 text-sm leading-relaxed">{ai.memoryTip}</p></div>}{ai.etymology && <div><p className="text-xs text-muted">詞源／字根（AI）</p><p className="mt-1 text-sm leading-relaxed">{ai.etymology}</p></div>}{ai.mistakes?.length ? <div><p className="text-xs text-muted">常見錯誤</p><div className="mt-1 space-y-1.5">{ai.mistakes.map((mistake, index) => <div key={`${mistake.wrong}-${index}`} className="rounded-xl bg-black/20 p-2 text-sm"><p className="text-rose-200">❌ {mistake.wrong}</p><p className="text-emerald-200">✅ {mistake.correct}</p><p className="mt-0.5 text-xs text-muted">{mistake.reason}</p></div>)}</div></div> : null}</div>}</div></Section>
               </>
