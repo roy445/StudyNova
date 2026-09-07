@@ -278,6 +278,43 @@ export function MyVocabularyPanel() {
   </Card>;
 }
 
+type BrowseWord = { id: string; word: string; meaning: string; meanings?: string[]; phrases?: Array<{ en: string; zh: string }>; partOfSpeech: string; example: string; exampleZh: string; level: string; familiarity: number };
+
+export function WordLibraryPanel() {
+  const toast = useToast();
+  const [track, setTrack] = useState<"junior" | "senior">("senior");
+  const [category, setCategory] = useState<"words" | "phrases" | "sentences">("words");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | "mastered" | "unmastered">("all");
+  const [active, setActive] = useState<BrowseWord | null>(null);
+  const wordsApi = useApi<{ words: BrowseWord[] }>(`/words/all?track=${track}&limit=1000`, [track]);
+  const sentencesApi = useApi<{ sentences: Sentence[] }>("/sentences");
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const words = (wordsApi.data?.words ?? []).filter((word) => {
+    const matchesQuery = !normalizedQuery || [word.word, word.meaning, word.example, word.exampleZh, ...(word.phrases ?? []).flatMap((phrase) => [phrase.en, phrase.zh])].join(" ").toLocaleLowerCase().includes(normalizedQuery);
+    return matchesQuery;
+  });
+  const phrases = words.flatMap((word) => (word.phrases ?? []).map((phrase, index) => ({ ...phrase, id: `${word.id}-${index}`, word: word.word })));
+  const sentences = (sentencesApi.data?.sentences ?? []).filter((sentence) => !normalizedQuery || `${sentence.en} ${sentence.zh}`.toLocaleLowerCase().includes(normalizedQuery));
+  const filteredWords = words.filter((word) => status === "all" || status === "mastered" ? status === "all" || word.familiarity >= 80 : word.familiarity < 80);
+  return <Card title="📚 字詞百科" subtitle="像查單字網站一樣，搜尋單字、片語與句子，點擊即可查看完整內容。">
+    <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+      <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜尋英文、中文、片語或例句…" />
+      <Select value={track} onChange={(e) => setTrack(e.target.value as typeof track)}><option value="senior">高中詞庫</option><option value="junior">國中詞庫</option></Select>
+      <Select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}><option value="all">全部</option><option value="mastered">已掌握</option><option value="unmastered">未掌握</option></Select>
+    </div>
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      {([['words', '單字'], ['phrases', '片語'], ['sentences', '句子']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setCategory(key)} className={`rounded-full border px-3 py-1.5 text-xs transition ${category === key ? "border-[#37d3ff]/70 bg-[#37d3ff]/15 text-[#b9f2ff]" : "border-[var(--line)] text-muted hover:border-[#37d3ff]/40"}`}>{label}</button>)}
+      <span className="ml-auto text-xs text-muted">{category === "words" ? words.length : category === "phrases" ? phrases.length : sentences.length} 筆</span>
+    </div>
+    {category === "words" && <div className="mt-3 grid max-h-[560px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{wordsApi.loading && <Skeleton lines={5} />}{!wordsApi.loading && filteredWords.map((word) => <button key={word.id} type="button" onClick={() => setActive(word)} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{word.word}</p><p className="mt-0.5 text-xs text-[#7dd3fc]">{word.meaning}</p><p className="mt-1 text-[11px] text-muted">{word.partOfSpeech || "未分類"}・{word.level === "senior" ? "高中" : "國中"}・熟悉度 {word.familiarity}%</p></div><Badge tone={word.familiarity >= 80 ? "green" : "cyan"}>詳細</Badge></div><p className="mt-2 line-clamp-2 text-xs text-muted">{word.example || "點擊查看例句、片語與多重意思"}</p></button>)}</div>}
+    {category === "phrases" && <div className="mt-3 grid max-h-[560px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{phrases.map((phrase) => <button key={phrase.id} type="button" onClick={() => { const source = words.find((word) => word.word === phrase.word); if (source) setActive(source); }} className="glass-soft rounded-xl p-3 text-left"><p className="font-semibold text-[#e8edff]">{phrase.en}</p><p className="mt-1 text-xs text-[#7dd3fc]">{phrase.zh}</p><p className="mt-2 text-[11px] text-muted">來源單字：{phrase.word}</p></button>)}</div>}
+    {category === "sentences" && <div className="mt-3 space-y-2">{sentences.map((sentence) => <button key={sentence.id} type="button" onClick={() => { setQuery(sentence.en); toast.push("info", "已定位這個句子，可切換回單字或片語繼續查詢"); }} className="glass-soft w-full rounded-xl p-3 text-left"><p className="text-sm font-medium">{sentence.en}</p><p className="mt-1 text-xs text-muted">{sentence.zh}</p><p className="mt-2 text-[11px] text-muted">熟悉度 {sentence.familiarity}%</p></button>)}</div>}
+    {category === "words" && !wordsApi.loading && !filteredWords.length && <EmptyState icon="⌕" title="找不到符合的內容" hint="試試其他英文、中文或片語關鍵字。" />}
+    <Modal open={Boolean(active)} onClose={() => setActive(null)} title={active?.word ?? "單字詳細資訊"}>{active && <div className="space-y-3"><div className="flex flex-wrap items-center gap-2"><Badge tone="cyan">{active.partOfSpeech || "單字"}</Badge><Button size="sm" variant="ghost" onClick={() => { if (!speak(active.word)) toast.push("error", "此瀏覽器不支援語音"); }}>🔊 朗讀</Button></div><section className="rounded-xl bg-[#37d3ff]/10 p-3"><p className="text-xs text-muted">主要意思</p><p className="mt-1 text-lg font-semibold text-[#7dd3fc]">{active.meaning}</p>{active.meanings?.filter(Boolean).map((meaning, index) => <p key={`${meaning}-${index}`} className="mt-1 text-sm">{meaning}</p>)}</section><section className="rounded-xl bg-white/5 p-3"><p className="text-xs font-semibold text-muted">例句</p><p className="mt-1 text-sm">{active.example || "尚未整理例句"}</p><p className="mt-1 text-sm text-muted">{active.exampleZh}</p></section><section><p className="mb-2 text-xs font-semibold text-muted">相關片語</p>{active.phrases?.length ? active.phrases.map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="mb-1.5 rounded-lg border border-[var(--line)] p-2"><p className="text-sm">{phrase.en}</p><p className="text-xs text-muted">{phrase.zh}</p></div>) : <p className="text-sm text-muted">目前沒有整理到相關片語。</p>}</section></div>}</Modal>
+  </Card>;
+}
+
 type Sentence = { id: string; en: string; zh: string; level: string; familiarity: number };
 
 export function SentencesPanel() {

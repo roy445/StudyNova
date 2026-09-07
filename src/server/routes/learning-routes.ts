@@ -956,11 +956,23 @@ export const routes: RouteDef[] = [
     path: "/words/all",
     auth: "user",
     handler: async (ctx) => {
+      const user = ctx.requireUser();
       const requestedTrack = ctx.query.get("track");
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : null;
       const requestedLimit = Number(ctx.query.get("limit") ?? 500);
       const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
-      const rows = await db.select().from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined).orderBy(asc(dailyWords.word)).limit(limit);
+      const rows = await db.select({
+        id: dailyWords.id,
+        word: dailyWords.word,
+        meaning: dailyWords.meaning,
+        meanings: dailyWords.meanings,
+        phrases: dailyWords.phrases,
+        partOfSpeech: dailyWords.partOfSpeech,
+        example: dailyWords.example,
+        exampleZh: dailyWords.exampleZh,
+        level: dailyWords.level,
+        familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
+      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(track ? eq(dailyWords.level, track) : undefined).orderBy(asc(dailyWords.word)).limit(limit);
       return { words: rows };
     },
   }),
