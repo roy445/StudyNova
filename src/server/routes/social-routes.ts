@@ -24,6 +24,7 @@ import {
   dailyWords,
   userVocabularies,
   userSettings,
+  platformSettings,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, forbidden, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
@@ -33,6 +34,14 @@ import { notify } from "../notify";
 async function friendIds(userId: string) {
   const rows = await db.select({ friendId: friends.friendId }).from(friends).where(eq(friends.userId, userId));
   return rows.map((r) => r.friendId);
+}
+
+async function vocabularyChallengeSetting() {
+  const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "challenge_vocabulary_source")).limit(1))[0];
+  const value = (row?.value ?? {}) as { manualOpen?: boolean; minimumWords?: number };
+  const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(dailyWords);
+  const minimumWords = Math.max(100, Number(value.minimumWords ?? 100));
+  return { totalWords: Number(total?.count ?? 0), minimumWords, manualOpen: value.manualOpen === true };
 }
 
 export const routes: RouteDef[] = [
@@ -195,7 +204,7 @@ export const routes: RouteDef[] = [
         })
         .from(challenges)
         .innerJoin(users, eq(users.userId, challenges.creatorId))
-        .where(and(inArray(challenges.creatorId, scope), gte(challenges.expiresAt, new Date())))
+        .where(and(inArray(challenges.creatorId, scope), eq(challenges.status, "open"), gte(challenges.expiresAt, new Date())))
         .orderBy(desc(challenges.createdAt))
         .limit(30);
       const out = [];
@@ -232,7 +241,8 @@ export const routes: RouteDef[] = [
           direction: z.enum(["zh2en", "en2zh", "mixed"]).default("mixed"),
           difficulty: z.enum(["easy", "normal", "hard"]).default("normal"),
           challengeMode: z.enum(["choice", "listening", "handwriting", "confusable", "part_of_speech", "meaning"]).default("choice"),
-          source: z.enum(["catalog", "mine"]).default("catalog"),
+          timeMode: z.enum(["standard", "sprint"]).default("standard"),
+          source: z.enum(["catalog", "mine", "vocabulary"]).default("catalog"),
         }),
       );
       if (body.kind === "quiz") {
@@ -249,11 +259,15 @@ export const routes: RouteDef[] = [
       let challengeItems: Array<Record<string, unknown>> = [];
       if (body.kind === "word") {
         const count = Math.max(5, Math.min(200, body.questionCount));
+        if (body.source === "vocabulary") {
+          const setting = await vocabularyChallengeSetting();
+          if (!setting.manualOpen && setting.totalWords < setting.minimumWords) throw badRequest(`字詞百科題庫尚未開放，目前 ${setting.totalWords}/${setting.minimumWords} 個單字`);
+        }
         // 題目在建立挑戰時一次抽好並寫入 payload，所有參與者讀到完全相同的題目。
         // 每一題的選項也預先洗牌，且同一輪不重複使用選項文字。
         const pool = body.source === "mine"
           ? await db.select({ id: userVocabularies.id, word: userVocabularies.word, meaning: userVocabularies.meaning, partOfSpeech: userVocabularies.partOfSpeech, example: userVocabularies.example, exampleZh: userVocabularies.exampleZh, level: sql<string>`'mine'` }).from(userVocabularies).where(eq(userVocabularies.userId, user.userId)).orderBy(sql`random()`).limit(200)
-          : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, body.track)).orderBy(sql`random()`).limit(Math.min(800, count * 4));
+          : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(body.source === "vocabulary" ? sql`true` : eq(dailyWords.level, body.track)).orderBy(sql`random()`).limit(Math.min(800, count * 4));
         const distinctPool = pool.filter((item, index, all) => {
           const normalized = item.word.trim().toLocaleLowerCase("en-US");
           return normalized && all.findIndex((candidate) => candidate.word.trim().toLocaleLowerCase("en-US") === normalized) === index;
@@ -266,7 +280,7 @@ export const routes: RouteDef[] = [
             const options = body.challengeMode === "part_of_speech"
               ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4)
               : [answer, ...distinctPool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
-            challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, options: options.sort(() => Math.random() - 0.5), answer });
+            challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, timeMode: body.timeMode, options: options.sort(() => Math.random() - 0.5), answer });
           }
         } else {
           for (let i = 0; i < Math.min(count, Math.floor(distinctPool.length / 4)); i += 1) {
@@ -274,7 +288,7 @@ export const routes: RouteDef[] = [
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
             const answer = body.challengeMode === "part_of_speech" ? group[0].partOfSpeech : direction === "zh2en" ? group[0].word : group[0].meaning;
             const options = body.challengeMode === "part_of_speech" ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4) : group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
-            challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, options: [...options].sort(() => Math.random() - 0.5), answer });
+            challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, timeMode: body.timeMode, options: [...options].sort(() => Math.random() - 0.5), answer });
           }
         }
         if (challengeItems.length < 5) throw badRequest("目前題庫不足，請稍後再試");
@@ -293,6 +307,7 @@ export const routes: RouteDef[] = [
             difficulty: body.difficulty,
             challengeMode: body.challengeMode,
             source: body.source,
+            timeMode: body.timeMode,
             items: challengeItems,
             readyUserIds: [user.userId],
           } : {},
@@ -318,11 +333,12 @@ export const routes: RouteDef[] = [
       const ids = await friendIds(user.userId);
       if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       if (challenge.kind !== "word") throw badRequest("這不是單字挑戰");
-      const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string; items?: Array<Record<string, unknown>>; readyUserIds?: string[] };
+      if (challenge.status !== "open") throw badRequest("這個挑戰目前已暫停或關閉");
+      const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string; timeMode?: "standard" | "sprint"; items?: Array<Record<string, unknown>>; readyUserIds?: string[] };
       const track = payload.track === "senior" ? "senior" : "junior";
       const count = Math.max(5, Math.min(200, Number(payload.questionCount ?? 10)));
       const rows = payload.items?.length ? payload.items.slice(0, count) : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, track)).orderBy(sql`random()`).limit(count);
-      return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal" }, words: rows };
+      return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal", timeMode: payload.timeMode ?? "standard" }, words: rows };
     },
   }),
 
@@ -353,6 +369,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ score: z.number().int().min(0).max(10000), durationSec: z.number().int().min(0).max(36000) }));
       const c = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
       if (!c) throw notFound("找不到挑戰");
+      if (c.status !== "open") throw fail("SOCIAL_CHALLENGE_ENDED", { message: "這個挑戰目前已暫停或關閉" });
       if (new Date(c.expiresAt) < new Date()) throw fail("SOCIAL_CHALLENGE_ENDED");
       await db.insert(challengeParticipants).values({ challengeId: c.id, userId: user.userId }).onConflictDoNothing();
       const rows = await db

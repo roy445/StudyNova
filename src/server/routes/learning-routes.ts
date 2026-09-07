@@ -905,7 +905,12 @@ export const routes: RouteDef[] = [
       await ensureSeeded();
       const rows = await db.execute(sql`select level, count(*)::int as count from daily_words where level in ('junior', 'senior') group by level`);
       const counts = new Map(rows.rows.map((row) => [String(row.level), Number(row.count)]));
+      const settingRow = (await db.select().from(platformSettings).where(eq(platformSettings.key, "challenge_vocabulary_source")).limit(1))[0];
+      const setting = (settingRow?.value ?? {}) as { manualOpen?: boolean; minimumWords?: number };
+      const totalWords = [...counts.values()].reduce((sum, value) => sum + value, 0);
+      const minimumWords = Math.max(100, Number(setting.minimumWords ?? 100));
       return {
+        sourceAvailability: { unlocked: setting.manualOpen === true || totalWords >= minimumWords, totalWords, minimumWords, manualOpen: setting.manualOpen === true },
         tracks: [
           { id: "senior", label: "高中 7000 單挑戰", description: "依高中英文參考詞彙表，適合高中學習與大考準備", count: counts.get("senior") ?? 0 },
           { id: "junior", label: "國中 2000 單挑戰", description: "依國中英文 2000 字，打好基礎字彙力", count: counts.get("junior") ?? 0 },
@@ -976,6 +981,14 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const requestedTrack = ctx.query.get("track");
+      const source = ctx.query.get("source");
+      if (source === "vocabulary") {
+        const settingRow = (await db.select().from(platformSettings).where(eq(platformSettings.key, "challenge_vocabulary_source")).limit(1))[0];
+        const setting = (settingRow?.value ?? {}) as { manualOpen?: boolean; minimumWords?: number };
+        const [{ total: vocabularyTotal }] = await db.select({ total: count() }).from(dailyWords);
+        const minimumWords = Math.max(100, Number(setting.minimumWords ?? 100));
+        if (setting.manualOpen !== true && Number(vocabularyTotal ?? 0) < minimumWords) throw badRequest(`字詞百科題庫尚未開放，目前 ${Number(vocabularyTotal ?? 0)}/${minimumWords} 個單字`);
+      }
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : null;
       const requestedLimit = Number(ctx.query.get("limit") ?? 500);
       const unlockedOnly = ctx.query.get("unlocked") === "true";
