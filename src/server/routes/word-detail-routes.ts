@@ -49,10 +49,38 @@ function cleanList<T>(items: T[], max: number): T[] {
   return items.filter(Boolean).slice(0, max);
 }
 
+async function safeRows<T>(load: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await load();
+  } catch {
+    // 0017 is deployed independently from the application bundle in some environments.
+    // The detail page must still render the legacy daily_words record if optional tables are absent.
+    return [];
+  }
+}
+
 async function getWord(wordId: string) {
-  const word = (await db.select().from(dailyWords).where(eq(dailyWords.id, wordId)).limit(1))[0];
-  if (!word) throw notFound("找不到單字");
-  return word;
+  try {
+    const word = (await db.select().from(dailyWords).where(eq(dailyWords.id, wordId)).limit(1))[0];
+    if (!word) throw notFound("找不到單字");
+    return word;
+  } catch {
+    const legacy = (await db.select({
+      id: dailyWords.id,
+      word: dailyWords.word,
+      meaning: dailyWords.meaning,
+      meanings: dailyWords.meanings,
+      phrases: dailyWords.phrases,
+      partOfSpeech: dailyWords.partOfSpeech,
+      example: dailyWords.example,
+      exampleZh: dailyWords.exampleZh,
+      level: dailyWords.level,
+      weekId: dailyWords.weekId,
+      createdAt: dailyWords.createdAt,
+    }).from(dailyWords).where(eq(dailyWords.id, wordId)).limit(1))[0];
+    if (!legacy) throw notFound("找不到單字");
+    return legacy;
+  }
 }
 
 export const routes: RouteDef[] = [
@@ -65,13 +93,13 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const word = await getWord(ctx.params.id);
       const [synonyms, examples, phrases, forms, explanations, progress, ai] = await Promise.all([
-        db.select().from(wordSynonyms).where(eq(wordSynonyms.wordId, word.id)).orderBy(asc(wordSynonyms.createdAt)),
-        db.select().from(wordExamples).where(eq(wordExamples.wordId, word.id)).orderBy(asc(wordExamples.createdAt)),
-        db.select().from(wordPhrases).where(eq(wordPhrases.wordId, word.id)).orderBy(asc(wordPhrases.createdAt)),
-        db.select().from(wordForms).where(eq(wordForms.wordId, word.id)).orderBy(asc(wordForms.createdAt)),
-        db.select().from(wordExplanations).where(eq(wordExplanations.wordId, word.id)).orderBy(asc(wordExplanations.createdAt)),
-        db.select().from(wordProgress).where(and(eq(wordProgress.wordId, word.id), eq(wordProgress.userId, user.userId))).limit(1),
-        db.select().from(wordAiContents).where(eq(wordAiContents.wordId, word.id)).limit(1),
+        safeRows(() => db.select().from(wordSynonyms).where(eq(wordSynonyms.wordId, word.id)).orderBy(asc(wordSynonyms.createdAt))),
+        safeRows(() => db.select().from(wordExamples).where(eq(wordExamples.wordId, word.id)).orderBy(asc(wordExamples.createdAt))),
+        safeRows(() => db.select().from(wordPhrases).where(eq(wordPhrases.wordId, word.id)).orderBy(asc(wordPhrases.createdAt))),
+        safeRows(() => db.select().from(wordForms).where(eq(wordForms.wordId, word.id)).orderBy(asc(wordForms.createdAt))),
+        safeRows(() => db.select().from(wordExplanations).where(eq(wordExplanations.wordId, word.id)).orderBy(asc(wordExplanations.createdAt))),
+        safeRows(() => db.select().from(wordProgress).where(and(eq(wordProgress.wordId, word.id), eq(wordProgress.userId, user.userId))).limit(1)),
+        safeRows(() => db.select().from(wordAiContents).where(eq(wordAiContents.wordId, word.id)).limit(1)),
       ]);
       const currentProgress = progress[0];
       return {
@@ -80,11 +108,11 @@ export const routes: RouteDef[] = [
           word: word.word,
           meaning: word.meaning,
           meanings: word.meanings,
-          englishDefinition: word.englishDefinition,
+          englishDefinition: "englishDefinition" in word ? word.englishDefinition : "",
           partOfSpeech: word.partOfSpeech,
           level: word.level,
-          phonetics: { us: word.usPhonetic, uk: word.ukPhonetic },
-          audio: { us: word.usAudioUrl, uk: word.ukAudioUrl },
+          phonetics: { us: "usPhonetic" in word ? word.usPhonetic : "", uk: "ukPhonetic" in word ? word.ukPhonetic : "" },
+          audio: { us: "usAudioUrl" in word ? word.usAudioUrl : "", uk: "ukAudioUrl" in word ? word.ukAudioUrl : "" },
           pronunciation: { us: Boolean(word.word), uk: Boolean(word.word), fallback: "browser_tts" },
         },
         explanations: cleanList(explanations.map((item) => ({ explanation: item.explanation, sourceKind: item.sourceKind })), 8).length
@@ -123,7 +151,9 @@ export const routes: RouteDef[] = [
           feature: "word_detail",
           userId: user.userId,
           system: "你是台灣國高中英文單字老師。只提供可驗證、符合該單字詞義與詞性的教學內容。不要硬拆不可靠的字根；沒有可靠資料就輸出空字串。不要把 AI 內容假裝成教材來源。回傳 JSON，欄位：explanations:string[]、synonyms:{word,meaning,partOfSpeech,difference,usage}[]、examples:{english,chinese,level}[]、phrases:{phrase,meaning}[]、forms:{form,partOfSpeech,meaning}[]、mistakes:{wrong,correct,reason}[]、memoryTip:string、etymology:string。例句 2-3 句，難度可用 基礎／會考／進階。",
-          parts: [{ kind: "text", text: `單字：${word.word}\n詞性：${word.partOfSpeech}\n中文：${word.meaning}\n英文定義：${word.englishDefinition}\n既有例句：${word.example}\n既有片語：${JSON.stringify(word.phrases)}` }],
+          parts: [{ kind: "text", text: `單字：${word.word}\n詞性：${word.partOfSpeech}\n中文：${word.meaning}\n
+英文定義：${"englishDefinition" in word ? word.englishDefinition : ""}
+\n既有例句：${word.example}\n既有片語：${JSON.stringify(word.phrases)}` }],
           maxOutputTokens: 2400,
           temperature: 0.2,
         },
