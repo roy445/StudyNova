@@ -84,6 +84,7 @@ async function loadRoutes(): Promise<Compiled[]> {
   const mods = await Promise.all([
     import("./routes/auth-routes"),
     import("./routes/learning-routes"),
+    import("./routes/word-detail-routes"),
     import("./routes/content-routes"),
     import("./routes/ai-routes"),
     import("./routes/social-routes"),

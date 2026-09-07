@@ -553,6 +553,11 @@ export const dailyWords = pgTable(
     partOfSpeech: text("part_of_speech").notNull().default(""),
     example: text("example").notNull().default(""),
     exampleZh: text("example_zh").notNull().default(""),
+    englishDefinition: text("english_definition").notNull().default(""),
+    usPhonetic: text("us_phonetic").notNull().default(""),
+    ukPhonetic: text("uk_phonetic").notNull().default(""),
+    usAudioUrl: text("us_audio_url").notNull().default(""),
+    ukAudioUrl: text("uk_audio_url").notNull().default(""),
     level: text("level").notNull().default("A2"),
     weekId: uuid("week_id"),
     createdAt: created(),
@@ -570,6 +575,88 @@ export const dailyWordAppearances = pgTable(
     createdAt: created(),
   },
   (t) => [uniqueIndex("daily_word_appearances_uq").on(t.userId, t.wordId, t.appearanceDate), index("daily_word_appearances_user_idx").on(t.userId, t.appearanceDate)],
+);
+
+export const wordSynonyms = pgTable(
+  "word_synonyms",
+  {
+    id: id(),
+    wordId: uuid("word_id").notNull().references(() => dailyWords.id, { onDelete: "cascade" }),
+    word: text("word").notNull(),
+    meaning: text("meaning").notNull().default(""),
+    partOfSpeech: text("part_of_speech").notNull().default(""),
+    difference: text("difference").notNull().default(""),
+    usage: text("usage").notNull().default(""),
+    sourceKind: text("source_kind").notNull().default("source"),
+    createdAt: created(),
+  },
+  (t) => [index("word_synonyms_word_idx").on(t.wordId)],
+);
+
+export const wordExamples = pgTable(
+  "word_examples",
+  {
+    id: id(),
+    wordId: uuid("word_id").notNull().references(() => dailyWords.id, { onDelete: "cascade" }),
+    english: text("english").notNull(),
+    chinese: text("chinese").notNull().default(""),
+    level: text("level").notNull().default("一般"),
+    sourceKind: text("source_kind").notNull().default("source"),
+    createdAt: created(),
+  },
+  (t) => [index("word_examples_word_idx").on(t.wordId)],
+);
+
+export const wordPhrases = pgTable(
+  "word_phrases",
+  {
+    id: id(),
+    wordId: uuid("word_id").notNull().references(() => dailyWords.id, { onDelete: "cascade" }),
+    phrase: text("phrase").notNull(),
+    meaning: text("meaning").notNull().default(""),
+    sourceKind: text("source_kind").notNull().default("source"),
+    createdAt: created(),
+  },
+  (t) => [index("word_phrases_word_idx").on(t.wordId)],
+);
+
+export const wordForms = pgTable(
+  "word_forms",
+  {
+    id: id(),
+    wordId: uuid("word_id").notNull().references(() => dailyWords.id, { onDelete: "cascade" }),
+    form: text("form").notNull(),
+    partOfSpeech: text("part_of_speech").notNull().default(""),
+    meaning: text("meaning").notNull().default(""),
+    sourceKind: text("source_kind").notNull().default("source"),
+    createdAt: created(),
+  },
+  (t) => [index("word_forms_word_idx").on(t.wordId)],
+);
+
+export const wordExplanations = pgTable(
+  "word_explanations",
+  {
+    id: id(),
+    wordId: uuid("word_id").notNull().references(() => dailyWords.id, { onDelete: "cascade" }),
+    explanation: text("explanation").notNull(),
+    sourceKind: text("source_kind").notNull().default("source"),
+    createdAt: created(),
+  },
+  (t) => [index("word_explanations_word_idx").on(t.wordId)],
+);
+
+export const wordAiContents = pgTable(
+  "word_ai_contents",
+  {
+    id: id(),
+    wordId: uuid("word_id").notNull().references(() => dailyWords.id, { onDelete: "cascade" }),
+    content: jsonb("content").$type<Record<string, unknown>>().notNull().default({}),
+    model: text("model").notNull().default(""),
+    generatedAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("word_ai_contents_word_uq").on(t.wordId)],
 );
 
 export const wordProgress = pgTable(

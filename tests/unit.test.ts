@@ -11,6 +11,7 @@ import {
   trend,
   safeErrorMessage,
   nextUtcMonthStart,
+  localWeekday,
 } from "@/server/core";
 import { fail, deriveErrorCode, lookupErrorCode, CATALOG_LIST, ERROR_CATALOG } from "@/server/errors";
 import { extractJson } from "@/server/ai";
@@ -87,7 +88,8 @@ describe("scheduled learning reminders", () => {
   });
 
   it("keeps weekly exam scheduling deterministic", () => {
-    expect(isWeekOpen({ status: "published", openMode: "schedule", openDays: [1], openTime: "00:00", closeTime: "23:59", openFrom: null, openUntil: null })).toBe(false);
+    const nextDay = (localWeekday() + 1) % 7;
+    expect(isWeekOpen({ status: "published", openMode: "schedule", openDays: [nextDay], openTime: "00:00", closeTime: "23:59", openFrom: null, openUntil: null })).toBe(false);
   });
 });
 

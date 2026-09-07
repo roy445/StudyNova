@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
+import { WordDetailSheet } from "@/components/WordDetailSheet";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -32,6 +33,8 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const [speechRate, setSpeechRate] = useState(1);
   const dailyPath = track ? `/words/daily?track=${track}` : "/words/daily";
   const { data, loading, error, reload } = useApi<{ words: Word[]; level: string; track?: string; count: number; dailyTarget?: number; appearedCount?: number; totalWords?: number; resetAt?: string }>(dailyPath, [track]);
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const aiContextCost = quotas.data?.quotas.find((item) => item.feature === "ai_context")?.novaCost ?? null;
   const [index, setIndex] = useState(0);
   const [mode, setMode] = useState<"card" | "zh2en" | "en2zh" | "spell" | "timed">("card");
   const [flipped, setFlipped] = useState(false);
@@ -209,45 +212,16 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         </div>
       )}
 
-      <Modal open={Boolean(detailWord)} onClose={() => setDetailWord(null)} title={detailWord?.word ?? "單字詳情"} fullScreen>
-        {detailWord && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="cyan">{detailWord.part_of_speech}</Badge>
-              <Badge tone="muted">熟悉度 {detailWord.familiarity}%</Badge>
-              <Button size="sm" variant="ghost" onClick={() => { if (!speak(detailWord.word, "en-US", speechRate)) toast.push("error", "此瀏覽器不支援語音"); }}>朗讀</Button>
-            </div>
-            <section className="rounded-2xl border border-[#37d3ff]/20 bg-[#37d3ff]/10 p-3.5">
-              <p className="text-xs text-muted">主要中文</p>
-              <p className="mt-1 text-lg font-semibold text-[#7dd3fc]">{detailWord.meaning || "尚未補上中文釋義"}</p>
-            </section>
-            <section>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">一字多意</p>
-              <div className="space-y-1.5">
-                {(detailWord.meanings?.length ? detailWord.meanings : [detailWord.meaning]).filter(Boolean).map((meaning, meaningIndex) => (
-                  <div key={`${meaning}-${meaningIndex}`} className="rounded-xl bg-white/5 px-3 py-2 text-sm">{meaning}</div>
-                ))}
-              </div>
-            </section>
-            <section>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">相關片語與中文</p>
-              {detailWord.phrases?.length ? (
-                <div className="space-y-1.5">
-                  {detailWord.phrases.map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="rounded-xl border border-[var(--line)] px-3 py-2"><p className="text-sm font-medium text-[#e8edff]">{phrase.en}</p><p className="mt-0.5 text-xs text-muted">{phrase.zh}</p></div>)}
-                </div>
-              ) : <p className="rounded-xl bg-white/5 px-3 py-2 text-sm text-muted">這個單字目前沒有整理到常用片語。</p>}
-            </section>
-            <section className="rounded-xl bg-black/20 p-3 text-sm"><p className="text-xs text-muted">例句</p><p className="mt-1">{detailWord.example || fallbackExample(detailWord.word, data?.level)}</p><p className="mt-0.5 text-muted">{detailWord.example_zh || "我今天在課堂上學會了這個單字。"}</p></section>
-          </div>
-        )}
-      </Modal>
+      <WordDetailSheet wordId={detailWord?.id ?? null} preview={detailWord} onClose={() => setDetailWord(null)} />
 
       <div className="mt-2">
+        <NovaCostNotice cost={aiContextCost} action="AI 記憶方法" className="mb-2" />
         <Button
           size="sm"
           variant="ghost"
           loading={tipLoading}
           onClick={async () => {
+            if (!confirmNovaSpend("AI 記憶方法", aiContextCost)) return;
             setTipLoading(true);
             try {
               const res = await apiPost<{ tip: string }>("/words/memory-tip", { wordId: current.id });
