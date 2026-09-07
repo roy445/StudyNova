@@ -202,7 +202,7 @@ export const routes: RouteDef[] = [
       await consumeFeature(user.userId, "ai_context");
 
       await db.insert(aiMessages).values({ conversationId: conv.id, role: "user", content: body.content });
-      const history = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(asc(aiMessages.createdAt)).limit(30);
+        const history = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(asc(aiMessages.createdAt)).limit(16);
       const context = await buildContext(user.userId, conv.allowContext, conv.contextMaterialId);
 
       const { data, meta } = await runAiJson<{ reply?: string; importance?: string; action?: { type?: string; payload?: Record<string, unknown>; preview?: string } | null; memory?: Array<{ key: string; value: string }> }>(
@@ -218,9 +218,9 @@ export const routes: RouteDef[] = [
             "繁體中文回答。不得杜撰使用者資料。",
           parts: [
             { kind: "text", text: context ? `使用者已授權的學習資料：\n${context}` : "使用者未授權任何個人資料，只能根據對話內容回答。" },
-            { kind: "text", text: `對話紀錄：\n${history.map((m) => `${m.role === "user" ? "學生" : "Novi"}：${m.content}`).join("\n").slice(-8000)}` },
+            { kind: "text", text: `對話紀錄：\n${history.map((m) => `${m.role === "user" ? "學生" : "Novi"}：${m.content}`).join("\n").slice(-5000)}` },
           ],
-          maxOutputTokens: 2200,
+          maxOutputTokens: 1200,
         },
         {},
       );

@@ -271,6 +271,7 @@ type PersonalWord = { id: string; word: string; meaning: string; partOfSpeech: s
 export function MyVocabularyPanel() {
   const toast = useToast();
   const [speechRate, setSpeechRate] = useState(1);
+  const [openDetailOnClick, setOpenDetailOnClick] = useState(true);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [active, setActive] = useState<PersonalWord | null>(null);
@@ -296,11 +297,11 @@ export function MyVocabularyPanel() {
       await reload();
     } catch (err) { toast.push("error", errorMessage(err)); }
   }
-  return <Card title="我的單字" subtitle={`OCR、教材與手動收藏的單字都集中在這裡・共 ${data?.total ?? 0} 個`} action={<div className="flex flex-wrap gap-1.5"><Button size="sm" onClick={() => setAddOpen(true)}>＋ 手動新增</Button><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋單字或中文" className="!w-36 !py-1.5 text-xs" /><Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto !py-1.5 text-xs"><option value="all">全部</option><option value="new">需加強</option><option value="review">複習中</option><option value="mastered">已熟悉</option></Select></div>}>
+  return <Card title="我的單字" subtitle={`OCR、教材與手動收藏的單字都集中在這裡・共 ${data?.total ?? 0} 個`} action={<div className="flex flex-wrap items-center gap-1.5"><label className="flex items-center gap-1 text-[11px] text-muted"><input type="checkbox" checked={openDetailOnClick} onChange={(event) => setOpenDetailOnClick(event.target.checked)} /> 點擊直接看詳細</label><Button size="sm" onClick={() => setAddOpen(true)}>＋ 手動新增</Button><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋單字或中文" className="!w-36 !py-1.5 text-xs" /><Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto !py-1.5 text-xs"><option value="all">全部</option><option value="new">需加強</option><option value="review">複習中</option><option value="mastered">已熟悉</option></Select></div>}>
     <div className="mb-3 grid grid-cols-3 gap-2"><div className="glass-soft p-2"><p className="text-[11px] text-muted">總單字</p><p className="text-lg font-bold">{data?.total ?? 0}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">需要加強</p><p className="text-lg font-bold text-rose-300">{(data?.items ?? []).filter((i) => i.familiarity < 40).length}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">已熟悉</p><p className="text-lg font-bold text-emerald-300">{(data?.items ?? []).filter((i) => i.familiarity >= 80).length}</p></div></div>
     {loading && <Skeleton lines={4} />}{error && <ErrorState message={error} onRetry={reload} />}{!loading && !items.length && <EmptyState icon="◇" title="還沒有我的單字" hint="從圖片 OCR 或教材分析結果按『加入單字本』開始建立。" />}
     <Modal open={Boolean(active)} onClose={() => setActive(null)} title={active?.word ?? "單字詳細資訊"} fullScreen>{active && <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted">{active.partOfSpeech || "單字"}・熟悉度 {active.familiarity}%・{active.phonetic || ""}</p><div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={() => { if (!speak(active.word)) toast.push("error", "此瀏覽器不支援語音"); }}>朗讀</Button><Button size="sm" onClick={() => review(active, true)}>我會了</Button><Button size="sm" variant="outline" onClick={() => review(active, false)}>加入複習</Button><Button size="sm" variant="ghost" onClick={async () => { if (confirm("確定移除此單字？")) { await apiDelete(`/my-vocabulary/${active.id}`); setActive(null); await reload(); } }}>刪除</Button></div></div><div className="rounded-xl bg-[#37d3ff]/10 p-3"><p className="text-lg font-semibold">{active.meaning || "尚未補上中文釋義"}</p></div>{active.example && <div className="rounded-xl bg-white/5 p-3 text-sm"><p className="text-xs text-muted">例句</p><p className="mt-1">{active.example}</p><p className="text-muted">{active.exampleZh}</p></div>}{(() => { const a = active.analysis ?? {}; const list = (key: string) => Array.isArray(a[key]) ? (a[key] as unknown[]).map(String).filter(Boolean) : []; const confusables = list("confusables"); const synonyms = list("synonyms"); const nearSynonyms = list("nearSynonyms"); const collocations = list("collocations"); return <div className="grid gap-2 text-xs sm:grid-cols-2">{collocations.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">相關片語</p><p className="mt-1 text-muted">{collocations.join("、")}</p></div>}{confusables.length > 0 && <div className="rounded-xl bg-amber-400/10 p-2"><p className="font-semibold">易錯與易混淆</p><p className="mt-1 text-muted">{confusables.join("；")}</p></div>}{synonyms.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">相似字</p><p className="mt-1 text-muted">{synonyms.join("、")}</p></div>}{nearSynonyms.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">近義字</p><p className="mt-1 text-muted">{nearSynonyms.join("、")}</p></div>}</div>; })()}</div>}</Modal>
-    <div className="grid gap-2 sm:grid-cols-2">{items.map((item) => <button key={item.id} type="button" onClick={() => setActive(item)} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.word}</p><p className="text-xs text-[#7dd3fc]">{item.meaning}</p><p className="mt-1 text-[11px] text-muted">{item.partOfSpeech || "未分類"}・複習 {item.reviewCount} 次</p></div><Badge tone={item.familiarity >= 80 ? "green" : item.familiarity >= 40 ? "cyan" : "rose"}>{item.familiarity}%</Badge></div><Progress value={item.familiarity} max={100} tone={item.familiarity >= 80 ? "green" : "violet"} /></button>)}</div>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <button key={item.id} type="button" onClick={() => { if (openDetailOnClick) setActive(item); else speak(item.word); }} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.word}</p><p className="text-xs text-[#7dd3fc]">{item.meaning}</p><p className="mt-1 text-[11px] text-muted">{item.partOfSpeech || "未分類"}・複習 {item.reviewCount} 次</p></div><Badge tone={item.familiarity >= 80 ? "green" : item.familiarity >= 40 ? "cyan" : "rose"}>{item.familiarity}%</Badge></div><Progress value={item.familiarity} max={100} tone={item.familiarity >= 80 ? "green" : "violet"} /></button>)}</div>
     <Modal open={addOpen} onClose={() => setAddOpen(false)} title="手動新增單字"><div className="space-y-3"><Field label="單字" required><Input value={newWord.word} onChange={(e) => setNewWord({ ...newWord, word: e.target.value })} /></Field><Field label="中文意思"><Input value={newWord.meaning} onChange={(e) => setNewWord({ ...newWord, meaning: e.target.value })} /></Field><Field label="詞性／音標"><div className="grid gap-2 sm:grid-cols-2"><Input value={newWord.partOfSpeech} onChange={(e) => setNewWord({ ...newWord, partOfSpeech: e.target.value })} placeholder="例如：noun" /><Input value={newWord.phonetic} onChange={(e) => setNewWord({ ...newWord, phonetic: e.target.value })} placeholder="音標" /></div></Field><Field label="例句"><Textarea value={newWord.example} onChange={(e) => setNewWord({ ...newWord, example: e.target.value })} /></Field><Field label="例句中文"><Input value={newWord.exampleZh} onChange={(e) => setNewWord({ ...newWord, exampleZh: e.target.value })} /></Field><Button full onClick={addWord}>加入我的單字</Button></div></Modal>
   </Card>;
 }
@@ -846,17 +847,21 @@ export function QuickMemoryPanel() {
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fileProgress, setFileProgress] = useState<{ value: number; label: string } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, QuickMemoryItem>>({});
 
   async function createItems() {
     if (!file && content.trim().length < 3) return toast.push("error", "請貼上題目與答案，或選擇檔案");
     setBusy(true);
+    setFileProgress({ value: 12, label: "準備分析檔案…" });
     try {
       const form = new FormData();
       form.append("title", title.trim() || "我的快速背題目");
       form.append("content", content);
       if (file) form.append("file", file);
+      setFileProgress({ value: 35, label: "上傳並讀取內容…" });
       const res = await apiPost<{ created: number }>("/quick-memory", form);
+      setFileProgress({ value: 90, label: "整理成可練習題目…" });
       toast.push("success", `已自動建立 ${res.created} 題快速背題目`);
       setContent("");
       setFile(null);
@@ -865,6 +870,7 @@ export function QuickMemoryPanel() {
       toast.push("error", errorMessage(err));
     } finally {
       setBusy(false);
+      setFileProgress(null);
     }
   }
 
@@ -893,7 +899,7 @@ export function QuickMemoryPanel() {
           <Field label="或直接貼上內容" hint="格式：題目 → 答案，也支援題目 Tab 答案、題目：答案">
             <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={7} placeholder={'例：\nWhat is the opposite of hot? → cold\n光合作用的原料 → 二氧化碳和水'} className="bg-[#101d35]" />
           </Field>
-          <Button full loading={busy} onClick={createItems}>自動生成快速背題目</Button>
+          <Button full loading={busy} onClick={createItems}>自動生成快速背題目</Button>{fileProgress && <div className="rounded-xl bg-[#37d3ff]/5 p-2 text-xs"><div className="flex justify-between"><span>{fileProgress.label}</span><span>{fileProgress.value}%</span></div><Progress value={fileProgress.value} max={100} tone="cyan" /></div>}
         </div>
         <div className="max-h-[620px] space-y-2 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[#0b1428] p-3 opacity-100 shadow-inner">
           {list.loading && <Skeleton lines={5} />}
@@ -922,13 +928,14 @@ export function QuickMemoryPanel() {
 
 type VisualChild = { title: string; summary?: string; color?: string };
 type VisualNode = VisualChild & { children?: VisualChild[] };
-type VisualNote = { title: string; central: string; nodes: VisualNode[]; style: "cute" | "handwritten" | "clean"; generatedAt: string };
+type VisualNote = { title: string; central: string; nodes: VisualNode[]; style: "cute" | "handwritten" | "clean" | "doodle" | "sticker"; generatedAt: string };
 
 export function VisualNotesPanel() {
   const toast = useToast();
   const [title, setTitle] = useState("我的學習重點");
   const [sourceText, setSourceText] = useState("");
   const [style, setStyle] = useState<VisualNote["style"]>("cute");
+  const [icon, setIcon] = useState("✦");
   const [visual, setVisual] = useState<VisualNote | null>(null);
   const [busy, setBusy] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -960,9 +967,9 @@ export function VisualNotesPanel() {
   const colors = ["#b8e8ff", "#ffd6e7", "#d9f7be", "#ffe7a8", "#d9d0ff", "#c8f1e8", "#ffd9b8", "#cfe3ff"];
   return <Card title="✦ 重點視覺化" subtitle="把教材變成清楚的心智圖，加入可愛色彩與手寫感，並可下載保存。">
     <div className="grid gap-4 xl:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.5fr)]">
-      <div className="space-y-3"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="心智圖標題" /><Textarea value={sourceText} onChange={(event) => setSourceText(event.target.value)} placeholder="貼上課本、筆記或 AI 對話內容…" className="min-h-52" /><div className="flex flex-wrap items-center gap-2"><Select value={style} onChange={(event) => setStyle(event.target.value as VisualNote["style"])} className="!w-auto"><option value="cute">可愛色彩</option><option value="handwritten">手寫筆記</option><option value="clean">清楚簡約</option></Select><Button onClick={generate} loading={busy}>AI 生成心智圖</Button></div><p className="text-[11px] text-muted">AI 會整理主題、重點與子重點；文字由系統繪製，方便閱讀與匯出。</p></div>
+      <div className="space-y-3"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="心智圖標題" /><Textarea value={sourceText} onChange={(event) => setSourceText(event.target.value)} placeholder="貼上課本、筆記或 AI 對話內容…" className="min-h-52" /><div className="flex flex-wrap items-center gap-2"><Select value={style} onChange={(event) => setStyle(event.target.value as VisualNote["style"])} className="!w-auto"><option value="cute">可愛色彩</option><option value="handwritten">手寫筆記</option><option value="doodle">塗鴉筆記</option><option value="sticker">貼紙卡片</option><option value="clean">清楚簡約</option></Select><div className="flex items-center gap-1 rounded-xl border border-[var(--line)] px-2 py-1"><span className="text-[11px] text-muted">圖示</span>{["✦", "🌱", "💡", "📚", "🧠", "⭐", "✏️"].map((item) => <button key={item} type="button" aria-label={`選擇${item}圖示`} onClick={() => setIcon(item)} className={`rounded-lg px-1.5 py-0.5 text-base ${icon === item ? "bg-[#ffc857]/30" : "hover:bg-white/10"}`}>{item}</button>)}</div><Button onClick={generate} loading={busy}>AI 生成心智圖</Button></div><p className="text-[11px] text-muted">AI 會整理主題、重點與子重點；文字由系統繪製，方便閱讀與匯出。</p></div>
       <div className="min-h-[460px] overflow-auto rounded-2xl border border-[#ffc857]/30 bg-[#fffaf0] p-2 text-[#24324b]">{visual ? <><svg ref={svgRef} viewBox="0 0 1400 900" className={`min-w-[760px] w-full ${style === "handwritten" ? "[font-family:cursive]" : ""}`} role="img" aria-label="AI 生成的學習心智圖"><rect width="1400" height="900" rx="36" fill="#fffaf0" /><path d="M700 450 C520 310 420 220 300 170 M700 450 C500 450 370 450 220 450 M700 450 C520 590 420 690 300 740 M700 450 C880 310 980 220 1100 170 M700 450 C900 450 1030 450 1180 450 M700 450 C880 590 980 690 1100 740" fill="none" stroke="#9eb6c9" strokeWidth="7" strokeLinecap="round" strokeDasharray={style === "handwritten" ? "14 12" : undefined} />
-        <g><rect x="510" y="365" width="380" height="170" rx="42" fill="#ffe7a8" stroke="#e1b85d" strokeWidth="6" /><text x="700" y="435" textAnchor="middle" fontSize="34" fontWeight="800">{visual.central.slice(0, 18)}</text><text x="700" y="480" textAnchor="middle" fontSize="20" fill="#536274">學習重點</text></g>
+        <g><rect x="510" y="365" width="380" height="170" rx="42" fill="#ffe7a8" stroke="#e1b85d" strokeWidth="6" /><text x="700" y="420" textAnchor="middle" fontSize="34">{icon}</text><text x="700" y="465" textAnchor="middle" fontSize="30" fontWeight="800">{visual.central.slice(0, 18)}</text><text x="700" y="505" textAnchor="middle" fontSize="20" fill="#536274">學習重點</text></g>
         {visual.nodes.map((node, index) => { const positions = [[150,100],[70,385],[150,675],[1000,100],[1090,385],[1000,675]]; const [x, y] = positions[index % positions.length]; const color = node.color || colors[index % colors.length]; return <g key={`${node.title}-${index}`}><rect x={x} y={y} width="300" height="130" rx="28" fill={color} stroke="#7890a4" strokeWidth="4" /><text x={x + 150} y={y + 48} textAnchor="middle" fontSize="25" fontWeight="700">{node.title.slice(0, 14)}</text><text x={x + 150} y={y + 82} textAnchor="middle" fontSize="16" fill="#536274">{(node.summary || "重要概念").slice(0, 22)}</text>{(node.children || []).slice(0, 2).map((child, childIndex) => <text key={child.title} x={x + 18} y={y + 107 + childIndex * 17} fontSize="13" fill="#536274">• {child.title.slice(0, 25)}</text>)}</g>; })}</svg><div className="mt-2 flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" onClick={downloadSvg}>下載 SVG</Button><Button size="sm" onClick={() => void downloadPng()}>下載 PNG</Button></div></> : <div className="flex min-h-[440px] items-center justify-center text-center text-sm text-[#718096]">AI 生成後，心智圖會顯示在這裡<br />適合複習、列印或加入教材。</div>}</div>
     </div>
   </Card>;

@@ -14,7 +14,7 @@ export const routes: RouteDef[] = [
     rate: { limit: 20, windowSec: 3600, key: "visual-notes" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ title: z.string().max(100).default("學習重點"), sourceText: z.string().min(20, "請輸入至少 20 個字的教材內容").max(16000), style: z.enum(["cute", "handwritten", "clean"]).default("cute") }));
+      const body = await ctx.json(z.object({ title: z.string().max(100).default("學習重點"), sourceText: z.string().min(20, "請輸入至少 20 個字的教材內容").max(16000), style: z.enum(["cute", "handwritten", "doodle", "sticker", "clean"]).default("cute") }));
       if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
       await consumeFeature(user.userId, "ai_visual");
       const { data } = await runAiJson<{ title?: string; central?: string; nodes?: Array<z.infer<typeof nodeSchema>> }>(

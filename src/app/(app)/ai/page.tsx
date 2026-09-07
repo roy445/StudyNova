@@ -58,6 +58,7 @@ export default function AiPage() {
   const [renaming, setRenaming] = useState<Conversation | null>(null);
   const [renameText, setRenameText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<{ value: number; label: string } | null>(null);
   const [solutionResult, setSolutionResult] = useState<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean; mode?: string } | null>(null);
   const [scope, setScope] = useState({ includeQuestion: true, includeHandwriting: true, includeNote: true, highlightPriority: false });
   const fileInput = useRef<HTMLInputElement>(null);
@@ -120,15 +121,19 @@ export default function AiPage() {
   async function uploadAndAnalyze(files: FileList | null) {
     if (!files?.length || uploading) return;
     setUploading(true);
+    setAnalysisProgress({ value: 8, label: "準備檔案…" });
     setError(null);
     try {
       const form = new FormData();
+      setAnalysisProgress({ value: 20, label: "上傳檔案中…" });
       Array.from(files).slice(0, 8).forEach((file) => form.append("files", file));
       Object.entries(scope).forEach(([key, value]) => form.append(key, String(value)));
       const uploaded = await apiPost<{ results: Array<{ context: FileContext; duplicate: boolean }>; newCount: number; duplicateCount: number }>("/ai/solution/upload", form);
+      setAnalysisProgress({ value: 52, label: "檔案已上傳，正在辨識內容…" });
       const ids = uploaded.results.map((item) => item.context.id);
       if (!ids.length) throw new Error("這批檔案都是重複內容，沒有需要重新分析的檔案。");
       const analyzed = await apiPost<{ result: typeof solutionResult }>("/ai/solution/analyze", { contextIds: ids, scope });
+      setAnalysisProgress({ value: 92, label: "整理題目、筆記與手寫範圍…" });
       setSolutionResult(analyzed.result);
       toast.push("success", `完成分析：新增 ${uploaded.newCount} 個檔案，略過重複 ${uploaded.duplicateCount} 個`);
       await contexts.reload();
@@ -136,6 +141,7 @@ export default function AiPage() {
       setError(errorMessage(err));
     } finally {
       setUploading(false);
+      setAnalysisProgress(null);
       if (fileInput.current) fileInput.current.value = "";
     }
   }
@@ -321,6 +327,7 @@ export default function AiPage() {
                   <label key={key} className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={scope[key]} onChange={(e) => setScope((s) => ({ ...s, [key]: e.target.checked }))} /> {label}</label>
                 ))}
               </div>
+              {analysisProgress && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 px-3 py-2"><div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-[#b9f2ff]">{analysisProgress.label}</span><span className="text-muted">{analysisProgress.value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-black/20"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all duration-500" style={{ width: `${analysisProgress.value}%` }} /></div><p className="mt-1 text-[10px] text-muted">你可以切換其他功能，分析會在背景完成；完成後回到 Novi 即可查看。</p></div>}
               {solutionResult && (
                 <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/8 px-3 py-2 text-xs leading-5">
                   <div className="mb-1 flex items-center justify-between"><span className="font-semibold text-[#7dd3fc]">共用 AI 分析 · {solutionResult.mode ?? "tutor"}{solutionResult.needsCrop ? " · 請裁切成單題" : ""}</span><button className="text-muted" onClick={() => setSolutionResult(null)}>關閉</button></div>
