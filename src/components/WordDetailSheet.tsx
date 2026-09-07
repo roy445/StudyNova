@@ -80,9 +80,20 @@ function SourceBadge({ sourceKind }: { sourceKind?: SourceKind }) {
 function SpeakButton({ text, lang = "en-US", label = "朗讀", spellFirst = false }: { text: string; lang?: string; label?: string; spellFirst?: boolean }) {
   const speak = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
-    const utterance = new SpeechSynthesisUtterance(spellFirst ? `${text.split("").join(", ")}. ${text}` : text);
-    utterance.lang = lang;
     window.speechSynthesis.cancel();
+    if (spellFirst) {
+      const spelling = new SpeechSynthesisUtterance(text.split("").join(", "));
+      const completeWord = new SpeechSynthesisUtterance(text);
+      spelling.lang = lang;
+      completeWord.lang = lang;
+      spelling.onend = () => {
+        window.setTimeout(() => window.speechSynthesis.speak(completeWord), 700);
+      };
+      window.speechSynthesis.speak(spelling);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
     window.speechSynthesis.speak(utterance);
   };
   return <button type="button" onClick={speak} aria-label={`${label}：${text}`} className="focus-ring shrink-0 rounded-lg border border-[var(--line)] px-2 py-1 text-[11px] text-muted transition hover:border-[#37d3ff]/50 hover:text-[#b8efff]">🔊 {label}</button>;
@@ -251,10 +262,16 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
     if (!pronunciation) return;
     const audioUrl = pronunciation.audio[kind];
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(`${pronunciation.word.split("").join(", ")}. ${pronunciation.word}`);
-      utterance.lang = kind === "us" ? "en-US" : "en-GB";
+      const lang = kind === "us" ? "en-US" : "en-GB";
+      const spelling = new SpeechSynthesisUtterance(pronunciation.word.split("").join(", "));
+      const completeWord = new SpeechSynthesisUtterance(pronunciation.word);
+      spelling.lang = lang;
+      completeWord.lang = lang;
       window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+      spelling.onend = () => {
+        window.setTimeout(() => window.speechSynthesis.speak(completeWord), 700);
+      };
+      window.speechSynthesis.speak(spelling);
       return;
     }
     if (audioUrl) {
