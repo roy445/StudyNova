@@ -44,7 +44,7 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
     if (mode === "part_of_speech") return [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
     const pool = words.filter((word) => word.id !== current.id).map((word) => actualDirection === "zh2en" ? word.word : word.meaning).filter(Boolean);
     return [answer, ...pool].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
-  }, [actualDirection, current, words]);
+  }, [actualDirection, current, mode, words]);
 
   if (summary) return <Card title="🎉 挑戰完成" subtitle={title}><div className="space-y-4 text-center"><div className="grid grid-cols-3 gap-2"><div className="glass-soft rounded-xl p-3"><p className="text-xs text-muted">總分</p><p className="mt-1 text-2xl font-black text-[#7dd3fc]">{summary.score}</p></div><div className="glass-soft rounded-xl p-3"><p className="text-xs text-muted">答對</p><p className="mt-1 text-2xl font-black text-emerald-300">{correct}/{summary.total}</p></div><div className="glass-soft rounded-xl p-3"><p className="text-xs text-muted">用時</p><p className="mt-1 text-2xl font-black">{summary.durationSec}s</p></div></div><p className="text-sm text-muted">{summary.score >= 90 ? "表現非常好，繼續保持！" : summary.score >= 60 ? "做得不錯，再複習錯題會更穩。" : "先整理錯題，再挑戰一次看看。"}</p><Button full onClick={onExit}>返回挑戰專區</Button></div></Card>;
   if (!current) return <EmptyState icon="✓" title="題目準備中" />;
