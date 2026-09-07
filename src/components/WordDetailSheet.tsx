@@ -92,8 +92,9 @@ function SpeakButton({ text, lang = "en-US", label = "朗讀", spellFirst = fals
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
     window.speechSynthesis.cancel();
     if (spellFirst) {
-      const spelling = new SpeechSynthesisUtterance(text.split("").join(", "));
-      const completeWord = new SpeechSynthesisUtterance(text);
+      const spokenText = text.replace(/\s*\/\s*/g, " , ");
+      const spelling = new SpeechSynthesisUtterance(spokenText.split("").join(" , "));
+      const completeWord = new SpeechSynthesisUtterance(spokenText);
       spelling.lang = lang;
       completeWord.lang = lang;
       spelling.onend = () => {
@@ -273,8 +274,9 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
     const audioUrl = pronunciation.audio[kind];
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       const lang = kind === "us" ? "en-US" : "en-GB";
-      const spelling = new SpeechSynthesisUtterance(pronunciation.word.split("").join(", "));
-      const completeWord = new SpeechSynthesisUtterance(pronunciation.word);
+      const spokenWord = pronunciation.word.replace(/\s*\/\s*/g, " , ");
+      const spelling = new SpeechSynthesisUtterance(spokenWord.split("").join(" , "));
+      const completeWord = new SpeechSynthesisUtterance(spokenWord);
       spelling.lang = lang;
       completeWord.lang = lang;
       window.speechSynthesis.cancel();

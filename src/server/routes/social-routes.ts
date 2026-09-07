@@ -240,7 +240,7 @@ export const routes: RouteDef[] = [
           questionCount: z.number().int().min(5).max(200).default(10),
           direction: z.enum(["zh2en", "en2zh", "mixed"]).default("mixed"),
           difficulty: z.enum(["easy", "normal", "hard"]).default("normal"),
-          challengeMode: z.enum(["choice", "listening", "handwriting", "confusable", "part_of_speech", "meaning"]).default("choice"),
+          challengeMode: z.enum(["choice", "listening", "handwriting", "confusable", "part_of_speech", "meaning", "semantic_image"]).default("choice"),
           timeMode: z.enum(["standard", "sprint"]).default("standard"),
           source: z.enum(["catalog", "mine", "vocabulary"]).default("catalog"),
         }),
@@ -280,7 +280,7 @@ export const routes: RouteDef[] = [
             const options = body.challengeMode === "part_of_speech"
               ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4)
               : [answer, ...distinctPool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
-            challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, timeMode: body.timeMode, options: options.sort(() => Math.random() - 0.5), answer });
+            challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: current.example, options: options.sort(() => Math.random() - 0.5), answer });
           }
         } else {
           for (let i = 0; i < Math.min(count, Math.floor(distinctPool.length / 4)); i += 1) {
@@ -288,7 +288,7 @@ export const routes: RouteDef[] = [
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
             const answer = body.challengeMode === "part_of_speech" ? group[0].partOfSpeech : direction === "zh2en" ? group[0].word : group[0].meaning;
             const options = body.challengeMode === "part_of_speech" ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4) : group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
-            challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, timeMode: body.timeMode, options: [...options].sort(() => Math.random() - 0.5), answer });
+            challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: group[0].example, options: [...options].sort(() => Math.random() - 0.5), answer });
           }
         }
         if (challengeItems.length < 5) throw badRequest("目前題庫不足，請稍後再試");

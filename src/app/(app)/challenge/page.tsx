@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -21,8 +22,9 @@ type Challenge = {
   participants: Array<{ userId: string; displayName: string; score: number; durationSec: number; finishedAt: string | null }>;
 };
 
-type ChallengeMode = "choice" | "listening" | "handwriting" | "confusable" | "part_of_speech" | "meaning";
-type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string; direction?: "zh2en" | "en2zh"; challengeMode?: ChallengeMode; options?: string[]; answer?: string };
+type ChallengeMode = "choice" | "listening" | "handwriting" | "confusable" | "part_of_speech" | "meaning" | "semantic_image";
+type SemanticOption = { id: string; label: string; emoji: string; imageUrl: string; correct: boolean };
+type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string; direction?: "zh2en" | "en2zh"; challengeMode?: ChallengeMode; options?: string[]; answer?: string; sentence?: string; semanticOptions?: SemanticOption[] };
 type AnswerRecord = { number: number; word: string; prompt: string; expected: string; response: string; correct: boolean; timedOut: boolean };
 type TimeMode = "standard" | "sprint";
 
@@ -30,10 +32,37 @@ type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2e
 
 function secondsForMode(mode: ChallengeMode, timeMode: TimeMode) {
   if (timeMode === "sprint") return 10;
-  if (mode === "handwriting") return 45;
-  if (mode === "meaning" || mode === "confusable") return 35;
+  if (mode === "handwriting" || mode === "listening") return 45;
+  if (mode === "meaning" || mode === "confusable" || mode === "semantic_image") return 35;
   if (mode === "part_of_speech") return 25;
   return 30;
+}
+
+const semanticScenes = [
+  { emoji: "🏫", label: "校園情境" },
+  { emoji: "🏠", label: "日常生活" },
+  { emoji: "🌳", label: "戶外情境" },
+  { emoji: "🚌", label: "出行與社會情境" },
+  { emoji: "🍽️", label: "生活活動" },
+  { emoji: "🧪", label: "學習與實驗" },
+  { emoji: "🏃", label: "人物行動" },
+  { emoji: "🌧️", label: "天氣與環境" },
+];
+
+function createSemanticImage(scene: { emoji: string; label: string }, seed: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#172554"/><stop offset="1" stop-color="#0e7490"/></linearGradient></defs><rect width="640" height="360" rx="28" fill="url(#g)"/><circle cx="520" cy="90" r="68" fill="#67e8f9" opacity=".18"/><circle cx="130" cy="280" r="100" fill="#a78bfa" opacity=".18"/><text x="320" y="190" text-anchor="middle" font-size="104">${scene.emoji}</text><text x="320" y="305" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="28">${scene.label}</text><text x="320" y="335" text-anchor="middle" fill="#bae6fd" font-family="Arial,sans-serif" font-size="14">StudyNova semantic visual · ${seed.slice(0, 6)}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function decorateChallengeWord(word: ChallengeWord, index: number, mode: ChallengeMode): ChallengeWord {
+  const sentence = word.sentence || word.example || `A student used the word ${word.word} in a real situation.`;
+  if (mode !== "semantic_image") return { ...word, challengeMode: mode, sentence };
+  const correctScene = semanticScenes[index % semanticScenes.length];
+  const distractors = semanticScenes.filter((_, sceneIndex) => sceneIndex !== index % semanticScenes.length).slice(0, 3);
+  return { ...word, challengeMode: mode, sentence, semanticOptions: [
+    { id: `${word.id}-correct`, label: correctScene.label, emoji: correctScene.emoji, imageUrl: createSemanticImage(correctScene, word.id), correct: true },
+    ...distractors.map((scene, optionIndex) => ({ id: `${word.id}-${optionIndex}`, label: scene.label, emoji: scene.emoji, imageUrl: createSemanticImage(scene, `${word.id}-${optionIndex}`), correct: false })),
+  ].sort((a, b) => `${word.id}-${a.id}`.localeCompare(`${word.id}-${b.id}`)) };
 }
 
 function QuizRunner({ title, words, direction, difficulty, challengeMode = "choice", timeMode = "standard", onFinish, onExit }: QuizRunnerProps) {
@@ -45,6 +74,7 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
   const [typed, setTyped] = useState("");
   const [summary, setSummary] = useState<{ score: number; total: number; durationSec: number; records: AnswerRecord[] } | null>(null);
   const [records, setRecords] = useState<AnswerRecord[]>([]);
+  const [finishing, setFinishing] = useState(false);
   const current = words[index];
   const mode = current?.challengeMode ?? challengeMode;
   const secondsPerQuestion = secondsForMode(mode, timeMode);
@@ -53,6 +83,7 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
   const choices = useMemo(() => {
     if (!current) return [];
     const answer = mode === "part_of_speech" ? current.partOfSpeech : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
+    if (mode === "listening" || mode === "handwriting" || mode === "semantic_image") return [];
     if (current.options?.length) return [...current.options].filter(Boolean).sort(() => Math.random() - 0.5);
     if (mode === "part_of_speech") return [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4).sort(() => Math.random() - 0.5);
     const pool = words.filter((word) => word.id !== current.id).map((word) => actualDirection === "zh2en" ? word.word : word.meaning).filter(Boolean);
@@ -77,13 +108,14 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, index, secondsPerQuestion, selected, submitting, summary]);
 
+  if (finishing) return <Card title="⏳ 正在整理挑戰結果" subtitle="正在保存你的作答紀錄，請稍等一下…"><div className="flex min-h-56 flex-col items-center justify-center gap-4 text-center"><div className="h-12 w-12 animate-spin rounded-full border-4 border-[#37d3ff]/25 border-t-[#37d3ff]" /><p className="text-sm text-muted">正在計算分數與整理錯題，不會漏掉你的紀錄。</p></div></Card>;
   if (summary) return <Card title="🎉 挑戰完成" subtitle={title}><div className="space-y-4"><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="glass-soft rounded-xl p-3 text-center"><p className="text-xs text-muted">總分</p><p className="mt-1 text-2xl font-black text-[#7dd3fc]">{summary.score}</p></div><div className="glass-soft rounded-xl p-3 text-center"><p className="text-xs text-muted">答對</p><p className="mt-1 text-2xl font-black text-emerald-300">{correct}/{summary.total}</p></div><div className="glass-soft rounded-xl p-3 text-center"><p className="text-xs text-muted">未作答</p><p className="mt-1 text-2xl font-black text-amber-200">{summary.records.filter((item) => item.timedOut).length}</p></div><div className="glass-soft rounded-xl p-3 text-center"><p className="text-xs text-muted">用時</p><p className="mt-1 text-2xl font-black">{summary.durationSec}s</p></div></div><p className="text-center text-sm text-muted">{summary.score >= 90 ? "表現非常好，繼續保持！" : summary.score >= 60 ? "做得不錯，再複習錯題會更穩。" : "先整理錯題，再挑戰一次看看。"}</p><div className="max-h-80 space-y-2 overflow-y-auto pr-1">{summary.records.map((item) => <div key={item.number} className={`rounded-xl border p-3 text-left text-sm ${item.timedOut ? "border-amber-300/30 bg-amber-300/5" : item.correct ? "border-emerald-300/30 bg-emerald-300/5" : "border-rose-300/30 bg-rose-300/5"}`}><div className="flex items-center justify-between gap-2"><span>第 {item.number} 題・{item.word}</span><Badge tone={item.timedOut ? "gold" : item.correct ? "green" : "rose"}>{item.timedOut ? "未作答" : item.correct ? "答對" : "答錯"}</Badge></div><p className="mt-1 text-xs text-muted">題目：{item.prompt}</p><p className="mt-1 text-xs">正確答案：{item.expected}{item.response ? `・你的答案：${item.response}` : "・未作答"}</p></div>)}</div><Button full onClick={onExit}>返回挑戰專區</Button></div></Card>;
   if (!current) return <EmptyState icon="✓" title="題目準備中" />;
   async function choose(answer: string, timedOut = false) {
     if (selected !== null || submitting) return;
     setSelected(answer || "__timeout__");
-    const expected = mode === "part_of_speech" ? current.partOfSpeech : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
-    const isCorrect = !timedOut && answer === expected;
+    const expected = mode === "part_of_speech" ? current.partOfSpeech : mode === "listening" ? current.word : mode === "semantic_image" ? "語意圖片" : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
+    const isCorrect = !timedOut && (mode === "semantic_image" ? current.semanticOptions?.find((option) => option.id === answer)?.correct === true : answer.trim().toLocaleLowerCase() === expected.trim().toLocaleLowerCase());
     const nextCorrect = correct + (isCorrect ? 1 : 0);
     const nextRecords = [...records, { number: index + 1, word: current.word, prompt: actualDirection === "zh2en" ? current.meaning : current.word, expected, response: answer, correct: isCorrect, timedOut }];
     setRecords(nextRecords);
@@ -102,22 +134,25 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
         return;
       }
       setSubmitting(true);
+      setFinishing(true);
       const score = Math.round((nextCorrect / words.length) * 100);
       const durationSec = Math.round((Date.now() - startedAt) / 1000);
       await onFinish(score, words.length, durationSec, nextRecords);
       setSummary({ score, total: words.length, durationSec, records: nextRecords });
       setSubmitting(false);
+      setFinishing(false);
     }, 550);
   }
-  const expected = mode === "part_of_speech" ? current.partOfSpeech : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
+      const expected = mode === "part_of_speech" ? current.partOfSpeech : mode === "listening" ? current.word : mode === "semantic_image" ? "語意圖片" : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
   return (
     <Card title={title} subtitle={`${index + 1}/${words.length} 題・難度 ${difficulty === "easy" ? "簡單" : difficulty === "hard" ? "困難" : "普通"}`}>
-      <div className="mb-4 flex items-center justify-between gap-2 text-xs text-muted"><span>{mode === "listening" ? `聽力辨識・${actualDirection === "zh2en" ? "播放英文，選中文／英文答案" : "播放中文，選中文答案"}` : mode === "confusable" ? "易混淆單字辨析" : mode === "part_of_speech" ? "詞性辨識（n.／v.／adj.／adv.）" : mode === "meaning" ? "單字多義辨析" : actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}<span className="ml-2">第 {index + 1}/{words.length} 題</span></span><Badge tone={remaining <= 5 ? "rose" : "cyan"}>剩餘 {remaining}s・答對 {correct} 題</Badge></div>
+      <div className="mb-4 flex items-center justify-between gap-2 text-xs text-muted"><span>{mode === "semantic_image" ? "辨識語意・聽完整句子，選最符合語意的圖片" : mode === "listening" ? "聽力模式・只播放英文，請手寫單字" : mode === "confusable" ? "易混淆單字辨析" : mode === "part_of_speech" ? "詞性辨識（n.／v.／adj.／adv.）" : mode === "meaning" ? "單字多義辨析" : actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}<span className="ml-2">第 {index + 1}/{words.length} 題</span></span><Badge tone={remaining <= 5 ? "rose" : "cyan"}>剩餘 {remaining}s・答對 {correct} 題</Badge></div>
       <div className="glass-soft mb-4 rounded-2xl p-6 text-center">
-        {mode === "listening" ? <Button aria-label="播放聽力音檔" className="min-h-16 min-w-48 text-lg" onClick={() => { const text = actualDirection === "zh2en" ? current.word : current.meaning; if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = actualDirection === "zh2en" ? "en-US" : "zh-TW"; window.speechSynthesis.speak(u); } }}>播放{actualDirection === "zh2en" ? "英文" : "中文"}音檔</Button> : <><p className="text-2xl font-bold text-[#e8edff]">{actualDirection === "zh2en" ? current.meaning : current.word}</p><p className="mt-2 text-xs text-muted">{current.partOfSpeech}</p></>}
+        {mode === "semantic_image" || mode === "listening" ? <Button aria-label="播放英文聽力" className="min-h-16 min-w-48 text-lg" onClick={() => { const text = mode === "semantic_image" ? current.sentence : current.word; if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; window.speechSynthesis.speak(u); } }}>播放英文</Button> : <><p className="text-2xl font-bold text-[#e8edff]">{actualDirection === "zh2en" ? current.meaning : current.word}</p><p className="mt-2 text-xs text-muted">{current.partOfSpeech}</p></>}
       </div>
-      {mode === "handwriting" ? <div className="flex gap-2"><Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={actualDirection === "zh2en" ? "請手寫輸入英文" : "請手寫輸入中文"} disabled={Boolean(selected) || submitting} onKeyDown={(e) => e.key === "Enter" && void choose(typed.trim())} /><Button disabled={!typed.trim()} onClick={() => void choose(typed.trim())}>送出</Button></div> : <div className="grid gap-2 sm:grid-cols-2">{choices.map((choice) => <button key={choice} type="button" disabled={Boolean(selected) || submitting} onClick={() => void choose(choice)} className={`focus-ring rounded-xl border p-3 text-left text-sm transition ${selected ? choice === expected ? "border-emerald-400/60 bg-emerald-400/10" : choice === selected ? "border-rose-400/60 bg-rose-400/10" : "border-[var(--line)] opacity-60" : "border-[var(--line)] bg-white/[0.03] hover:border-[#37d3ff]/60 hover:bg-[#37d3ff]/10"}`}>{choice}</button>)}</div>}
-      {mode !== "listening" && <p className="mt-4 text-center text-[11px] text-muted">選出最適合的答案，答完會自動進入下一題</p>}
+      {mode === "handwriting" || mode === "listening" ? <div className="flex gap-2"><Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={mode === "listening" ? "聽完英文後手寫單字" : actualDirection === "zh2en" ? "請手寫輸入英文" : "請手寫輸入中文"} disabled={Boolean(selected) || submitting} onKeyDown={(e) => e.key === "Enter" && void choose(typed.trim())} /><Button disabled={!typed.trim()} onClick={() => void choose(typed.trim())}>送出</Button></div> : mode === "semantic_image" ? <div className="grid gap-3 sm:grid-cols-2">{current.semanticOptions?.map((option) => <button key={option.id} type="button" disabled={Boolean(selected) || submitting} onClick={() => void choose(option.id)} className={`focus-ring min-h-32 rounded-2xl border p-4 text-center transition ${selected ? option.id === selected ? option.correct ? "border-emerald-400/70 bg-emerald-400/15" : "border-rose-400/70 bg-rose-400/15" : option.correct ? "border-emerald-400/50 bg-emerald-400/10" : "border-[var(--line)] opacity-60" : "border-[var(--line)] bg-white/[0.03] hover:border-[#37d3ff]/60 hover:bg-[#37d3ff]/10"}`}><Image src={option.imageUrl} alt={option.label} width={640} height={360} unoptimized className="h-32 w-full rounded-xl object-cover" /><span className="mt-2 block text-sm">{option.label}</span></button>)}</div> : <div className="grid gap-2 sm:grid-cols-2">{choices.map((choice) => <button key={choice} type="button" disabled={Boolean(selected) || submitting} onClick={() => void choose(choice)} className={`focus-ring rounded-xl border p-3 text-left text-sm transition ${selected ? choice === expected ? "border-emerald-400/60 bg-emerald-400/10" : choice === selected ? "border-rose-400/60 bg-rose-400/10" : "border-[var(--line)] opacity-60" : "border-[var(--line)] bg-white/[0.03] hover:border-[#37d3ff]/60 hover:bg-[#37d3ff]/10"}`}>{choice}</button>)}</div>}
+      {mode !== "listening" && mode !== "semantic_image" && <p className="mt-4 text-center text-[11px] text-muted">選出最適合的答案，答完會自動進入下一題</p>}
+      {mode === "semantic_image" && <p className="mt-4 text-center text-[11px] text-muted">聽懂句子後，選出最符合整句語意的圖片。</p>}
     </Card>
   );
 }
@@ -157,7 +192,8 @@ function ChallengeInner() {
       const distinctWords = sourceWords.filter((word, index, all) => all.findIndex((candidate) => candidate.word.trim().toLocaleLowerCase("en-US") === word.word.trim().toLocaleLowerCase("en-US")) === index);
       const words = selfForm.shuffle ? [...distinctWords].sort(() => Math.random() - 0.5) : distinctWords;
       if (!words.length) throw new Error("目前沒有可用的題目");
-      const nextSession = { title: `自我挑戰・${selfForm.source === "mine" ? "我的單字" : selfForm.source === "vocabulary" ? "字詞百科" : selfForm.track === "junior" ? "國中" : "高中"}`, words: words.slice(0, selfForm.questionCount).map((word) => ({ ...word, challengeMode: selfForm.challengeMode })), direction: selfForm.direction, difficulty: selfForm.difficulty, challengeMode: selfForm.challengeMode, timeMode: selfForm.timeMode } as const;
+      const preparedWords = words.slice(0, selfForm.questionCount).map((word, index) => decorateChallengeWord(word, index, selfForm.challengeMode === "listening" ? "listening" : selfForm.challengeMode));
+      const nextSession = { title: `自我挑戰・${selfForm.source === "mine" ? "我的單字" : selfForm.source === "vocabulary" ? "字詞百科" : selfForm.track === "junior" ? "國中" : "高中"}`, words: preparedWords, direction: selfForm.direction, difficulty: selfForm.difficulty, challengeMode: selfForm.challengeMode, timeMode: selfForm.timeMode } as const;
       setCountdown(3);
       window.setTimeout(() => setCountdown(2), 1000);
       window.setTimeout(() => setCountdown(1), 2000);
@@ -334,7 +370,7 @@ function ChallengeInner() {
               <Field label="題數"><Select value={String(selfForm.questionCount)} onChange={(e) => setSelfForm({ ...selfForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option><option value="100">100 題</option></Select></Field>
               <Field label="難度"><Select value={selfForm.difficulty} onChange={(e) => setSelfForm({ ...selfForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
               <Field label="題目方向"><Select value={selfForm.direction} onChange={(e) => setSelfForm({ ...selfForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
-              <Field label="作答模式"><Select value={selfForm.challengeMode} onChange={(e) => setSelfForm({ ...selfForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="meaning">多義選擇</option><option value="part_of_speech">詞性辨識</option><option value="handwriting">手寫作答</option><option value="listening">純音檔聽力</option><option value="confusable">易混淆辨析</option></Select></Field>
+              <Field label="作答模式"><Select value={selfForm.challengeMode} onChange={(e) => setSelfForm({ ...selfForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="meaning">多義選擇</option><option value="part_of_speech">詞性辨識</option><option value="handwriting">手寫作答</option><option value="listening">聽力・播放英文後手寫單字</option><option value="semantic_image">辨識語意・四圖選義</option><option value="confusable">易混淆辨析</option></Select></Field>
               <Field label="作答速度"><Select value={selfForm.timeMode} onChange={(e) => setSelfForm({ ...selfForm, timeMode: e.target.value as TimeMode })}><option value="standard">一般：依題型分配 25–45 秒</option><option value="sprint">速戰速決：每題 10 秒</option></Select></Field>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-muted"><input type="checkbox" checked={selfForm.shuffle} onChange={(e) => setSelfForm({ ...selfForm, shuffle: e.target.checked })} />每次開始時打亂題目</label>
@@ -375,7 +411,7 @@ function ChallengeInner() {
                         window.setTimeout(() => setCountdown(1), 2000);
                         window.setTimeout(() => {
                           setCountdown(null);
-                          setQuizSession({ title: result.title, challengeId: c.id, words: result.words, direction: result.settings.direction, difficulty: result.settings.difficulty, timeMode: result.settings.timeMode });
+                          setQuizSession({ title: result.title, challengeId: c.id, words: result.words.map((word, index) => decorateChallengeWord(word, index, word.challengeMode ?? "choice")), direction: result.settings.direction, difficulty: result.settings.difficulty, timeMode: result.settings.timeMode });
                         }, 3000);
                       } catch (err) {
                         toast.push("error", errorMessage(err));
@@ -649,7 +685,7 @@ function ChallengeInner() {
               <Field label="題數"><Select value={String(cForm.questionCount)} onChange={(e) => setCForm({ ...cForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option></Select></Field>
               <Field label="難度"><Select value={cForm.difficulty} onChange={(e) => setCForm({ ...cForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
                                 <Field label="題目方向"><Select value={cForm.direction} onChange={(e) => setCForm({ ...cForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
-              <Field label="作答模式"><Select value={cForm.challengeMode} onChange={(e) => setCForm({ ...cForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="meaning">多義選擇</option><option value="part_of_speech">詞性辨識</option><option value="handwriting">手寫作答</option><option value="listening">純音檔聽力</option><option value="confusable">易混淆辨析</option></Select></Field>
+              <Field label="作答模式"><Select value={cForm.challengeMode} onChange={(e) => setCForm({ ...cForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="meaning">多義選擇</option><option value="part_of_speech">詞性辨識</option><option value="handwriting">手寫作答</option><option value="listening">聽力・播放英文後手寫單字</option><option value="semantic_image">辨識語意・四圖選義</option><option value="confusable">易混淆辨析</option></Select></Field>
               <Field label="作答速度"><Select value={cForm.timeMode} onChange={(e) => setCForm({ ...cForm, timeMode: e.target.value as TimeMode })}><option value="standard">一般：依題型 25–45 秒</option><option value="sprint">速戰速決：每題 10 秒</option></Select></Field>
             </div>
           )}
