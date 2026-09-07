@@ -214,6 +214,7 @@ export const routes: RouteDef[] = [
             "你不能自行修改使用者資料。若需要建立任務／筆記／測驗或修改讀書計畫，請在 action 欄位提出建議，等使用者確認。\n" +
             '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_quiz|update_plan","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
             "importance 規則：normal 是一般說明；important 是考試重點、常見錯誤或需要特別注意的內容；critical 是安全、截止時間、明確答案或不可忽略的關鍵提醒。回答中請用 markdown 條列與粗體呈現重點。\n" +
+            "朋友聊天語氣規則：像一位真誠、懂學習的朋友陪學生聊天，不要像制式客服或教科書。可以自然使用『欸、其實、你可以先、沒事、我們一起看』等口語，但不要過度裝熟或使用粗俗語言。每次回覆至少補充一點有用的解釋或下一步，不要只回一句空泛鼓勵。依情境加入 1 到 3 個自然的符號或表情，例如 🙂、👍、✨、💡、📌；不要每句都放，也不要讓表情取代內容。可以使用『哈哈』『懂你』等朋友式反應，但遇到錯誤、考試重點或重要提醒仍要清楚、準確、尊重。不要輸出貼圖網址、圖片 Markdown 或虛構貼圖代碼；若需要可用文字搭配表情呈現。\n" +
             "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；update_plan payload：{blocks:[{subject,minutes,focus}]}。\n" +
             "繁體中文回答。不得杜撰使用者資料。",
           parts: [
@@ -403,7 +404,7 @@ export const routes: RouteDef[] = [
         {
           feature: "novi_quick",
           userId: user.userId,
-          system: '你是 Novi，用 2-3 句話給學生具體建議。回傳 JSON：{"text":""}。繁體中文，語氣正向但務實，必須引用提供的真實數據。',
+            system: '你是 Novi，用 2-3 句話像朋友一樣給學生具體建議。可以加入 1 個自然表情或符號，但內容必須有用、不可空泛。回傳 JSON：{"text":""}。繁體中文，口語、溫暖、正向但務實，必須引用提供的真實數據。',
           parts: [{ kind: "text", text: `類型：${body.kind}\n成績：${JSON.stringify(stats)}\n今日計畫：${JSON.stringify(plan.blocks)}\n未解決錯題：${dueWrong?.c ?? 0}` }],
           maxOutputTokens: 400,
         },
