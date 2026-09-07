@@ -258,7 +258,7 @@ export function ErrorState({ message, onRetry, code, requestId }: { message: str
   );
 }
 
-export function Modal({ open, onClose, title, children, wide = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+export function Modal({ open, onClose, title, children, wide = false, fullScreen = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; fullScreen?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -273,18 +273,18 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
+    <div className={`fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm ${fullScreen ? "p-0" : "p-3 sm:p-4"}`} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`glass anim-pop max-h-[calc(100dvh-1.5rem)] w-[min(94vw,44rem)] overflow-y-auto overscroll-contain scroll-thin rounded-3xl bg-[var(--surface-solid)] p-4 touch-pan-y sm:max-h-[calc(100dvh-2rem)] sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+        className={`glass anim-pop overflow-y-auto overscroll-contain scroll-thin bg-[var(--surface-solid)] touch-pan-y ${fullScreen ? "h-[100dvh] w-full max-w-none rounded-none p-4 sm:p-8" : `max-h-[calc(100dvh-1.5rem)] w-[min(94vw,44rem)] rounded-3xl p-4 sm:max-h-[calc(100dvh-2rem)] sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}`}
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-base font-semibold">{title}</h3>
-          <button onClick={onClose} aria-label="關閉" className="focus-ring rounded-lg px-2 py-1 text-muted hover:bg-white/10">
-            ✕
+          <button onClick={onClose} aria-label={fullScreen ? "返回" : "關閉"} className="focus-ring rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs text-muted hover:bg-white/10">
+            {fullScreen ? "返回" : "✕"}
           </button>
         </div>
         {children}
