@@ -560,6 +560,18 @@ export const dailyWords = pgTable(
   (t) => [uniqueIndex("daily_words_uq").on(t.word, t.level), index("daily_words_week_idx").on(t.weekId)],
 );
 
+export const dailyWordAppearances = pgTable(
+  "daily_word_appearances",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    wordId: uuid("word_id").notNull().references(() => dailyWords.id, { onDelete: "cascade" }),
+    appearanceDate: text("appearance_date").notNull(),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("daily_word_appearances_uq").on(t.userId, t.wordId, t.appearanceDate), index("daily_word_appearances_user_idx").on(t.userId, t.appearanceDate)],
+);
+
 export const wordProgress = pgTable(
   "word_progress",
   {

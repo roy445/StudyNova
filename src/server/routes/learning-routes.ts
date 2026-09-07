@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, count, desc, eq, gte, sql, isNull, lte } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql, isNull, lte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   gradeRecords,
@@ -24,6 +24,7 @@ import {
   achievements,
   userAchievements,
   dailyWords,
+  dailyWordAppearances,
   platformSettings,
   wordProgress,
   questions,
@@ -43,6 +44,13 @@ import {
 import { isProUser } from "../economy";
 import { isWeekOpen } from "../queue";
 import { unreadCount } from "../notify";
+
+function taipeiDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 import { runAiJson, aiConfigured } from "../ai";
 import { ensureSeeded } from "../seed";
 
@@ -917,15 +925,16 @@ export const routes: RouteDef[] = [
       const dailyTarget = 10;
       const requestedTrack = ctx.query.get("track");
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : settings?.schoolLevel === "senior" ? "senior" : "junior";
-      const dayNumber = Math.floor(Date.now() / 86_400_000);
+      const dateKey = taipeiDateKey();
       const [{ total }] = await db.select({ total: count() }).from(dailyWords).where(eq(dailyWords.level, track));
       const totalWords = Number(total ?? 0);
-      const learningStart = Date.UTC(2026, 0, 1);
-      const learningDay = Math.max(1, Math.floor((Date.now() - learningStart) / 86_400_000) + 1);
-      const appearedCount = Math.min(totalWords, learningDay * dailyTarget);
       const resetAt = "每天 00:00（台灣時間）";
-      if (!totalWords) return { words: [], level: track, track, count: 0, dailyTarget, appearedCount: 0, totalWords: 0, resetAt };
-      const offset = ((learningDay - 1) * dailyTarget) % totalWords;
+      if (!totalWords) return { words: [], level: track, track, count: 0, dailyTarget, appearedCount: 0, totalWords: 0, resetAt, appearanceDate: dateKey };
+      const previousAppearances = await db.select({ wordId: dailyWordAppearances.wordId, appearanceDate: dailyWordAppearances.appearanceDate }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWords.level, track)));
+      const previousWordIds = new Set(previousAppearances.map((row) => row.wordId));
+      const todayWordIds = new Set(previousAppearances.filter((row) => row.appearanceDate === dateKey).map((row) => row.wordId));
+      const priorUniqueCount = previousWordIds.size - todayWordIds.size;
+      const offset = (priorUniqueCount % totalWords);
       const fetchWords = (limit: number, skip: number) => db
         .select({
           id: dailyWords.id,
@@ -951,7 +960,12 @@ export const routes: RouteDef[] = [
       const first = await fetchWords(dailyTarget, offset);
       const remaining = dailyTarget - first.length;
       const rows = remaining > 0 ? [...first, ...(await fetchWords(remaining, 0))] : first;
-      return { words: rows, level: track, track, count: rows.length, dailyTarget, appearedCount, totalWords, resetAt };
+      if (rows.length) {
+        await db.insert(dailyWordAppearances).values(rows.map((row) => ({ userId: user.userId, wordId: row.id, appearanceDate: dateKey }))).onConflictDoNothing();
+      }
+      const appearanceRows = await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWords.level, track)));
+      const appearedCount = new Set(appearanceRows.map((row) => row.wordId)).size;
+      return { words: rows, level: track, track, count: rows.length, dailyTarget, appearedCount, totalWords, resetAt, appearanceDate: dateKey };
     },
   }),
 
@@ -968,10 +982,10 @@ export const routes: RouteDef[] = [
       const baseLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
       const [{ total: totalRow }] = await db.select({ total: count() }).from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined);
       const totalWords = Number(totalRow ?? 0);
-      const learningStart = Date.UTC(2026, 0, 1);
-      const learningDay = Math.max(1, Math.floor((Date.now() - learningStart) / 86_400_000) + 1);
-      const unlockedCount = Math.min(totalWords, learningDay * 10);
-      const limit = unlockedOnly ? Math.min(baseLimit, Math.max(1, unlockedCount)) : baseLimit;
+      const appearanceRows = unlockedOnly ? await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), track ? eq(dailyWords.level, track) : undefined)) : [];
+      const unlockedIds = [...new Set(appearanceRows.map((row) => row.wordId))];
+      const unlockedCount = unlockedIds.length;
+      const limit = baseLimit;
       const rows = await db.select({
         id: dailyWords.id,
         word: dailyWords.word,
@@ -983,7 +997,7 @@ export const routes: RouteDef[] = [
         exampleZh: dailyWords.exampleZh,
         level: dailyWords.level,
         familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
-      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(track ? eq(dailyWords.level, track) : undefined).orderBy(asc(dailyWords.word)).limit(limit);
+      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(and(track ? eq(dailyWords.level, track) : undefined, unlockedOnly ? (unlockedIds.length ? inArray(dailyWords.id, unlockedIds) : sql`false`) : undefined)).orderBy(asc(dailyWords.word)).limit(limit);
       return { words: rows, unlockedCount, totalWords, unlockedOnly };
     },
   }),
