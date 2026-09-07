@@ -85,6 +85,7 @@ export const routes: RouteDef[] = [
           level: word.level,
           phonetics: { us: word.usPhonetic, uk: word.ukPhonetic },
           audio: { us: word.usAudioUrl, uk: word.ukAudioUrl },
+          pronunciation: { us: Boolean(word.word), uk: Boolean(word.word), fallback: "browser_tts" },
         },
         explanations: cleanList(explanations.map((item) => ({ explanation: item.explanation, sourceKind: item.sourceKind })), 8).length
           ? cleanList(explanations.map((item) => ({ explanation: item.explanation, sourceKind: item.sourceKind })), 8)
