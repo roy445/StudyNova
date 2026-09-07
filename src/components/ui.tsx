@@ -273,13 +273,13 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[150] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`glass anim-pop max-h-[92dvh] w-full overflow-y-auto overscroll-contain scroll-thin rounded-b-none bg-[var(--surface-solid)] p-4 touch-pan-y sm:rounded-3xl sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+        className={`glass anim-pop max-h-[calc(100dvh-1.5rem)] w-[min(94vw,44rem)] overflow-y-auto overscroll-contain scroll-thin rounded-3xl bg-[var(--surface-solid)] p-4 touch-pan-y sm:max-h-[calc(100dvh-2rem)] sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-base font-semibold">{title}</h3>
