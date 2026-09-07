@@ -66,6 +66,7 @@ const FEATURES = [
   { feature: "ai_study_plan", label: "AI 讀書計畫", freeDailyLimit: 0, proDailyLimit: 5 },
   { feature: "wrong_review_ai", label: "錯題 AI 複習", freeDailyLimit: 5, proDailyLimit: 30 },
   { feature: "ai_speech", label: "AI 朗讀 / 語音分析", freeDailyLimit: 0, proDailyLimit: 20 },
+  { feature: "ai_visual", label: "AI 重點心智圖", freeDailyLimit: 3, proDailyLimit: 20 },
   { feature: "image_ocr", label: "圖片辨識", freeDailyLimit: 5, proDailyLimit: 50 },
   { feature: "multi_image_ocr", label: "多圖片辨識", freeDailyLimit: 0, proDailyLimit: 10 },
 ];

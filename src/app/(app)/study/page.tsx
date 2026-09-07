@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Tabs } from "@/components/ui";
 import { MaterialsPanel, NotesPanel, OcrPanel } from "@/features/study/panels-a";
 import { QuizPanel, WrongPanel } from "@/features/study/panels-b";
-import { FocusPanel, MyVocabularyPanel, PlanPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, WordLibraryPanel, WordsPanel } from "@/features/study/panels-c";
+import { FocusPanel, MyVocabularyPanel, PlanPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, VisualNotesPanel, WordLibraryPanel, WordsPanel } from "@/features/study/panels-c";
 
 const TABS = [
   { key: "plan", label: "今日計畫", icon: "▤" },
@@ -14,6 +14,7 @@ const TABS = [
   { key: "quiz", label: "測驗", icon: "▤" },
   { key: "wrong", label: "錯題本", icon: "◇" },
   { key: "words", label: "單字", icon: "⌁" },
+  { key: "visual-notes", label: "重點心智圖", icon: "✦" },
   { key: "word-library", label: "字詞百科", icon: "▤" },
   { key: "my-vocabulary", label: "我的單字", icon: "◇" },
   { key: "quick-memory", label: "快速背", icon: "✦" },
@@ -47,13 +48,14 @@ function StudyInner() {
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      <div ref={contentRef} className={`scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))] ${tab === "words" || tab === "word-library" || tab === "my-vocabulary" ? "study-vocabulary-fullbleed" : ""}`}>
+      <div ref={contentRef} className={`scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))] ${tab === "words" || tab === "word-library" || tab === "my-vocabulary" || tab === "visual-notes" ? "study-vocabulary-fullbleed" : ""}`}>
         {tab === "plan" && <PlanPanel />}
         {tab === "materials" && <MaterialsPanel />}
         {tab === "ocr" && <OcrPanel />}
         {tab === "quiz" && <QuizPanel />}
         {tab === "wrong" && <WrongPanel />}
         {tab === "words" && <WordsPanel />}
+        {tab === "visual-notes" && <VisualNotesPanel />}
         {tab === "word-library" && <WordLibraryPanel />}
         {tab === "my-vocabulary" && <MyVocabularyPanel />}
         {tab === "quick-memory" && <QuickMemoryPanel />}
