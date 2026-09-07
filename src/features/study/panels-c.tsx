@@ -106,6 +106,21 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         </div>
       )}
 
+      <section className="mb-3 rounded-2xl border border-[#37d3ff]/30 bg-gradient-to-br from-[#37d3ff]/10 to-[#7c5cff]/10 p-4" aria-label="目前單字詳細資訊">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7dd3fc]">目前單字・第 {index + 1} 題</p>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1"><h2 className="break-words text-2xl font-extrabold tracking-tight">{current.word}</h2><span className="text-xs text-muted">{current.part_of_speech || "單字"}</span></div>
+            <p className="mt-1 text-base font-semibold text-[#7dd3fc]">{current.meaning || "尚未補上中文釋義"}</p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => { if (!speak(current.word)) toast.push("error", "此瀏覽器不支援語音"); }}>🔊 朗讀</Button>
+        </div>
+        {current.meanings && current.meanings.length > 1 && <div className="mt-3"><p className="text-[11px] font-semibold text-muted">一字多意</p><div className="mt-1 flex flex-wrap gap-1.5">{current.meanings.slice(0, 6).map((meaning) => <span key={meaning} className="rounded-lg bg-white/10 px-2 py-1 text-xs">{meaning}</span>)}</div></div>}
+        {current.phrases?.length ? <div className="mt-3"><p className="text-[11px] font-semibold text-muted">常用片語</p><div className="mt-1 grid gap-1.5 sm:grid-cols-2">{current.phrases.slice(0, 4).map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="rounded-lg bg-black/15 px-2.5 py-1.5 text-xs"><span className="font-medium">{phrase.en}</span><span className="ml-1 text-muted">{phrase.zh}</span></div>)}</div></div> : null}
+        {(current.example || current.example_zh) && <div className="mt-3 rounded-xl bg-black/15 px-3 py-2 text-xs leading-5"><p className="text-muted">例句</p>{current.example && <p>{current.example}</p>}{current.example_zh && <p className="text-muted">{current.example_zh}</p>}</div>}
+        <div className="mt-3 flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => setDetailWord(current)}>查看完整解析</Button><span className="text-[11px] text-muted">熟悉度 {current.familiarity}%・點擊下方單字可切換</span></div>
+      </section>
+
       <ol className="mb-3 space-y-2" aria-label="今日單字清單">
         {words.map((word, wordIndex) => (
           <li key={word.id}>
