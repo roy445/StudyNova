@@ -673,6 +673,78 @@ export const aiConversations = pgTable(
   (t) => [index("ai_conv_user_idx").on(t.userId, t.archived)],
 );
 
+/* ---------------------------------------------------- UNIFIED AI SOLUTION */
+
+export const fileContexts = pgTable(
+  "file_contexts",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    objectId: uuid("object_id").notNull().references(() => storageObjects.id, { onDelete: "cascade" }),
+    uploadBatch: integer("upload_batch").notNull().default(1),
+    sha256: text("sha256").notNull().default(""),
+    status: text("status").notNull().default("uploaded"), // uploaded | analyzing | ready | failed
+    originalName: text("original_name").notNull().default(""),
+    detected: jsonb("detected").$type<Array<{ kind: string; text: string; confidence: number; box?: number[] }>>().notNull().default([]),
+    error: text("error").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("file_context_user_idx").on(t.userId, t.createdAt), index("file_context_hash_idx").on(t.userId, t.sha256)],
+);
+
+export const analysisScopes = pgTable(
+  "analysis_scopes",
+  {
+    id: id(),
+    fileContextId: uuid("file_context_id").notNull().references(() => fileContexts.id, { onDelete: "cascade" }),
+    includeQuestion: boolean("include_question").notNull().default(true),
+    includeHandwriting: boolean("include_handwriting").notNull().default(true),
+    includeNote: boolean("include_note").notNull().default(true),
+    highlightPriority: boolean("highlight_priority").notNull().default(false),
+    questionColor: text("question_color").notNull().default(""),
+    sentenceColor: text("sentence_color").notNull().default(""),
+    keywordColor: text("keyword_color").notNull().default(""),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("analysis_scope_context_uq").on(t.fileContextId)],
+);
+
+export const aiModes = pgTable(
+  "ai_modes",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    solutionSessionId: uuid("solution_session_id"),
+    mode: text("mode").notNull().default("tutor"), // tutor | solution | note
+    source: text("source").notNull().default("manual"), // manual | router
+    locked: boolean("locked").notNull().default(false),
+    reason: text("reason").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("ai_mode_user_idx").on(t.userId, t.updatedAt)],
+);
+
+export const solutionSessions = pgTable(
+  "solution_sessions",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    mode: text("mode").notNull().default("tutor"),
+    modeLocked: boolean("mode_locked").notNull().default(false),
+    status: text("status").notNull().default("active"),
+    fileContextIds: jsonb("file_context_ids").$type<string[]>().notNull().default([]),
+    result: jsonb("result").$type<Record<string, unknown> | null>(),
+    novaCost: integer("nova_cost").notNull().default(0),
+    charged: boolean("charged").notNull().default(false),
+    error: text("error").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("solution_session_user_idx").on(t.userId, t.createdAt)],
+);
+
 export const aiMessages = pgTable(
   "ai_messages",
   {

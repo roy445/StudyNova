@@ -131,7 +131,7 @@ export function QuizPanel() {
                 {i + 1}. {q.stem}
               </p>
               <div className="mt-2 space-y-1.5">
-                {q.type === "single" || q.type === "truefalse" ? (
+                {q.type === "single" || q.type === "truefalse" || q.type === "part_of_speech" || q.type === "meaning" ? (
                   q.options.map((o) => (
                     <label key={o} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm ${answers[q.id]?.[0] === o ? "border-[#37d3ff] bg-[#37d3ff]/10" : "border-[var(--line)]"}`}>
                       <input type="radio" name={q.id} checked={answers[q.id]?.[0] === o} onChange={() => saveAnswer(q.id, [o])} className="accent-[#37d3ff]" />
@@ -176,7 +176,7 @@ export function QuizPanel() {
     <>
       <Card
         title="📝 AI 測驗"
-        subtitle="依教材、章節、錯題與弱點出題，支援單選／多選／填空／是非／簡答"
+        subtitle="依教材、章節、錯題與弱點出題，支援詞性辨識、多義選擇、多選、填空、是非與簡答"
         action={
           <div className="flex gap-1.5">
             <Button
@@ -266,6 +266,8 @@ export function QuizPanel() {
               <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                 <option value="single">單選題</option>
                 <option value="multiple">多選題</option>
+                <option value="part_of_speech">詞性辨識（n./v./adj./adv.）</option>
+                <option value="meaning">單字意思四選一</option>
                 <option value="fill">填空題</option>
                 <option value="truefalse">是非題</option>
                 <option value="short">簡答題</option>

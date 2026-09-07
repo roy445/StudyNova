@@ -231,7 +231,7 @@ export const routes: RouteDef[] = [
           questionCount: z.number().int().min(5).max(200).default(10),
           direction: z.enum(["zh2en", "en2zh", "mixed"]).default("mixed"),
           difficulty: z.enum(["easy", "normal", "hard"]).default("normal"),
-          challengeMode: z.enum(["choice", "listening", "handwriting", "confusable"]).default("choice"),
+          challengeMode: z.enum(["choice", "listening", "handwriting", "confusable", "part_of_speech", "meaning"]).default("choice"),
           source: z.enum(["catalog", "mine"]).default("catalog"),
         }),
       );
@@ -262,16 +262,18 @@ export const routes: RouteDef[] = [
           for (let i = 0; i < Math.min(count, distinctPool.length); i += 1) {
             const current = distinctPool[i];
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
-            const answer = direction === "zh2en" ? current.word : current.meaning;
-            const options = [answer, ...distinctPool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
+            const answer = body.challengeMode === "part_of_speech" ? current.partOfSpeech : direction === "zh2en" ? current.word : current.meaning;
+            const options = body.challengeMode === "part_of_speech"
+              ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4)
+              : [answer, ...distinctPool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
             challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, options: options.sort(() => Math.random() - 0.5), answer });
           }
         } else {
           for (let i = 0; i < Math.min(count, Math.floor(distinctPool.length / 4)); i += 1) {
             const group = distinctPool.slice(i * 4, i * 4 + 4);
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
-            const answer = direction === "zh2en" ? group[0].word : group[0].meaning;
-            const options = group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
+            const answer = body.challengeMode === "part_of_speech" ? group[0].partOfSpeech : direction === "zh2en" ? group[0].word : group[0].meaning;
+            const options = body.challengeMode === "part_of_speech" ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4) : group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
             challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, options: [...options].sort(() => Math.random() - 0.5), answer });
           }
         }

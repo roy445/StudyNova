@@ -21,7 +21,7 @@ type Challenge = {
   participants: Array<{ userId: string; displayName: string; score: number; durationSec: number; finishedAt: string | null }>;
 };
 
-type ChallengeMode = "choice" | "listening" | "handwriting" | "confusable";
+type ChallengeMode = "choice" | "listening" | "handwriting" | "confusable" | "part_of_speech" | "meaning";
 type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: string; example?: string; exampleZh?: string; level: string; direction?: "zh2en" | "en2zh"; challengeMode?: ChallengeMode; options?: string[]; answer?: string };
 
 type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; challengeMode?: ChallengeMode; onFinish: (score: number, total: number, durationSec: number) => Promise<void>; onExit: () => void };
@@ -39,8 +39,9 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
   const mode = current?.challengeMode ?? challengeMode;
   const choices = useMemo(() => {
     if (!current) return [];
-    const answer = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
+    const answer = mode === "part_of_speech" ? current.partOfSpeech : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
     if (current.options?.length) return current.options;
+    if (mode === "part_of_speech") return [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
     const pool = words.filter((word) => word.id !== current.id).map((word) => actualDirection === "zh2en" ? word.word : word.meaning).filter(Boolean);
     return [answer, ...pool].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
   }, [actualDirection, current, words]);
@@ -50,7 +51,7 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
   async function choose(answer: string) {
     if (selected || submitting) return;
     setSelected(answer);
-    const expected = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
+    const expected = mode === "part_of_speech" ? current.partOfSpeech : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
     const nextCorrect = correct + (answer === expected ? 1 : 0);
     setCorrect(nextCorrect);
     if (answer !== expected) {
@@ -77,9 +78,9 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
   const expected = current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
   return (
     <Card title={title} subtitle={`${index + 1}/${words.length} 題・難度 ${difficulty === "easy" ? "簡單" : difficulty === "hard" ? "困難" : "普通"}`}>
-      <div className="mb-4 flex items-center justify-between text-xs text-muted"><span>{mode === "listening" ? "聽力辨識" : mode === "confusable" ? "易混淆單字辨析" : actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}</span><Badge tone="cyan">目前答對 {correct} 題</Badge></div>
+      <div className="mb-4 flex items-center justify-between text-xs text-muted"><span>{mode === "listening" ? "聽力辨識" : mode === "confusable" ? "易混淆單字辨析" : mode === "part_of_speech" ? "詞性辨識（n.／v.／adj.／adv.）" : mode === "meaning" ? "單字多義辨析" : actualDirection === "zh2en" ? "中文 → 英文" : "英文 → 中文"}</span><Badge tone="cyan">目前答對 {correct} 題</Badge></div>
       <div className="glass-soft mb-4 rounded-2xl p-6 text-center">
-        {mode === "listening" ? <Button aria-label="播放聽力音檔" className="min-h-16 min-w-48 text-lg" onClick={() => { const text = actualDirection === "zh2en" ? current.word : current.meaning; if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = actualDirection === "zh2en" ? "en-US" : "zh-TW"; window.speechSynthesis.speak(u); } }}>🔊 播放音檔</Button> : <><p className="text-2xl font-bold text-[#e8edff]">{actualDirection === "zh2en" ? current.meaning : current.word}</p><p className="mt-2 text-xs text-muted">{current.partOfSpeech}</p></>}
+        {mode === "listening" ? <Button aria-label="播放聽力音檔" className="min-h-16 min-w-48 text-lg" onClick={() => { const text = actualDirection === "zh2en" ? current.word : current.meaning; if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = actualDirection === "zh2en" ? "en-US" : "zh-TW"; window.speechSynthesis.speak(u); } }}>播放音檔</Button> : <><p className="text-2xl font-bold text-[#e8edff]">{actualDirection === "zh2en" ? current.meaning : current.word}</p><p className="mt-2 text-xs text-muted">{current.partOfSpeech}</p></>}
       </div>
       {mode === "handwriting" ? <div className="flex gap-2"><Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={actualDirection === "zh2en" ? "請手寫輸入英文" : "請手寫輸入中文"} disabled={Boolean(selected) || submitting} onKeyDown={(e) => e.key === "Enter" && void choose(typed.trim())} /><Button disabled={!typed.trim()} onClick={() => void choose(typed.trim())}>送出</Button></div> : <div className="grid gap-2 sm:grid-cols-2">{choices.map((choice) => <button key={choice} type="button" disabled={Boolean(selected) || submitting} onClick={() => void choose(choice)} className={`focus-ring rounded-xl border p-3 text-left text-sm transition ${selected ? choice === expected ? "border-emerald-400/60 bg-emerald-400/10" : choice === selected ? "border-rose-400/60 bg-rose-400/10" : "border-[var(--line)] opacity-60" : "border-[var(--line)] bg-white/[0.03] hover:border-[#37d3ff]/60 hover:bg-[#37d3ff]/10"}`}>{choice}</button>)}</div>}
       {mode !== "listening" && <p className="mt-4 text-center text-[11px] text-muted">選出最適合的答案，答完會自動進入下一題</p>}
@@ -299,7 +300,7 @@ function ChallengeInner() {
               <Field label="題數"><Select value={String(selfForm.questionCount)} onChange={(e) => setSelfForm({ ...selfForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option><option value="100">100 題</option></Select></Field>
               <Field label="難度"><Select value={selfForm.difficulty} onChange={(e) => setSelfForm({ ...selfForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
               <Field label="題目方向"><Select value={selfForm.direction} onChange={(e) => setSelfForm({ ...selfForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
-              <Field label="作答模式"><Select value={selfForm.challengeMode} onChange={(e) => setSelfForm({ ...selfForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="handwriting">手寫作答</option><option value="listening">純音檔聽力</option><option value="confusable">易混淆辨析</option></Select></Field>
+              <Field label="作答模式"><Select value={selfForm.challengeMode} onChange={(e) => setSelfForm({ ...selfForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="meaning">多義選擇</option><option value="part_of_speech">詞性辨識</option><option value="handwriting">手寫作答</option><option value="listening">純音檔聽力</option><option value="confusable">易混淆辨析</option></Select></Field>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-muted"><input type="checkbox" checked={selfForm.shuffle} onChange={(e) => setSelfForm({ ...selfForm, shuffle: e.target.checked })} />每次開始時打亂題目</label>
             <Button className="mt-4" onClick={() => void startSelfChallenge()}>開始自我挑戰</Button>
@@ -613,7 +614,7 @@ function ChallengeInner() {
               <Field label="題數"><Select value={String(cForm.questionCount)} onChange={(e) => setCForm({ ...cForm, questionCount: Number(e.target.value) })}><option value="5">5 題</option><option value="10">10 題</option><option value="20">20 題</option><option value="50">50 題</option></Select></Field>
               <Field label="難度"><Select value={cForm.difficulty} onChange={(e) => setCForm({ ...cForm, difficulty: e.target.value as "easy" | "normal" | "hard" })}><option value="easy">簡單</option><option value="normal">普通</option><option value="hard">困難</option></Select></Field>
               <Field label="題目方向"><Select value={cForm.direction} onChange={(e) => setCForm({ ...cForm, direction: e.target.value as "zh2en" | "en2zh" | "mixed" })}><option value="mixed">中英混合</option><option value="zh2en">中文 → 英文</option><option value="en2zh">英文 → 中文</option></Select></Field>
-              <Field label="作答模式"><Select value={cForm.challengeMode} onChange={(e) => setCForm({ ...cForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="handwriting">手寫作答</option><option value="listening">純音檔聽力</option><option value="confusable">易混淆辨析</option></Select></Field>
+              <Field label="作答模式"><Select value={cForm.challengeMode} onChange={(e) => setCForm({ ...cForm, challengeMode: e.target.value as ChallengeMode })}><option value="choice">四選一</option><option value="meaning">多義選擇</option><option value="part_of_speech">詞性辨識</option><option value="handwriting">手寫作答</option><option value="listening">純音檔聽力</option><option value="confusable">易混淆辨析</option></Select></Field>
             </div>
           )}
           {cForm.kind === "quiz" && (

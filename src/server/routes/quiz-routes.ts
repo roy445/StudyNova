@@ -20,7 +20,7 @@ import { runAiJson, aiConfigured } from "../ai";
 import { recordStudy } from "./learning-routes";
 
 const difficulty = z.enum(["easy", "normal", "hard", "exam", "advanced"]);
-const qType = z.enum(["single", "multiple", "fill", "truefalse", "short", "reading", "mixed"]);
+const qType = z.enum(["single", "multiple", "fill", "truefalse", "short", "reading", "part_of_speech", "meaning", "mixed"]);
 
 type GeneratedQuestion = {
   type?: string;
@@ -29,6 +29,7 @@ type GeneratedQuestion = {
   answer?: string[] | string;
   explanation?: string;
   topic?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export async function generateQuestions(params: {
@@ -47,8 +48,8 @@ export async function generateQuestions(params: {
       userId: params.userId,
       system:
         "你是台灣國高中題目設計引擎。請依提供教材出題，題目必須可由教材內容作答，不得杜撰教材沒有的事實。" +
-        '回傳 JSON：{"questions":[{"type":"single|multiple|fill|truefalse|short|reading","stem":"","options":["A選項",...],"answer":["正確選項文字"],"explanation":"","topic":""}]}。' +
-        "single/multiple 必須提供 4 個 options，answer 必須完全等於某個 option 字串。使用繁體中文（英文科目可用英文）。",
+        '回傳 JSON：{"questions":[{"type":"single|multiple|fill|truefalse|short|reading|part_of_speech|meaning","stem":"","options":["A選項",...],"answer":["正確選項文字"],"explanation":"","topic":"","metadata":{"partOfSpeech":"n.|v.|adj.|adv.|conj.","meanings":["...","..."]}}]}。' +
+        "single/part_of_speech/meaning 必須提供 4 個 options。part_of_speech 的選項是英文詞性縮寫（n., v., adj., adv., prep., conj. 等）；meaning 用於單字可能有多個意思，type 可用 multiple 並把所有正確意思放入 answer。multiple 的 answer 可有多個且必須完全等於 options 字串。使用繁體中文（英文科目可用英文）。",
       parts: [
         {
           kind: "text",
@@ -66,18 +67,19 @@ export async function generateQuestions(params: {
       const answerArr = Array.isArray(q.answer) ? q.answer.map(String) : q.answer ? [String(q.answer)] : [];
       const options = Array.isArray(q.options) ? q.options.map(String).filter(Boolean) : [];
       if (!q.stem || !answerArr.length) return null;
-      if ((type === "single" || type === "multiple") && options.length < 2) return null;
-      if ((type === "single" || type === "multiple") && !answerArr.every((a) => options.includes(a))) return null;
+      if ((type === "single" || type === "multiple" || type === "part_of_speech" || type === "meaning") && options.length < 2) return null;
+      if ((type === "single" || type === "multiple" || type === "part_of_speech" || type === "meaning") && !answerArr.every((a) => options.includes(a))) return null;
       return {
         type,
         stem: String(q.stem).slice(0, 2000),
         options: options.slice(0, 8),
         answer: answerArr.slice(0, 8),
         explanation: String(q.explanation ?? "").slice(0, 2000),
+        metadata: q.metadata ?? {},
         topic: String(q.topic ?? params.topic).slice(0, 60),
       };
     })
-    .filter(Boolean) as Array<{ type: string; stem: string; options: string[]; answer: string[]; explanation: string; topic: string }>;
+    .filter(Boolean) as Array<{ type: string; stem: string; options: string[]; answer: string[]; explanation: string; topic: string; metadata: Record<string, unknown> }>;
 
   if (!cleaned.length) throw fail("AI_NO_VALID_QUESTIONS");
 
@@ -98,6 +100,7 @@ export async function generateQuestions(params: {
         options: q.options,
         answer: q.answer,
         explanation: q.explanation,
+        metadata: q.metadata,
         fingerprint: fp,
       })
       .onConflictDoNothing()

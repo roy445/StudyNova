@@ -8,6 +8,7 @@ import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
 type Message = { id: string; conversationId?: string; role: string; content: string; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
+type FileContext = { id: string; originalName: string; status: string; detected: Array<{ kind: string; text: string; confidence: number }>; error: string; uploadBatch: number };
 
 const MODES = [
   { key: "teacher", label: "學習教練模式", description: "陪你規劃學習、拆解觀念與建立可執行的下一步。" },
@@ -42,6 +43,7 @@ export default function AiPage() {
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
   const memory = useApi<{ memory: Array<{ id: string; key: string; value: string }> }>("/ai/memory");
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const contexts = useApi<{ contexts: FileContext[] }>("/ai/solution/contexts");
   const aiContextCost = quotas.data?.quotas.find((item) => item.feature === "ai_context")?.novaCost ?? null;
   const aiPracticeCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -55,6 +57,10 @@ export default function AiPage() {
   const [showMemory, setShowMemory] = useState(false);
   const [renaming, setRenaming] = useState<Conversation | null>(null);
   const [renameText, setRenameText] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [solutionResult, setSolutionResult] = useState<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean; mode?: string } | null>(null);
+  const [scope, setScope] = useState({ includeQuestion: true, includeHandwriting: true, includeNote: true, highlightPriority: false });
+  const fileInput = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const activeMode = MODES.find((mode) => mode.key === (conv?.mode ?? "teacher")) ?? MODES[0];
 
@@ -108,6 +114,29 @@ export default function AiPage() {
       setError(errorMessage(err));
     } finally {
       setSending(false);
+    }
+  }
+
+  async function uploadAndAnalyze(files: FileList | null) {
+    if (!files?.length || uploading) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      Array.from(files).slice(0, 8).forEach((file) => form.append("files", file));
+      Object.entries(scope).forEach(([key, value]) => form.append(key, String(value)));
+      const uploaded = await apiPost<{ results: Array<{ context: FileContext; duplicate: boolean }>; newCount: number; duplicateCount: number }>("/ai/solution/upload", form);
+      const ids = uploaded.results.map((item) => item.context.id);
+      if (!ids.length) throw new Error("這批檔案都是重複內容，沒有需要重新分析的檔案。");
+      const analyzed = await apiPost<{ result: typeof solutionResult }>("/ai/solution/analyze", { contextIds: ids, scope });
+      setSolutionResult(analyzed.result);
+      toast.push("success", `完成分析：新增 ${uploaded.newCount} 個檔案，略過重複 ${uploaded.duplicateCount} 個`);
+      await contexts.reload();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = "";
     }
   }
 
@@ -284,6 +313,22 @@ export default function AiPage() {
             </div>
 
             <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
+              <input ref={fileInput} type="file" accept="image/*,.pdf" multiple hidden onChange={(e) => void uploadAndAnalyze(e.target.files)} />
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line)] bg-black/10 px-3 py-2 text-xs">
+                <Button size="sm" variant="ghost" loading={uploading} onClick={() => fileInput.current?.click()}>＋ 上傳題目／筆記</Button>
+                <span className="text-muted">分析範圍：</span>
+                {([["includeQuestion", "題目"], ["includeHandwriting", "手寫"], ["includeNote", "筆記"], ["highlightPriority", "螢光筆優先"]] as const).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={scope[key]} onChange={(e) => setScope((s) => ({ ...s, [key]: e.target.checked }))} /> {label}</label>
+                ))}
+              </div>
+              {solutionResult && (
+                <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/8 px-3 py-2 text-xs leading-5">
+                  <div className="mb-1 flex items-center justify-between"><span className="font-semibold text-[#7dd3fc]">共用 AI 分析 · {solutionResult.mode ?? "tutor"}{solutionResult.needsCrop ? " · 請裁切成單題" : ""}</span><button className="text-muted" onClick={() => setSolutionResult(null)}>關閉</button></div>
+                  {solutionResult.reply && <p>{solutionResult.reply}</p>}
+                  {solutionResult.hint && <p className="mt-1 text-amber-200">提示：{solutionResult.hint}</p>}
+                  {!!solutionResult.steps?.length && <ol className="mt-1 list-decimal pl-5">{solutionResult.steps.map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}</ol>}
+                </div>
+              )}
               <NovaCostNotice cost={aiContextCost} action="Novi 回覆" />
               <div className="flex gap-2">
               <Input

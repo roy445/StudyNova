@@ -21,6 +21,9 @@ import { consumeFeature, isProUser } from "../economy";
 import { runAiJson, aiConfigured } from "../ai";
 import { subjectStats, buildPlan } from "./learning-routes";
 import { generateQuestions } from "./quiz-routes";
+import { putObject } from "../storage";
+import { analysisScopes, fileContexts, solutionSessions } from "@/db/schema";
+import { analyzeSolution, createFileContext } from "../unified-ai-engine";
 
 const MODES = {
   teacher: "學習教練模式：像一位有耐心的台灣國高中學習教練，先確認學生理解程度，再一步步教學。",
@@ -407,6 +410,74 @@ export const routes: RouteDef[] = [
         {},
       );
       return { text: data.text ?? "先完成今天的第一個學習區塊吧！", aiUsed: true };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/ai/solution/upload",
+    auth: "user",
+    rate: { limit: 12, windowSec: 3600, key: "ai-solution-upload" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const form = await ctx.formData();
+      const files = form.getAll("files").filter((value): value is File => typeof File !== "undefined" && value instanceof File);
+      if (!files.length) throw badRequest("請選擇至少一個圖片或 PDF 檔案");
+      if (files.length > 8) throw badRequest("一次最多上傳 8 個檔案");
+      const scope = {
+        includeQuestion: form.get("includeQuestion") !== "false",
+        includeHandwriting: form.get("includeHandwriting") !== "false",
+        includeNote: form.get("includeNote") !== "false",
+        highlightPriority: form.get("highlightPriority") === "true",
+        questionColor: String(form.get("questionColor") ?? ""),
+        sentenceColor: String(form.get("sentenceColor") ?? ""),
+        keywordColor: String(form.get("keywordColor") ?? ""),
+      };
+      const previous = await db.select({ batch: fileContexts.uploadBatch }).from(fileContexts).where(eq(fileContexts.userId, user.userId)).orderBy(desc(fileContexts.uploadBatch)).limit(1);
+      const batch = (previous[0]?.batch ?? 0) + 1;
+      const results = [];
+      for (const file of files) {
+        const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+        const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
+        results.push(await createFileContext({ userId: user.userId, objectId: stored.id, originalName: file.name, batch, scope }));
+      }
+      return { batch, results, newCount: results.filter((r) => !r.duplicate).length, duplicateCount: results.filter((r) => r.duplicate).length };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/ai/solution/contexts",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const rows = await db.select().from(fileContexts).where(eq(fileContexts.userId, user.userId)).orderBy(desc(fileContexts.createdAt)).limit(60);
+      return { contexts: rows };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/ai/solution/analyze",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ contextIds: z.array(z.string().uuid()).min(1).max(8), mode: z.enum(["tutor", "solution", "note"]).optional(), scope: z.object({ includeQuestion: z.boolean().optional(), includeHandwriting: z.boolean().optional(), includeNote: z.boolean().optional(), highlightPriority: z.boolean().optional() }).optional() }));
+      return analyzeSolution({ userId: user.userId, contextIds: body.contextIds, requestedMode: body.mode, scope: body.scope });
+    },
+  }),
+
+  route({
+    method: "PATCH",
+    path: "/ai/solution/contexts/:id/scope",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ includeQuestion: z.boolean(), includeHandwriting: z.boolean(), includeNote: z.boolean(), highlightPriority: z.boolean(), questionColor: z.string().max(30).optional(), sentenceColor: z.string().max(30).optional(), keywordColor: z.string().max(30).optional() }));
+      const context = (await db.select().from(fileContexts).where(and(eq(fileContexts.id, ctx.params.id), eq(fileContexts.userId, user.userId))).limit(1))[0];
+      if (!context) throw notFound("找不到檔案分析內容");
+      const rows = await db.insert(analysisScopes).values({ fileContextId: context.id, ...body }).onConflictDoUpdate({ target: analysisScopes.fileContextId, set: { ...body, updatedAt: new Date() } }).returning();
+      return { scope: rows[0] };
     },
   }),
 ];
