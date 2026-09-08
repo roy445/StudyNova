@@ -554,7 +554,7 @@ export const routes: RouteDef[] = [
     auth: "none",
     handler: async (ctx) => {
       const row = (await db.select().from(shares).where(eq(shares.slug, ctx.params.slug)).limit(1))[0];
-      if (!row) throw fail("SOCIAL_SHARE_NOT_FOUND");
+      if (!row || row.visibility === "friends") throw fail("SOCIAL_SHARE_NOT_FOUND");
       await db.update(shares).set({ viewCount: sql`${shares.viewCount} + 1` }).where(eq(shares.id, row.id));
       const owner = (await db.select({ displayName: users.displayName, novaId: users.novaId }).from(users).where(eq(users.userId, row.userId)).limit(1))[0];
       return { share: { kind: row.kind, title: row.title, payload: row.payload, createdAt: row.createdAt }, owner };
