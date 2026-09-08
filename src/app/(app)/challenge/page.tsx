@@ -204,7 +204,7 @@ function ChallengeInner() {
   }
 
   if (countdown !== null) return <Card title="⚔️ 雙方已準備" subtitle="題目與選項已鎖定，所有參與者完全相同"><div className="flex min-h-[260px] flex-col items-center justify-center"><p className="text-sm text-muted">挑戰即將開始</p><p className="mt-3 text-8xl font-black text-[#37d3ff]">{countdown}</p></div></Card>;
-  if (quizSession) return <div className="space-y-4"><QuizRunner {...quizSession} onExit={() => setQuizSession(null)} onFinish={async (score, total, durationSec) => { if (quizSession.challengeId) await apiPost(`/challenges/${quizSession.challengeId}/submit`, { score, durationSec }); else await apiPost("/words/session-complete", { correct: Math.round((score / 100) * total), total, seconds: durationSec }); toast.push("success", `挑戰完成！得分 ${score} 分`); await challenges.reload(); }} /><Button variant="ghost" onClick={() => setQuizSession(null)}>離開挑戰</Button></div>;
+  if (quizSession) return <div className="space-y-4"><QuizRunner {...quizSession} onExit={() => setQuizSession(null)} onFinish={async (score, total, durationSec, records) => { if (quizSession.challengeId) await apiPost(`/challenges/${quizSession.challengeId}/submit`, { score, durationSec, records }); else await apiPost("/words/session-complete", { correct: Math.round((score / 100) * total), total, seconds: durationSec }); toast.push("success", `挑戰完成！得分 ${score} 分`); await challenges.reload(); }} /><Button variant="ghost" onClick={() => setQuizSession(null)}>離開挑戰</Button></div>;
 
   return (
     <div className="space-y-4">

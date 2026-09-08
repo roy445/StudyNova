@@ -35,6 +35,8 @@ import {
   achievements,
   accountAppeals,
   sessions,
+  linkGenerationLogs,
+  emailMessageLogs,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
@@ -51,6 +53,14 @@ function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
       "content-disposition": `attachment; filename="${filename}"`,
     },
   });
+}
+
+async function recordGeneratedLink(values: typeof linkGenerationLogs.$inferInsert) {
+  try {
+    await db.insert(linkGenerationLogs).values(values);
+  } catch (error) {
+    console.error("[support] link log unavailable", error);
+  }
 }
 
 export const routes: RouteDef[] = [
@@ -141,6 +151,7 @@ export const routes: RouteDef[] = [
       await adminLog({ actorId: admin.userId, action: "password-reset-link.create", targetType: "user", targetId: target.userId, reason: body.reason, after: { expiresMinutes: body.expiresMinutes }, ip: ctx.ip });
       const origin = new URL(ctx.req.url).origin;
       const link = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
+      await recordGeneratedLink({ actorId: admin.userId, kind: "password_reset", targetType: "user", targetId: target.userId, recipient: target.email, url: link, expiresAt: new Date(Date.now() + body.expiresMinutes * 60_000), reason: body.reason, metadata: { source: "password-reset-links" } });
       return {
         link,
         expiresAt: new Date(Date.now() + body.expiresMinutes * 60_000).toISOString(),
@@ -165,6 +176,7 @@ export const routes: RouteDef[] = [
         const expiresAt = new Date(Date.now() + body.expiresMinutes * 60_000);
         await db.insert(passwordResetTokens).values({ userId: target.userId, tokenHash: sha256(token), expiresAt });
         const link = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
+        await recordGeneratedLink({ actorId: admin.userId, kind: "password_reset", targetType: "user", targetId: target.userId, recipient: target.email, url: link, expiresAt, reason: body.reason ?? "管理員連結中心", metadata: { source: "action-links" } });
         await adminLog({ actorId: admin.userId, action: "action-link.password-reset", targetType: "user", targetId: target.userId, reason: "管理員連結中心", after: { expiresMinutes: body.expiresMinutes }, ip: ctx.ip });
         return { kind: body.kind, link, expiresAt: expiresAt.toISOString(), label: "密碼重設連結", customerMessage: accountLinkCopy({ kind: body.kind, link, expiresText: `${body.expiresMinutes} 分鐘`, reason: body.reason }) };
       }
@@ -174,6 +186,7 @@ export const routes: RouteDef[] = [
       const coupon = await db.insert(coupons).values({ code, kind: body.kind === "pro_reward" ? "pro" : "nova", value: body.value ?? (body.kind === "pro_reward" ? 30 : 100), maxRedemptions: 1, endsAt: new Date(Date.now() + body.expiresMinutes * 60_000), createdBy: admin.userId }).returning({ id: coupons.id, code: coupons.code, endsAt: coupons.endsAt, value: coupons.value });
       await adminLog({ actorId: admin.userId, action: `action-link.${body.kind}`, targetType: "coupon", targetId: coupon[0].id, reason: "管理員連結中心", after: coupon[0], ip: ctx.ip });
       const link = `${origin}/profile?tab=pass&coupon=${encodeURIComponent(code)}`;
+      await recordGeneratedLink({ actorId: admin.userId, kind: body.kind, targetType: "coupon", targetId: coupon[0].id, recipient: body.email ?? "", url: link, code, value: coupon[0].value, expiresAt: coupon[0].endsAt, reason: body.reason ?? "管理員連結中心", metadata: { source: "action-links", emailProvided: Boolean(body.email) } });
       return { kind: body.kind, link, code, value: coupon[0].value, expiresAt: coupon[0].endsAt?.toISOString?.() ?? null, label: body.kind === "pro_reward" ? "Pro 資格連結" : "Nova 獎勵連結", customerMessage: accountLinkCopy({ kind: body.kind, link, value: coupon[0].value, expiresText: `${body.expiresMinutes} 分鐘`, reason: body.reason }) };
     },
   }),
@@ -1005,7 +1018,8 @@ export const routes: RouteDef[] = [
         const target = (await db.select({ displayName: users.displayName }).from(users).where(eq(users.userId, appeal.userId)).limit(1))[0];
         const link = `${body.baseUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://study-nova-psi.vercel.app"}/login`;
         const message = accountEmailTemplate({ kind: "reactivate", displayName: target?.displayName ?? "StudyNova 使用者", link, note: body.adminNote });
-        const email = body.sendEmail ? await sendAccountEmail(appeal.contactEmail, message) : { sent: false, configured: smtpConfigured(), reason: "未要求寄信" };
+        await recordGeneratedLink({ actorId: admin.userId, kind: "reactivate", targetType: "account_appeal", targetId: appeal.id, recipient: appeal.contactEmail, url: link, reason: body.adminNote ?? "申訴審核通過", metadata: { source: "account-appeal" } });
+        const email = body.sendEmail ? await sendAccountEmail(appeal.contactEmail, message, { actorId: admin.userId, kind: "account_reactivate", displayName: target?.displayName, metadata: { appealId: appeal.id } }) : { sent: false, configured: smtpConfigured(), reason: "未要求寄信" };
         return { appealId: appeal.id, status: body.status, email, customerMessage: message.text, subject: message.subject };
       }
       return { appealId: appeal.id, status: body.status, email: { sent: false, configured: smtpConfigured(), reason: "未解封" } };
@@ -1019,8 +1033,22 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const body = await ctx.json(z.object({ to: z.string().email(), displayName: z.string().min(1).max(80), kind: z.enum(["reactivate", "password_reset", "pro_reward"]), link: z.string().url(), expiresText: z.string().max(120).optional(), note: z.string().max(1000).optional() }));
       const message = accountEmailTemplate(body);
-      const result = await sendAccountEmail(body.to, message);
+      const result = await sendAccountEmail(body.to, message, { actorId: ctx.requireUser().userId, kind: body.kind, displayName: body.displayName, metadata: { source: "account-emails", link: body.link, note: body.note ?? "" } });
       return { ...result, subject: message.subject, customerMessage: message.text };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/admin/communication-logs",
+    auth: "admin",
+    handler: async (ctx) => {
+      const limit = Math.min(200, Math.max(1, Number(ctx.query.get("limit") ?? 100)));
+      const [links, emails] = await Promise.all([
+        db.select().from(linkGenerationLogs).orderBy(desc(linkGenerationLogs.createdAt)).limit(limit),
+        db.select().from(emailMessageLogs).orderBy(desc(emailMessageLogs.createdAt)).limit(limit),
+      ]);
+      return { links, emails, generatedAt: new Date().toISOString() };
     },
   }),
 

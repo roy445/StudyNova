@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import { db } from "@/db";
+import { emailMessageLogs } from "@/db/schema";
 
 export type AccountEmailKind = "reactivate" | "password_reset" | "pro_reward";
 
@@ -61,15 +63,28 @@ function smtpFailureReason(error: unknown) {
   return { code, reason: `Gmail SMTP 寄信失敗（${code}）：請確認 Gmail 帳號、應用程式密碼與 Vercel 環境變數` };
 }
 
-export async function sendAccountEmail(to: string, email: EmailMessage) {
+async function recordEmailLog(values: typeof emailMessageLogs.$inferInsert) {
+  try {
+    await db.insert(emailMessageLogs).values(values);
+  } catch (error) {
+    console.error("[email] message log unavailable", error);
+  }
+}
+
+export async function sendAccountEmail(to: string, email: EmailMessage, metadata: { actorId?: string | null; kind?: string; displayName?: string; metadata?: Record<string, unknown> } = {}) {
   const config = smtpConfig();
-  if (!config) return { sent: false, configured: false, reason: "尚未設定 Gmail SMTP：SMTP_USER 與 SMTP_PASSWORD", code: "SMTP_NOT_CONFIGURED" };
+  if (!config) {
+    await recordEmailLog({ actorId: metadata.actorId ?? null, recipient: to, displayName: metadata.displayName ?? "", kind: metadata.kind ?? "account", subject: email.subject, textBody: email.text, htmlBody: email.html, status: "not_configured", error: "SMTP_NOT_CONFIGURED", metadata: metadata.metadata ?? {} });
+    return { sent: false, configured: false, reason: "尚未設定 Gmail SMTP：SMTP_USER 與 SMTP_PASSWORD", code: "SMTP_NOT_CONFIGURED" };
+  }
   try {
     const transporter = nodemailer.createTransport({ host: config.host, port: config.port, secure: config.secure, auth: config.auth });
     const result = await transporter.sendMail({ from: config.from, to, subject: email.subject, html: email.html, text: email.text });
+    await recordEmailLog({ actorId: metadata.actorId ?? null, recipient: to, displayName: metadata.displayName ?? "", kind: metadata.kind ?? "account", subject: email.subject, textBody: email.text, htmlBody: email.html, status: "sent", providerMessageId: result.messageId, metadata: metadata.metadata ?? {}, sentAt: new Date() });
     return { sent: true, configured: true, id: result.messageId };
   } catch (error) {
     const failure = smtpFailureReason(error);
+    await recordEmailLog({ actorId: metadata.actorId ?? null, recipient: to, displayName: metadata.displayName ?? "", kind: metadata.kind ?? "account", subject: email.subject, textBody: email.text, htmlBody: email.html, status: "failed", error: failure.reason, metadata: { ...(metadata.metadata ?? {}), code: failure.code } });
     console.error("[email] Gmail SMTP send failed", { code: failure.code, host: config.host, port: config.port, secure: config.secure, userConfigured: Boolean(config.auth.user), fromConfigured: Boolean(config.from) });
     return { sent: false, configured: true, code: failure.code, reason: failure.reason };
   }

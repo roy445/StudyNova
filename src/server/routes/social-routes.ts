@@ -25,9 +25,10 @@ import {
   userVocabularies,
   userSettings,
   platformSettings,
+  challengeQuestionHistory,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { badRequest, conflict, fail, forbidden, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
+import { badRequest, conflict, fail, forbidden, fingerprint, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
 import { grantLearningReward } from "../economy";
 import { notify } from "../notify";
 
@@ -42,6 +43,15 @@ async function vocabularyChallengeSetting() {
   const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(dailyWords);
   const minimumWords = Math.max(100, Number(value.minimumWords ?? 100));
   return { totalWords: Number(total?.count ?? 0), minimumWords, manualOpen: value.manualOpen === true };
+}
+
+function normalizeChallengeOption(value: unknown) {
+  return String(value ?? "").trim().toLocaleLowerCase("zh-TW");
+}
+
+function challengeQuestionFingerprint(item: Record<string, unknown>) {
+  const options = Array.isArray(item.options) ? item.options.map(normalizeChallengeOption).sort().join("|") : "";
+  return fingerprint("challenge-question", String(item.word ?? ""), `${String(item.meaning ?? "")}|${options}`);
 }
 
 export const routes: RouteDef[] = [
@@ -337,7 +347,18 @@ export const routes: RouteDef[] = [
       const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string; timeMode?: "standard" | "sprint"; items?: Array<Record<string, unknown>>; readyUserIds?: string[] };
       const track = payload.track === "senior" ? "senior" : "junior";
       const count = Math.max(5, Math.min(200, Number(payload.questionCount ?? 10)));
-      const rows = payload.items?.length ? payload.items.slice(0, count) : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, track)).orderBy(sql`random()`).limit(count);
+      const history = await db.select({ questionFingerprint: challengeQuestionHistory.questionFingerprint, options: challengeQuestionHistory.options }).from(challengeQuestionHistory).where(eq(challengeQuestionHistory.userId, user.userId));
+      const usedQuestions = new Set(history.map((item) => item.questionFingerprint));
+      const usedOptions = new Set(history.flatMap((item) => item.options.map(normalizeChallengeOption)));
+      const sourceRows = payload.items?.length ? payload.items : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, track)).orderBy(sql`random()`).limit(Math.min(800, count * 8));
+      const freshRows = sourceRows.filter((item) => {
+        const record = item as Record<string, unknown>;
+        const questionKey = challengeQuestionFingerprint(record);
+        const options = Array.isArray(record.options) ? record.options.map(normalizeChallengeOption).filter(Boolean) : [];
+        return !usedQuestions.has(questionKey) && !options.some((option) => usedOptions.has(option));
+      });
+      const rows = freshRows.slice(0, count);
+      if (!rows.length) throw badRequest("這位使用者已完成目前題庫的題目與選項，請等待新的題庫內容");
       return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal", timeMode: payload.timeMode ?? "standard" }, words: rows };
     },
   }),
@@ -366,7 +387,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ score: z.number().int().min(0).max(10000), durationSec: z.number().int().min(0).max(36000) }));
+      const body = await ctx.json(z.object({ score: z.number().int().min(0).max(10000), durationSec: z.number().int().min(0).max(36000), records: z.array(z.object({ word: z.string().max(400), prompt: z.string().max(1000), expected: z.string().max(400), response: z.string().max(400), correct: z.boolean(), timedOut: z.boolean() })).max(200).default([]) }));
       const c = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
       if (!c) throw notFound("找不到挑戰");
       if (c.status !== "open") throw fail("SOCIAL_CHALLENGE_ENDED", { message: "這個挑戰目前已暫停或關閉" });
@@ -377,6 +398,12 @@ export const routes: RouteDef[] = [
         .set({ score: body.score, durationSec: body.durationSec, finishedAt: new Date() })
         .where(and(eq(challengeParticipants.challengeId, c.id), eq(challengeParticipants.userId, user.userId)))
         .returning();
+      const payload = c.payload as { items?: Array<Record<string, unknown>> };
+      for (const record of body.records) {
+        const item = payload.items?.find((candidate) => String(candidate.word ?? "") === record.word);
+        const options = Array.isArray(item?.options) ? item.options.map(String) : [];
+        await db.insert(challengeQuestionHistory).values({ userId: user.userId, challengeId: c.id, questionFingerprint: challengeQuestionFingerprint(item ?? { word: record.word, meaning: record.prompt, options }), options }).onConflictDoNothing();
+      }
       const claimed = await db
         .update(challengeParticipants)
         .set({ rewardGranted: true })
@@ -384,7 +411,15 @@ export const routes: RouteDef[] = [
         .returning({ id: challengeParticipants.id });
       let reward = null;
       if (claimed[0]) {
-        reward = await grantLearningReward({ userId: user.userId, nova: 15, xp: 30, reason: `完成挑戰：${c.title}`, idempotencyKey: `challenge:${c.id}:${user.userId}` });
+        const wrongCount = body.records.filter((record) => !record.correct && !record.timedOut).length;
+        const timedOutCount = body.records.filter((record) => record.timedOut).length;
+        const total = Math.max(1, body.records.length);
+        const accuracy = Math.max(0, Math.min(1, (total - wrongCount - timedOutCount) / total));
+        const nova = Math.max(5, Math.round(10 + accuracy * 30 - wrongCount * 2));
+        const xp = Math.max(10, Math.round(20 + accuracy * 60 - wrongCount * 4));
+        reward = await grantLearningReward({ userId: user.userId, nova, xp, reason: `完成挑戰：${c.title}（錯題 ${wrongCount} 題）`, idempotencyKey: `challenge:${c.id}:${user.userId}` });
+        (reward as Record<string, unknown>).wrongCount = wrongCount;
+        (reward as Record<string, unknown>).timedOutCount = timedOutCount;
       }
       const board = await db
         .select({ userId: challengeParticipants.userId, score: challengeParticipants.score, durationSec: challengeParticipants.durationSec, displayName: users.displayName })

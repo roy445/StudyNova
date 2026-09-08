@@ -61,11 +61,21 @@ export default function AdminSupportPage() {
   const [emailResult, setEmailResult] = useState<string | null>(null);
   const [linkForm, setLinkForm] = useState({ kind: "password_reset", email: "", value: "30", expiresMinutes: "60", reason: "" });
   const [linkResult, setLinkResult] = useState<{ link: string; code?: string; label: string; expiresAt?: string | null; customerMessage: string } | null>(null);
+  const communication = useApi<{ links: Array<Record<string, unknown>>; emails: Array<Record<string, unknown>> }>("/admin/communication-logs");
 
   const count = (s: string) => list.data?.counts.find((c) => c.status === s)?.c ?? 0;
 
   return (
     <div className="space-y-4">
+      <Card title="🧾 連結與郵件紀錄" subtitle="所有使用者獎勵／重設連結，以及寄出的郵件內容、收件人、狀態與錯誤都會保留。">
+        <div className="mb-3 flex justify-end"><Button size="sm" variant="ghost" onClick={() => void communication.reload()}>重新整理紀錄</Button></div>
+        {communication.loading && <Skeleton lines={3} />}
+        {communication.error && <ErrorState message={communication.error} onRetry={communication.reload} />}
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="space-y-2"><p className="text-sm font-semibold">產生的連結（{communication.data?.links.length ?? 0}）</p>{communication.data?.links.map((item) => <details key={String(item.id)} className="glass-soft rounded-xl p-3 text-xs"><summary className="cursor-pointer"><span className="font-semibold">{String(item.kind)}</span>・{String(item.recipient || "未指定收件人")}・{new Date(String(item.createdAt)).toLocaleString("zh-TW")}</summary><pre className="mt-2 whitespace-pre-wrap break-all leading-5 text-muted">{JSON.stringify(item, null, 2)}</pre></details>)}</div>
+          <div className="space-y-2"><p className="text-sm font-semibold">郵件訊息（{communication.data?.emails.length ?? 0}）</p>{communication.data?.emails.map((item) => <details key={String(item.id)} className="glass-soft rounded-xl p-3 text-xs"><summary className="cursor-pointer"><span className="font-semibold">{String(item.status)}</span>・{String(item.recipient)}・{String(item.subject)}・{new Date(String(item.createdAt)).toLocaleString("zh-TW")}</summary><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all leading-5 text-muted">{JSON.stringify(item, null, 2)}</pre></details>)}</div>
+        </div>
+      </Card>
       <Card title="🔐 產生密碼重設連結" subtitle="輸入使用者提出的 Email 與原因，產生一次性限時連結，再由你自行寄出。">
         <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr_120px_auto] sm:items-end">
           <Field label="使用者 Email"><Input type="email" value={resetForm.email} onChange={(e) => setResetForm({ ...resetForm, email: e.target.value })} placeholder="student@example.com" /></Field>

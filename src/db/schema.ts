@@ -1924,3 +1924,60 @@ export const contentThemes = pgTable("content_themes", {
   enabled: boolean("enabled").notNull().default(true),
   createdAt: created(),
 }, (t) => [uniqueIndex("content_theme_key_uq").on(t.key)]);
+
+
+/* ----------------------------------------------- COMMUNICATION AUDIT */
+export const linkGenerationLogs = pgTable(
+  "link_generation_logs",
+  {
+    id: id(),
+    actorId: uuid("actor_id").references(() => users.userId, { onDelete: "set null" }),
+    kind: text("kind").notNull(),
+    targetType: text("target_type").notNull().default("user"),
+    targetId: uuid("target_id"),
+    recipient: text("recipient").notNull().default(""),
+    url: text("url").notNull(),
+    code: text("code").notNull().default(""),
+    value: integer("value"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    reason: text("reason").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [index("link_logs_created_idx").on(t.createdAt), index("link_logs_kind_idx").on(t.kind)],
+);
+
+export const emailMessageLogs = pgTable(
+  "email_message_logs",
+  {
+    id: id(),
+    actorId: uuid("actor_id").references(() => users.userId, { onDelete: "set null" }),
+    recipient: text("recipient").notNull(),
+    displayName: text("display_name").notNull().default(""),
+    kind: text("kind").notNull().default("system"),
+    subject: text("subject").notNull(),
+    textBody: text("text_body").notNull().default(""),
+    htmlBody: text("html_body").notNull().default(""),
+    status: text("status").notNull().default("pending"),
+    providerMessageId: text("provider_message_id").notNull().default(""),
+    error: text("error").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => [index("email_logs_created_idx").on(t.createdAt), index("email_logs_recipient_idx").on(t.recipient)],
+);
+
+
+export const challengeQuestionHistory = pgTable(
+  "challenge_question_history",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    challengeId: uuid("challenge_id").notNull().references(() => challenges.id, { onDelete: "cascade" }),
+    questionFingerprint: text("question_fingerprint").notNull(),
+    options: jsonb("options").$type<string[]>().notNull().default([]),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("challenge_history_question_uq").on(t.userId, t.questionFingerprint), index("challenge_history_user_idx").on(t.userId, t.createdAt)],
+);
