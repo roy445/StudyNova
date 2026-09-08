@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Badge, Button, Card, ErrorState, Input, Select, Skeleton, useToast } from "@/components/ui";
 import { apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
-type Feature = { id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number };
+type Feature = { id: string; feature: string; label: string; category?: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number };
 const CATEGORY: Record<string, string[]> = {
   AI: ["ai", "novi", "solution", "ocr", "quiz"],
   學習: ["word", "vocabulary", "study", "wrong", "sentence", "material", "plan"],
@@ -43,7 +43,8 @@ export default function AdminFeaturesPage() {
     </Card>
     {state.loading && <Card title="載入功能設定"><Skeleton lines={5} /></Card>}
     {state.error && <ErrorState message={state.error} onRetry={state.reload} />}
-    <div className="grid gap-3 lg:grid-cols-2">{features.map((feature) => <Card key={feature.id} title={feature.label} subtitle={`${categoryOf(feature.feature)} · ${feature.feature}`} action={<label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={feature.enabled} onChange={(event) => void update(feature, { enabled: event.target.checked })} /> 啟用</label>}>
+    <div className="grid gap-3 lg:grid-cols-2">{features.map((feature) => <Card key={feature.id} title={feature.label} subtitle={`${feature.category || categoryOf(feature.feature)} · ${feature.feature}`} action={<label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={feature.enabled} onChange={(event) => void update(feature, { enabled: event.target.checked })} /> 啟用</label>}>
+      <div className="mb-3 flex items-center gap-2 text-xs"><span className="text-muted">服務分類</span><Select value={feature.category || categoryOf(feature.feature)} onChange={(event) => void update(feature, { category: event.target.value })}>{Object.keys(CATEGORY).map((item) => <option key={item}>{item}</option>)}</Select></div>
       <div className="grid grid-cols-2 gap-2 text-xs"><label className="rounded-xl bg-white/5 p-2">免費每日<input type="number" min={-1} value={feature.freeDailyLimit} onChange={(event) => void update(feature, { freeDailyLimit: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-black/20 px-2 py-1" /></label><label className="rounded-xl bg-white/5 p-2">PRO 每日<input type="number" min={-1} value={feature.proDailyLimit} onChange={(event) => void update(feature, { proDailyLimit: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-black/20 px-2 py-1" /></label><label className="rounded-xl bg-white/5 p-2">每月上限<input type="number" min={0} value={feature.monthlyLimit} onChange={(event) => void update(feature, { monthlyLimit: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-black/20 px-2 py-1" /></label><label className="rounded-xl bg-white/5 p-2">Nova 成本<input type="number" min={0} value={feature.novaCost} onChange={(event) => void update(feature, { novaCost: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-[var(--line)] bg-black/20 px-2 py-1" /></label></div>
       <label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={feature.proOnly} onChange={(event) => void update(feature, { proOnly: event.target.checked })} /> 僅開放 PRO</label>
     </Card>)}</div>

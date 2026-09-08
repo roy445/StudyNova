@@ -1081,6 +1081,8 @@ export const challenges = pgTable(
     quizId: uuid("quiz_id").references(() => quizzes.id, { onDelete: "set null" }),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
     status: text("status").notNull().default("open"),
+    competitionMode: text("competition_mode").notNull().default("entertainment"), // entertainment | stake
+    stakeNova: integer("stake_nova").notNull().default(0),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: created(),
   },
@@ -1094,6 +1096,9 @@ export const challengeParticipants = pgTable(
     challengeId: uuid("challenge_id").notNull().references(() => challenges.id, { onDelete: "cascade" }),
     userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
     score: integer("score").notNull().default(0),
+    points: integer("points").notNull().default(0),
+    correctCount: integer("correct_count").notNull().default(0),
+    wrongCount: integer("wrong_count").notNull().default(0),
     durationSec: integer("duration_sec").notNull().default(0),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     rewardGranted: boolean("reward_granted").notNull().default(false),
@@ -1354,6 +1359,7 @@ export const featurePermissions = pgTable(
     id: id(),
     feature: text("feature").notNull(),
     label: text("label").notNull(),
+    category: text("category").notNull().default("系統與其他"),
     enabled: boolean("enabled").notNull().default(true),
     proOnly: boolean("pro_only").notNull().default(false),
     freeDailyLimit: integer("free_daily_limit").notNull().default(0),
@@ -1886,6 +1892,10 @@ export const textbookEditions = pgTable("textbook_editions", {
   volume: text("volume").notNull().default(""),
   coverObjectId: uuid("cover_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
   coverUrl: text("cover_url").notNull().default("/brand/studynova-logo-square.png"),
+  description: text("description").notNull().default(""),
+  isbn: text("isbn").notNull().default(""),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  ocrStatus: text("ocr_status").notNull().default("not_started"),
   enabled: boolean("enabled").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: created(),
@@ -1980,4 +1990,35 @@ export const challengeQuestionHistory = pgTable(
     createdAt: created(),
   },
   (t) => [uniqueIndex("challenge_history_question_uq").on(t.userId, t.questionFingerprint), index("challenge_history_user_idx").on(t.userId, t.createdAt)],
+);
+
+
+export const challengeAnswers = pgTable(
+  "challenge_answers",
+  {
+    id: id(),
+    challengeId: uuid("challenge_id").notNull().references(() => challenges.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    questionIndex: integer("question_index").notNull(),
+    correct: boolean("correct").notNull().default(false),
+    pointsAwarded: integer("points_awarded").notNull().default(0),
+    response: text("response").notNull().default(""),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("challenge_answer_once_uq").on(t.challengeId, t.userId, t.questionIndex), index("challenge_answers_question_idx").on(t.challengeId, t.questionIndex, t.answeredAt)],
+);
+
+export const challengeSettlements = pgTable(
+  "challenge_settlements",
+  {
+    id: id(),
+    challengeId: uuid("challenge_id").notNull().references(() => challenges.id, { onDelete: "cascade" }),
+    winnerId: uuid("winner_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    loserId: uuid("loser_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    winnerPoints: integer("winner_points").notNull().default(0),
+    loserPoints: integer("loser_points").notNull().default(0),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("challenge_settlement_once_uq").on(t.challengeId)],
 );

@@ -411,6 +411,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({
           enabled: z.boolean().optional(),
+          category: z.string().max(40).optional(),
           proOnly: z.boolean().optional(),
           freeDailyLimit: z.number().int().min(-1).max(100000).optional(),
           proDailyLimit: z.number().int().min(-1).max(100000).optional(),
@@ -440,7 +441,7 @@ export const routes: RouteDef[] = [
       const admin = ctx.requireUser();
       const body = await ctx.json(z.object({ enabled: z.boolean(), category: z.string().max(40).optional() }));
       const all = await db.select().from(featurePermissions);
-      const selected = body.category ? all.filter((feature) => feature.feature.startsWith(`${body.category}:`)) : all;
+      const selected = body.category ? all.filter((feature) => feature.category === body.category || feature.feature.startsWith(`${body.category}:`)) : all;
       if (!selected.length) return { updated: 0 };
       for (const feature of selected) {
         await db.update(featurePermissions).set({ enabled: body.enabled, updatedAt: new Date() }).where(eq(featurePermissions.id, feature.id));

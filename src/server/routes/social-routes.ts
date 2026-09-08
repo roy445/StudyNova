@@ -26,6 +26,9 @@ import {
   userSettings,
   platformSettings,
   challengeQuestionHistory,
+  challengeAnswers,
+  challengeSettlements,
+  novaTransactions,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, forbidden, fingerprint, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
@@ -52,6 +55,26 @@ function normalizeChallengeOption(value: unknown) {
 function challengeQuestionFingerprint(item: Record<string, unknown>) {
   const options = Array.isArray(item.options) ? item.options.map(normalizeChallengeOption).sort().join("|") : "";
   return fingerprint("challenge-question", String(item.word ?? ""), `${String(item.meaning ?? "")}|${options}`);
+}
+
+async function settleChallengeStake(challenge: typeof challenges.$inferSelect) {
+  if (challenge.competitionMode !== "stake" || challenge.stakeNova < 100) return null;
+  const participants = await db.select({ userId: challengeParticipants.userId, points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, durationSec: challengeParticipants.durationSec, finishedAt: challengeParticipants.finishedAt }).from(challengeParticipants).where(eq(challengeParticipants.challengeId, challenge.id));
+  if (participants.length < 2 || participants.some((participant) => !participant.finishedAt)) return null;
+  const ordered = [...participants].sort((a, b) => b.points - a.points || b.correctCount - a.correctCount || a.durationSec - b.durationSec);
+  if (ordered[0].points === ordered[1].points && ordered[0].correctCount === ordered[1].correctCount && ordered[0].durationSec === ordered[1].durationSec) return { tie: true, amount: 0 };
+  const winner = ordered[0];
+  const loser = ordered[1];
+  const claim = await db.insert(challengeSettlements).values({ challengeId: challenge.id, winnerId: winner.userId, loserId: loser.userId, amount: challenge.stakeNova, winnerPoints: winner.points, loserPoints: loser.points }).onConflictDoNothing().returning();
+  if (!claim[0]) return null;
+  await db.insert(novaAccounts).values([{ userId: winner.userId }, { userId: loser.userId }]).onConflictDoNothing();
+  const winnerBalance = (await db.update(novaAccounts).set({ balance: sql`${novaAccounts.balance} + ${challenge.stakeNova}`, lifetimeEarned: sql`${novaAccounts.lifetimeEarned} + ${challenge.stakeNova}`, updatedAt: new Date() }).where(eq(novaAccounts.userId, winner.userId)).returning({ balance: novaAccounts.balance }))[0]?.balance ?? challenge.stakeNova;
+  const loserBalance = (await db.update(novaAccounts).set({ balance: sql`${novaAccounts.balance} - ${challenge.stakeNova}`, lifetimeSpent: sql`${novaAccounts.lifetimeSpent} + ${challenge.stakeNova}`, updatedAt: new Date() }).where(eq(novaAccounts.userId, loser.userId)).returning({ balance: novaAccounts.balance }))[0]?.balance ?? -challenge.stakeNova;
+  await db.insert(novaTransactions).values([
+    { userId: winner.userId, amount: challenge.stakeNova, balanceAfter: winnerBalance, reason: `挑戰勝利：${challenge.title}`, source: "challenge_stake", idempotencyKey: `challenge-stake-win:${challenge.id}` },
+    { userId: loser.userId, amount: -challenge.stakeNova, balanceAfter: loserBalance, reason: `挑戰落敗：${challenge.title}`, source: "challenge_stake", idempotencyKey: `challenge-stake-loss:${challenge.id}` },
+  ]).onConflictDoNothing();
+  return { tie: false, amount: challenge.stakeNova, winnerId: winner.userId, loserId: loser.userId, winnerPoints: winner.points, loserPoints: loser.points, winnerBalance, loserBalance, debt: Math.max(0, -loserBalance) };
 }
 
 export const routes: RouteDef[] = [
@@ -209,6 +232,8 @@ export const routes: RouteDef[] = [
           quizId: challenges.quizId,
           payload: challenges.payload,
           status: challenges.status,
+          competitionMode: challenges.competitionMode,
+          stakeNova: challenges.stakeNova,
           expiresAt: challenges.expiresAt,
           createdAt: challenges.createdAt,
         })
@@ -220,7 +245,7 @@ export const routes: RouteDef[] = [
       const out = [];
       for (const c of rows) {
         const parts = await db
-          .select({ userId: challengeParticipants.userId, score: challengeParticipants.score, durationSec: challengeParticipants.durationSec, finishedAt: challengeParticipants.finishedAt, displayName: users.displayName, novaId: users.novaId })
+          .select({ userId: challengeParticipants.userId, score: challengeParticipants.score, points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount, durationSec: challengeParticipants.durationSec, finishedAt: challengeParticipants.finishedAt, displayName: users.displayName, novaId: users.novaId })
           .from(challengeParticipants)
           .innerJoin(users, eq(users.userId, challengeParticipants.userId))
           .where(eq(challengeParticipants.challengeId, c.id))
@@ -253,8 +278,11 @@ export const routes: RouteDef[] = [
           challengeMode: z.enum(["choice", "listening", "handwriting", "confusable", "part_of_speech", "meaning", "semantic_image"]).default("choice"),
           timeMode: z.enum(["standard", "sprint"]).default("standard"),
           source: z.enum(["catalog", "mine", "vocabulary"]).default("catalog"),
+          competitionMode: z.enum(["entertainment", "stake"]).default("entertainment"),
+          stakeNova: z.number().int().min(0).max(100000).default(0),
         }),
       );
+      if (body.competitionMode === "stake" && body.stakeNova < 100) throw badRequest("籌碼競賽最低 100 Nova；也可以選擇娛樂模式，不扣籌碼");
       if (body.kind === "quiz") {
         if (!body.quizId) throw badRequest("請選擇測驗");
         const q = (await db.select().from(quizzes).where(eq(quizzes.id, body.quizId)).limit(1))[0];
@@ -310,6 +338,8 @@ export const routes: RouteDef[] = [
           kind: body.kind,
           title: body.title,
           quizId: body.quizId ?? null,
+          competitionMode: body.competitionMode,
+          stakeNova: body.competitionMode === "stake" ? body.stakeNova : 0,
           payload: body.kind === "weekly" ? { weekId: body.weekId } : body.kind === "word" ? {
             track: body.track,
             questionCount: body.questionCount,
@@ -383,6 +413,32 @@ export const routes: RouteDef[] = [
 
   route({
     method: "POST",
+    path: "/challenges/:id/answer",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ questionIndex: z.number().int().min(0).max(200), correct: z.boolean(), response: z.string().max(500).default("") }));
+      const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
+      if (!challenge || challenge.status !== "open") throw notFound("找不到進行中的挑戰");
+      await db.insert(challengeParticipants).values({ challengeId: challenge.id, userId: user.userId }).onConflictDoNothing();
+      const inserted = await db.insert(challengeAnswers).values({ challengeId: challenge.id, userId: user.userId, questionIndex: body.questionIndex, correct: body.correct, response: body.response }).onConflictDoNothing().returning();
+      if (!inserted[0]) {
+        const current = (await db.select({ points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount }).from(challengeParticipants).where(and(eq(challengeParticipants.challengeId, challenge.id), eq(challengeParticipants.userId, user.userId))).limit(1))[0];
+        return { accepted: false, points: current?.points ?? 0, correctCount: current?.correctCount ?? 0, wrongCount: current?.wrongCount ?? 0, reason: "這一題已經提交過" };
+      }
+      let pointsAwarded = 0;
+      if (body.correct) {
+        const firstCorrect = await db.select({ id: challengeAnswers.id }).from(challengeAnswers).where(and(eq(challengeAnswers.challengeId, challenge.id), eq(challengeAnswers.questionIndex, body.questionIndex), eq(challengeAnswers.correct, true))).orderBy(asc(challengeAnswers.answeredAt)).limit(1);
+        pointsAwarded = firstCorrect[0]?.id === inserted[0].id ? 1 : 0;
+        await db.update(challengeAnswers).set({ pointsAwarded }).where(eq(challengeAnswers.id, inserted[0].id));
+      }
+      const updated = await db.update(challengeParticipants).set({ points: sql`${challengeParticipants.points} + ${pointsAwarded}`, correctCount: sql`${challengeParticipants.correctCount} + ${body.correct ? 1 : 0}`, wrongCount: sql`${challengeParticipants.wrongCount} + ${body.correct ? 0 : 1}`, score: sql`${challengeParticipants.score} + ${pointsAwarded}` }).where(and(eq(challengeParticipants.challengeId, challenge.id), eq(challengeParticipants.userId, user.userId))).returning({ points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount });
+      return { accepted: true, pointsAwarded, points: updated[0]?.points ?? pointsAwarded, correctCount: updated[0]?.correctCount ?? (body.correct ? 1 : 0), wrongCount: updated[0]?.wrongCount ?? (body.correct ? 0 : 1), firstCorrect: pointsAwarded === 1 };
+    },
+  }),
+
+  route({
+    method: "POST",
     path: "/challenges/:id/submit",
     auth: "user",
     handler: async (ctx) => {
@@ -395,7 +451,7 @@ export const routes: RouteDef[] = [
       await db.insert(challengeParticipants).values({ challengeId: c.id, userId: user.userId }).onConflictDoNothing();
       const rows = await db
         .update(challengeParticipants)
-        .set({ score: body.score, durationSec: body.durationSec, finishedAt: new Date() })
+        .set({ score: body.records.length ? sql`${challengeParticipants.points}` : body.score, durationSec: body.durationSec, finishedAt: new Date() })
         .where(and(eq(challengeParticipants.challengeId, c.id), eq(challengeParticipants.userId, user.userId)))
         .returning();
       const payload = c.payload as { items?: Array<Record<string, unknown>> };
@@ -404,6 +460,7 @@ export const routes: RouteDef[] = [
         const options = Array.isArray(item?.options) ? item.options.map(String) : [];
         await db.insert(challengeQuestionHistory).values({ userId: user.userId, challengeId: c.id, questionFingerprint: challengeQuestionFingerprint(item ?? { word: record.word, meaning: record.prompt, options }), options }).onConflictDoNothing();
       }
+      const settlement = await settleChallengeStake(c);
       const claimed = await db
         .update(challengeParticipants)
         .set({ rewardGranted: true })
@@ -427,7 +484,7 @@ export const routes: RouteDef[] = [
         .innerJoin(users, eq(users.userId, challengeParticipants.userId))
         .where(eq(challengeParticipants.challengeId, c.id))
         .orderBy(desc(challengeParticipants.score), asc(challengeParticipants.durationSec));
-      return { participant: rows[0], leaderboard: board, reward };
+      return { participant: rows[0], leaderboard: board, reward, settlement };
     },
   }),
 

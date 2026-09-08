@@ -28,7 +28,7 @@ type ChallengeWord = { id: string; word: string; meaning: string; partOfSpeech: 
 type AnswerRecord = { number: number; word: string; prompt: string; expected: string; response: string; correct: boolean; timedOut: boolean };
 type TimeMode = "standard" | "sprint";
 
-type QuizRunnerProps = { title: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; challengeMode?: ChallengeMode; timeMode?: TimeMode; onFinish: (score: number, total: number, durationSec: number, records: AnswerRecord[]) => Promise<void>; onExit: () => void };
+type QuizRunnerProps = { title: string; challengeId?: string; words: ChallengeWord[]; direction: "zh2en" | "en2zh" | "mixed"; difficulty: string; challengeMode?: ChallengeMode; timeMode?: TimeMode; onFinish: (score: number, total: number, durationSec: number, records: AnswerRecord[]) => Promise<void>; onExit: () => void };
 
 function secondsForMode(mode: ChallengeMode, timeMode: TimeMode) {
   if (timeMode === "sprint") return 10;
@@ -65,7 +65,7 @@ function decorateChallengeWord(word: ChallengeWord, index: number, mode: Challen
   ].sort((a, b) => `${word.id}-${a.id}`.localeCompare(`${word.id}-${b.id}`)) };
 }
 
-function QuizRunner({ title, words, direction, difficulty, challengeMode = "choice", timeMode = "standard", onFinish, onExit }: QuizRunnerProps) {
+function QuizRunner({ title, challengeId, words, direction, difficulty, challengeMode = "choice", timeMode = "standard", onFinish, onExit }: QuizRunnerProps) {
   const [index, setIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [startedAt] = useState(() => Date.now());
@@ -120,6 +120,7 @@ function QuizRunner({ title, words, direction, difficulty, challengeMode = "choi
     const nextRecords = [...records, { number: index + 1, word: current.word, prompt: actualDirection === "zh2en" ? current.meaning : current.word, expected, response: answer, correct: isCorrect, timedOut }];
     setRecords(nextRecords);
     setCorrect(nextCorrect);
+    if (challengeId) void apiPost(`/challenges/${challengeId}/answer`, { questionIndex: index, correct: isCorrect, response: answer });
     if (!isCorrect) {
       const addToWrongBook = timedOut ? false : window.confirm(`答錯了：${current.word}\n要加入錯題本，之後到「學習中心 → 錯題本」複習嗎？`);
       void apiPost("/words/answer", { wordId: current.id, correct: false, mode: "challenge", addToWrongBook });
@@ -179,7 +180,7 @@ function ChallengeInner() {
   const [novaId, setNovaId] = useState(params.get("add") ?? "");
   const [qr, setQr] = useState<{ svg: string; link: string; novaId: string } | null>(null);
   const [challengeOpen, setChallengeOpen] = useState(false);
-  const [cForm, setCForm] = useState({ kind: "word", title: "", quizId: "", durationHours: 48, source: "catalog" as "catalog" | "mine" | "vocabulary", track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard", challengeMode: "choice" as ChallengeMode, timeMode: "standard" as TimeMode });
+  const [cForm, setCForm] = useState({ kind: "word", title: "", quizId: "", durationHours: 48, source: "catalog" as "catalog" | "mine" | "vocabulary", track: "junior" as "junior" | "senior", questionCount: 10, direction: "mixed" as "zh2en" | "en2zh" | "mixed", difficulty: "normal" as "easy" | "normal" | "hard", challengeMode: "choice" as ChallengeMode, timeMode: "standard" as TimeMode, competitionMode: "entertainment" as "entertainment" | "stake", stakeNova: 100 });
   const [roomOpen, setRoomOpen] = useState(false);
   const [roomForm, setRoomForm] = useState({ name: "", kind: "room", goalMinutes: 120 });
   const [joinCode, setJoinCode] = useState("");
@@ -704,6 +705,10 @@ function ChallengeInner() {
           <Field label="持續時間（小時）">
             <Input type="number" min={1} max={168} value={cForm.durationHours} onChange={(e) => setCForm({ ...cForm, durationHours: Number(e.target.value) })} />
           </Field>
+          <Field label="競賽模式" hint="娛樂模式不扣籌碼；籌碼模式由落敗者支付給勝者，最低 100 Nova，餘額不足會形成負債。">
+            <Select value={cForm.competitionMode} onChange={(e) => setCForm({ ...cForm, competitionMode: e.target.value as "entertainment" | "stake" })}><option value="entertainment">娛樂模式・不扣籌碼</option><option value="stake">籌碼模式・勝者取得籌碼</option></Select>
+          </Field>
+          {cForm.competitionMode === "stake" && <Field label="每人籌碼"><Input type="number" min={100} step={10} value={cForm.stakeNova} onChange={(e) => setCForm({ ...cForm, stakeNova: Math.max(100, Number(e.target.value)) })} /><p className="mt-1 text-[11px] text-muted">最低 100 Nova；不足時允許負債。</p></Field>}
           <Button
             full
             onClick={async () => {
@@ -721,6 +726,8 @@ function ChallengeInner() {
                   difficulty: cForm.difficulty,
                   challengeMode: cForm.challengeMode,
                   timeMode: cForm.timeMode,
+                  competitionMode: cForm.competitionMode,
+                  stakeNova: cForm.stakeNova,
                   inviteIds: friends.data?.friends.map((f) => f.userId) ?? [],
                 });
                 toast.push("success", "挑戰已建立，已通知好友");
