@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS "audit_logs" (
-  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(), "user_id" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(), "user_id" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "occurred_at" timestamptz NOT NULL DEFAULT now(), "event_type" text NOT NULL, "module" text NOT NULL,
   "action" text NOT NULL, "resource_id" text NOT NULL DEFAULT '', "outcome" text NOT NULL DEFAULT 'success',
   "error_category" text NOT NULL DEFAULT '', "correlation_id" text NOT NULL, "ip" text NOT NULL DEFAULT '',
