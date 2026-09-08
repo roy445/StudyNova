@@ -158,6 +158,7 @@ export const ERROR_CATALOG = {
   /* ----------------------------------------------------------- SYS 99xx */
   SYS_INTERNAL: def("SN-SYS-9901", 500, "SYS", "系統發生錯誤，請稍後再試", "我們已自動記錄這個錯誤，你可以附上錯誤代碼回報問題。"),
   SYS_DB_UNAVAILABLE: def("SN-SYS-9902", 503, "SYS", "資料庫暫時無法連線", "請稍後再試；若持續發生請通知管理員。"),
+  SERVICE_MAINTENANCE: def("SN-SYS-9905", 503, "SYS", "服務目前暫停中", "請稍後再試。"),
   SYS_NOT_FOUND: def("SN-SYS-9903", 404, "SYS", "找不到資料", "資料可能已被刪除。"),
   SYS_CONFLICT: def("SN-SYS-9904", 409, "SYS", "資料狀態衝突", "請重新整理頁面後再試一次。"),
 } as const satisfies Record<string, ErrorDef>;

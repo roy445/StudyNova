@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import type { AuthUser } from "./auth";
 import { clientIp, getSession, rateLimit, requireAdmin, requireUser } from "./auth";
 import { AppError, fail, newRequestId, safeErrorMessage } from "./core";
 import { db } from "@/db";
-import { systemLogs } from "@/db/schema";
+import { platformSettings, systemLogs } from "@/db/schema";
 import { classifyAuditPath, writeAudit } from "./audit";
 
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -79,6 +80,15 @@ export function errorResponse(err: AppError) {
 }
 
 let compiledRoutes: Compiled[] | null = null;
+let serviceControlCache: { enabled: boolean; message: string; expiresAt: number } | null = null;
+
+async function serviceControl() {
+  if (serviceControlCache && serviceControlCache.expiresAt > Date.now()) return serviceControlCache;
+  const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "service_control")).limit(1))[0];
+  const value = (row?.value ?? {}) as { enabled?: boolean; message?: string };
+  serviceControlCache = { enabled: value.enabled !== false, message: value.message || "服務目前暫停中，請稍後再試。", expiresAt: Date.now() + 10_000 };
+  return serviceControlCache;
+}
 
 async function loadRoutes(): Promise<Compiled[]> {
   if (compiledRoutes) return compiledRoutes;
@@ -119,6 +129,11 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     if (def.auth === "admin") user = await requireAdmin();
     else if (def.auth === "user") user = await requireUser();
     else if (def.auth === "optional") user = (await getSession())?.user ?? null;
+
+    if (def.auth !== "admin" && !def.path.startsWith("/auth") && def.path !== "/health") {
+      const control = await serviceControl();
+      if (!control.enabled) throw fail("SERVICE_MAINTENANCE", { message: control.message });
+    }
 
     if (def.rate) {
       const bucket = `${def.rate.key ?? def.path}:${user?.userId ?? ip}`;

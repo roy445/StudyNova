@@ -395,6 +395,28 @@ export const routes: RouteDef[] = [
   /* ------------------------------------------------ feature control */
   route({
     method: "GET",
+    path: "/admin/service-control",
+    auth: "admin",
+    handler: async () => {
+      const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "service_control")).limit(1))[0];
+      const value = (row?.value ?? {}) as { enabled?: boolean; message?: string };
+      return { enabled: value.enabled !== false, message: value.message ?? "服務目前暫停中，請稍後再試。" };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/service-control",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ enabled: z.boolean(), message: z.string().max(240).default("服務目前暫停中，請稍後再試。") }));
+      await db.insert(platformSettings).values({ key: "service_control", value: body, updatedAt: new Date() }).onConflictDoUpdate({ target: platformSettings.key, set: { value: body, updatedAt: new Date() } });
+      await adminLog({ actorId: admin.userId, action: body.enabled ? "service.enable" : "service.disable", targetType: "platform", targetId: "service_control", after: body, ip: ctx.ip });
+      return body;
+    },
+  }),
+  route({
+    method: "GET",
     path: "/admin/features",
     auth: "admin",
     handler: async () => {

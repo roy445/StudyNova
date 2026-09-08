@@ -5,6 +5,7 @@ import { Badge, Button, Card, ErrorState, Input, Select, Skeleton, useToast } fr
 import { apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 type Feature = { id: string; feature: string; label: string; category?: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number };
+type ServiceControl = { enabled: boolean; message: string };
 const CATEGORY: Record<string, string[]> = {
   AI: ["ai", "novi", "solution", "ocr", "quiz"],
   學習: ["word", "vocabulary", "study", "wrong", "sentence", "material", "plan"],
@@ -20,6 +21,7 @@ function categoryOf(feature: string) {
 export default function AdminFeaturesPage() {
   const toast = useToast();
   const state = useApi<{ features: Feature[] }>("/admin/features");
+  const service = useApi<ServiceControl>("/admin/service-control");
   const [category, setCategory] = useState("全部");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,9 +38,15 @@ export default function AdminFeaturesPage() {
       toast.push("success", `已${enabled ? "開啟" : "關閉"} ${features.length} 個功能`);
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
+  async function toggleService(enabled: boolean) {
+    try { await apiPatch("/admin/service-control", { enabled, message: "系統目前進行維護，請稍後再試。" }); await service.reload(); toast.push("success", enabled ? "全站服務已開啟" : "全站服務已關閉"); } catch (error) { toast.push("error", errorMessage(error)); }
+  }
   return <div className="space-y-4">
     <header><h1 className="text-xl font-bold sm:text-2xl">功能總控台</h1><p className="text-xs text-muted sm:text-sm">所有功能由你控制。可分類查看、即時關閉、設定會員限制與 Nova 成本。</p></header>
-    <Card title="總控操作" subtitle="關閉功能只會影響使用者端，不會刪除既有資料。">
+    <Card title="全站服務總開關" subtitle="關閉後，使用者 API 會顯示維護訊息；管理員後台與登入仍可使用，不會刪除資料。">
+      <div className="flex flex-wrap items-center gap-3"><span className={`rounded-full px-3 py-1 text-xs ${service.data?.enabled !== false ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"}`}>{service.data?.enabled !== false ? "服務運作中" : "服務已關閉"}</span><Button size="sm" variant={service.data?.enabled === false ? "primary" : "ghost"} onClick={() => void toggleService(true)}>開啟全站服務</Button><Button size="sm" variant="ghost" onClick={() => void toggleService(false)}>關閉全站服務</Button></div>
+    </Card>
+    <Card title="分類與功能總控" subtitle="關閉功能只會影響使用者端，不會刪除既有資料。">
       <div className="flex flex-wrap items-center gap-2"><Select value={category} onChange={(event) => setCategory(event.target.value)} className="!w-auto"><option>全部</option>{Object.keys(CATEGORY).map((item) => <option key={item}>{item}</option>)}</Select><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋功能名稱…" className="!w-48" /><Button size="sm" variant="ghost" loading={busy} onClick={() => bulk(false)}>關閉目前分類</Button><Button size="sm" loading={busy} onClick={() => bulk(true)}>開啟目前分類</Button><Badge tone="cyan">顯示 {features.length} 項</Badge></div>
     </Card>
     {state.loading && <Card title="載入功能設定"><Skeleton lines={5} /></Card>}
