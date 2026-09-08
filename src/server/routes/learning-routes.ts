@@ -390,7 +390,11 @@ export const routes: RouteDef[] = [
       const nova = (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0];
       const novi = (await db.select().from(assistantProfiles).where(eq(assistantProfiles.userId, user.userId)).limit(1))[0];
       const streak = await streakDays(user.userId);
-      await bumpAchievement(user.userId, "streak_days", streak);
+      try {
+        await bumpAchievement(user.userId, "streak_days", streak);
+      } catch (error) {
+        console.error("[dashboard] achievement update skipped", error);
+      }
 
       const now = new Date();
       const liveActivities = await db
