@@ -54,16 +54,24 @@ export function smtpConfigured() {
   return Boolean(smtpConfig());
 }
 
+function smtpFailureReason(error: unknown) {
+  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "UNKNOWN";
+  if (code === "EAUTH") return { code, reason: "Gmail SMTP 認證失敗：請確認 SMTP_USER 是完整 Gmail 地址，SMTP_PASSWORD 是 16 位應用程式密碼，不是 Gmail 登入密碼" };
+  if (code === "ECONNECTION" || code === "ESOCKET" || code === "ETIMEDOUT") return { code, reason: `Gmail SMTP 連線失敗（${code}）：請確認 SMTP_HOST、SMTP_PORT、SMTP_SECURE 與 Vercel Production 環境變數` };
+  return { code, reason: `Gmail SMTP 寄信失敗（${code}）：請確認 Gmail 帳號、應用程式密碼與 Vercel 環境變數` };
+}
+
 export async function sendAccountEmail(to: string, email: EmailMessage) {
   const config = smtpConfig();
-  if (!config) return { sent: false, configured: false, reason: "尚未設定 Gmail SMTP：SMTP_USER 與 SMTP_PASSWORD" };
+  if (!config) return { sent: false, configured: false, reason: "尚未設定 Gmail SMTP：SMTP_USER 與 SMTP_PASSWORD", code: "SMTP_NOT_CONFIGURED" };
   try {
     const transporter = nodemailer.createTransport({ host: config.host, port: config.port, secure: config.secure, auth: config.auth });
     const result = await transporter.sendMail({ from: config.from, to, subject: email.subject, html: email.html, text: email.text });
     return { sent: true, configured: true, id: result.messageId };
   } catch (error) {
-    console.error("[email] Gmail SMTP send failed", error);
-    return { sent: false, configured: true, reason: "Gmail SMTP 寄信失敗，請確認帳號、應用程式密碼與 Vercel 環境變數" };
+    const failure = smtpFailureReason(error);
+    console.error("[email] Gmail SMTP send failed", { code: failure.code, host: config.host, port: config.port, secure: config.secure, userConfigured: Boolean(config.auth.user), fromConfigured: Boolean(config.from) });
+    return { sent: false, configured: true, code: failure.code, reason: failure.reason };
   }
 }
 

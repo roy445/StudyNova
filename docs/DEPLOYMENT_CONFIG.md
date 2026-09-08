@@ -109,9 +109,9 @@ Header: x-cron-secret: <CRON_SECRET>
 | 變數 | 必填性 | 說明 |
 |---|---|---|
 | `ADMIN_EMAIL`／`ADMIN_PASSWORD`／`ADMIN_NAME` | 不使用 | 新註冊一律為 `student`；管理員角色請在 Neon 執行 `database/admin-role.sql` |
-| `SMTP_URL` | 密碼重設寄信需要 | 設定後忘記密碼 API 不會直接回傳 reset link，而是交由 SMTP 寄送 |
+| `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASSWORD` | Gmail 寄信需要 | 使用 Gmail SMTP 時，`SMTP_USER` 必須是完整 Gmail 地址，`SMTP_PASSWORD` 必須是 Google 兩步驟驗證產生的 16 位應用程式密碼，不是 Gmail 登入密碼；可選填 `EMAIL_FROM` |
 
-如果沒有 SMTP，忘記密碼流程在開發或低風險部署情境可回傳 reset link；正式環境建議設定 SMTP，避免敏感連結出現在 API response 或 log。
+如果沒有 SMTP，忘記密碼流程在開發或低風險部署情境可回傳 reset link；正式環境建議設定 SMTP，避免敏感連結出現在 API response 或 log。若 Gmail 回傳 `535-5.7.8 BadCredentials`，代表帳號或應用程式密碼未被接受，請重新建立應用程式密碼並更新 Vercel 的 Production 變數。
 
 ### Cron
 
@@ -127,7 +127,7 @@ Header: x-cron-secret: <CRON_SECRET>
 
 ```powershell
 $env:DATABASE_URL = "你的 Neon DATABASE_URL"
-npx drizzle-kit push
+pnpm exec drizzle-kit push
 ```
 
 Seed 只建立平台初始資料，不會自動授予任何使用者管理員權限。所有新註冊帳號一律是 `student`。請在 Neon SQL Editor 執行 `database/admin-role.sql`：先查詢使用者，再明確將指定帳號更新為 `admin` 或 `owner`。
@@ -238,7 +238,12 @@ VAPID_PRIVATE_KEY=<vapid-private-key>
 VAPID_SUBJECT=mailto:admin@studynova.example.com
 
 CRON_SECRET=<cron-secret>
-SMTP_URL=smtps://user:password@smtp.example.com:465
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=<your-gmail-address>
+SMTP_PASSWORD=<google-16-character-app-password>
+EMAIL_FROM=StudyNova <your-gmail-address>
 ```
 
 ## 七、可選的 Docker Compose 方案
