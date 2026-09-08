@@ -1,0 +1,162 @@
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"A spaced repetition algorithm based on DSR model"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 27[1;38m,[m
+[1;34m"language"[m[1;38m:[m [36mnull[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"MIT"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"open-spaced-repetition/free-spaced-repetition-scheduler"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 714[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-06T16:22:28Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"A benchmark for spaced repetition algorithms"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 1[1;38m,[m
+[1;34m"language"[m[1;38m:[m [36mnull[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"NOASSERTION"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"ankitects/fsrs-benchmark"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 1[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2024-07-07T03:20:47Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"The Memory Layer for AI Agents - Drop-in memory infrastructure for AI agents and apps. Context that persists. Built for production."[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 7600[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Python"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"Apache-2.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"mem0ai/mem0"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 64871[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T02:31:34Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Build Real-Time Knowledge Graphs for AI Agents"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 3115[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Python"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"Apache-2.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"getzep/graphiti"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 30685[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T03:40:34Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Cognee is the open-source AI memory platform for agents. Give your AI agents persistent long-term memory across sessions with a self-hosted knowledge graph engine."[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 3009[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Python"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"Apache-2.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"topoteretes/cognee"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 30573[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T03:33:40Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Platform for stateful agents: AI with advanced memory that can learn and self-improve over time."[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 2615[1;38m,[m
+[1;34m"language"[m[1;38m:[m [36mnull[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"Apache-2.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"letta-ai/letta"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 24651[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T03:38:18Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"A privacy-first, open-source platform for knowledge management and collaboration. Download link:  http://github.com/logseq/logseq/releases. roadmap: https://logseq.io/p/NX4mc_ggEV"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 2801[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Clojure"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"AGPL-3.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"logseq/logseq"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 44818[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T03:41:42Z"[m
+[1;38m}[m
+[1;37m{[m
+  [1;34m"message"[m[1;37m:[m [32m"Not Found"[m[1;37m,[m
+  [1;34m"documentation_url"[m[1;37m:[m [32m"https://docs.github.com/rest/repos/repos#get-a-repository"[m[1;37m,[m
+  [1;34m"status"[m[1;37m:[m [32m"404"[m
+[1;37m}[m
+{"repo":"AFFiNEorg/AFFiNE","error":true}
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Bring projects, wikis, and teams together with AI. AppFlowy is the AI collaborative workspace where you achieve more without losing control of your data. The leading open source Notion alternative."[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 5986[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Dart"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"AGPL-3.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"AppFlowy-IO/AppFlowy"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 76431[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T03:38:10Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"PDF Reader in JavaScript"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 10664[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"JavaScript"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"Apache-2.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"mozilla/pdf.js"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 53846[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T00:22:29Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Enhanced eBooks in the browser."[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 1189[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"JavaScript"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"NOASSERTION"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"futurepress/epub.js"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 6958[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-07T02:22:08Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"A lightning-fast search engine API bringing AI-powered hybrid search to your sites and applications."[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 2701[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Rust"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"NOASSERTION"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"meilisearch/meilisearch"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 59212[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T02:47:26Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Open Source alternative to Algolia + Pinecone and an Easier-to-Use alternative to ElasticSearch ⚡ 🔍 ✨ Fast, typo tolerant, in-memory fuzzy Search Engine for building delightful search experiences"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 970[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"C++"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"GPL-3.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"typesense/typesense"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 26525[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-07T23:04:28Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"🔎 Open source distributed and RESTful search engine."[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 2952[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Java"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"Apache-2.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"opensearch-project/OpenSearch"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 13681[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T03:41:48Z"[m
+[1;38m}[m
+[1;37m{[m
+  [1;34m"message"[m[1;37m:[m [32m"Not Found"[m[1;37m,[m
+  [1;34m"documentation_url"[m[1;37m:[m [32m"https://docs.github.com/rest/repos/repos#get-a-repository"[m[1;37m,[m
+  [1;34m"status"[m[1;37m:[m [32m"404"[m
+[1;37m}[m
+{"repo":"badgr/server","error":true}
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Moodle - the world's open source learning platform"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 7620[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"PHP"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"GPL-3.0"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"moodle/moodle"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 7384[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-07T18:30:47Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"Kolibri Learning Platform: the offline app for universal education"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 965[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"Python"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"MIT"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"learningequality/kolibri"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 1114[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-07T17:05:36Z"[m
+[1;38m}[m
+[1;38m{[m
+[1;34m"description"[m[1;38m:[m [32m"The open-source communication infrastructure for agents and products"[m[1;38m,[m
+[1;34m"forks"[m[1;38m:[m 4478[1;38m,[m
+[1;34m"language"[m[1;38m:[m [32m"TypeScript"[m[1;38m,[m
+[1;34m"license"[m[1;38m:[m [32m"NOASSERTION"[m[1;38m,[m
+[1;34m"repo"[m[1;38m:[m [32m"novuhq/novu"[m[1;38m,[m
+[1;34m"stars"[m[1;38m:[m 39920[1;38m,[m
+[1;34m"updated"[m[1;38m:[m [32m"2026-09-08T03:59:49Z"[m
+[1;38m}[m
+[1;37m{[m
+  [1;34m"message"[m[1;37m:[m [32m"Not Found"[m[1;37m,[m
+  [1;34m"documentation_url"[m[1;37m:[m [32m"https://docs.github.com/rest/repos/repos#get-a-repository"[m[1;37m,[m
+  [1;34m"status"[m[1;37m:[m [32m"404"[m
+[1;37m}[m
+{"repo":"PowerSyncLtd/powersync-js","error":true}
