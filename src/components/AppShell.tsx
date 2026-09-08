@@ -136,12 +136,20 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   }, []);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+    let registration: ServiceWorkerRegistration | undefined;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then((value) => { registration = value; }).catch(() => {});
+    }
+    const syncOfflineQueue = () => {
+      registration?.active?.postMessage({ type: "STUDYNOVA_SYNC_NOW" });
+      navigator.serviceWorker.controller?.postMessage({ type: "STUDYNOVA_SYNC_NOW" });
+    };
+    window.addEventListener("online", syncOfflineQueue);
     const standalone = window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
     const guideTimer = !standalone && !localStorage.getItem("sn-install-guide-seen") ? window.setTimeout(() => setInstallGuideOpen(true), 0) : !localStorage.getItem("sn-usage-guide-seen") ? window.setTimeout(() => setUsageGuideOpen(true), 0) : undefined;
     const onInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", onInstall);
-    return () => { if (guideTimer) window.clearTimeout(guideTimer); window.removeEventListener("beforeinstallprompt", onInstall); };
+    return () => { if (guideTimer) window.clearTimeout(guideTimer); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("online", syncOfflineQueue); };
   }, []);
 
   useEffect(() => {
