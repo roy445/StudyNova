@@ -1,0 +1,2 @@
+import { Skeleton } from "@/components/ui";
+export default function Loading() { return <main className="mx-auto flex min-h-[60dvh] w-full max-w-7xl items-start px-4 py-8 sm:px-6"><div className="w-full space-y-4" aria-busy="true" aria-label="載入中"><Skeleton className="max-w-sm" lines={1}/><Skeleton lines={3}/><div className="grid gap-3 sm:grid-cols-3"><Skeleton lines={5}/><Skeleton lines={5}/><Skeleton lines={5}/></div></div></main>; }

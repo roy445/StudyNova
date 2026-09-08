@@ -4,6 +4,7 @@ import { clientIp, getSession, rateLimit, requireAdmin, requireUser } from "./au
 import { AppError, fail, newRequestId, safeErrorMessage } from "./core";
 import { db } from "@/db";
 import { systemLogs } from "@/db/schema";
+import { classifyAuditPath, writeAudit } from "./audit";
 
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export type AuthMode = "none" | "optional" | "user" | "admin";
@@ -98,6 +99,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/compression-routes"),
     import("./routes/export-routes"),
     import("./routes/visual-routes"),
+    import("./routes/audit-content-routes"),
   ]);
   compiledRoutes = compile(mods.flatMap((m) => m.routes));
   return compiledRoutes;
@@ -111,9 +113,9 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
 
   const { route: def, params } = found;
   const ip = clientIp(req);
+  let user: AuthUser | null = null;
 
   try {
-    let user: AuthUser | null = null;
     if (def.auth === "admin") user = await requireAdmin();
     else if (def.auth === "user") user = await requireUser();
     else if (def.auth === "optional") user = (await getSession())?.user ?? null;
@@ -155,10 +157,18 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     const startedAt = Date.now();
     const result = await def.handler(ctx);
     const response = result instanceof Response ? result : jsonResponse(result ?? null);
+    if (user && (def.method !== "GET" || def.path.startsWith("/admin") || def.path.includes("/auth"))) {
+      const audit = classifyAuditPath(def.path);
+      await writeAudit({ userId: user.userId, eventType: audit.eventType, module: audit.module, action: audit.action, resourceId: params.id, ip, userAgent: req.headers.get("user-agent") ?? "", metadata: { status: response.status, httpStatus: response.status, durationMs: Date.now() - startedAt, route: def.path, method: def.method, queryKeys: Array.from(url.searchParams.keys()).join(",") } });
+    }
     void logApiPerformance({ route: def.path, method: def.method, status: response.status, durationMs: Date.now() - startedAt, requestId: response.headers.get("x-request-id") ?? newRequestId() });
     return response;
   } catch (err) {
     if (err instanceof AppError) {
+      if (user) {
+        const audit = classifyAuditPath(def.path);
+        await writeAudit({ userId: user.userId, eventType: audit.eventType, module: audit.module, action: audit.action, resourceId: params.id, outcome: "failure", errorCategory: err.code, ip, userAgent: req.headers.get("user-agent") ?? "", metadata: { status: err.status, httpStatus: err.status, route: def.path, method: def.method, errorCode: err.code } });
+      }
       if (err.status >= 500) {
         await logSystemError(`api:${def.method} ${def.path}`, err.message, { ip, code: err.code, requestId: err.requestId });
       }

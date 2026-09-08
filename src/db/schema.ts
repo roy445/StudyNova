@@ -1806,3 +1806,121 @@ export const legalDocuments = pgTable("legal_documents", {
   effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: updated(),
 });
+
+
+/* -------------------------------------------------- AUDIT / EDUCATION CONTENT */
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: id(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    eventType: text("event_type").notNull(),
+    module: text("module").notNull(),
+    action: text("action").notNull(),
+    resourceId: text("resource_id").notNull().default(""),
+    outcome: text("outcome").notNull().default("success"),
+    errorCategory: text("error_category").notNull().default(""),
+    correlationId: text("correlation_id").notNull(),
+    ip: text("ip").notNull().default(""),
+    userAgent: text("user_agent").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+  },
+  (t) => [
+    index("audit_user_time_idx").on(t.userId, t.occurredAt),
+    index("audit_time_idx").on(t.occurredAt),
+    index("audit_event_idx").on(t.eventType, t.occurredAt),
+    index("audit_module_idx").on(t.module, t.occurredAt),
+    index("audit_outcome_idx").on(t.outcome, t.occurredAt),
+    index("audit_resource_idx").on(t.resourceId),
+    uniqueIndex("audit_correlation_idx").on(t.correlationId),
+  ],
+);
+
+export const educationStages = pgTable("education_stages", {
+  id: id(),
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [uniqueIndex("education_stage_key_uq").on(t.key), index("education_stage_sort_idx").on(t.enabled, t.sortOrder)]);
+
+export const educationSchools = pgTable("education_schools", {
+  id: id(),
+  name: text("name").notNull(),
+  stageId: uuid("stage_id").references(() => educationStages.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [index("education_school_stage_idx").on(t.stageId, t.enabled, t.sortOrder)]);
+
+export const educationGrades = pgTable("education_grades", {
+  id: id(),
+  name: text("name").notNull(),
+  stageId: uuid("stage_id").references(() => educationStages.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+}, (t) => [index("education_grade_stage_idx").on(t.stageId, t.enabled, t.sortOrder)]);
+
+export const educationSubjects = pgTable("education_subjects", {
+  id: id(),
+  name: text("name").notNull(),
+  stageId: uuid("stage_id").references(() => educationStages.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+}, (t) => [index("education_subject_stage_idx").on(t.stageId, t.enabled, t.sortOrder)]);
+
+export const textbookEditions = pgTable("textbook_editions", {
+  id: id(),
+  stageId: uuid("stage_id").references(() => educationStages.id, { onDelete: "set null" }),
+  schoolId: uuid("school_id").references(() => educationSchools.id, { onDelete: "set null" }),
+  gradeId: uuid("grade_id").references(() => educationGrades.id, { onDelete: "set null" }),
+  subjectId: uuid("subject_id").references(() => educationSubjects.id, { onDelete: "set null" }),
+  publisher: text("publisher").notNull(),
+  version: text("version").notNull().default(""),
+  volume: text("volume").notNull().default(""),
+  coverObjectId: uuid("cover_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+  coverUrl: text("cover_url").notNull().default("/brand/studynova-logo-square.png"),
+  enabled: boolean("enabled").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [index("textbook_scope_idx").on(t.stageId, t.schoolId, t.gradeId, t.subjectId), index("textbook_enabled_idx").on(t.enabled, t.sortOrder)]);
+
+export const textbookLessons = pgTable("textbook_lessons", {
+  id: id(),
+  editionId: uuid("edition_id").notNull().references(() => textbookEditions.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [index("textbook_lesson_edition_idx").on(t.editionId, t.enabled, t.sortOrder)]);
+
+export const textbookContents = pgTable("textbook_contents", {
+  id: id(),
+  lessonId: uuid("lesson_id").notNull().references(() => textbookLessons.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  sortOrder: integer("sort_order").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [index("textbook_content_lesson_idx").on(t.lessonId, t.enabled, t.sortOrder), index("textbook_content_type_idx").on(t.type)]);
+
+export const contentThemes = pgTable("content_themes", {
+  id: id(),
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  tokens: jsonb("tokens").$type<Record<string, string>>().notNull().default({}),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: created(),
+}, (t) => [uniqueIndex("content_theme_key_uq").on(t.key)]);

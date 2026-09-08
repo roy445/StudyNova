@@ -11,6 +11,8 @@ const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/admin/features", label: "功能總控台", icon: "admin" },
   { href: "/admin/weekly", label: "每週小考", icon: "weekly" },
   { href: "/admin/reference-materials", label: "AI 參考資料", icon: "admin" },
+  { href: "/admin/content", label: "Content Studio", icon: "study" },
+  { href: "/admin/audit", label: "Audit Log", icon: "admin" },
   { href: "/admin/challenges", label: "挑戰管理", icon: "challenge" },
   { href: "/admin/ops", label: "AI・會員・內容", icon: "nova" },
   { href: "/admin/support", label: "問題回報", icon: "challenge" },

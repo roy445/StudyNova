@@ -19,6 +19,7 @@ export type ShellUser = {
 const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
+  { href: "/textbooks", label: "教材", icon: "study" },
   { href: "/ai", label: "AI", icon: "nova" },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
@@ -62,6 +63,7 @@ const NOVI_MODES = [
 const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "Dashboard", icon: "home" },
   { href: "/study", label: "學習中心", icon: "study" },
+  { href: "/textbooks", label: "教材專區", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/essay", label: "英文作文批改", icon: "pen" },
   { href: "/compress", label: "智慧壓縮", icon: "archive" },
