@@ -34,7 +34,31 @@ export const routes: RouteDef[] = [
     return { editions: rows.map((row) => row.edition) };
   }}),
   route({ method: "GET", path: "/textbooks/:id", auth: "user", handler: async (ctx) => { const edition = (await db.select({ edition: textbookEditions }).from(textbookEditions).innerJoin(educationStages, eq(educationStages.id, textbookEditions.stageId)).innerJoin(userSettings, eq(userSettings.schoolLevel, educationStages.key)).where(and(eq(textbookEditions.id, ctx.params.id), eq(textbookEditions.enabled, true), eq(userSettings.userId, ctx.user!.userId))).limit(1))[0]?.edition; if (!edition) throw notFound("找不到符合目前教育階段的教材版本"); const lessons = await db.select().from(textbookLessons).where(and(eq(textbookLessons.editionId, edition.id), eq(textbookLessons.enabled, true))).orderBy(asc(textbookLessons.sortOrder)); const contents = lessons.length ? await db.select().from(textbookContents).where(and(inArray(textbookContents.lessonId, lessons.map(l => l.id)), eq(textbookContents.enabled, true))).orderBy(asc(textbookContents.sortOrder)) : []; return { edition, lessons: lessons.map(l => ({ ...l, contents: contents.filter(c => c.lessonId === l.id) })) }; } }),
-  route({ method: "GET", path: "/admin/textbooks", auth: "admin", handler: async () => ({ editions: await db.select().from(textbookEditions).orderBy(asc(textbookEditions.sortOrder), desc(textbookEditions.createdAt)) }) }),
+  route({ method: "GET", path: "/admin/textbooks", auth: "admin", handler: async () => {
+    try {
+      return { editions: await db.select().from(textbookEditions).orderBy(asc(textbookEditions.sortOrder), desc(textbookEditions.createdAt)) };
+    } catch {
+      // Keep the admin page usable while an older production database is still
+      // waiting for the additive textbook-detail migration.
+      const editions = await db.select({
+        id: textbookEditions.id,
+        stageId: textbookEditions.stageId,
+        schoolId: textbookEditions.schoolId,
+        gradeId: textbookEditions.gradeId,
+        subjectId: textbookEditions.subjectId,
+        publisher: textbookEditions.publisher,
+        version: textbookEditions.version,
+        volume: textbookEditions.volume,
+        coverObjectId: textbookEditions.coverObjectId,
+        coverUrl: textbookEditions.coverUrl,
+        enabled: textbookEditions.enabled,
+        sortOrder: textbookEditions.sortOrder,
+        createdAt: textbookEditions.createdAt,
+        updatedAt: textbookEditions.updatedAt,
+      }).from(textbookEditions).orderBy(asc(textbookEditions.sortOrder), desc(textbookEditions.createdAt));
+      return { editions: editions.map((edition) => ({ ...edition, description: "", isbn: "", metadata: {}, ocrStatus: "not_started" })) };
+    }
+  } }),
   route({ method: "POST", path: "/admin/textbooks", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ ...stageScope.shape, publisher: z.string().min(1).max(120), version: z.string().max(120).default(""), volume: z.string().max(80).default(""), coverUrl: z.string().url().or(z.literal("/brand/studynova-logo-square.png")).default("/brand/studynova-logo-square.png"), description: z.string().max(2000).default(""), isbn: z.string().max(80).default(""), sortOrder: z.number().int().default(0) })); const row = (await db.insert(textbookEditions).values(body).returning())[0]; await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "textbooks", action: "edition.create", resourceId: row.id, ip: ctx.ip }); return { edition: row }; } }),
   route({ method: "PATCH", path: "/admin/textbooks/:id", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ publisher: z.string().min(1).max(120).optional(), version: z.string().max(120).optional(), volume: z.string().max(80).optional(), coverUrl: z.string().max(500).optional(), description: z.string().max(2000).optional(), isbn: z.string().max(80).optional(), metadata: z.record(z.string(), z.unknown()).optional(), ocrStatus: z.string().max(40).optional(), enabled: z.boolean().optional(), sortOrder: z.number().int().optional() })); const rows = await db.update(textbookEditions).set({ ...body, updatedAt: new Date() }).where(eq(textbookEditions.id, ctx.params.id)).returning(); if (!rows[0]) throw notFound("找不到教材版本"); await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "textbooks", action: "edition.update", resourceId: ctx.params.id, ip: ctx.ip }); return { edition: rows[0] }; } }),
   route({ method: "POST", path: "/admin/textbooks/:id/cover", auth: "admin", handler: async (ctx) => { const admin = ctx.requireUser(); const edition = (await db.select().from(textbookEditions).where(eq(textbookEditions.id, ctx.params.id)).limit(1))[0]; if (!edition) throw notFound("找不到教材版本"); const form = await ctx.formData(); const file = form.get("file"); if (!(typeof File !== "undefined" && file instanceof File)) throw new Error("請選擇封面圖片"); const stored = await putObject({ userId: admin.userId, filename: file.name, mimeType: file.type || "image/jpeg", data: Buffer.from(await file.arrayBuffer()), allow: ["image"] }); const coverUrl = `/api/textbook-covers/${stored.id}`; const row = (await db.update(textbookEditions).set({ coverObjectId: stored.id, coverUrl, updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id)).returning())[0]; await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "textbooks", action: "edition.cover_upload", resourceId: edition.id, ip: ctx.ip, metadata: { objectId: stored.id, filename: file.name } }); return { edition: row, coverUrl }; } }),
