@@ -73,7 +73,12 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      return { notifications: await listNotifications(user.userId), unread: await unreadCount(user.userId) };
+      try {
+        return { notifications: await listNotifications(user.userId), unread: await unreadCount(user.userId) };
+      } catch (error) {
+        console.error("[notifications] read failed; returning empty state", error);
+        return { notifications: [], unread: 0, degraded: true };
+      }
     },
   }),
 

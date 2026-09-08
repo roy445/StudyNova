@@ -938,7 +938,8 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const dueItems = await db.select().from(reviewItems).where(and(eq(reviewItems.userId, user.userId), lte(reviewItems.dueAt, new Date()), ne(reviewItems.state, "suspended"))).orderBy(asc(reviewItems.dueAt)).limit(20);
+      try {
+        const dueItems = await db.select().from(reviewItems).where(and(eq(reviewItems.userId, user.userId), lte(reviewItems.dueAt, new Date()), ne(reviewItems.state, "suspended"))).orderBy(asc(reviewItems.dueAt)).limit(20);
       const weakConcepts = await db.select().from(knowledgeNodes).where(and(eq(knowledgeNodes.userId, user.userId), sql`${knowledgeNodes.mastery} < 70`)).orderBy(asc(knowledgeNodes.mastery), desc(knowledgeNodes.updatedAt)).limit(10);
       const since = new Date(Date.now() - 30 * 86_400_000);
       const [eventSummary] = await db.select({ total: count(), correct: sql<number>`coalesce(sum(case when ${learningEvents.correct} then 1 else 0 end),0)::int`, seconds: sql<number>`coalesce(sum(${learningEvents.durationSec}),0)::int`, activeDays: sql<number>`count(distinct date(${learningEvents.occurredAt}))::int` }).from(learningEvents).where(and(eq(learningEvents.userId, user.userId), gte(learningEvents.occurredAt, since)));
@@ -955,7 +956,11 @@ export const routes: RouteDef[] = [
         weakConcepts,
         weakSubjects,
         recommendations,
-      };
+        };
+      } catch (error) {
+        console.error("[adaptive] read failed; returning empty plan", error);
+        return { generatedAt: new Date().toISOString(), metrics: { reviewsDue: 0, events30d: 0, correctEvents30d: 0, studySeconds30d: 0, activeDays30d: 0 }, dueItems: [], weakConcepts: [], weakSubjects: [], recommendations: [], degraded: true };
+      }
     },
   }),
 
