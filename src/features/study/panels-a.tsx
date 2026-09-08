@@ -23,6 +23,29 @@ export function MaterialsPanel() {
   const [detail, setDetail] = useState<Material | null>(null);
   const [analysis, setAnalysis] = useState<Record<string, unknown> | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [readingProgress, setReadingProgress] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(window.localStorage.getItem("studynova-reading-progress") ?? "{}"); } catch { return {}; }
+  });
+  const [highlights, setHighlights] = useState<Record<string, string[]>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(window.localStorage.getItem("studynova-material-highlights") ?? "{}"); } catch { return {}; }
+  });
+
+  function saveReadingProgress(materialId: string, value: number) {
+    const next = { ...readingProgress, [materialId]: Math.max(0, Math.min(100, Math.round(value))) };
+    setReadingProgress(next);
+    window.localStorage.setItem("studynova-reading-progress", JSON.stringify(next));
+  }
+
+  function addHighlight(materialId: string) {
+    const text = window.getSelection()?.toString().trim();
+    if (!text) return toast.push("info", "請先選取教材中的文字，再按標註");
+    const next = { ...highlights, [materialId]: Array.from(new Set([...(highlights[materialId] ?? []), text])).slice(-30) };
+    setHighlights(next);
+    window.localStorage.setItem("studynova-material-highlights", JSON.stringify(next));
+    toast.push("success", "已加入閱讀標註");
+  }
 
   async function upload() {
     if (!title.trim()) {
@@ -90,6 +113,7 @@ export function MaterialsPanel() {
               <Badge tone={m.status === "ready" ? "green" : m.status === "failed" ? "rose" : "cyan"}>{m.status}</Badge>
             </div>
             {m.summary && <p className="mt-1.5 line-clamp-2 text-xs text-muted">{m.summary}</p>}
+            <div className="mt-2 flex items-center gap-2"><div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-cyan-400" style={{ width: `${readingProgress[m.id] ?? 0}%` }} /></div><span className="text-[10px] text-muted">閱讀 {readingProgress[m.id] ?? 0}%</span></div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Button size="sm" variant="ghost" onClick={() => { setDetail(m); setAnalysis(null); }}>
                 查看
@@ -161,7 +185,9 @@ export function MaterialsPanel() {
                 {detail.summary}
               </div>
             )}
-            <div className="max-h-64 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-xl bg-black/25 p-3 text-xs leading-relaxed">{detail.content || "（沒有文字內容）"}</div>
+            <div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="ghost" onClick={() => addHighlight(detail.id)}>標註選取文字</Button><label className="flex min-w-[180px] flex-1 items-center gap-2 text-[11px] text-muted"><span>閱讀進度</span><input type="range" min="0" max="100" value={readingProgress[detail.id] ?? 0} onChange={(e) => saveReadingProgress(detail.id, Number(e.target.value))} className="min-w-0 flex-1" /></label></div>
+            <div className="max-h-64 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-xl bg-black/25 p-3 text-xs leading-relaxed select-text">{detail.content || "（沒有文字內容）"}</div>
+            {(highlights[detail.id] ?? []).length > 0 && <div className="glass-soft space-y-1 p-3 text-xs"><p className="font-medium">我的閱讀標註</p>{(highlights[detail.id] ?? []).map((item, index) => <p key={`${item}-${index}`} className="rounded-lg bg-yellow-300/10 p-2 text-yellow-100">{item}</p>)}</div>}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" loading={analyzing} onClick={() => analyze(detail)}>
                 AI 整理重點
@@ -867,21 +893,21 @@ function VisionAnalysisResult({ data, onAction, onBatchVocabulary, onBatchLearni
   );
 }
 
-type Note = { id: string; title: string; subject: string; body: string; updatedAt: string; visibility: string };
+type Note = { id: string; title: string; subject: string; body: string; updatedAt: string; visibility: string; tags?: string[]; template?: string | null; backlinks?: string[] };
 
 export function NotesPanel() {
   const toast = useToast();
   const { data, loading, error, reload } = useApi<{ notes: Note[] }>("/notes");
   const [editing, setEditing] = useState<Note | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ title: "", subject: "其他", body: "" });
+  const [form, setForm] = useState({ title: "", subject: "其他", body: "", tags: "", template: "freeform", backlinks: "" });
 
   return (
     <Card
       title="🗒️ 我的筆記"
       subtitle="AI 整理與 OCR 轉換的筆記都會自動存在這裡"
       action={
-        <Button size="sm" onClick={() => { setCreating(true); setForm({ title: "", subject: "其他", body: "" }); }}>
+        <Button size="sm" onClick={() => { setCreating(true); setForm({ title: "", subject: "其他", body: "", tags: "", template: "freeform", backlinks: "" }); }}>
           ＋ 新增筆記
         </Button>
       }
@@ -897,6 +923,7 @@ export function NotesPanel() {
               {n.subject}・{new Date(n.updatedAt).toLocaleDateString("zh-TW")}
             </p>
             <p className="mt-1 line-clamp-2 text-xs text-muted">{n.body.slice(0, 120)}</p>
+            <div className="mt-2 flex flex-wrap gap-1">{(n.tags ?? []).slice(0, 4).map((tag) => <Badge key={tag} tone="violet">#{tag}</Badge>)}{n.template && n.template !== "freeform" && <Badge tone="cyan">{n.template}</Badge>}{(n.backlinks ?? []).length > 0 && <Badge tone="muted">↗ {n.backlinks?.length} 個連結</Badge>}</div>
           </button>
         ))}
       </div>
@@ -913,6 +940,17 @@ export function NotesPanel() {
               ))}
             </Select>
           </Field>
+          <Field label="模板">
+            <Select value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })}>
+              <option value="freeform">自由筆記</option>
+              <option value="cornell">Cornell 重點筆記</option>
+              <option value="mistake-review">錯題複習</option>
+              <option value="concept-map">知識點整理</option>
+            </Select>
+          </Field>
+          <Field label="標籤" hint="用逗號分隔，例如：文法,被動語態,待複習">
+            <Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="文法,重點,待複習" />
+          </Field>
           <Field label="內容">
             <Textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} className="!min-h-[160px]" />
           </Field>
@@ -920,7 +958,7 @@ export function NotesPanel() {
             full
             onClick={async () => {
               if (!form.title.trim()) return toast.push("error", "請輸入標題");
-              await apiPost("/notes", form);
+              await apiPost("/notes", { title: form.title, subject: form.subject, body: form.body, template: form.template, tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 20) });
               toast.push("success", "筆記已建立");
               setCreating(false);
               await reload();
@@ -934,12 +972,23 @@ export function NotesPanel() {
       <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing?.title ?? ""} wide>
         {editing && (
           <div className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label="模板">
+                <Select value={editing.template ?? "freeform"} onChange={(e) => setEditing({ ...editing, template: e.target.value })}>
+                  <option value="freeform">自由筆記</option><option value="cornell">Cornell 重點筆記</option><option value="mistake-review">錯題複習</option><option value="concept-map">知識點整理</option>
+                </Select>
+              </Field>
+              <Field label="標籤">
+                <Input value={(editing.tags ?? []).join(", ")} onChange={(e) => setEditing({ ...editing, tags: e.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} />
+              </Field>
+            </div>
+            <div className="rounded-xl border border-[var(--line)] bg-black/10 p-2 text-[11px] text-muted">{(editing.backlinks ?? []).length ? `已連結 ${(editing.backlinks ?? []).length} 個學習內容：${(editing.backlinks ?? []).join("、")}` : "尚未建立 backlink；儲存後可由知識圖譜 API 連結教材、單字、錯題或知識點。"}</div>
             <Textarea value={editing.body} onChange={(e) => setEditing({ ...editing, body: e.target.value })} className="!min-h-[300px] text-xs" />
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 onClick={async () => {
-                  await apiPatch(`/notes/${editing.id}`, { body: editing.body });
+                  await apiPatch(`/notes/${editing.id}`, { body: editing.body, tags: editing.tags ?? [], template: editing.template ?? "freeform", backlinks: editing.backlinks ?? [] });
                   toast.push("success", "已儲存");
                   await reload();
                 }}
