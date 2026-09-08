@@ -957,30 +957,56 @@ export const routes: RouteDef[] = [
       const q = (ctx.query.get("q") ?? "").trim();
       if (q.length < 1) return { results: [] };
       const like = `%${q}%`;
-      const mats = await db.execute(sql`
-        select 'material' as kind, id::text, title, subject, created_at from study_materials
-        where user_id = ${user.userId} and (title ilike ${like} or content ilike ${like}) limit 10`);
-      const nts = await db.execute(sql`
-        select 'note' as kind, id::text, title, subject, created_at from notes
-        where user_id = ${user.userId} and (title ilike ${like} or body ilike ${like}) limit 10`);
-      const qzs = await db.execute(sql`
-        select 'quiz' as kind, id::text, title, subject, created_at from quizzes
-        where user_id = ${user.userId} and title ilike ${like} limit 10`);
-      const qs = await db
-        .select({ id: questions.id, stem: questions.stem, subject: questions.subject, difficulty: questions.difficulty })
-        .from(questions)
-        .where(and(sql`${questions.stem} ilike ${like}`, sql`(${questions.ownerId} = ${user.userId} or ${questions.origin} = 'bank')`))
-        .limit(10);
-      const acts = await db.select().from(activities).where(and(eq(activities.published, true), sql`${activities.title} ilike ${like}`)).limit(5);
-      return {
-        results: [
-          ...(mats.rows as Array<Record<string, unknown>>),
-          ...(nts.rows as Array<Record<string, unknown>>),
-          ...(qzs.rows as Array<Record<string, unknown>>),
-          ...qs.map((x) => ({ kind: "question", id: x.id, title: x.stem.slice(0, 80), subject: x.subject, created_at: null })),
-          ...acts.map((a) => ({ kind: "activity", id: a.id, title: a.title, subject: "活動", created_at: a.startsAt })),
-        ],
-      };
+      const tsQuery = q.replace(/[!&|():*<>]/g, " ").trim() || q;
+      const [mats, nts, qzs, words, wrongs, ai, acts] = await Promise.all([
+        db.execute(sql`
+          select 'material' as kind, id::text, title, subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(content,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from study_materials
+          where user_id = ${user.userId} and (title ilike ${like} or content ilike ${like} or to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(content,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, created_at desc limit 12`),
+        db.execute(sql`
+          select 'note' as kind, id::text, title, subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(body,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from notes
+          where user_id = ${user.userId} and (title ilike ${like} or body ilike ${like} or to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(body,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, created_at desc limit 12`),
+        db.execute(sql`
+          select 'quiz' as kind, id::text, title, subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(title,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from quizzes
+          where user_id = ${user.userId} and (title ilike ${like} or to_tsvector('simple', coalesce(title,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, created_at desc limit 8`),
+        db.execute(sql`
+          select 'vocabulary' as kind, id::text, word as title, '單字' as subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(word,'') || ' ' || coalesce(meaning,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from daily_words
+          where word ilike ${like} or meaning ilike ${like} or to_tsvector('simple', coalesce(word,'') || ' ' || coalesce(meaning,'')) @@ websearch_to_tsquery('simple', ${tsQuery})
+          order by rank desc, word asc limit 12`),
+        db.execute(sql`
+          select 'wrong' as kind, w.id::text, left(q.stem, 100) as title, w.subject, w.last_wrong_at as created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(q.stem,'') || ' ' || coalesce(w.reason,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from wrong_questions w join questions q on q.id = w.question_id
+          where w.user_id = ${user.userId} and (q.stem ilike ${like} or w.reason ilike ${like} or to_tsvector('simple', coalesce(q.stem,'') || ' ' || coalesce(w.reason,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, w.last_wrong_at desc limit 10`),
+        db.execute(sql`
+          select 'ai_conversation' as kind, c.id::text, c.title, 'Novi' as subject, c.updated_at as created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(c.title,'') || ' ' || coalesce(m.content,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from ai_conversations c join ai_messages m on m.conversation_id = c.id
+          where c.user_id = ${user.userId} and (c.title ilike ${like} or m.content ilike ${like} or to_tsvector('simple', coalesce(c.title,'') || ' ' || coalesce(m.content,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, c.updated_at desc limit 10`),
+        db.select({ id: activities.id, title: activities.title, startsAt: activities.startsAt }).from(activities).where(and(eq(activities.published, true), sql`${activities.title} ilike ${like}`)).limit(5),
+      ]);
+      const resultRows = [
+        ...(mats.rows as Array<Record<string, unknown>>),
+        ...(nts.rows as Array<Record<string, unknown>>),
+        ...(qzs.rows as Array<Record<string, unknown>>),
+        ...(words.rows as Array<Record<string, unknown>>),
+        ...(wrongs.rows as Array<Record<string, unknown>>),
+        ...(ai.rows as Array<Record<string, unknown>>),
+        ...acts.map((a) => ({ kind: "activity", id: a.id, title: a.title, subject: "活動", created_at: a.startsAt })),
+      ];
+      return { query: q, mode: "postgres-hybrid", results: resultRows.slice(0, 60) };
     },
   }),
 
