@@ -31,6 +31,7 @@ import {
   userVocabularies,
   learningEvents,
   reviewItems,
+  knowledgeNodes,
 } from "@/db/schema";
 import { route, zDate, type RouteDef } from "../router";
 import { addDaysStr, badRequest, daysBetween, fail, notFound, randomToken, round1, todayStr, trend, toCsv } from "../core";
@@ -927,6 +928,33 @@ export const routes: RouteDef[] = [
         level: novi?.level ?? 1,
         nova: nova?.balance ?? 0,
         stats: await subjectStats(user.userId),
+      };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/adaptive/next",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const dueItems = await db.select().from(reviewItems).where(and(eq(reviewItems.userId, user.userId), lte(reviewItems.dueAt, new Date()), ne(reviewItems.state, "suspended"))).orderBy(asc(reviewItems.dueAt)).limit(20);
+      const weakConcepts = await db.select().from(knowledgeNodes).where(and(eq(knowledgeNodes.userId, user.userId), sql`${knowledgeNodes.mastery} < 70`)).orderBy(asc(knowledgeNodes.mastery), desc(knowledgeNodes.updatedAt)).limit(10);
+      const since = new Date(Date.now() - 30 * 86_400_000);
+      const [eventSummary] = await db.select({ total: count(), correct: sql<number>`coalesce(sum(case when ${learningEvents.correct} then 1 else 0 end),0)::int`, seconds: sql<number>`coalesce(sum(${learningEvents.durationSec}),0)::int`, activeDays: sql<number>`count(distinct date(${learningEvents.occurredAt}))::int` }).from(learningEvents).where(and(eq(learningEvents.userId, user.userId), gte(learningEvents.occurredAt, since)));
+      const weakSubjects = await db.select({ subject: wrongQuestions.subject, count: sql<number>`count(*)::int` }).from(wrongQuestions).where(and(eq(wrongQuestions.userId, user.userId), isNull(wrongQuestions.resolvedAt))).groupBy(wrongQuestions.subject).orderBy(desc(sql`count(*)`)).limit(5);
+      const recommendations = [
+        ...(dueItems.length ? [{ kind: "review", priority: 1, title: `先複習 ${dueItems.length} 個到期項目`, reason: "依 FSRS 排程，現在是較有效率的回憶時機。", count: dueItems.length }] : []),
+        ...weakConcepts.slice(0, 3).map((node, index) => ({ kind: "concept", priority: 2 + index, title: `補強「${node.title}」`, reason: `目前熟練度約 ${node.mastery}%，建議先閱讀相關教材，再做一次主動回憶。`, nodeId: node.id, mastery: node.mastery })),
+        ...(weakSubjects[0] ? [{ kind: "wrong", priority: 6, title: `處理 ${weakSubjects[0].subject} 錯題`, reason: `目前有 ${weakSubjects[0].count} 題未解決錯題，適合安排短時段集中修正。`, subject: weakSubjects[0].subject, count: weakSubjects[0].count }] : []),
+      ].slice(0, 6);
+      return {
+        generatedAt: new Date().toISOString(),
+        metrics: { reviewsDue: dueItems.length, events30d: Number(eventSummary?.total ?? 0), correctEvents30d: Number(eventSummary?.correct ?? 0), studySeconds30d: Number(eventSummary?.seconds ?? 0), activeDays30d: Number(eventSummary?.activeDays ?? 0) },
+        dueItems,
+        weakConcepts,
+        weakSubjects,
+        recommendations,
       };
     },
   }),

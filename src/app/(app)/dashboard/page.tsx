@@ -20,6 +20,11 @@ type SubjectStat = {
   series: Array<{ date: string; percentage: number; examName: string }>;
 };
 
+type Adaptive = {
+  metrics: { reviewsDue: number; events30d: number; correctEvents30d: number; studySeconds30d: number; activeDays30d: number };
+  recommendations: Array<{ kind: string; priority: number; title: string; reason: string; count?: number; mastery?: number; subject?: string }>;
+};
+
 type Dashboard = {
   today: string;
   greeting: string;
@@ -52,6 +57,7 @@ const TREND_LABEL = { up: "↗ 上升", down: "↘ 下降", flat: "→ 持平", 
 export default function DashboardPage() {
   const toast = useToast();
   const { data, loading, error, reload } = useApi<Dashboard>("/dashboard");
+  const adaptive = useApi<Adaptive>("/adaptive/next");
   const [claiming, setClaiming] = useState<string | null>(null);
 
   async function claim(taskId: string) {
@@ -131,6 +137,25 @@ export default function DashboardPage() {
           </div>
         </div>
       </Card>
+
+      {adaptive.data && (
+        <Card title="🧭 Novi 的下一步建議" subtitle="依照你的實際複習、錯題與知識點狀態動態安排，不是固定模板。">
+          <div className="mb-3 grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="glass-soft rounded-xl p-2"><p className="text-muted">到期複習</p><p className="mt-1 text-lg font-bold text-[#7dd3fc]">{adaptive.data.metrics.reviewsDue}</p></div>
+            <div className="glass-soft rounded-xl p-2"><p className="text-muted">近 30 天活動</p><p className="mt-1 text-lg font-bold text-violet-200">{adaptive.data.metrics.activeDays30d} 天</p></div>
+            <div className="glass-soft rounded-xl p-2"><p className="text-muted">近 30 天正確</p><p className="mt-1 text-lg font-bold text-emerald-200">{adaptive.data.metrics.correctEvents30d}</p></div>
+          </div>
+          <div className="space-y-2">
+            {adaptive.data.recommendations.slice(0, 4).map((item) => (
+              <div key={`${item.kind}-${item.title}`} className="glass-soft flex items-start gap-3 rounded-xl p-3">
+                <span className="text-lg">{item.kind === "review" ? "🔁" : item.kind === "wrong" ? "🧩" : "📚"}</span>
+                <div className="min-w-0"><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs leading-5 text-muted">{item.reason}</p></div>
+              </div>
+            ))}
+            {!adaptive.data.recommendations.length && <p className="text-sm text-muted">目前沒有急迫項目，維持今天的學習節奏就很棒了 ✨</p>}
+          </div>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
