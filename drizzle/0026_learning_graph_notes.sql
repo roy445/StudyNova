@@ -6,7 +6,7 @@ ALTER TABLE "notes" ADD COLUMN IF NOT EXISTS "backlinks" jsonb DEFAULT '[]'::jso
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "knowledge_nodes" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "subject" text DEFAULT '其他' NOT NULL,
   "title" text NOT NULL,
   "kind" text DEFAULT 'concept' NOT NULL,
@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS "knowledge_nodes_user_kind_idx" ON "knowledge_nodes" 
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "knowledge_edges" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "from_node_id" uuid NOT NULL REFERENCES "knowledge_nodes"("id") ON DELETE CASCADE,
   "to_node_id" uuid NOT NULL REFERENCES "knowledge_nodes"("id") ON DELETE CASCADE,
   "relation" text DEFAULT 'related' NOT NULL,

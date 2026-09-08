@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "user_vocabularies" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "word" text NOT NULL,
   "normalized_word" text NOT NULL,
   "part_of_speech" text DEFAULT '' NOT NULL,

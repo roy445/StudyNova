@@ -47,7 +47,7 @@ ON CONFLICT ("days") DO UPDATE SET "price_nova" = EXCLUDED."price_nova", "enable
 
 CREATE TABLE IF NOT EXISTS "nova_pro_exchange_transactions" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "days" integer NOT NULL,
   "price_nova" integer NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT now()

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "learning_events" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "event_type" text NOT NULL,
   "object_type" text NOT NULL,
   "object_id" uuid,
@@ -28,7 +28,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "learning_events_idempotency_uq" ON "learning_
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "review_items" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "content_type" text NOT NULL,
   "content_id" uuid NOT NULL,
   "concept_id" uuid,

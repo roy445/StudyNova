@@ -1,7 +1,7 @@
 -- Unified AI solution engine: upload context, analysis scopes, mode locking, and sessions.
 CREATE TABLE IF NOT EXISTS "file_contexts" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "object_id" uuid NOT NULL REFERENCES "storage_objects"("id") ON DELETE CASCADE,
   "upload_batch" integer NOT NULL DEFAULT 1,
   "sha256" text NOT NULL DEFAULT '',
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS "analysis_scopes" (
 );
 CREATE TABLE IF NOT EXISTS "solution_sessions" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "mode" text NOT NULL DEFAULT 'tutor',
   "mode_locked" boolean NOT NULL DEFAULT false,
   "status" text NOT NULL DEFAULT 'active',
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS "solution_sessions" (
 CREATE INDEX IF NOT EXISTS "solution_session_user_idx" ON "solution_sessions" ("user_id", "created_at");
 CREATE TABLE IF NOT EXISTS "ai_modes" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "solution_session_id" uuid,
   "mode" text NOT NULL DEFAULT 'tutor',
   "source" text NOT NULL DEFAULT 'manual',
