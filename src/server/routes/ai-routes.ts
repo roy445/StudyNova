@@ -72,7 +72,7 @@ async function buildContext(userId: string, allow: string[], materialId: string 
     const m = (await db.select().from(studyMaterials).where(eq(studyMaterials.id, materialId)).limit(1))[0];
     if (m && m.userId === userId) parts.push(`【教材：${m.title}】\n${m.content.slice(0, 8000)}`);
   }
-  const mem = await db.select().from(aiMemory).where(eq(aiMemory.userId, userId)).limit(20);
+  const mem = await db.select().from(aiMemory).where(and(eq(aiMemory.userId, userId), eq(aiMemory.consentStatus, "active"), isNull(aiMemory.deletedAt), sql`(${aiMemory.expiresAt} is null or ${aiMemory.expiresAt} > now())`)).orderBy(desc(aiMemory.confidence), desc(aiMemory.updatedAt)).limit(20);
   if (mem.length) parts.push(`【長期記憶】${mem.map((m) => `${m.key}: ${m.value}`).join("；")}`);
   return parts.join("\n\n");
 }
@@ -248,8 +248,8 @@ export const routes: RouteDef[] = [
         if (!m?.key) continue;
         await db
           .insert(aiMemory)
-          .values({ userId: user.userId, key: String(m.key).slice(0, 60), value: String(m.value ?? "").slice(0, 400) })
-          .onConflictDoUpdate({ target: [aiMemory.userId, aiMemory.key], set: { value: String(m.value ?? "").slice(0, 400), updatedAt: new Date() } });
+          .values({ userId: user.userId, key: String(m.key).slice(0, 60), value: String(m.value ?? "").slice(0, 400), scope: "episodic", sourceType: "ai_conversation", sourceId: conv.id, confidence: 60, consentStatus: "active", lastUsedAt: new Date() })
+          .onConflictDoUpdate({ target: [aiMemory.userId, aiMemory.key], set: { value: String(m.value ?? "").slice(0, 400), scope: "episodic", sourceType: "ai_conversation", sourceId: conv.id, confidence: 60, consentStatus: "active", deletedAt: null, lastUsedAt: new Date(), updatedAt: new Date() } });
       }
 
       if (history.length <= 2) {
@@ -360,7 +360,77 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      return { memory: await db.select().from(aiMemory).where(eq(aiMemory.userId, user.userId)).orderBy(desc(aiMemory.updatedAt)) };
+      const memory = await db.select().from(aiMemory).where(and(eq(aiMemory.userId, user.userId), isNull(aiMemory.deletedAt))).orderBy(desc(aiMemory.updatedAt));
+      return { memory, memoryEnabled: memory.some((item) => item.consentStatus === "active") };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/ai/memory",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        key: z.string().min(1).max(60),
+        value: z.string().min(1).max(400),
+        scope: z.enum(["session", "task", "profile", "mastery", "episodic", "semantic"]).default("profile"),
+        confidence: z.number().int().min(0).max(100).default(80),
+        expiresAt: z.string().datetime().nullable().optional(),
+      }));
+      const rows = await db.insert(aiMemory).values({
+        userId: user.userId,
+        key: body.key,
+        value: body.value,
+        scope: body.scope,
+        sourceType: "user",
+        confidence: body.confidence,
+        consentStatus: "active",
+        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+        lastUsedAt: new Date(),
+      }).onConflictDoUpdate({ target: [aiMemory.userId, aiMemory.key], set: { value: body.value, scope: body.scope, confidence: body.confidence, consentStatus: "active", expiresAt: body.expiresAt ? new Date(body.expiresAt) : null, deletedAt: null, lastUsedAt: new Date(), updatedAt: new Date() } }).returning();
+      return { memory: rows[0] };
+    },
+  }),
+
+  route({
+    method: "PATCH",
+    path: "/ai/memory/:id",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        value: z.string().min(1).max(400).optional(),
+        consentStatus: z.enum(["active", "paused", "revoked"]).optional(),
+        confidence: z.number().int().min(0).max(100).optional(),
+        expiresAt: z.string().datetime().nullable().optional(),
+      }));
+      const rows = await db.update(aiMemory).set({ ...body, expiresAt: body.expiresAt === undefined ? undefined : body.expiresAt ? new Date(body.expiresAt) : null, updatedAt: new Date() }).where(and(eq(aiMemory.id, ctx.params.id), eq(aiMemory.userId, user.userId), isNull(aiMemory.deletedAt))).returning();
+      if (!rows[0]) throw notFound("找不到這筆 Novi 記憶");
+      return { memory: rows[0] };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/ai/memory/export",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const memory = await db.select().from(aiMemory).where(and(eq(aiMemory.userId, user.userId), isNull(aiMemory.deletedAt))).orderBy(desc(aiMemory.updatedAt));
+      return { exportedAt: new Date().toISOString(), memory };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/ai/memory/settings",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ enabled: z.boolean() }));
+      await db.update(aiMemory).set({ consentStatus: body.enabled ? "active" : "paused", updatedAt: new Date() }).where(and(eq(aiMemory.userId, user.userId), isNull(aiMemory.deletedAt)));
+      return { enabled: body.enabled };
     },
   }),
 
@@ -370,7 +440,8 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      await db.delete(aiMemory).where(and(eq(aiMemory.id, ctx.params.id), eq(aiMemory.userId, user.userId)));
+      const deleted = await db.delete(aiMemory).where(and(eq(aiMemory.id, ctx.params.id), eq(aiMemory.userId, user.userId))).returning({ id: aiMemory.id });
+      if (!deleted[0]) throw notFound("找不到這筆 Novi 記憶");
       return { deleted: true };
     },
   }),

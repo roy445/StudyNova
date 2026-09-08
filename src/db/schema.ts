@@ -924,9 +924,17 @@ export const aiMemory = pgTable(
     userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
     key: text("key").notNull(),
     value: text("value").notNull(),
+    scope: text("scope").notNull().default("profile"), // session | task | profile | mastery | episodic | semantic
+    sourceType: text("source_type").notNull().default("user"), // user | ai_conversation | learning_event | import
+    sourceId: uuid("source_id"),
+    confidence: integer("confidence").notNull().default(50),
+    consentStatus: text("consent_status").notNull().default("active"), // active | paused | revoked
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     updatedAt: updated(),
   },
-  (t) => [uniqueIndex("ai_memory_uq").on(t.userId, t.key)],
+  (t) => [uniqueIndex("ai_memory_uq").on(t.userId, t.key), index("ai_memory_active_idx").on(t.userId, t.consentStatus, t.deletedAt)],
 );
 
 export const aiUsageLogs = pgTable(

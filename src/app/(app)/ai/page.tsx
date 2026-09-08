@@ -9,6 +9,7 @@ import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
 type Message = { id: string; conversationId?: string; role: string; content: string; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
 type FileContext = { id: string; originalName: string; status: string; detected: Array<{ kind: string; text: string; confidence: number }>; error: string; uploadBatch: number };
+type MemoryItem = { id: string; key: string; value: string; scope?: string; confidence?: number; consentStatus?: string; updatedAt?: string };
 
 const MODES = [
   { key: "teacher", label: "學習教練模式", description: "陪你規劃學習、拆解觀念與建立可執行的下一步。" },
@@ -41,7 +42,7 @@ export default function AiPage() {
   const toast = useToast();
   const convs = useApi<{ conversations: Conversation[]; aiEnabled: boolean }>("/ai/conversations");
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
-  const memory = useApi<{ memory: Array<{ id: string; key: string; value: string }> }>("/ai/memory");
+  const memory = useApi<{ memory: MemoryItem[]; memoryEnabled?: boolean }>("/ai/memory");
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
   const contexts = useApi<{ contexts: FileContext[] }>("/ai/solution/contexts");
   const aiContextCost = quotas.data?.quotas.find((item) => item.feature === "ai_context")?.novaCost ?? null;
@@ -360,19 +361,50 @@ export default function AiPage() {
       </Card>
 
       <Modal open={showMemory} onClose={() => setShowMemory(false)} title="Novi 長期記憶">
-        <p className="mb-2 text-xs text-muted">Novi 會記住你的學習偏好與弱點，你可以隨時刪除。</p>
+        <div className="mb-3 space-y-2 text-xs text-muted">
+          <p>Novi 只會使用狀態為「啟用」且尚未過期的記憶。你可以查看來源、信心、暫停全部記憶，或匯出後自行保存。</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={async () => {
+                await apiPost("/ai/memory/settings", { enabled: !memory.data?.memoryEnabled });
+                await memory.reload();
+              }}
+            >
+              {memory.data?.memoryEnabled ? "暫停全部記憶" : "恢復全部記憶"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={async () => {
+                const result = await apiGet<{ exportedAt: string; memory: MemoryItem[] }>("/ai/memory/export");
+                const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement("a");
+                anchor.href = url;
+                anchor.download = "novi-memory-export.json";
+                anchor.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              匯出記憶
+            </Button>
+          </div>
+        </div>
         <div className="space-y-1.5">
           {memory.data?.memory.map((m) => (
             <div key={m.id} className="glass-soft flex items-center justify-between gap-2 px-3 py-2 text-xs">
               <span className="min-w-0">
                 <span className="font-medium">{m.key}</span>：<span className="text-muted">{m.value}</span>
+                <span className="mt-1 block text-[10px] text-muted">{m.scope ?? "profile"} · 信心 {m.confidence ?? 50}% · {m.consentStatus === "paused" ? "已暫停" : "啟用中"}</span>
               </span>
               <button
                 onClick={async () => {
                   await apiDelete(`/ai/memory/${m.id}`);
                   await memory.reload();
                 }}
-                className="text-rose-300"
+                className="shrink-0 text-rose-300"
               >
                 刪除
               </button>
