@@ -335,6 +335,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      try {
       const today = todayStr();
       const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
       await ensureDailyTasks(user.userId, today);
@@ -450,6 +451,10 @@ export const routes: RouteDef[] = [
         isPro: user.isPro,
         aiEnabled: aiConfigured(),
       };
+      } catch (error) {
+        console.error("[dashboard] read failed; returning safe shell", error);
+        return { today: todayStr(), greeting: `嗨，${user.displayName}！`, minutes: 0, focusMinutes: 0, goal: 45, streak: 0, tasks: [], plan: null, stats: [], weakest: null, recentGrades: [], upcomingExams: [], countdowns: [], dueWrong: 0, wordsDue: 0, nova: 0, novi: null, activities: [], announcements: [], marquee: [], openWeek: null, unread: 0, isPro: user.isPro, aiEnabled: aiConfigured(), degraded: true };
+      }
     },
   }),
 

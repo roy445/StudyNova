@@ -360,8 +360,13 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const memory = await db.select().from(aiMemory).where(and(eq(aiMemory.userId, user.userId), isNull(aiMemory.deletedAt))).orderBy(desc(aiMemory.updatedAt));
-      return { memory, memoryEnabled: memory.some((item) => item.consentStatus === "active") };
+      try {
+        const memory = await db.select().from(aiMemory).where(and(eq(aiMemory.userId, user.userId), isNull(aiMemory.deletedAt))).orderBy(desc(aiMemory.updatedAt));
+        return { memory, memoryEnabled: memory.some((item) => item.consentStatus === "active") };
+      } catch (error) {
+        console.error("[ai/memory] read failed; returning empty state", error);
+        return { memory: [], memoryEnabled: false, degraded: true };
+      }
     },
   }),
 
