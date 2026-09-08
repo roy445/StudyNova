@@ -141,16 +141,30 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
   }, [load]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !path) return;
     const refreshFromShell = () => {
       if (document.visibilityState !== "visible") return;
       const activeTag = document.activeElement?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
+      // 事件代表頁面狀態可能已跨日、跨分頁或重新連線；不能沿用 10 秒 GET cache。
+      GET_CACHE.delete(path);
       void load(true);
     };
+    const refreshOnVisibility = () => { if (document.visibilityState === "visible") refreshFromShell(); };
+    const refreshOnStorage = (event: StorageEvent) => { if (!event.key || event.key.startsWith("studynova:")) refreshFromShell(); };
     window.addEventListener("studynova:sync", refreshFromShell);
-    return () => window.removeEventListener("studynova:sync", refreshFromShell);
-  }, [load]);
+    window.addEventListener("focus", refreshFromShell);
+    window.addEventListener("online", refreshFromShell);
+    document.addEventListener("visibilitychange", refreshOnVisibility);
+    window.addEventListener("storage", refreshOnStorage);
+    return () => {
+      window.removeEventListener("studynova:sync", refreshFromShell);
+      window.removeEventListener("focus", refreshFromShell);
+      window.removeEventListener("online", refreshFromShell);
+      document.removeEventListener("visibilitychange", refreshOnVisibility);
+      window.removeEventListener("storage", refreshOnStorage);
+    };
+  }, [load, path]);
 
   return {
     data,
