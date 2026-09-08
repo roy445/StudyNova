@@ -289,6 +289,9 @@ export const notes = pgTable(
     title: text("title").notNull(),
     subject: text("subject").notNull().default("其他"),
     body: text("body").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    template: text("template").notNull().default("自由筆記"),
+    backlinks: jsonb("backlinks").$type<string[]>().notNull().default([]),
     source: text("source").notNull().default("manual"),
     materialId: uuid("material_id").references(() => studyMaterials.id, { onDelete: "set null" }),
     visibility: text("visibility").notNull().default("private"),
@@ -297,6 +300,43 @@ export const notes = pgTable(
     updatedAt: updated(),
   },
   (t) => [index("notes_user_idx").on(t.userId), uniqueIndex("notes_slug_uq").on(t.shareSlug)],
+);
+
+/* ------------------------------------------------------ LEARNING GRAPH */
+
+export const knowledgeNodes = pgTable(
+  "knowledge_nodes",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    subject: text("subject").notNull().default("其他"),
+    title: text("title").notNull(),
+    kind: text("kind").notNull().default("concept"), // subject | unit | concept | material | note | vocabulary | wrong_question
+    description: text("description").notNull().default(""),
+    mastery: integer("mastery").notNull().default(0),
+    sourceType: text("source_type").notNull().default("manual"),
+    sourceId: uuid("source_id"),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("knowledge_nodes_user_subject_idx").on(t.userId, t.subject), index("knowledge_nodes_user_kind_idx").on(t.userId, t.kind)],
+);
+
+export const knowledgeEdges = pgTable(
+  "knowledge_edges",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    fromNodeId: uuid("from_node_id").notNull().references(() => knowledgeNodes.id, { onDelete: "cascade" }),
+    toNodeId: uuid("to_node_id").notNull().references(() => knowledgeNodes.id, { onDelete: "cascade" }),
+    relation: text("relation").notNull().default("related"), // contains | prerequisite | reinforces | sourced_from | related
+    weight: real("weight").notNull().default(1),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("knowledge_edges_uq").on(t.userId, t.fromNodeId, t.toNodeId, t.relation), index("knowledge_edges_from_idx").on(t.userId, t.fromNodeId), index("knowledge_edges_to_idx").on(t.userId, t.toNodeId)],
 );
 
 /* --------------------------------------------------------------- QUIZ */

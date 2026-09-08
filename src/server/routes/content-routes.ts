@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   studyMaterials,
@@ -15,6 +15,8 @@ import {
   questions,
   quizzes,
   sentences,
+  knowledgeNodes,
+  knowledgeEdges,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, sanitizeText, slugToken, todayStr, fingerprint } from "../core";
@@ -815,6 +817,60 @@ export const contentRoutes: RouteDef[] = [
       return { deleted: true };
     },
   }),
+  /* ----------------------------------------------------- learning graph */
+  route({
+    method: "GET",
+    path: "/knowledge/graph",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const subject = ctx.query.get("subject");
+      const kind = ctx.query.get("kind");
+      const nodes = await db.select().from(knowledgeNodes).where(and(eq(knowledgeNodes.userId, user.userId), subject ? eq(knowledgeNodes.subject, subject) : undefined, kind ? eq(knowledgeNodes.kind, kind) : undefined)).orderBy(desc(knowledgeNodes.updatedAt)).limit(300);
+      const nodeIds = new Set(nodes.map((node) => node.id));
+      const edges = (await db.select().from(knowledgeEdges).where(eq(knowledgeEdges.userId, user.userId)).orderBy(desc(knowledgeEdges.createdAt)).limit(600)).filter((edge) => nodeIds.has(edge.fromNodeId) && nodeIds.has(edge.toNodeId));
+      return { nodes, edges };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/knowledge/nodes",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ subject: z.string().max(30).default("其他"), title: z.string().min(1).max(160), kind: z.enum(["subject", "unit", "concept", "material", "note", "vocabulary", "wrong_question"]).default("concept"), description: z.string().max(2000).default(""), mastery: z.number().int().min(0).max(100).default(0), sourceType: z.string().max(30).default("manual"), sourceId: z.string().uuid().nullable().optional(), tags: z.array(z.string().max(40)).max(20).default([]), metadata: z.record(z.string(), z.unknown()).default({}) }));
+      const rows = await db.insert(knowledgeNodes).values({ userId: user.userId, ...body, sourceId: body.sourceId ?? null }).returning();
+      return { node: rows[0] };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/knowledge/edges",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ fromNodeId: z.string().uuid(), toNodeId: z.string().uuid(), relation: z.enum(["contains", "prerequisite", "reinforces", "sourced_from", "related"]).default("related"), weight: z.number().min(0).max(10).default(1), metadata: z.record(z.string(), z.unknown()).default({}) }));
+      const owned = await db.select({ id: knowledgeNodes.id }).from(knowledgeNodes).where(and(eq(knowledgeNodes.userId, user.userId), inArray(knowledgeNodes.id, [body.fromNodeId, body.toNodeId])));
+      if (owned.length !== 2) throw forbidden();
+      const rows = await db.insert(knowledgeEdges).values({ userId: user.userId, ...body }).onConflictDoUpdate({ target: [knowledgeEdges.userId, knowledgeEdges.fromNodeId, knowledgeEdges.toNodeId, knowledgeEdges.relation], set: { weight: body.weight, metadata: body.metadata } }).returning();
+      return { edge: rows[0] };
+    },
+  }),
+
+  route({
+    method: "DELETE",
+    path: "/knowledge/edges/:id",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const deleted = await db.delete(knowledgeEdges).where(and(eq(knowledgeEdges.id, ctx.params.id), eq(knowledgeEdges.userId, user.userId))).returning({ id: knowledgeEdges.id });
+      if (!deleted[0]) throw notFound("找不到知識關聯");
+      return { deleted: true };
+    },
+  }),
+
   /* ---------------------------------------------------------- notes */
   route({
     method: "GET",
@@ -833,8 +889,9 @@ export const contentRoutes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ title: z.string().min(1).max(120), subject: z.string().max(20).default("其他"), body: z.string().max(30000).default("") }));
-      const rows = await db.insert(notes).values({ userId: user.userId, title: body.title, subject: body.subject, body: body.body }).returning();
+      const body = await ctx.json(z.object({ title: z.string().min(1).max(120), subject: z.string().max(20).default("其他"), body: z.string().max(30000).default(""), tags: z.array(z.string().max(40)).max(20).default([]), template: z.string().max(40).default("自由筆記"), backlinks: z.array(z.string().uuid()).max(50).default([]) }));
+      const rows = await db.insert(notes).values({ userId: user.userId, title: body.title, subject: body.subject, body: body.body, tags: body.tags, template: body.template, backlinks: body.backlinks }).returning();
+      const node = await db.insert(knowledgeNodes).values({ userId: user.userId, title: body.title, subject: body.subject, kind: "note", description: body.body.slice(0, 500), sourceType: "note", sourceId: rows[0]?.id ?? null, tags: body.tags }).returning();
       await progressDailyTask(user.userId, "material", 1);
       return { note: rows[0] };
     },
@@ -846,7 +903,7 @@ export const contentRoutes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ title: z.string().min(1).max(120).optional(), body: z.string().max(30000).optional(), visibility: visibility.optional() }));
+      const body = await ctx.json(z.object({ title: z.string().min(1).max(120).optional(), body: z.string().max(30000).optional(), tags: z.array(z.string().max(40)).max(20).optional(), template: z.string().max(40).optional(), backlinks: z.array(z.string().uuid()).max(50).optional(), visibility: visibility.optional() }));
       const n = (await db.select().from(notes).where(eq(notes.id, ctx.params.id)).limit(1))[0];
       if (!n) throw notFound("找不到筆記");
       if (n.userId !== user.userId) throw forbidden();
