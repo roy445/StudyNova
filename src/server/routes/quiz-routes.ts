@@ -18,6 +18,7 @@ import { badRequest, conflict, fail, fingerprint, notFound, forbidden, todayStr 
 import { consumeFeature, grantLearningReward, progressDailyTask, progressActivities, bumpAchievement } from "../economy";
 import { runAiJson, aiConfigured } from "../ai";
 import { recordStudy } from "./learning-routes";
+import { recordReviewOutcome } from "../review-service";
 
 const difficulty = z.enum(["easy", "normal", "hard", "exam", "advanced"]);
 const qType = z.enum(["single", "multiple", "fill", "truefalse", "short", "reading", "part_of_speech", "meaning", "mixed"]);
@@ -468,6 +469,14 @@ export const routes: RouteDef[] = [
         .where(eq(wrongQuestions.id, row.id))
         .returning();
       await progressDailyTask(user.userId, "wrong_review", 1);
+      await recordReviewOutcome({
+        userId: user.userId,
+        contentType: "wrong_question",
+        contentId: row.id,
+        rating: body.correct ? "good" : "again",
+        source: "wrong_review",
+        metadata: { questionId: row.questionId, mastery },
+      });
       if (mastery >= 100) {
         await grantLearningReward({ userId: user.userId, nova: 8, xp: 15, reason: "錯題完全掌握", idempotencyKey: `wrongmastered:${row.id}` });
         const resolved = await db.select({ c: sql<number>`count(*)::int` }).from(wrongQuestions).where(and(eq(wrongQuestions.userId, user.userId), sql`${wrongQuestions.resolvedAt} is not null`));
@@ -529,6 +538,14 @@ export const routes: RouteDef[] = [
         .returning();
       await progressDailyTask(user.userId, "words", 1);
       await progressActivities(user.userId, "words", 1);
+      await recordReviewOutcome({
+        userId: user.userId,
+        contentType: "vocabulary",
+        contentId: word.id,
+        rating: body.correct ? "good" : "again",
+        source: `word_answer:${body.mode}`,
+        metadata: { word: word.word, mode: body.mode },
+      });
       if (!body.correct && body.addToWrongBook) {
         const qRows = await db.insert(questions).values({
           ownerId: user.userId,

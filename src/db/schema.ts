@@ -542,6 +542,74 @@ export const focusSessions = pgTable(
 
 /* ---------------------------------------------------------- VOCAB/VOICE */
 
+/* ----------------------------------------------- LEARNING INTELLIGENCE */
+
+/**
+ * Append-only evidence ledger. Polymorphic object references are intentional:
+ * vocabulary, wrong questions, material highlights and knowledge nodes are
+ * introduced at different product phases, while this ledger keeps one event
+ * contract for analytics and scheduling.
+ */
+export const learningEvents = pgTable(
+  "learning_events",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(), // review | answer | hint | read | highlight | note | focus | voice
+    objectType: text("object_type").notNull(), // vocabulary | wrong_question | material | knowledge_point | note | sentence
+    objectId: uuid("object_id"),
+    conceptId: uuid("concept_id"),
+    sessionId: uuid("session_id"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    durationSec: integer("duration_sec").notNull().default(0),
+    responseTimeMs: integer("response_time_ms").notNull().default(0),
+    correct: boolean("correct"),
+    hintUsed: boolean("hint_used").notNull().default(false),
+    confidence: integer("confidence"),
+    source: text("source").notNull().default("app"),
+    idempotencyKey: text("idempotency_key").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [
+    index("learning_events_user_time_idx").on(t.userId, t.occurredAt),
+    index("learning_events_object_idx").on(t.objectType, t.objectId),
+    index("learning_events_concept_idx").on(t.conceptId, t.occurredAt),
+    uniqueIndex("learning_events_idempotency_uq").on(t.userId, t.idempotencyKey),
+  ],
+);
+
+/** A unified review queue item whose scheduler state is owned by StudyNova. */
+export const reviewItems = pgTable(
+  "review_items",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    contentType: text("content_type").notNull(), // vocabulary | wrong_question | material_highlight | knowledge_point | sentence
+    contentId: uuid("content_id").notNull(),
+    conceptId: uuid("concept_id"),
+    state: text("state").notNull().default("new"), // new | learning | review | relearning | suspended
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull().defaultNow(),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    stability: real("stability").notNull().default(0),
+    difficulty: real("difficulty").notNull().default(0),
+    retrievability: real("retrievability").notNull().default(0),
+    reps: integer("reps").notNull().default(0),
+    lapses: integer("lapses").notNull().default(0),
+    lastRating: text("last_rating").notNull().default(""), // again | hard | good | easy
+    sourceEvidenceId: uuid("source_evidence_id"),
+    suspendedReason: text("suspended_reason").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [
+    uniqueIndex("review_items_user_content_uq").on(t.userId, t.contentType, t.contentId),
+    index("review_items_due_idx").on(t.userId, t.dueAt),
+    index("review_items_concept_idx").on(t.userId, t.conceptId),
+  ],
+);
+
 export const dailyWords = pgTable(
   "daily_words",
   {

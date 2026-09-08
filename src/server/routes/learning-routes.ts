@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, count, desc, eq, gte, sql, isNull, lte, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql, isNull, lte, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   gradeRecords,
@@ -29,6 +29,8 @@ import {
   wordProgress,
   questions,
   userVocabularies,
+  learningEvents,
+  reviewItems,
 } from "@/db/schema";
 import { route, zDate, type RouteDef } from "../router";
 import { addDaysStr, badRequest, daysBetween, fail, notFound, randomToken, round1, todayStr, trend, toCsv } from "../core";
@@ -53,6 +55,7 @@ function taipeiDateKey(date = new Date()) {
 
 import { runAiJson, aiConfigured } from "../ai";
 import { ensureSeeded } from "../seed";
+import { initialReviewState, scheduleReview, type ReviewRating } from "../review-scheduler";
 
 /* --------------------------------------------------------- analytics */
 
@@ -241,6 +244,90 @@ async function buildLearningExport(userId: string, kind: ExportKind) {
 }
 
 export const routes: RouteDef[] = [
+  /* ----------------------------------------------- intelligent review */
+  route({
+    method: "GET",
+    path: "/review/due",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const limit = Math.min(100, Math.max(1, Number(ctx.query.get("limit") ?? 30)));
+      const rows = await db
+        .select()
+        .from(reviewItems)
+        .where(and(eq(reviewItems.userId, user.userId), lte(reviewItems.dueAt, new Date()), ne(reviewItems.state, "suspended")))
+        .orderBy(asc(reviewItems.dueAt))
+        .limit(limit);
+      return { items: rows, count: rows.length };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/review/items",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        contentType: z.enum(["vocabulary", "wrong_question", "material_highlight", "knowledge_point", "sentence"]),
+        contentId: z.string().uuid(),
+        conceptId: z.string().uuid().nullable().optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
+      }));
+      const initial = initialReviewState();
+      await db.insert(reviewItems).values({
+        userId: user.userId,
+        contentType: body.contentType,
+        contentId: body.contentId,
+        conceptId: body.conceptId ?? null,
+        dueAt: initial.dueAt,
+        metadata: body.metadata ?? {},
+      }).onConflictDoNothing();
+      const item = (await db.select().from(reviewItems).where(and(eq(reviewItems.userId, user.userId), eq(reviewItems.contentType, body.contentType), eq(reviewItems.contentId, body.contentId))).limit(1))[0];
+      return { item };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/review/items/:id/review",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        rating: z.enum(["again", "hard", "good", "easy"]),
+        responseTimeMs: z.number().int().min(0).max(86_400_000).default(0),
+        hintUsed: z.boolean().default(false),
+        confidence: z.number().int().min(0).max(100).nullable().optional(),
+        source: z.string().max(40).default("review"),
+        idempotencyKey: z.string().max(160).optional(),
+      }));
+      const item = (await db.select().from(reviewItems).where(and(eq(reviewItems.id, ctx.params.id), eq(reviewItems.userId, user.userId))).limit(1))[0];
+      if (!item) throw notFound("找不到複習項目");
+      if (item.state === "suspended") throw badRequest("這個複習項目目前已暫停");
+      const now = new Date();
+      const next = scheduleReview(item, body.rating as ReviewRating, now);
+      const updated = await db.update(reviewItems).set({ ...next, updatedAt: now }).where(eq(reviewItems.id, item.id)).returning();
+      const idempotencyKey = body.idempotencyKey ?? `review:${item.id}:${now.getTime()}:${randomToken()}`;
+      await db.insert(learningEvents).values({
+        userId: user.userId,
+        eventType: "review",
+        objectType: item.contentType,
+        objectId: item.contentId,
+        conceptId: item.conceptId,
+        occurredAt: now,
+        responseTimeMs: body.responseTimeMs,
+        correct: body.rating !== "again",
+        hintUsed: body.hintUsed,
+        confidence: body.confidence ?? null,
+        source: body.source,
+        idempotencyKey,
+        metadata: { rating: body.rating, reviewItemId: item.id },
+      }).onConflictDoNothing();
+      return { item: updated[0], eventRecorded: true };
+    },
+  }),
+
   route({
     method: "GET",
     path: "/dashboard",
