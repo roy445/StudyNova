@@ -420,7 +420,23 @@ export const routes: RouteDef[] = [
     path: "/admin/features",
     auth: "admin",
     handler: async () => {
-      return { features: await db.select().from(featurePermissions).orderBy(asc(featurePermissions.feature)) };
+      try {
+        return { features: await db.select().from(featurePermissions).orderBy(asc(featurePermissions.feature)) };
+      } catch {
+        const features = await db.select({
+          id: featurePermissions.id,
+          feature: featurePermissions.feature,
+          label: featurePermissions.label,
+          enabled: featurePermissions.enabled,
+          proOnly: featurePermissions.proOnly,
+          freeDailyLimit: featurePermissions.freeDailyLimit,
+          proDailyLimit: featurePermissions.proDailyLimit,
+          monthlyLimit: featurePermissions.monthlyLimit,
+          novaCost: featurePermissions.novaCost,
+          updatedAt: featurePermissions.updatedAt,
+        }).from(featurePermissions).orderBy(asc(featurePermissions.feature));
+        return { features: features.map((feature) => ({ ...feature, category: "系統與其他" })) };
+      }
     },
   }),
 
