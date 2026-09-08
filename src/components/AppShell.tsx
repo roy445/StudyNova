@@ -120,8 +120,6 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [quickChatInput, setQuickChatInput] = useState("");
   const [quickChatReply, setQuickChatReply] = useState("");
   const [quickChatSending, setQuickChatSending] = useState(false);
-  const [noviPosition, setNoviPosition] = useState({ x: 0, y: 0 });
-  const noviDrag = useRef<{ startX: number; startY: number; x: number; y: number } | null>(null);
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
@@ -182,17 +180,6 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
     }, 90_000);
     return () => window.clearTimeout(timer);
   }, [noviOpen, quickChatReply, advice, encouragement]);
-
-  useEffect(() => {
-    const move = (event: PointerEvent) => {
-      if (!noviDrag.current) return;
-      setNoviPosition({ x: noviDrag.current.x + event.clientX - noviDrag.current.startX, y: noviDrag.current.y + event.clientY - noviDrag.current.startY });
-    };
-    const up = () => { noviDrag.current = null; };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
@@ -491,7 +478,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       </nav>
 
       {/* Novi dock */}
-      <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5" style={{ transform: `translate(${noviPosition.x}px, ${noviPosition.y}px)` }}>
+      <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5">
         {!noviOpen && encouragement && (
           <button type="button" onClick={() => setNoviOpen(true)} className="glass anim-pop max-w-[min(82vw,300px)] p-3 text-left text-xs leading-relaxed text-[#e8edff] shadow-[0_0_28px_rgba(55,211,255,0.18)]">
             <span className="mb-1 block text-[10px] font-semibold tracking-wider text-[#37d3ff]">Novi 給你的話</span>
@@ -572,7 +559,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               >
                 －
               </button>
-              <button onPointerDown={(event) => { noviDrag.current = { startX: event.clientX, startY: event.clientY, x: noviPosition.x, y: noviPosition.y }; }} onClick={() => { touchNovi(); setQuickChatReply((current) => current || "嗨！點下面的輸入框就能直接和我聊天。你不一定要完美，我們先完成下一步。\n\n拖曳我到你習慣的位置，太久沒有互動我會自動縮小。 "); }} className="focus-ring cursor-grab rounded-full active:cursor-grabbing" aria-label="開啟 Novi 小助理">
+              <button onClick={() => { touchNovi(); setQuickChatReply((current) => current || "嗨！點下面的輸入框就能直接和我聊天。你不一定要完美，我們先完成下一步。\n\n我會固定在右下角，方便你隨時找到我。 "); }} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
                 <NoviAvatar size={58} state={encouragement?.state ?? (noviOpen ? "happy" : "idle")} level={level} />
               </button>
             </>
