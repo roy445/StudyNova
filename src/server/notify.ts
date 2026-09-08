@@ -28,6 +28,7 @@ export type NotifyInput = {
   link?: string;
   dedupeKey?: string;
   push?: boolean;
+  scheduleAt?: Date;
   vibrate?: number[];
 };
 
@@ -42,11 +43,15 @@ export async function notify(input: NotifyInput): Promise<boolean> {
       body: (input.body ?? "").slice(0, 800),
       link: input.link ?? "",
       dedupeKey: input.dedupeKey ?? null,
+      channel: input.push ? "push" : "in_app",
+      scheduledAt: input.scheduleAt ?? null,
     })
     .onConflictDoNothing()
     .returning({ id: notifications.id });
   const created = Boolean(rows[0]);
-  if (created && input.push) await sendPush(input.userId, { title: input.title, body: input.body ?? "", link: input.link ?? "/", vibrate: input.vibrate ?? [120, 60, 120] });
+  if (!created || !input.push || (input.scheduleAt && input.scheduleAt > new Date())) return created;
+  const result = await sendPush(input.userId, { title: input.title, body: input.body ?? "", link: input.link ?? "/", vibrate: input.vibrate ?? [120, 60, 120] });
+  await db.update(notifications).set({ attempts: 1, deliveredAt: result.sent > 0 ? new Date() : null, lastError: result.sent > 0 || !result.configured ? "" : "沒有可用的推播訂閱" }).where(eq(notifications.id, rows[0].id));
   return created;
 }
 

@@ -32,6 +32,7 @@ import {
   platformSettings,
   challenges,
   challengeParticipants,
+  achievements,
   accountAppeals,
   sessions,
 } from "@/db/schema";
@@ -53,6 +54,38 @@ function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/admin/achievements",
+    auth: "admin",
+    handler: async () => ({ achievements: await db.select().from(achievements).orderBy(asc(achievements.sortOrder)) }),
+  }),
+  route({
+    method: "POST",
+    path: "/admin/achievements",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ code: z.string().min(2).max(80), title: z.string().min(1).max(120), description: z.string().max(500), icon: z.string().max(12).default("🏅"), target: z.number().int().min(1).max(100000).default(1), metric: z.string().max(80), rewardNova: z.number().int().min(0).max(100000).default(0), rewardXp: z.number().int().min(0).max(100000).default(0), rule: z.record(z.string(), z.unknown()).default({}), enabled: z.boolean().default(true), sortOrder: z.number().int().min(0).max(9999).default(0) }));
+      const rows = await db.insert(achievements).values(body).returning();
+      await adminLog({ actorId: admin.userId, action: "achievement.create", targetType: "achievement", targetId: rows[0].id, after: rows[0], ip: ctx.ip });
+      return { achievement: rows[0] };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/achievements/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ title: z.string().min(1).max(120).optional(), description: z.string().max(500).optional(), icon: z.string().max(12).optional(), target: z.number().int().min(1).max(100000).optional(), metric: z.string().max(80).optional(), rewardNova: z.number().int().min(0).max(100000).optional(), rewardXp: z.number().int().min(0).max(100000).optional(), rule: z.record(z.string(), z.unknown()).optional(), enabled: z.boolean().optional(), sortOrder: z.number().int().min(0).max(9999).optional() }));
+      const before = (await db.select().from(achievements).where(eq(achievements.id, ctx.params.id)).limit(1))[0];
+      if (!before) throw notFound("找不到成就");
+      const rows = await db.update(achievements).set(body).where(eq(achievements.id, before.id)).returning();
+      await adminLog({ actorId: admin.userId, action: "achievement.update", targetType: "achievement", targetId: before.id, before, after: rows[0], ip: ctx.ip });
+      return { achievement: rows[0] };
+    },
+  }),
   route({
     method: "GET",
     path: "/admin/challenges",
