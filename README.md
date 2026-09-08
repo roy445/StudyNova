@@ -17,7 +17,7 @@ StudyNova AI 是專為 **台灣國中／高中學生** 打造的正式全端學�
 | 學習 | 今日 AI 讀書計畫、專注計時器、每日任務、待辦與作業、學習紀錄與連續天數 |
 | 成績 | 成績登錄（段考／小考／模擬考／作業／平時）、百分比・平均・最高・最低・趨勢、AI 成績分析、目標分數追蹤、考試倒數 |
 | 教材 | PDF／TXT／圖片上傳、AI 文字擷取、AI 重點・單字・句子・筆記、教材可見度與分享 |
-| OCR | 多圖上傳、排序、旋轉、裁切、5 色螢光筆框選、AI OCR、可編輯文字、8 種 AI 轉換（筆記／出題／解題／重點／記憶卡／翻譯／易錯／複習計畫） |
+| OCR | 多圖上傳、排序、旋轉、裁切、5 色螢光筆框選、AI OCR、可編輯文字、8 種 AI 轉換（筆記／出題／解題／重點／記憶卡／翻譯／易錯／複習計畫）；管理員可設定教材 OCR 類型與信心門檻 |
 | 測驗 | AI 出題（6 種題型・5 種難度）、倒數計時、自動儲存與恢復、自動計分、解析、錯題自動建檔 |
 | 錯題本 | 錯誤次數、複習次數、熟練度、間隔複習、AI 更簡單解法與記憶法、錯題複習卷 |
 | 單字／句子 | 每日單字（依程度與熟悉度排序）、單字卡／中英互測／拼寫／限時挑戰、AI 記憶法、句子中英互譯與填空、TTS 朗讀 |
@@ -29,7 +29,7 @@ StudyNova AI 是專為 **台灣國中／高中學生** 打造的正式全端學�
 | AI | Gemini 2.5 Flash → GPT-4.1-mini → OpenRouter 三層 Fallback、只有 429/5xx/Timeout/Network/Quota 才降級、Quota 用盡持久化冷卻至下個 UTC 月初、完整 AI Log 與 Health 儀表板 |
 | 通知 | 站內通知、Web Push（VAPID + Service Worker）、Idempotency 去重 |
 | 排程 | Queue Adapter（Redis/BullMQ ↔ PostgreSQL）、7 個 Cron 任務、Secret 驗證 + Task UID 冪等 |
-| 後台 | 總覽、使用者批次管理、Nova/XP 贈送、會員授予、功能權限與額度、公告、活動、優惠碼、題庫匯入、AI Health、系統健康、Cron、CSV 匯出、Audit Log、System Test Center |
+| 後台 | 總覽、使用者批次管理、Nova/XP 贈送、會員授予、功能權限與額度、全站服務總開關、教材 Content Studio、封面上傳、教材 OCR、公告、活動、優惠碼、題庫匯入、AI Health、系統健康、Cron、CSV 匯出、Audit Log、System Test Center |
 
 ---
 
@@ -160,6 +160,7 @@ Migration 一律採 additive 策略，禁止直接刪除生產資料表／欄位
 | --- | --- |
 | [`docs/MANUAL.md`](./docs/MANUAL.md) | 完整使用手冊（學生 / 管理員 / 維運三部分） |
 | [`docs/ERROR_CODES.md`](./docs/ERROR_CODES.md) | 全部 90 組錯誤代碼、格式說明與回報流程 |
+| [`docs/content-studio-ocr.md`](./docs/content-studio-ocr.md) | Content Studio、封面上傳與 OCR 詳細設定規格 |
 | `/faq` | 站內常見問題 + 錯誤代碼即時查詢 |
 | `/support` | 問題回報（自動帶入錯誤代碼與追蹤編號，可附截圖、可查單號） |
 | `/privacy`、`/terms` | 隱私權政策與使用條款（存於資料庫、可版本管理） |
@@ -187,6 +188,8 @@ Migration 一律採 additive 策略，禁止直接刪除生產資料表／欄位
 - Drizzle 參數化查詢（無字串拼接 SQL）、zod 全面輸入驗證、輸出錯誤訊息過濾金鑰
 - Nova／XP／會員／獎勵／優惠碼／測驗皆使用 Transaction + Idempotency Key + Conditional Update，杜絕重複扣點與重複發獎
 - Rate Limit 套用於註冊、登入、密碼重設、AI、OCR、上傳等高風險端點
+- 全站服務總開關關閉時，使用者 API 會回傳 `SN-SYS-9905`；管理員仍可進入後台恢復服務
+- 教材 OCR 會保存分析設定、信心分數與來源檔案，低信心文字不會被系統自行猜測
 
 ---
 
