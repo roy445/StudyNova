@@ -686,7 +686,7 @@ export const contentRoutes: RouteDef[] = [
         plan: '建立 3 天複習計畫。JSON：{"title":"複習計畫","body":"markdown","tasks":["任務"]}',
       };
 
-      const { data } = await runAiJson<Record<string, unknown>>(
+      let { data } = await runAiJson<Record<string, unknown>>(
         {
           feature: `ocr_${action}`,
           userId: user.userId,
@@ -696,6 +696,22 @@ export const contentRoutes: RouteDef[] = [
         },
         {},
       );
+      const hasOutput = Object.values(data).some((value) =>
+        (Array.isArray(value) && value.length > 0) || (typeof value === "string" && value.trim().length > 0),
+      );
+      if (!hasOutput) {
+        const retry = await runAiJson<Record<string, unknown>>(
+          {
+            feature: `ocr_${action}_retry`,
+            userId: user.userId,
+            system: `只輸出一個合法 JSON 物件，不要 markdown 或說明文字。${prompts[action]}。資料不足時仍要根據原文產生至少一項結果，不得回傳空陣列。繁體中文。`,
+            parts: [{ kind: "text", text: `原文：\n${doc.combinedText.slice(0, 14000)}` }],
+            maxOutputTokens: 1800,
+          },
+          {},
+        );
+        if (Object.keys(retry.data).length > 0) data = retry.data;
+      }
 
       if ((action === "notes" || action === "keypoints" || action === "solve" || action === "translate" || action === "wrong") && data.body) {
         await db.insert(notes).values({
