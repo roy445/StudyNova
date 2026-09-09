@@ -330,9 +330,15 @@ async function logUsage(entry: {
 
 export async function runAi(req: AiRequest): Promise<AiResult> {
   const normalizedReq = await normalizeAiRequest(req);
-  const imageModel = cleanModel(process.env.GEMINI_FAST_MODEL || process.env.GEMINI_OCR_MODEL || "gemini-2.5-flash");
+  // Flash-Lite is the low-latency multimodal path. It avoids sending OCR
+  // traffic through the slower/unstable 3.6 model; deployments can override
+  // it with GEMINI_FAST_MODEL when their account exposes another model.
+  const imageModel = cleanModel(process.env.GEMINI_FAST_MODEL || process.env.GEMINI_OCR_MODEL || "gemini-2.5-flash-lite");
   const configs = providerConfigs()
-    .map((config) => isImageTask(req) && config.name.startsWith("gemini_") ? { ...config, model: imageModel } : config)
+    // Try the fast OCR model on the first Gemini key only. If that model is
+    // not enabled for the account, later Gemini keys retain the deployment's
+    // configured model instead of repeating the same configuration failure.
+    .map((config, index) => isImageTask(req) && config.name.startsWith("gemini_") && index === 1 ? { ...config, model: imageModel } : config)
     .filter((c) => Boolean(c.apiKey))
     .sort((a, b) => a.priority - b.priority);
 
@@ -412,6 +418,13 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
         console.error("[ai] provider telemetry write failed after provider error", { provider: cfg.name, category, error: telemetryError instanceof Error ? telemetryError.message : "unknown" });
       }
       if (!RETRYABLE.includes(category)) {
+        // A model may be unavailable for one key/project. For image tasks,
+        // continue to the next configured provider/model rather than turning
+        // one configuration mismatch into an immediate SN-AI-6002.
+        if (isImageTask(req) && category === "configuration") {
+          fallbackFrom = fallbackFrom || cfg.name;
+          continue;
+        }
         const message = category === "invalid_request"
           ? "圖片格式或內容不符合目前 AI 模型要求，請改用清晰的 JPG、PNG 或 WebP 圖片後重試。"
           : category === "configuration"
