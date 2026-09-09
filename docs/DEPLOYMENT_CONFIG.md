@@ -151,7 +151,20 @@ npx drizzle-kit generate
 npx drizzle-kit migrate
 ```
 
-首次呼叫 `/api/health` 會執行冪等 seed。Seed 使用 `platform_settings.seed.version` 管理版本，不會覆蓋學生資料或刪除生產資料。
+首次呼叫 `/api/health` 會執行冪等 seed。Seed 使用 `platform_settings.seed.version` 管理版本，不會覆蓋學生資料或刪除生產資料。`ai_solution` 的正式 permission 也包含在 seed version 10；既有 feature row 只更新顯示名稱，不覆蓋管理員目前設定的額度、啟用狀態或 Nova cost。
+
+### AI 解題 production migration 與檢查
+
+`ai_solution` 使用固定 feature key：`ai_solution`。新部署先套用 Drizzle schema，再以同一個 `DATABASE_URL` 執行專用的 PostgreSQL migration。此 migration 會補上 `solution_sessions.idempotency_key`、唯一索引，以及在不存在時建立 `feature_permissions.feature = 'ai_solution'`，不會覆蓋既有 permission 設定：
+
+```bash
+DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:migrate:ai-solution
+DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:check:ai-solution
+```
+
+`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。若 production 尚未套用完整 schema，先執行既有的 `pnpm exec drizzle-kit push` 或正式的 `pnpm exec drizzle-kit migrate`，再執行上述 0042 migration。部署啟動後呼叫 `/api/health` 會觸發 seed version 10；也可依部署平台的 release hook 執行相同 seed 流程。
+
+預期的成功 log 應包含 `feature_permissions` 查詢成功、`ai_solution` permission 已解析，且 `/api/v1/ai/solution/analyze` 的 external provider request 會在 quota preflight 之後出現。若 schema／連線／資料庫權限錯誤，log 會以 `[quota] database failure` 並標示 `schema_migration`、`connection`、`permission_denied` 或 `query_error`，不會偽裝成 permission 缺失。
 
 ### 主要資料域
 

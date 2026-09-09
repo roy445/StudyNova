@@ -20,6 +20,7 @@ import {
   users,
 } from "@/db/schema";
 import { fail, todayStr } from "./core";
+import { classifyQuotaDatabaseError, type FeaturePermissionPolicy, serverDefaultForFeature } from "./quota-policy";
 
 /* ------------------------------------------------------------ helpers */
 
@@ -162,29 +163,16 @@ export async function grantLearningReward(params: {
 }
 
 /* ------------------------------------------------------- FEATURE GATE */
-const DEFAULT_FEATURE_PERMISSIONS = [
-  { feature: "ai_context", label: "情境 AI", enabled: true, proOnly: false, freeDailyLimit: 12, proDailyLimit: 80, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_practice", label: "AI 練習出題", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 15, monthlyLimit: 0, novaCost: 0 },
-  { feature: "material_organize", label: "教材整理", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 15, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_study_plan", label: "AI 讀書計畫", enabled: true, proOnly: false, freeDailyLimit: 0, proDailyLimit: 5, monthlyLimit: 0, novaCost: 0 },
-  { feature: "wrong_review_ai", label: "錯題 AI 複習", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 30, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_speech", label: "AI 朗讀／語音分析", enabled: true, proOnly: false, freeDailyLimit: 0, proDailyLimit: 20, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_visual", label: "AI 重點心智圖", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 20, monthlyLimit: 0, novaCost: 0 },
-  { feature: "image_ocr", label: "圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 50, monthlyLimit: 0, novaCost: 0 },
-  { feature: "multi_image_ocr", label: "多圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 0, proDailyLimit: 10, monthlyLimit: 0, novaCost: 0 },
-  { feature: "essay_grading", label: "英文作文批改", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 10, monthlyLimit: 30, novaCost: 10 },
-] as const;
+type QuotaPermission = FeaturePermissionPolicy;
 
-type QuotaPermission = {
-  feature: string;
-  label: string;
-  enabled: boolean;
-  proOnly: boolean;
-  freeDailyLimit: number;
-  proDailyLimit: number;
-  monthlyLimit: number;
-  novaCost: number;
-};
+function throwQuotaDatabaseError(error: unknown, subsystem: string): never {
+  const raw = error instanceof Error ? error.message : String(error);
+  const category = classifyQuotaDatabaseError(error);
+  console.error("[quota] database failure", { subsystem, category, error: raw.slice(0, 240) });
+  if (category === "connection") throw fail("SYS_DB_UNAVAILABLE", { details: { subsystem, category } });
+  if (category === "permission_denied") throw fail("PERM_DENIED", { details: { subsystem, category } });
+  throw fail("SYS_INTERNAL", { details: { subsystem, category } });
+}
 
 export type QuotaState = {
   feature: string;
@@ -207,44 +195,28 @@ export async function featureState(userId: string, feature: string): Promise<Quo
     const rows = await db.select().from(featurePermissions).where(eq(featurePermissions.feature, feature)).limit(1);
     perm = rows[0] as QuotaPermission | undefined;
   } catch (error) {
-    console.error("[quota] feature permission lookup failed; using server defaults", { feature, error: error instanceof Error ? error.message : "unknown" });
+    throwQuotaDatabaseError(error, "feature_permissions");
   }
-  perm = perm ?? DEFAULT_FEATURE_PERMISSIONS.find((item) => item.feature === feature);
+  perm = perm ?? serverDefaultForFeature(feature);
   if (!perm) {
     return { feature, label: feature, enabled: true, proOnly: false, limit: 0, used: 0, remaining: 0, monthlyLimit: 0, monthlyUsed: 0, monthlyRemaining: Number.MAX_SAFE_INTEGER, unlimited: true, novaCost: 0 };
   }
-  let isAdmin = false;
-  try {
-    const adminRows = await db.select({ role: users.role }).from(users).where(eq(users.userId, userId)).limit(1);
-    isAdmin = adminRows[0]?.role === "admin" || adminRows[0]?.role === "owner";
-  } catch (error) {
-    console.error("[quota] user role lookup failed; treating requester as regular user", { error: error instanceof Error ? error.message : "unknown" });
-  }
+  const adminRows = await db.select({ role: users.role }).from(users).where(eq(users.userId, userId)).limit(1);
+  const isAdmin = adminRows[0]?.role === "admin" || adminRows[0]?.role === "owner";
   if (isAdmin) {
     return { feature, label: perm.label, enabled: perm.enabled, proOnly: false, limit: -1, used: 0, remaining: Number.MAX_SAFE_INTEGER, monthlyLimit: -1, monthlyUsed: 0, monthlyRemaining: Number.MAX_SAFE_INTEGER, unlimited: true, novaCost: 0 };
   }
-  let pro = false;
-  try {
-    pro = await isProUser(userId);
-  } catch (error) {
-    console.error("[quota] membership lookup failed; treating requester as free user", { error: error instanceof Error ? error.message : "unknown" });
-  }
+  const pro = await isProUser(userId);
   const today = todayStr();
-  let usage: { count?: number; unlimited?: boolean } | undefined;
-  let monthlyUsed = 0;
-  try {
-    const usageRows = await db
-      .select()
-      .from(featureUsage)
-      .where(and(eq(featureUsage.userId, userId), eq(featureUsage.feature, feature), eq(featureUsage.usageDate, today)))
-      .limit(1);
-    usage = usageRows[0];
-    const month = today.slice(0, 7);
-    const monthlyRows = await db.select({ total: sql<number>`coalesce(sum(${featureUsage.count}), 0)` }).from(featureUsage).where(and(eq(featureUsage.userId, userId), eq(featureUsage.feature, feature), sql`${featureUsage.usageDate} like ${month + "%"}`));
-    monthlyUsed = Number(monthlyRows[0]?.total ?? 0);
-  } catch (error) {
-    console.error("[quota] feature usage lookup failed; assuming zero usage", { feature, error: error instanceof Error ? error.message : "unknown" });
-  }
+  const usageRows = await db
+    .select()
+    .from(featureUsage)
+    .where(and(eq(featureUsage.userId, userId), eq(featureUsage.feature, feature), eq(featureUsage.usageDate, today)))
+    .limit(1);
+  const usage = usageRows[0];
+  const month = today.slice(0, 7);
+  const monthlyRows = await db.select({ total: sql<number>`coalesce(sum(${featureUsage.count}), 0)` }).from(featureUsage).where(and(eq(featureUsage.userId, userId), eq(featureUsage.feature, feature), sql`${featureUsage.usageDate} like ${month + "%"}`));
+  const monthlyUsed = Number(monthlyRows[0]?.total ?? 0);
   const limit = pro ? Number(perm.proDailyLimit ?? 0) : Number(perm.freeDailyLimit ?? 0);
   // 舊資料可能尚未填 monthly_limit；對已有每日配額的功能採用 30 天預設，
   // 管理員若填入明確月度上限則以後台設定為準。
@@ -268,8 +240,13 @@ export async function featureState(userId: string, feature: string): Promise<Quo
 }
 
 /** Atomically consume one unit of a gated feature. Throws when unavailable. */
-export async function consumeFeature(userId: string, feature: string, units = 1): Promise<QuotaState> {
+export async function consumeFeature(userId: string, feature: string, units = 1, idempotencyKey?: string): Promise<QuotaState> {
   const state = await featureState(userId, feature);
+  const chargeKey = idempotencyKey ?? `feat:${userId}:${feature}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+  if (idempotencyKey && state.novaCost > 0) {
+    const priorCharge = await db.select({ id: novaTransactions.id }).from(novaTransactions).where(eq(novaTransactions.idempotencyKey, chargeKey)).limit(1);
+    if (priorCharge[0]) return state;
+  }
   if (!state.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: `「${state.label}」目前已停用` });
   const pro = await isProUser(userId);
   if (state.proOnly && !pro) throw fail("QUOTA_PRO_REQUIRED", { message: `「${state.label}」是 Nova Pro 專屬功能` });
@@ -314,7 +291,7 @@ export async function consumeFeature(userId: string, feature: string, units = 1)
       amount: -state.novaCost * units,
       reason: `使用功能：${state.label}`,
       source: "feature",
-      idempotencyKey: `feat:${userId}:${feature}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+      idempotencyKey: chargeKey,
     });
   }
   return featureState(userId, feature);
@@ -326,18 +303,10 @@ export async function allFeatureStates(userId: string): Promise<QuotaState[]> {
     const perms = await db.select({ feature: featurePermissions.feature }).from(featurePermissions).orderBy(featurePermissions.feature);
     features = perms.map((p) => p.feature);
   } catch (error) {
-    console.error("[quota] feature permission list failed; using server defaults", { error: error instanceof Error ? error.message : "unknown" });
-    features = DEFAULT_FEATURE_PERMISSIONS.map((p) => p.feature);
+    throwQuotaDatabaseError(error, "feature_permissions.list");
   }
   const out: QuotaState[] = [];
-  for (const feature of features) {
-    try {
-      out.push(await featureState(userId, feature));
-    } catch (error) {
-      console.error("[quota] feature state failed; returning safe disabled state", { feature, error: error instanceof Error ? error.message : "unknown" });
-      out.push({ feature, label: feature, enabled: false, proOnly: false, limit: 0, used: 0, remaining: 0, monthlyLimit: 0, monthlyUsed: 0, monthlyRemaining: 0, unlimited: false, novaCost: 0 });
-    }
-  }
+  for (const feature of features) out.push(await featureState(userId, feature));
   return out;
 }
 

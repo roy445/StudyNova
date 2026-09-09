@@ -19,7 +19,7 @@ import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
 import vocabulary from "@/data/vocabulary.json";
 
-const SEED_VERSION = 9;
+const SEED_VERSION = 10;
 
 const LEVELS = [
   { level: 1, name: "初始助手", requiredXp: 0, upgradeCostNova: 0, ability: "基本問答與今日建議", aura: "#38bdf8" },
@@ -69,6 +69,7 @@ const FEATURES = [
   { feature: "ai_visual", label: "AI 重點心智圖", freeDailyLimit: 3, proDailyLimit: 20 },
   { feature: "image_ocr", label: "圖片辨識", freeDailyLimit: 5, proDailyLimit: 50 },
   { feature: "multi_image_ocr", label: "多圖片辨識", freeDailyLimit: 0, proDailyLimit: 10 },
+  { feature: "ai_solution", label: "AI 解題初次分析", freeDailyLimit: 3, proDailyLimit: 30 },
 ];
 
 const WORDS = [

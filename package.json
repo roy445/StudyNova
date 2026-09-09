@@ -7,7 +7,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:migrate:ai-solution": "node scripts/apply-ai-solution-migration.mjs",
+    "db:check:ai-solution": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f scripts/check-ai-solution-permission.sql"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1124.0",

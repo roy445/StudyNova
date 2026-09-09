@@ -933,11 +933,12 @@ export const solutionSessions = pgTable(
     result: jsonb("result").$type<Record<string, unknown> | null>(),
     novaCost: integer("nova_cost").notNull().default(0),
     charged: boolean("charged").notNull().default(false),
+    idempotencyKey: text("idempotency_key").notNull().default(""),
     error: text("error").notNull().default(""),
     createdAt: created(),
     updatedAt: updated(),
   },
-  (t) => [index("solution_session_user_idx").on(t.userId, t.createdAt)],
+  (t) => [index("solution_session_user_idx").on(t.userId, t.createdAt), uniqueIndex("solution_session_idem_uq").on(t.userId, t.idempotencyKey)],
 );
 
 export const aiMessages = pgTable(

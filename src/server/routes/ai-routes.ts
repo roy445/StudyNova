@@ -539,8 +539,8 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ contextIds: z.array(z.string().uuid()).min(1).max(8), mode: z.enum(["tutor", "solution", "note"]).optional(), scope: z.object({ includeQuestion: z.boolean().optional(), includeHandwriting: z.boolean().optional(), includeNote: z.boolean().optional(), highlightPriority: z.boolean().optional() }).optional() }));
-      return analyzeSolution({ userId: user.userId, contextIds: body.contextIds, requestedMode: body.mode, scope: body.scope });
+      const body = await ctx.json(z.object({ contextIds: z.array(z.string().uuid()).min(1).max(8), mode: z.enum(["tutor", "solution", "note"]).optional(), idempotencyKey: z.string().trim().min(1).max(160).optional(), scope: z.object({ includeQuestion: z.boolean().optional(), includeHandwriting: z.boolean().optional(), includeNote: z.boolean().optional(), highlightPriority: z.boolean().optional() }).optional() }));
+      return analyzeSolution({ userId: user.userId, contextIds: body.contextIds, requestedMode: body.mode, idempotencyKey: body.idempotencyKey, scope: body.scope });
     },
   }),
 

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { analysisScopes, aiModes, fileContexts, solutionSessions } from "@/db/schema";
 import { fail } from "./core";
 import { consumeFeature, featureState, grantNova } from "./economy";
+import { AI_SOLUTION_FEATURE } from "./quota-policy";
 import { readObject } from "./storage";
 import { runAiJson } from "./ai";
 
@@ -55,29 +56,45 @@ export async function resolveMode(userId: string, sessionId: string, requested: 
   return rows[0];
 }
 
-export async function analyzeSolution(params: { userId: string; contextIds: string[]; requestedMode?: string; scope?: Partial<Scope> }) {
+export async function analyzeSolution(params: { userId: string; contextIds: string[]; requestedMode?: string; scope?: Partial<Scope>; idempotencyKey?: string }) {
   if (!params.contextIds.length) throw fail("REQ_CONTENT_TOO_SHORT", { message: "請先上傳圖片或檔案" });
   const contexts = await db.select().from(fileContexts).where(and(eq(fileContexts.userId, params.userId), inArray(fileContexts.id, params.contextIds)));
   if (!contexts.length) throw fail("FILE_NOT_FOUND");
-  const costState = await featureState(params.userId, "ai_solution");
-  await consumeFeature(params.userId, "ai_solution");
-  const charged = costState.novaCost;
-  const session = (await db.insert(solutionSessions).values({ userId: params.userId, fileContextIds: contexts.map((x) => x.id), novaCost: charged, charged: charged > 0 }).returning())[0];
+
+  const scope = params.scope ?? DEFAULT_SCOPE;
+  const idempotencyKey = params.idempotencyKey?.trim().slice(0, 160) || createHash("sha256").update(JSON.stringify({ contexts: [...params.contextIds].sort(), mode: params.requestedMode ?? "", scope })).digest("hex");
+  const existing = (await db.select().from(solutionSessions).where(and(eq(solutionSessions.userId, params.userId), eq(solutionSessions.idempotencyKey, idempotencyKey))).limit(1))[0];
+  if (existing?.status === "completed") return { session: existing, result: existing.result ?? {} };
+  if (existing?.status === "processing") throw fail("SYS_CONFLICT", { message: "這筆 AI 解題正在分析中，請稍候。" });
+
+  // Preflight checks only. No usage row or Nova transaction is written here.
+  const costState = await featureState(params.userId, AI_SOLUTION_FEATURE);
+  if (!costState.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: `「${costState.label}」目前已停用` });
+  if (!costState.unlimited && costState.limit <= 0) throw fail("QUOTA_NOT_IN_PLAN", { message: `「${costState.label}」在你目前的方案中未開放` });
+  if (costState.monthlyLimit > 0 && costState.monthlyUsed >= costState.monthlyLimit) throw fail("QUOTA_EXHAUSTED", { message: `本月「${costState.label}」已達上限` });
+  if (!costState.unlimited && costState.used >= costState.limit) throw fail("QUOTA_EXHAUSTED", { message: `今日「${costState.label}」已達上限` });
+
+  const session = existing
+    ? (await db.update(solutionSessions).set({ status: "processing", error: "", result: null, updatedAt: new Date() }).where(eq(solutionSessions.id, existing.id)).returning())[0]
+    : (await db.insert(solutionSessions).values({ userId: params.userId, fileContextIds: contexts.map((x) => x.id), novaCost: costState.novaCost, charged: false, idempotencyKey, status: "processing" }).returning())[0];
+  let charged = false;
   try {
-    const scope = params.scope ?? DEFAULT_SCOPE;
     const segments = contexts.flatMap((c) => c.detected as Segment[]).filter((s) => (s.kind === "QUESTION" && scope.includeQuestion) || (s.kind === "HANDWRITING" && scope.includeHandwriting) || (s.kind === "NOTE" && scope.includeNote) || (s.kind === "HIGHLIGHT" && scope.highlightPriority));
     const mode = await resolveMode(params.userId, session.id, params.requestedMode, segments);
     const source = segments.map((s) => `[${s.kind}] ${s.text}`).join("\n");
     const { data } = await runAiJson<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean }>(
-      { feature: "ai_solution", userId: params.userId, system: `你是 StudyNova Novi。模式是 ${mode.mode}。預設採用引導解題：先給提示與步驟，不直接揭露答案；只有使用者明確要求且政策允許時才提供答案。若偵測多題，needsCrop=true 並請使用者裁切成單題。`, parts: [{ kind: "text", text: `分析範圍：${JSON.stringify(scope)}\n內容：\n${source.slice(0, 30000)}` }], maxOutputTokens: 2600 },
+      { feature: AI_SOLUTION_FEATURE, userId: params.userId, system: `你是 StudyNova Novi。模式是 ${mode.mode}。預設採用引導解題：先給提示與步驟，不直接揭露答案；只有使用者明確要求且政策允許時才提供答案。若偵測多題，needsCrop=true 並請使用者裁切成單題。`, parts: [{ kind: "text", text: `分析範圍：${JSON.stringify(scope)}\n內容：\n${source.slice(0, 30000)}` }], maxOutputTokens: 2600 },
       { reply: "目前無法產生解析。", hint: "請先確認圖片內容清楚。", steps: [], needsCrop: false },
     );
+    // The provider succeeded; only now atomically record quota/Nova consumption.
+    const settled = await consumeFeature(params.userId, AI_SOLUTION_FEATURE, 1, `solution:${session.id}`);
+    charged = settled.novaCost > 0;
     const result = { ...data, mode: mode.mode, modeLocked: mode.locked, segmentsUsed: segments.length };
-    const updated = await db.update(solutionSessions).set({ status: "completed", result, updatedAt: new Date() }).where(eq(solutionSessions.id, session.id)).returning();
+    const updated = await db.update(solutionSessions).set({ status: "completed", result, novaCost: settled.novaCost, charged, updatedAt: new Date() }).where(eq(solutionSessions.id, session.id)).returning();
     return { session: updated[0], result };
   } catch (error) {
-    if (charged > 0) await grantNova({ userId: params.userId, amount: charged, reason: "AI 解題失敗退款", source: "ai_refund", idempotencyKey: `ai-refund:${session.id}` });
-    const updated = await db.update(solutionSessions).set({ status: "failed", error: error instanceof Error ? error.message.slice(0, 500) : "分析失敗", updatedAt: new Date() }).where(eq(solutionSessions.id, session.id)).returning();
-    return { session: updated[0], refunded: charged > 0, error: "AI 分析失敗，已退回 Nova 點數" };
+    if (charged) await grantNova({ userId: params.userId, amount: costState.novaCost, reason: "AI 解題結算失敗退款", source: "ai_refund", idempotencyKey: `ai-refund:${session.id}` });
+    const updated = await db.update(solutionSessions).set({ status: "failed", charged: false, error: error instanceof Error ? error.message.slice(0, 500) : "分析失敗", updatedAt: new Date() }).where(eq(solutionSessions.id, session.id)).returning();
+    throw error;
   }
 }
