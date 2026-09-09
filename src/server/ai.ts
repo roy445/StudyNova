@@ -335,10 +335,11 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   // it with GEMINI_FAST_MODEL when their account exposes another model.
   const imageModel = cleanModel(process.env.GEMINI_FAST_MODEL || process.env.GEMINI_OCR_MODEL || "gemini-3.5-flash-lite");
   const configs = providerConfigs()
-    // Every Gemini key must use the same OCR model. Previously only Gemini 2
-    // was switched, so Gemini 3/4/5 continued using gemini-3.6-flash and
-    // exhausted the entire request with the known timeout path.
-    .map((config) => isImageTask(req) && config.name.startsWith("gemini_") ? { ...config, model: imageModel } : config)
+    // The production account has already proved this model works for OCR,
+    // while gemini-3.6-flash still times out for solution and memory flows.
+    // Use the same known-good model for every Gemini feature so a text request
+    // generated from an uploaded image does not silently fall back to 3.6.
+    .map((config) => config.name.startsWith("gemini_") ? { ...config, model: imageModel } : config)
     .filter((c) => Boolean(c.apiKey))
     .sort((a, b) => a.priority - b.priority);
 
