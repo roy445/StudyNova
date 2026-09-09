@@ -195,7 +195,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000) }));
+      const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000), contextId: z.string().uuid().optional() }));
       const conv = (await db.select().from(aiConversations).where(eq(aiConversations.id, ctx.params.id)).limit(1))[0];
       if (!conv) throw notFound("找不到對話");
       if (conv.userId !== user.userId) throw forbidden();
@@ -205,6 +205,12 @@ export const routes: RouteDef[] = [
       await db.insert(aiMessages).values({ conversationId: conv.id, role: "user", content: body.content });
         const history = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(asc(aiMessages.createdAt)).limit(16);
       const context = await buildContext(user.userId, conv.allowContext, conv.contextMaterialId);
+      const attachment = body.contextId
+        ? (await db.select().from(fileContexts).where(and(eq(fileContexts.id, body.contextId), eq(fileContexts.userId, user.userId))).limit(1))[0]
+        : null;
+      const attachmentText = attachment && Array.isArray(attachment.detected)
+        ? (attachment.detected as Array<{ kind?: string; text?: string }>).map((item) => `[${item.kind ?? "內容"}] ${item.text ?? ""}`).join("\n").slice(0, 16000)
+        : "";
 
       const { data, meta } = await runAiJson<{ reply?: string; importance?: string; action?: { type?: string; payload?: Record<string, unknown>; preview?: string } | null; memory?: Array<{ key: string; value: string }> }>(
         {
@@ -220,7 +226,7 @@ export const routes: RouteDef[] = [
             "繁體中文回答。不得杜撰使用者資料。",
           parts: [
             { kind: "text", text: context ? `使用者已授權的學習資料：\n${context}` : "使用者未授權任何個人資料，只能根據對話內容回答。" },
-            { kind: "text", text: `對話紀錄：\n${history.map((m) => `${m.role === "user" ? "學生" : "Novi"}：${m.content}`).join("\n").slice(-5000)}` },
+            { kind: "text", text: `對話紀錄：\n${history.map((m) => `${m.role === "user" ? "學生" : "Novi"}：${m.content}`).join("\n").slice(-5000)}${attachmentText ? `\n\n本次訊息附圖辨識內容：\n${attachmentText}` : ""}` },
           ],
           maxOutputTokens: 1200,
         },

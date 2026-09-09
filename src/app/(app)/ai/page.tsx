@@ -7,7 +7,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/li
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
-type Message = { id: string; conversationId?: string; role: string; content: string; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
+type Message = { id: string; conversationId?: string; role: string; content: string; attachment?: { name: string; previewUrl: string }; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
 type FileContext = { id: string; originalName: string; status: string; detected: Array<{ kind: string; text: string; confidence: number }>; error: string; uploadBatch: number };
 type MemoryItem = { id: string; key: string; value: string; scope?: string; confidence?: number; consentStatus?: string; updatedAt?: string };
 
@@ -60,6 +60,7 @@ export default function AiPage() {
   const [renameText, setRenameText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState<{ value: number; label: string } | null>(null);
+  const [attachment, setAttachment] = useState<{ contextId: string; name: string; previewUrl: string } | null>(null);
   const [solutionResult, setSolutionResult] = useState<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean; mode?: string } | null>(null);
   const [scope, setScope] = useState({ includeQuestion: true, includeHandwriting: true, includeNote: true, highlightPriority: false });
   const fileInput = useRef<HTMLInputElement>(null);
@@ -98,16 +99,18 @@ export default function AiPage() {
   }
 
   async function send() {
-    if (!activeId || !input.trim()) return;
+    if (!activeId || (!input.trim() && !attachment)) return;
     const content = input.trim();
     if (!confirmNovaSpend("Novi 回覆", aiContextCost)) return;
     setInput("");
+    const sentAttachment = attachment;
+    setAttachment(null);
     setSending(true);
     setNoviState("thinking");
     setError(null);
-    setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content, action: null, actionStatus: "none", createdAt: new Date().toISOString() }]);
+    setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content: content || "請分析這張圖片。", attachment: sentAttachment ?? undefined, action: null, actionStatus: "none", createdAt: new Date().toISOString() }]);
     try {
-      const res = await apiPost<{ message: Message }>(`/ai/conversations/${activeId}/messages`, { content });
+      const res = await apiPost<{ message: Message }>(`/ai/conversations/${activeId}/messages`, { content: content || "請分析這張圖片。", contextId: sentAttachment?.contextId });
       setMessages((m) => [...m, res.message]);
       setNoviState("happy");
       await convs.reload();
@@ -130,16 +133,13 @@ export default function AiPage() {
       Array.from(files).slice(0, 8).forEach((file) => form.append("files", file));
       Object.entries(scope).forEach(([key, value]) => form.append(key, String(value)));
       const uploaded = await apiPost<{ results: Array<{ context: FileContext | null; duplicate: boolean; errorCode?: string; error?: string }>; newCount: number; duplicateCount: number }>("/ai/solution/upload", form);
-      setAnalysisProgress({ value: 52, label: "檔案已上傳，正在辨識內容…" });
+      setAnalysisProgress({ value: 52, label: "圖片已加入對話，請輸入你的需求…" });
       const failed = uploaded.results.filter((item) => !item.context);
       if (failed.length) setError(failed.map((item) => `${item.error ?? "圖片分析失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；"));
-      const ids = uploaded.results.flatMap((item) => item.context?.id ? [item.context.id] : []);
-      if (!ids.length) throw new Error(failed.length ? "所有圖片分析失敗，請依畫面上的錯誤代碼回報。" : "這批檔案都是重複內容，沒有需要重新分析的檔案。");
-      const analyzed = await apiPost<{ result: typeof solutionResult }>("/ai/solution/analyze", { contextIds: ids, scope });
-      setAnalysisProgress({ value: 92, label: "整理題目、筆記與手寫範圍…" });
-      setSolutionResult(analyzed.result);
-      const reused = uploaded.duplicateCount > 0 ? `，已重用 ${uploaded.duplicateCount} 個既有分析結果` : "";
-      toast.push("success", `完成分析：新增 ${uploaded.newCount} 個檔案${reused}`);
+      const first = uploaded.results.find((item) => item.context);
+      if (!first?.context) throw new Error(failed.length ? "圖片分析失敗，請依畫面上的錯誤代碼回報。" : "找不到上傳的圖片。");
+      setAttachment({ contextId: first.context.id, name: first.context.originalName, previewUrl: URL.createObjectURL(files[0]) });
+      toast.push("success", uploaded.duplicateCount ? "已加入對話並重用既有圖片分析" : "圖片已加入對話");
       await contexts.reload();
     } catch (err) {
       setError(errorMessage(err));
@@ -287,6 +287,7 @@ export default function AiPage() {
               {messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[88%] rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "border-transparent bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : m.importance === "critical" ? "border-rose-300/60 bg-rose-400/15 text-rose-50 shadow-[0_0_24px_rgba(251,113,133,0.14)]" : m.importance === "important" ? "border-amber-300/50 bg-amber-400/12 text-amber-50" : "glass-soft border-transparent"}`}>
+                    {m.attachment && <img src={m.attachment.previewUrl} alt={m.attachment.name} className="mb-2 max-h-64 max-w-full rounded-xl object-contain" />}
                     {m.role !== "user" && m.importance && m.importance !== "normal" && <p className={`mb-1 text-[10px] font-bold tracking-wide ${m.importance === "critical" ? "text-rose-200" : "text-amber-200"}`}>{m.importance === "critical" ? "⚠ 關鍵提醒" : "✦ 學習重點"}</p>}
                     <pre className="whitespace-pre-wrap font-sans">{m.content}</pre>
                     {m.action && (
@@ -324,13 +325,7 @@ export default function AiPage() {
 
             <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
               <input ref={fileInput} type="file" accept="image/*,.pdf" multiple hidden onChange={(e) => void uploadAndAnalyze(e.target.files)} />
-              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line)] bg-black/10 px-3 py-2 text-xs">
-                <Button size="sm" variant="ghost" loading={uploading} onClick={() => fileInput.current?.click()}>＋ 上傳題目／筆記</Button>
-                <span className="text-muted">分析範圍：</span>
-                {([["includeQuestion", "題目"], ["includeHandwriting", "手寫"], ["includeNote", "筆記"], ["highlightPriority", "螢光筆優先"]] as const).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-1 text-[11px]"><input type="checkbox" checked={scope[key]} onChange={(e) => setScope((s) => ({ ...s, [key]: e.target.checked }))} /> {label}</label>
-                ))}
-              </div>
+              {attachment && <div className="flex items-center gap-2 rounded-xl border border-[#37d3ff]/40 bg-[#37d3ff]/5 p-2"><img src={attachment.previewUrl} alt={attachment.name} className="h-14 w-14 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-xs">{attachment.name}<span className="block text-[10px] text-[#b9f2ff]">已加入對話，輸入需求後送出</span></span><button type="button" className="text-xs text-muted" onClick={() => { URL.revokeObjectURL(attachment.previewUrl); setAttachment(null); }}>移除</button></div>}
               {analysisProgress && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 px-3 py-2"><div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-[#b9f2ff]">{analysisProgress.label}</span><span className="text-muted">{analysisProgress.value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-black/20"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all duration-500" style={{ width: `${analysisProgress.value}%` }} /></div><p className="mt-1 text-[10px] text-muted">你可以切換其他功能，分析會在背景完成；完成後回到 Novi 即可查看。</p></div>}
               {solutionResult && (
                 <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/8 px-3 py-2 text-xs leading-5">
@@ -341,7 +336,8 @@ export default function AiPage() {
                 </div>
               )}
               <NovaCostNotice cost={aiContextCost} action="Novi 回覆" />
-              <div className="flex gap-2">
+              <div className="flex items-end gap-2">
+              <Button size="sm" variant="outline" loading={uploading} onClick={() => fileInput.current?.click()} title="加入圖片或檔案">＋</Button>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -354,7 +350,7 @@ export default function AiPage() {
                 placeholder="問 Novi 任何學習問題…"
                 disabled={sending}
               />
-              <Button loading={sending} onClick={send} disabled={!input.trim()}>
+              <Button loading={sending} onClick={send} disabled={!input.trim() && !attachment}>
                 送出
               </Button>
               </div>
