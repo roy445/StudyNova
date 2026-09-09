@@ -11,6 +11,23 @@ import { createFileContext } from "../unified-ai-engine";
 const idSchema = z.string().uuid();
 const stageScope = z.object({ stageId: idSchema.optional(), schoolId: idSchema.optional(), gradeId: idSchema.optional(), subjectId: idSchema.optional() });
 const formFlag = (form: FormData, key: string, fallback: boolean) => form.get(key) === null ? fallback : form.get(key) === "true";
+// Avoid selecting additive 0041 columns on production databases before migration.
+const publicEditionColumns = {
+  id: textbookEditions.id,
+  stageId: textbookEditions.stageId,
+  schoolId: textbookEditions.schoolId,
+  gradeId: textbookEditions.gradeId,
+  subjectId: textbookEditions.subjectId,
+  publisher: textbookEditions.publisher,
+  version: textbookEditions.version,
+  volume: textbookEditions.volume,
+  coverObjectId: textbookEditions.coverObjectId,
+  coverUrl: textbookEditions.coverUrl,
+  enabled: textbookEditions.enabled,
+  sortOrder: textbookEditions.sortOrder,
+  createdAt: textbookEditions.createdAt,
+  updatedAt: textbookEditions.updatedAt,
+};
 
 export const routes: RouteDef[] = [
   route({ method: "GET", path: "/admin/audit-logs", auth: "admin", handler: async (ctx) => {
@@ -31,10 +48,10 @@ export const routes: RouteDef[] = [
   route({ method: "GET", path: "/textbooks", auth: "user", handler: async (ctx) => {
     const q = ctx.query.get("q")?.trim(); const scope = stageScope.safeParse(Object.fromEntries(["stageId", "schoolId", "gradeId", "subjectId"].map(k => [k, ctx.query.get(k) || undefined]))).data ?? {};
     const filters = [eq(textbookEditions.enabled, true), scope.stageId ? eq(textbookEditions.stageId, scope.stageId) : undefined, scope.schoolId ? eq(textbookEditions.schoolId, scope.schoolId) : undefined, scope.gradeId ? eq(textbookEditions.gradeId, scope.gradeId) : undefined, scope.subjectId ? eq(textbookEditions.subjectId, scope.subjectId) : undefined, q ? or(ilike(textbookEditions.publisher, `%${q}%`), ilike(textbookEditions.version, `%${q}%`), ilike(textbookEditions.volume, `%${q}%`)) : undefined].filter(Boolean);
-    const rows = await db.select({ edition: textbookEditions }).from(textbookEditions).innerJoin(educationStages, eq(educationStages.id, textbookEditions.stageId)).innerJoin(userSettings, eq(userSettings.schoolLevel, educationStages.key)).where(and(...filters, eq(userSettings.userId, ctx.user!.userId))).orderBy(asc(textbookEditions.sortOrder), desc(textbookEditions.createdAt));
+    const rows = await db.select({ edition: publicEditionColumns }).from(textbookEditions).innerJoin(educationStages, eq(educationStages.id, textbookEditions.stageId)).innerJoin(userSettings, eq(userSettings.schoolLevel, educationStages.key)).where(and(...filters, eq(userSettings.userId, ctx.user!.userId))).orderBy(asc(textbookEditions.sortOrder), desc(textbookEditions.createdAt));
     return { editions: rows.map((row) => row.edition) };
   }}),
-  route({ method: "GET", path: "/textbooks/:id", auth: "user", handler: async (ctx) => { const edition = (await db.select({ edition: textbookEditions }).from(textbookEditions).innerJoin(educationStages, eq(educationStages.id, textbookEditions.stageId)).innerJoin(userSettings, eq(userSettings.schoolLevel, educationStages.key)).where(and(eq(textbookEditions.id, ctx.params.id), eq(textbookEditions.enabled, true), eq(userSettings.userId, ctx.user!.userId))).limit(1))[0]?.edition; if (!edition) throw notFound("找不到符合目前教育階段的教材版本"); const lessons = await db.select().from(textbookLessons).where(and(eq(textbookLessons.editionId, edition.id), eq(textbookLessons.enabled, true))).orderBy(asc(textbookLessons.sortOrder)); const contents = lessons.length ? await db.select().from(textbookContents).where(and(inArray(textbookContents.lessonId, lessons.map(l => l.id)), eq(textbookContents.enabled, true))).orderBy(asc(textbookContents.sortOrder)) : []; return { edition, lessons: lessons.map(l => ({ ...l, contents: contents.filter(c => c.lessonId === l.id) })) }; } }),
+  route({ method: "GET", path: "/textbooks/:id", auth: "user", handler: async (ctx) => { const edition = (await db.select({ edition: publicEditionColumns }).from(textbookEditions).innerJoin(educationStages, eq(educationStages.id, textbookEditions.stageId)).innerJoin(userSettings, eq(userSettings.schoolLevel, educationStages.key)).where(and(eq(textbookEditions.id, ctx.params.id), eq(textbookEditions.enabled, true), eq(userSettings.userId, ctx.user!.userId))).limit(1))[0]?.edition; if (!edition) throw notFound("找不到符合目前教育階段的教材版本"); const lessons = await db.select().from(textbookLessons).where(and(eq(textbookLessons.editionId, edition.id), eq(textbookLessons.enabled, true))).orderBy(asc(textbookLessons.sortOrder)); const contents = lessons.length ? await db.select().from(textbookContents).where(and(inArray(textbookContents.lessonId, lessons.map(l => l.id)), eq(textbookContents.enabled, true))).orderBy(asc(textbookContents.sortOrder)) : []; return { edition, lessons: lessons.map(l => ({ ...l, contents: contents.filter(c => c.lessonId === l.id) })) }; } }),
   route({ method: "GET", path: "/admin/textbooks", auth: "admin", handler: async () => {
     try {
       return { editions: await db.select().from(textbookEditions).orderBy(asc(textbookEditions.sortOrder), desc(textbookEditions.createdAt)) };

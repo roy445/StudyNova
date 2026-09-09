@@ -684,7 +684,6 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         <div className="max-h-[68vh] space-y-3 overflow-y-auto pr-1 text-sm">
           <div className="rounded-xl border-2 border-[#ffc857]/60 bg-[#ffc857]/10 p-3"><p className="font-black text-[#ffe7ad]">先記住：StudyNova 是你的學習助手，不是壓力來源。</p><p className="mt-1 text-xs leading-5 text-muted">每日建議都可以跳過、調整或重新安排；請依自己的時間與狀態使用。</p></div>
           {FEATURE_GUIDANCE[featureKey] && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 p-3"><p className="font-semibold text-[#b9f2ff]">{FEATURE_GUIDANCE[featureKey].text}</p><ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-muted">{FEATURE_STEPS[featureKey]?.map((step) => <li key={step}>{step}</li>)}</ol></div>}
-          {[['首頁／讀書計畫','查看今日建議、學習進度、弱點與 AI 安排的讀書區塊。可勾選完成，也可以只挑一個最適合現在的項目。'],['學習中心','複習單字、錯題、專注計時與學習紀錄；日期與範圍請確認後再儲存。'],['Novi AI','可切換學習教練、解題、提示、考試、筆記、錯題與複習模式。涉及讀取或寫入資料時，請先確認授權與預覽。'],['智慧壓縮','上傳前確認檔案類型、大小與目標尺寸；批次處理前請確認 ZIP 內容與下載位置。'],['資料匯出','先選資料並查看樣本預覽，再進行兩次確認；正式匯出會依格式扣除 Nova，請確認點數餘額。'],['每週小考／挑戰','提交答案前確認題目與答案；活動獎勵、優惠碼與 Nova 交易紀錄請以系統結果為準。'],['公告與注意事項','醒目公告會固定在相關功能頂部；若公告已撤銷或超過結束時間，畫面會自動隱藏。']].map(([title, text]) => <div key={title} className="glass-soft border border-[var(--line)] p-3"><p className="font-bold text-[#7dd3fc]">{title}</p><p className="mt-1 text-xs leading-5 text-muted">{text}</p></div>)}
           <p className="text-[11px] text-muted">你可以在個人設定重新查看本說明；遇到異常請保留畫面與錯誤代碼，再到「回報問題」提交。</p>
         </div>
       </Modal>
