@@ -138,7 +138,8 @@ export default function AiPage() {
       const analyzed = await apiPost<{ result: typeof solutionResult }>("/ai/solution/analyze", { contextIds: ids, scope });
       setAnalysisProgress({ value: 92, label: "整理題目、筆記與手寫範圍…" });
       setSolutionResult(analyzed.result);
-      toast.push("success", `完成分析：新增 ${uploaded.newCount} 個檔案，略過重複 ${uploaded.duplicateCount} 個`);
+      const reused = uploaded.duplicateCount > 0 ? `，已重用 ${uploaded.duplicateCount} 個既有分析結果` : "";
+      toast.push("success", `完成分析：新增 ${uploaded.newCount} 個檔案${reused}`);
       await contexts.reload();
     } catch (err) {
       setError(errorMessage(err));

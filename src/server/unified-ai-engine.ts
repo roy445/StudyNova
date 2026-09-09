@@ -20,7 +20,10 @@ export async function createFileContext(params: { userId: string; objectId: stri
   if (object.userId !== params.userId) throw fail("PERM_FILE_DENIED");
   const sha256 = createHash("sha256").update(object.data).digest("hex");
   const duplicate = (await db.select().from(fileContexts).where(and(eq(fileContexts.userId, params.userId), eq(fileContexts.sha256, sha256))).limit(1))[0];
-  if (duplicate) return { context: duplicate, duplicate: true };
+  // A ready or currently-running hash is safely reusable. A previous failed
+  // attempt must be allowed to retry; otherwise the UI reports "duplicate"
+  // forever even though no usable analysis exists.
+  if (duplicate && duplicate.status !== "failed") return { context: duplicate, duplicate: true };
   const scope = { ...DEFAULT_SCOPE, ...params.scope };
   const inserted = await db.insert(fileContexts).values({ userId: params.userId, objectId: params.objectId, originalName: params.originalName.slice(0, 180), uploadBatch: params.batch, sha256, status: "analyzing" }).returning();
   const context = inserted[0];
