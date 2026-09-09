@@ -333,7 +333,7 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   // Flash-Lite is the low-latency multimodal path. It avoids sending OCR
   // traffic through the slower/unstable 3.6 model; deployments can override
   // it with GEMINI_FAST_MODEL when their account exposes another model.
-  const imageModel = cleanModel(process.env.GEMINI_FAST_MODEL || process.env.GEMINI_OCR_MODEL || "gemini-2.5-flash-lite");
+  const imageModel = cleanModel(process.env.GEMINI_FAST_MODEL || process.env.GEMINI_OCR_MODEL || "gemini-3.5-flash-lite");
   const configs = providerConfigs()
     // Every Gemini key must use the same OCR model. Previously only Gemini 2
     // was switched, so Gemini 3/4/5 continued using gemini-3.6-flash and
