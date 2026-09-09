@@ -28,7 +28,7 @@ export async function solveOcrImage(params: { userId: string; data: Buffer; mime
       system: "你是高精度教育 OCR 引擎。只能辨識影像中實際可見的文字，不得猜測。保留題號、選項、段落、表格、公式與標點；公式使用 LaTeX；不確定文字請標記 [不確定:候選]。只輸出 JSON：{text:string,blocks:[{content:string,x:number,y:number,width:number,height:number,confidence:number,page:number,line:number,block:number}]}。座標為 0 到 1。",
       parts: [{ kind: "text", text: params.prompt ?? "辨識圖片全部可見文字。" }, { kind: "image", mimeType: params.mimeType, base64: params.data.toString("base64") }],
       temperature: 0.05,
-      maxOutputTokens: 5000,
+      maxOutputTokens: 2200,
     },
     { text: "", blocks: [] },
   );

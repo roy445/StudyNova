@@ -58,6 +58,10 @@ function cleanModel(value?: string) {
   return (cleanEnv(value) || "gemini-3.6-flash").replace(/^models\//, "");
 }
 
+function isImageTask(req: AiRequest) {
+  return req.parts.some((part) => part.kind === "image");
+}
+
 const AI_IMAGE_MAX_PIXELS = 50_000_000;
 const AI_IMAGE_MAX_EDGE = 4096;
 
@@ -73,10 +77,11 @@ export async function normalizeAiRequest(req: AiRequest): Promise<AiRequest> {
     try {
       const input = Buffer.from(part.base64, "base64");
       if (!input.length) throw new Error("empty image payload");
+      const maxEdge = isImageTask(req) ? 2048 : AI_IMAGE_MAX_EDGE;
       const output = await sharp(input, { limitInputPixels: AI_IMAGE_MAX_PIXELS })
         .rotate()
-        .resize({ width: AI_IMAGE_MAX_EDGE, height: AI_IMAGE_MAX_EDGE, fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: 88, mozjpeg: true })
+        .resize({ width: maxEdge, height: maxEdge, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: isImageTask(req) ? 78 : 88, mozjpeg: true })
         .toBuffer();
       changed = true;
       return { kind: "image" as const, mimeType: "image/jpeg", base64: output.toString("base64") };
@@ -325,7 +330,9 @@ async function logUsage(entry: {
 
 export async function runAi(req: AiRequest): Promise<AiResult> {
   const normalizedReq = await normalizeAiRequest(req);
+  const imageModel = cleanModel(process.env.GEMINI_FAST_MODEL || process.env.GEMINI_OCR_MODEL || "gemini-2.5-flash");
   const configs = providerConfigs()
+    .map((config) => isImageTask(req) && config.name.startsWith("gemini_") ? { ...config, model: imageModel } : config)
     .filter((c) => Boolean(c.apiKey))
     .sort((a, b) => a.priority - b.priority);
 
