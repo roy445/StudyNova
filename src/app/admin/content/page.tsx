@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Field, Input, Select, Skeleton, Textarea, useToast } from "@/components/ui";
-import { apiPatch, apiPost, useApi } from "@/lib/api";
+import { apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 
 type OcrSettings = { includeQuestion: boolean; includeHandwriting: boolean; includeNote: boolean; highlightPriority: boolean; confidenceThreshold: number };
 type Edition = { id: string; publisher: string; version: string; volume: string; enabled: boolean; coverUrl: string; description?: string; isbn?: string; ocrStatus?: string; metadata?: Record<string, unknown>; stageId: string | null };
@@ -22,21 +22,21 @@ export default function ContentStudioPage() {
   async function create() {
     if (!form.stageId) return toast.push("error", "請選擇教育階段");
     if (!form.publisher.trim()) return toast.push("error", "請填寫出版社");
-    try { await apiPost("/admin/textbooks", form); setForm({ stageId: "", publisher: "", version: "", volume: "", coverUrl: "/brand/studynova-logo-square.png", description: "", isbn: "" }); await list.reload(); toast.push("success", "教材版本已建立"); } catch (error) { toast.push("error", error instanceof Error ? error.message : "建立失敗"); }
+    try { await apiPost("/admin/textbooks", form); setForm({ stageId: "", publisher: "", version: "", volume: "", coverUrl: "/brand/studynova-logo-square.png", description: "", isbn: "" }); await list.reload(); toast.push("success", "教材版本已建立"); } catch (error) { toast.push("error", errorMessage(error)); }
   }
   async function saveEdition() {
     if (!selected) return;
-    try { await apiPatch(`/admin/textbooks/${selected.id}`, { publisher: selected.publisher, version: selected.version, volume: selected.volume, coverUrl: selected.coverUrl, description: selected.description ?? "", isbn: selected.isbn ?? "", metadata: { ...(selected.metadata ?? {}), ocrSettings } }); await list.reload(); toast.push("success", "教材詳細設定已儲存"); } catch (error) { toast.push("error", error instanceof Error ? error.message : "儲存失敗"); }
+    try { await apiPatch(`/admin/textbooks/${selected.id}`, { publisher: selected.publisher, version: selected.version, volume: selected.volume, coverUrl: selected.coverUrl, description: selected.description ?? "", isbn: selected.isbn ?? "", metadata: { ...(selected.metadata ?? {}), ocrSettings } }); await list.reload(); toast.push("success", "教材詳細設定已儲存"); } catch (error) { toast.push("error", errorMessage(error)); }
   }
   async function runOcr() {
     if (!selected || !files?.length) return toast.push("error", "請選擇教材封面、內頁圖片或 PDF");
     const body = new FormData(); Array.from(files).forEach((file) => body.append("files", file)); Object.entries(ocrSettings).forEach(([key, value]) => body.append(key, String(value)));
-    try { const result = await apiPost<{ imported: number }>(`/admin/textbooks/${selected.id}/ocr`, body); toast.push("success", `OCR 完成，已匯入 ${result.imported} 段內容`); await list.reload(); } catch (error) { toast.push("error", error instanceof Error ? error.message : "OCR 分析失敗"); }
+    try { const result = await apiPost<{ imported: number }>(`/admin/textbooks/${selected.id}/ocr`, body); toast.push("success", `OCR 完成，已匯入 ${result.imported} 段內容`); await list.reload(); } catch (error) { toast.push("error", errorMessage(error)); }
   }
   async function uploadCover() {
     if (!selected || !coverFile) return toast.push("error", "請先選擇封面圖片");
     const body = new FormData(); body.append("file", coverFile);
-    try { const result = await apiPost<{ edition: Edition }>(`/admin/textbooks/${selected.id}/cover`, body); setSelected(result.edition); setCoverFile(null); await list.reload(); toast.push("success", "教材封面已上傳"); } catch (error) { toast.push("error", error instanceof Error ? error.message : "封面上傳失敗"); }
+    try { const result = await apiPost<{ edition: Edition }>(`/admin/textbooks/${selected.id}/cover`, body); setSelected(result.edition); setCoverFile(null); await list.reload(); toast.push("success", "教材封面已上傳"); } catch (error) { toast.push("error", errorMessage(error)); }
   }
   return <div className="space-y-4">
     <header><p className="text-xs uppercase tracking-[0.2em] text-[#37d3ff]">StudyNova Content Studio</p><h1 className="mt-1 text-2xl font-semibold">教材內容中心</h1><p className="text-sm text-muted">建立版本後，可完整設定封面、版本資訊、教材說明，並用與 AI 解題相同的 OCR 流程匯入題目與筆記內容。</p></header>

@@ -38,7 +38,13 @@ export async function solveOcrImage(params: { userId: string; data: Buffer; mime
     width: Math.max(0, Math.min(1, Number(block.width) || 0)), height: Math.max(0, Math.min(1, Number(block.height) || 0)),
     confidence: Math.max(0, Math.min(1, Number(block.confidence) || 0)), page: Number(block.page) || 1, line: Number(block.line) || 1, block: Number(block.block) || 1,
   })) : [];
-  const text = String(data.text ?? blocks.map((block) => block.content).join("\n")).trim();
-  if (!text && !blocks.length) throw fail(meta.outputTokens > 0 ? "AI_INVALID_RESPONSE" : "AI_OCR_EMPTY");
+  // Some vision providers return usable OCR text while ignoring the JSON-only
+  // instruction. Preserve that text instead of converting it to SN-AI-6013.
+  const providerText = String(meta.text ?? "").replace(/^```(?:text|json)?/i, "").replace(/```$/i, "").trim();
+  const text = String(data.text ?? (blocks.map((block) => block.content).join("\n") || providerText)).trim();
+  if (!text && !blocks.length) {
+    console.error("[ocr] provider returned no usable text", { feature: params.feature, outputTokens: meta.outputTokens, provider: meta.provider, model: meta.model });
+    throw fail(meta.outputTokens > 0 ? "AI_INVALID_RESPONSE" : "AI_OCR_EMPTY", { details: { provider: meta.provider, model: meta.model, outputTokens: meta.outputTokens } });
+  }
   return { text, blocks };
 }
