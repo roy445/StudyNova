@@ -16,7 +16,6 @@ export function MaterialsPanel() {
   const materialCost = quotas.data?.quotas.find((item) => item.feature === "material_organize")?.novaCost ?? null;
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("其他");
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -56,7 +55,7 @@ export function MaterialsPanel() {
     try {
       const fd = new FormData();
       fd.append("title", title);
-      fd.append("subject", subject);
+      fd.append("subject", "英文");
       fd.append("content", content);
       if (file) fd.append("file", file);
       await apiPost("/materials", fd);
@@ -92,7 +91,7 @@ export function MaterialsPanel() {
   return (
     <Card
       title="📚 我的教材"
-      subtitle="支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理重點、單字與題目"
+      subtitle="英文教材專區：支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理英文重點、單字與題目"
       action={<Button size="sm" onClick={() => setOpen(true)}>＋ 新增教材</Button>}
     >
       <NovaCostNotice cost={materialCost} action="AI 整理教材" className="mb-3" />
@@ -140,15 +139,9 @@ export function MaterialsPanel() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="新增教材">
         <div className="space-y-3">
+          <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs text-cyan-100">此教材流程目前聚焦英文科目；其他科目請到解題專區或詢問 Novi。</div>
           <Field label="標題" required>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：數學二次函數講義／歷史第三冊" />
-          </Field>
-          <Field label="科目">
-            <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
-              {SUBJECTS.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </Select>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：英文閱讀測驗／英文文法講義" />
           </Field>
           <Field label="檔案（PDF / TXT / 圖片）" hint="圖片與 PDF 會使用 AI 進行文字擷取，會消耗「教材整理」額度">
             <input
@@ -256,7 +249,7 @@ export function OcrPanel() {
   const [searchTerm, setSearchTerm] = useState("");
   const history = useApi<{ documents: Array<{ id: string; title: string; subject: string; analysis_kind: string }> }>(searchTerm.trim() ? `/ocr/search?q=${encodeURIComponent(searchTerm.trim())}` : null, [searchTerm]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [ocrSubject, setOcrSubject] = useState("");
+  const OCR_ENGLISH_WARNING = "提醒：圖片 OCR 目前只提供分析英文科目。若上傳其他科目圖片，可能無法正確分析；如要解答其他科目，請前往解題專區或直接詢問 Novi，隨時歡迎。";
   const detail = useApi<{ document: OcrDoc; pages: OcrPage[] }>(activeId ? `/ocr/documents/${activeId}` : null, [activeId]);
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
   const imageOcrCost = quotas.data?.quotas.find((item) => item.feature === "image_ocr")?.novaCost ?? null;
@@ -350,14 +343,15 @@ export function OcrPanel() {
     setCameraOpen(false);
   }
 
+  function confirmEnglishOcr() {
+    return window.confirm(OCR_ENGLISH_WARNING);
+  }
+
   async function createDoc() {
-    if (!ocrSubject) {
-      toast.push("info", "請先選擇科目，再建立文件與上傳圖片");
-      return;
-    }
+    if (!confirmEnglishOcr()) return;
     setBusy(true);
     try {
-      const res = await apiPost<{ document: OcrDoc }>("/ocr/documents", { title: `辨識 ${new Date().toLocaleDateString("zh-TW")}`, subject: ocrSubject });
+      const res = await apiPost<{ document: OcrDoc }>("/ocr/documents", { title: `英文辨識 ${new Date().toLocaleDateString("zh-TW")}`, subject: "英文" });
       setActiveId(res.document.id);
       setLatestBatchIds([]);
       setLatestBatchNumber(null);
@@ -373,10 +367,11 @@ export function OcrPanel() {
 
   async function uploadImages(files: FileList | null) {
     if (!files?.length || !activeId) return;
-    if (!detail.data?.document.subject) {
-      toast.push("info", "此文件尚未設定科目，請重新建立並先選擇科目");
+    if (detail.data?.document.subject !== "英文") {
+      toast.push("info", "圖片 OCR 目前只支援英文；其他科目請到解題專區或詢問 Novi。");
       return;
     }
+    if (!confirmEnglishOcr()) return;
     setBusy(true);
     try {
       const fd = new FormData();
@@ -395,6 +390,7 @@ export function OcrPanel() {
 
   async function runOcr(allPages = false) {
     if (!activeId) return;
+    if (!confirmEnglishOcr()) return;
     const pageIds = allPages ? detail.data?.pages.map((p) => p.id) : latestBatchIds.length ? latestBatchIds : detail.data?.pages.map((p) => p.id);
     const pageCount = pageIds?.length ?? 0;
     let cost: number | null = null;
@@ -534,6 +530,7 @@ export function OcrPanel() {
 
   async function vision(stage: "preflight" | "analyze", force = false, allPages = false) {
     if (!activeId) return;
+    if (!confirmEnglishOcr()) return;
     const cost = stage === "preflight" ? visionPreflightCost : visionAnalysisCost;
     if (!confirmNovaSpend(stage === "preflight" ? "圖片品質預檢" : "影像理解分析", cost)) return;
     setBusy(true);
@@ -607,11 +604,9 @@ export function OcrPanel() {
               </option>
             ))}
           </Select>
-          <Select value={ocrSubject} onChange={(e) => setOcrSubject(e.target.value)} className="!w-auto !py-1.5 text-xs" aria-label="OCR 科目">
-            {SUBJECTS.map((subject) => <option key={subject}>{subject}</option>)}
-          </Select>
-          <Button size="sm" loading={busy} onClick={createDoc} disabled={!ocrSubject}>
-            ＋ 新文件
+          <span className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-xs text-cyan-100">OCR 僅英文</span>
+          <Button size="sm" loading={busy} onClick={createDoc}>
+            ＋ 新英文 OCR 文件
           </Button>
         </div>
       }
@@ -642,16 +637,16 @@ export function OcrPanel() {
               ✨ 開始 AI 辨識{typeof ocrTotalCost === "number" ? `（扣 ${ocrTotalCost} Nova）` : ""}
             </Button>
             {(detail.data?.pages.length ?? 0) > 1 && <Button size="sm" variant="outline" loading={busy} onClick={() => runOcr(true)}>辨識全部 {detail.data?.pages.length} 張</Button>}
-            <span className="w-full text-[11px] text-muted">目前科目：{detail.data?.document.subject ?? ocrSubject}。系統會依科目抓取公式、定義、事件、實驗、圖表或語言重點；建議一次分析 3 張。</span>
+            <span className="w-full rounded-lg border border-amber-300/25 bg-amber-300/10 px-2 py-1.5 text-[11px] text-amber-100">目前僅分析英文科目。其他科目圖片可能無法正確分析；如要解題，請前往解題專區或詢問 Novi。</span>
             <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
               加入我的教材
             </Button>
-            {(["國文", "英文"] as string[]).includes(detail.data?.document.subject ?? "") && <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrVocabulary}>AI 整理並加入字詞</Button>}
+            {detail.data?.document.subject === "英文" && <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrVocabulary}>AI 整理並加入英文單字</Button>}
             {latestBatchNumber && <Badge tone="cyan">目前分析第 {latestBatchNumber} 批（{latestBatchIds.length} 張）</Badge>}
             <Select value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value as typeof analysisMode)} className="!w-auto !py-1.5 text-xs" aria-label="AI 分析模式">
               <option value="auto">智慧讀取（AI 自動判斷）</option>
-              {(["國文", "英文"] as string[]).includes(detail.data?.document.subject ?? "") && <option value="vocabulary">只分析字詞／術語</option>}
-              {(["國文", "英文"] as string[]).includes(detail.data?.document.subject ?? "") && <option value="sentences">只分析句子／句型</option>}
+              {detail.data?.document.subject === "英文" && <option value="vocabulary">只分析英文單字／片語</option>}
+              {detail.data?.document.subject === "英文" && <option value="sentences">只分析英文句子／句型</option>}
               <option value="questions">只分析題目</option>
             </Select>
             <label className="flex items-center gap-1.5 rounded-lg border border-[var(--line)] px-2 py-1.5 text-xs">

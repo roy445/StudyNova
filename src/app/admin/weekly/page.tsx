@@ -112,13 +112,14 @@ export default function AdminWeeklyPage() {
     <div className="space-y-4">
       <Card
         title="▦ 每週小考管理"
-        subtitle={`目前週次代碼：${list.data?.currentWeekCode ?? "-"}・開放時間可自由設定，不寫死星期六`}
+        subtitle={`英文考試／模擬考專區・目前週次代碼：${list.data?.currentWeekCode ?? "-"}・開放時間可自由設定，不寫死星期六`}
         action={
           <Button size="sm" onClick={() => { setCreateOpen(true); setForm({ weekCode: list.data?.currentWeekCode ?? "", title: "", note: "" }); }}>
             ＋ 建立週次
           </Button>
         }
       >
+        <div className="mb-3 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs text-cyan-100">此後台目前只提供英文考試與英文模擬考；其他科目請由解題專區或 Novi 處理。</div>
         {list.loading && <Skeleton lines={3} />}
         {list.error && <ErrorState message={list.error} onRetry={list.reload} />}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

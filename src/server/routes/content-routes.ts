@@ -68,7 +68,7 @@ export const contentRoutes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const rows = await db.select().from(studyMaterials).where(eq(studyMaterials.userId, user.userId)).orderBy(desc(studyMaterials.createdAt)).limit(100);
+      const rows = await db.select().from(studyMaterials).where(and(eq(studyMaterials.userId, user.userId), eq(studyMaterials.subject, "英文"))).orderBy(desc(studyMaterials.createdAt)).limit(100);
       return { materials: rows };
     },
   }),
@@ -82,7 +82,7 @@ export const contentRoutes: RouteDef[] = [
       const user = ctx.requireUser();
       const form = await ctx.formData();
       const title = String(form.get("title") ?? "").slice(0, 120);
-      const subject = String(form.get("subject") ?? "其他").slice(0, 20);
+      const subject = "英文";
       const rawText = String(form.get("content") ?? "");
       const file = form.get("file");
 
@@ -92,7 +92,7 @@ export const contentRoutes: RouteDef[] = [
 
       const created = await db
         .insert(studyMaterials)
-        .values({ userId: user.userId, title, subject, kind: file instanceof File ? "pdf" : "text", status: "processing", content: sanitizeText(rawText) })
+        .values({ userId: user.userId, title, subject: "英文", kind: file instanceof File ? "pdf" : "text", status: "processing", content: sanitizeText(rawText) })
         .returning();
       const material = created[0];
 
@@ -305,7 +305,7 @@ export const contentRoutes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const docs = await db.select().from(ocrDocuments).where(eq(ocrDocuments.userId, user.userId)).orderBy(desc(ocrDocuments.createdAt)).limit(50);
+      const docs = await db.select().from(ocrDocuments).where(and(eq(ocrDocuments.userId, user.userId), eq(ocrDocuments.subject, "英文"))).orderBy(desc(ocrDocuments.createdAt)).limit(50);
       return { documents: docs };
     },
   }),
@@ -323,6 +323,7 @@ export const contentRoutes: RouteDef[] = [
           case when ai_result ? 'visionAnalysis' then '影像理解' when ai_result ? 'visionPreflight' then '影像預檢' else 'OCR' end as analysis_kind
         from ocr_documents
         where user_id = ${user.userId}
+          and subject = '英文'
           and (title ilike ${`%${q}%`} or combined_text ilike ${`%${q}%`} or coalesce(ai_result::text, '') ilike ${`%${q}%`})
         order by updated_at desc limit 50
       `);
@@ -338,7 +339,7 @@ export const contentRoutes: RouteDef[] = [
       const body = await ctx.json(z.object({ title: z.string().max(80).optional(), subject: z.string().max(20).optional() }));
       const rows = await db
         .insert(ocrDocuments)
-        .values({ userId: user.userId, title: body.title || `辨識 ${todayStr()}`, subject: body.subject || "其他" })
+        .values({ userId: user.userId, title: body.title || `英文辨識 ${todayStr()}`, subject: "英文" })
         .returning();
       return { document: rows[0] };
     },
@@ -353,6 +354,7 @@ export const contentRoutes: RouteDef[] = [
       const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
       if (doc.userId !== user.userId) throw forbidden();
+      if (doc.subject !== "英文") throw badRequest("圖片 OCR 目前只提供英文科目；其他科目請到解題專區或詢問 Novi。", "OCR 目前只支援英文圖片，其他科目可使用解題專區或 Novi。");
       const pages = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
       return { document: doc, pages: pages.map((p) => ({ ...p, imageUrl: p.objectId ? signObjectUrl(p.objectId, user.userId) : null })) };
     },
@@ -368,6 +370,7 @@ export const contentRoutes: RouteDef[] = [
       const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
       if (doc.userId !== user.userId) throw forbidden();
+      if (doc.subject !== "英文") throw badRequest("圖片 OCR 目前只提供英文科目；其他科目請到解題專區或詢問 Novi。", "OCR 目前只支援英文圖片，其他科目可使用解題專區或 Novi。");
       const form = await ctx.formData();
       const files = form.getAll("files").filter((f): f is File => f instanceof File);
       if (!files.length) throw fail("REQ_NO_FILE", { message: "請至少選擇一張圖片" });
@@ -443,6 +446,7 @@ export const contentRoutes: RouteDef[] = [
       const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
       if (doc.userId !== user.userId) throw forbidden();
+      if (doc.subject !== "英文") throw badRequest("圖片 OCR 目前只提供英文科目；其他科目請到解題專區或詢問 Novi。", "OCR 目前只支援英文圖片，其他科目可使用解題專區或 Novi。");
       const allPages = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
       const pages = body.pageIds?.length ? allPages.filter((p) => body.pageIds!.includes(p.id)) : allPages;
       if (!pages.length) throw fail("REQ_NO_FILE", { message: "請先上傳圖片再執行 OCR" });
@@ -514,6 +518,7 @@ export const contentRoutes: RouteDef[] = [
       const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
       if (doc.userId !== user.userId) throw forbidden();
+      if (doc.subject !== "英文") throw badRequest("圖片 OCR 目前只提供英文科目；其他科目請到解題專區或詢問 Novi。", "OCR 目前只支援英文圖片，其他科目可使用解題專區或 Novi。");
       const allPages = await db.select().from(ocrPages).where(eq(ocrPages.documentId, doc.id)).orderBy(asc(ocrPages.orderIndex));
       const pages = body.pageIds?.length ? allPages.filter((p) => body.pageIds!.includes(p.id)) : allPages;
       if (!pages.length) throw fail("REQ_NO_FILE", { message: "請先選擇至少一張圖片" });
@@ -686,6 +691,7 @@ export const contentRoutes: RouteDef[] = [
       if (!doc) throw notFound("找不到辨識文件");
       stage = "ownership_check";
       if (doc.userId !== user.userId) throw forbidden();
+      if (doc.subject !== "英文") throw badRequest("圖片 OCR 目前只提供英文科目；其他科目請到解題專區或詢問 Novi。", "OCR 目前只支援英文圖片，其他科目可使用解題專區或 Novi。");
       if (doc.combinedText.trim().length < 10) throw fail("AI_OCR_EMPTY", { message: "請先完成 OCR 或手動輸入文字" });
 
       const prompts: Record<string, string> = {
