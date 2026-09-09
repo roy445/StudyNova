@@ -1,4 +1,5 @@
 import { and, eq, gte, sql } from "drizzle-orm";
+import sharp from "sharp";
 import { db } from "@/db";
 import { aiProviderHealth, aiUsageLogs } from "@/db/schema";
 import { fail, monthStart, nextUtcMonthStart } from "./core";
@@ -55,6 +56,42 @@ function cleanEnv(value?: string) {
 
 function cleanModel(value?: string) {
   return (cleanEnv(value) || "gemini-3.6-flash").replace(/^models\//, "");
+}
+
+const AI_IMAGE_MAX_PIXELS = 50_000_000;
+const AI_IMAGE_MAX_EDGE = 4096;
+
+/**
+ * Normalize every image once before provider fallback. Browsers may upload
+ * HEIC/AVIF/WebP or an incorrect MIME label; Gemini and OpenAI-compatible
+ * providers are much more reliable when they receive a decoded JPEG payload.
+ */
+export async function normalizeAiRequest(req: AiRequest): Promise<AiRequest> {
+  let changed = false;
+  const parts = await Promise.all(req.parts.map(async (part) => {
+    if (part.kind !== "image" || !part.mimeType.toLowerCase().startsWith("image/")) return part;
+    try {
+      const input = Buffer.from(part.base64, "base64");
+      if (!input.length) throw new Error("empty image payload");
+      const output = await sharp(input, { limitInputPixels: AI_IMAGE_MAX_PIXELS })
+        .rotate()
+        .resize({ width: AI_IMAGE_MAX_EDGE, height: AI_IMAGE_MAX_EDGE, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 88, mozjpeg: true })
+        .toBuffer();
+      changed = true;
+      return { kind: "image" as const, mimeType: "image/jpeg", base64: output.toString("base64") };
+    } catch (error) {
+      console.error("[ai] image normalization failed", {
+        mimeType: part.mimeType,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+      throw fail("AI_PROVIDER_ERROR", {
+        message: "圖片格式無法解析，請改用清晰的 JPG 或 PNG 圖片後再試一次。",
+        details: { category: "invalid_image" },
+      });
+    }
+  }));
+  return changed ? { ...req, parts } : req;
 }
 
 export function providerConfigs(): ProviderConfig[] {
@@ -271,6 +308,7 @@ async function logUsage(entry: {
 /* --------------------------------------------------------- public API */
 
 export async function runAi(req: AiRequest): Promise<AiResult> {
+  const normalizedReq = await normalizeAiRequest(req);
   const configs = providerConfigs()
     .filter((c) => Boolean(c.apiKey))
     .sort((a, b) => a.priority - b.priority);
@@ -298,10 +336,10 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     try {
       const out =
           cfg.name.startsWith("gemini_")
-          ? await callGemini(cfg, req)
+          ? await callGemini(cfg, normalizedReq)
           : await callOpenAiCompatible(
               cfg,
-              req,
+              normalizedReq,
               cfg.name === "openai"
                 ? "https://api.openai.com/v1/chat/completions"
                 : "https://openrouter.ai/api/v1/chat/completions",
