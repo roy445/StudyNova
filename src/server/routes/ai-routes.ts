@@ -24,6 +24,7 @@ import { generateQuestions } from "./quiz-routes";
 import { putObject } from "../storage";
 import { analysisScopes, fileContexts, solutionSessions } from "@/db/schema";
 import { analyzeSolution, createFileContext } from "../unified-ai-engine";
+import { AppError } from "../errors";
 
 const MODES = {
   teacher: "學習教練模式：像一位有耐心的台灣國高中學習教練，先確認學生理解程度，再一步步教學。",
@@ -512,12 +513,19 @@ export const routes: RouteDef[] = [
       };
       const previous = await db.select({ batch: fileContexts.uploadBatch }).from(fileContexts).where(eq(fileContexts.userId, user.userId)).orderBy(desc(fileContexts.uploadBatch)).limit(1);
       const batch = (previous[0]?.batch ?? 0) + 1;
-      const results = [];
-      for (const file of files) {
-        const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
-        const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
-        results.push(await createFileContext({ userId: user.userId, objectId: stored.id, originalName: file.name, batch, scope }));
-      }
+      const processFile = async (file: File) => {
+        try {
+          const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+          const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
+          return await createFileContext({ userId: user.userId, objectId: stored.id, originalName: file.name, batch, scope });
+        } catch (error) {
+          const code = error instanceof AppError ? error.code : "SN-SYS-9901";
+          console.error("[ai-solution-upload] file analysis failed", { filename: file.name, code, error: error instanceof Error ? error.message : String(error) });
+          return { context: null, duplicate: false, errorCode: code, error: error instanceof Error ? error.message.slice(0, 240) : "圖片分析失敗" };
+        }
+      };
+      const results: Array<Awaited<ReturnType<typeof processFile>>> = [];
+      for (let i = 0; i < files.length; i += 3) results.push(...await Promise.all(files.slice(i, i + 3).map(processFile)));
       return { batch, results, newCount: results.filter((r) => !r.duplicate).length, duplicateCount: results.filter((r) => r.duplicate).length };
     },
   }),

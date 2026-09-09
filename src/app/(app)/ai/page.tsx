@@ -129,10 +129,12 @@ export default function AiPage() {
       setAnalysisProgress({ value: 20, label: "上傳檔案中…" });
       Array.from(files).slice(0, 8).forEach((file) => form.append("files", file));
       Object.entries(scope).forEach(([key, value]) => form.append(key, String(value)));
-      const uploaded = await apiPost<{ results: Array<{ context: FileContext; duplicate: boolean }>; newCount: number; duplicateCount: number }>("/ai/solution/upload", form);
+      const uploaded = await apiPost<{ results: Array<{ context: FileContext | null; duplicate: boolean; errorCode?: string; error?: string }>; newCount: number; duplicateCount: number }>("/ai/solution/upload", form);
       setAnalysisProgress({ value: 52, label: "檔案已上傳，正在辨識內容…" });
-      const ids = uploaded.results.map((item) => item.context.id);
-      if (!ids.length) throw new Error("這批檔案都是重複內容，沒有需要重新分析的檔案。");
+      const failed = uploaded.results.filter((item) => !item.context);
+      if (failed.length) setError(failed.map((item) => `${item.error ?? "圖片分析失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；"));
+      const ids = uploaded.results.flatMap((item) => item.context?.id ? [item.context.id] : []);
+      if (!ids.length) throw new Error(failed.length ? "所有圖片分析失敗，請依畫面上的錯誤代碼回報。" : "這批檔案都是重複內容，沒有需要重新分析的檔案。");
       const analyzed = await apiPost<{ result: typeof solutionResult }>("/ai/solution/analyze", { contextIds: ids, scope });
       setAnalysisProgress({ value: 92, label: "整理題目、筆記與手寫範圍…" });
       setSolutionResult(analyzed.result);

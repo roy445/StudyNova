@@ -395,10 +395,11 @@ export function OcrPanel() {
     if (!confirmNovaSpend(`AI OCR（${pageCount} 頁）`, cost)) return;
     setBusy(true);
     try {
-      const res = await apiPost<{ results?: Array<{ ok: boolean }> }>(`/ocr/documents/${activeId}/run`, { pageIds });
+      const res = await apiPost<{ results?: Array<{ ok: boolean; error?: string; errorCode?: string }> }>(`/ocr/documents/${activeId}/run`, { pageIds });
       const ok = res.results?.filter((item) => item.ok).length ?? 0;
       const failed = (res.results?.length ?? 0) - ok;
-      toast.push(failed ? "info" : "success", `OCR 完成：${ok} 張成功${failed ? `，${failed} 張失敗` : ""}`);
+      const failureDetail = res.results?.filter((item) => !item.ok).map((item) => `${item.error ?? "辨識失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；");
+      toast.push(failed ? "info" : "success", `OCR 完成：${ok} 張成功${failed ? `，${failed} 張失敗：${failureDetail}` : ""}`);
       await detail.reload();
     } catch (err) {
       toast.push("error", errorMessage(err));

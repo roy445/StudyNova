@@ -24,6 +24,7 @@ import { putObject, readObject, deleteObject, signObjectUrl } from "../storage";
 import { consumeFeature, grantLearningReward, progressDailyTask, bumpAchievement } from "../economy";
 import { runAi, runAiJson, aiConfigured, type AiPart } from "../ai";
 import { solveOcrImage } from "../ocr-solver";
+import { AppError } from "../errors";
 import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
 
@@ -448,12 +449,12 @@ export const contentRoutes: RouteDef[] = [
       await consumeFeature(user.userId, "image_ocr", pages.length);
 
       await db.update(ocrDocuments).set({ status: "processing", updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
-      const results: Array<{ pageId: string; ok: boolean; error?: string }> = [];
+      const results: Array<{ pageId: string; ok: boolean; error?: string; errorCode?: string }> = [];
       // 有限併發送出影像：同時最多 3 張，兼顧速度與供應商併發限制。
       const processPage = async (page: typeof pages[number]) => {
         const objectId = page.objectId;
         if (!objectId) {
-          results.push({ pageId: page.id, ok: false, error: "找不到圖片檔案" });
+          results.push({ pageId: page.id, ok: false, error: "找不到圖片檔案", errorCode: "SN-FILE-7001" });
           return;
         }
         try {
@@ -470,7 +471,9 @@ export const contentRoutes: RouteDef[] = [
           results.push({ pageId: page.id, ok: true });
         } catch (err) {
           await db.update(ocrPages).set({ status: "failed" }).where(eq(ocrPages.id, page.id));
-          results.push({ pageId: page.id, ok: false, error: err instanceof Error ? err.message : "辨識失敗" });
+          const errorCode = err instanceof AppError ? err.code : "SN-SYS-9901";
+          console.error("[ocr-run] page analysis failed", { pageId: page.id, errorCode, error: err instanceof Error ? err.message : String(err) });
+          results.push({ pageId: page.id, ok: false, error: err instanceof Error ? err.message : "辨識失敗", errorCode });
         }
       };
       const concurrency = Math.min(3, pages.length);
@@ -514,10 +517,9 @@ export const contentRoutes: RouteDef[] = [
       const pages = body.pageIds?.length ? allPages.filter((p) => body.pageIds!.includes(p.id)) : allPages;
       if (!pages.length) throw fail("REQ_NO_FILE", { message: "請先選擇至少一張圖片" });
       if (pages.length > 8) throw fail("SYS_CONFLICT", { message: "一次最多分析 8 張圖片，請分批處理" });
-      const imageParts: AiPart[] = [];
-      const pageContext: string[] = [];
-      for (const page of pages) {
-        if (!page.objectId) continue;
+      const prepared: Array<{ page: typeof pages[number]; obj: Awaited<ReturnType<typeof readObject>>; ocrText: string }> = [];
+      const preparePage = async (page: typeof pages[number]) => {
+        if (!page.objectId) return null;
         const obj = await readObject(page.objectId);
         let ocrText = page.text;
         if (!ocrText.trim()) {
@@ -526,10 +528,14 @@ export const contentRoutes: RouteDef[] = [
           const confidence = ocr.blocks.length ? ocr.blocks.reduce((sum, block) => sum + block.confidence, 0) / ocr.blocks.length : 0.5;
           await db.update(ocrPages).set({ text: ocrText, blocks: ocr.blocks, status: "completed", confidence }).where(eq(ocrPages.id, page.id));
         }
-        imageParts.push({ kind: "text", text: `\n--- PAGE ${page.orderIndex + 1} / pageId=${page.id} ---\n既有 OCR：${ocrText || "（影像未取得文字）"}` });
-        imageParts.push({ kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") });
-        pageContext.push(`pageId=${page.id}; page=${page.orderIndex + 1}; OCR=${ocrText.slice(0, 8000)}`);
-      }
+        return { page, obj, ocrText };
+      };
+      for (let i = 0; i < pages.length; i += 3) prepared.push(...(await Promise.all(pages.slice(i, i + 3).map(preparePage))).filter((item): item is NonNullable<typeof item> => Boolean(item)));
+      const imageParts: AiPart[] = prepared.flatMap(({ page, obj, ocrText }) => [
+        { kind: "text", text: `\n--- PAGE ${page.orderIndex + 1} / pageId=${page.id} ---\n既有 OCR：${ocrText || "（影像未取得文字）"}` },
+        { kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") },
+      ]);
+      const pageContext = prepared.map(({ page, ocrText }) => `pageId=${page.id}; page=${page.orderIndex + 1}; OCR=${ocrText.slice(0, 8000)}`);
       if (!imageParts.length) throw fail("AI_OCR_EMPTY", { message: "圖片內容無法讀取，請重新上傳" });
       const studentProfile = await db.execute(sql`select school_level, grade, english_level, favorite_subjects from user_settings where user_id = ${user.userId} limit 1`).catch(() => ({ rows: [] as unknown[] }));
       const profile = (studentProfile.rows[0] ?? {}) as { school_level?: string; grade?: number; english_level?: string; favorite_subjects?: string[] };
