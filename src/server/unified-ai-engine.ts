@@ -61,7 +61,7 @@ export async function analyzeSolution(params: { userId: string; contextIds: stri
   const contexts = await db.select().from(fileContexts).where(and(eq(fileContexts.userId, params.userId), inArray(fileContexts.id, params.contextIds)));
   if (!contexts.length) throw fail("FILE_NOT_FOUND");
 
-  const scope = params.scope ?? DEFAULT_SCOPE;
+  const scope: Scope = { ...DEFAULT_SCOPE, ...(params.scope ?? {}) };
   const idempotencyKey = params.idempotencyKey?.trim().slice(0, 160) || createHash("sha256").update(JSON.stringify({ contexts: [...params.contextIds].sort(), mode: params.requestedMode ?? "", scope })).digest("hex");
   const existing = (await db.select().from(solutionSessions).where(and(eq(solutionSessions.userId, params.userId), eq(solutionSessions.idempotencyKey, idempotencyKey))).limit(1))[0];
   if (existing?.status === "completed") return { session: existing, result: existing.result ?? {} };
@@ -79,7 +79,7 @@ export async function analyzeSolution(params: { userId: string; contextIds: stri
     : (await db.insert(solutionSessions).values({ userId: params.userId, fileContextIds: contexts.map((x) => x.id), novaCost: costState.novaCost, charged: false, idempotencyKey, status: "processing" }).returning())[0];
   let charged = false;
   try {
-    const segments = contexts.flatMap((c) => c.detected as Segment[]).filter((s) => (s.kind === "QUESTION" && scope.includeQuestion) || (s.kind === "HANDWRITING" && scope.includeHandwriting) || (s.kind === "NOTE" && scope.includeNote) || (s.kind === "HIGHLIGHT" && scope.highlightPriority));
+    const segments = contexts.flatMap((c) => (Array.isArray(c.detected) ? c.detected : []) as Segment[]).filter((s) => (s.kind === "QUESTION" && scope.includeQuestion) || (s.kind === "HANDWRITING" && scope.includeHandwriting) || (s.kind === "NOTE" && scope.includeNote) || (s.kind === "HIGHLIGHT" && scope.highlightPriority));
     const mode = await resolveMode(params.userId, session.id, params.requestedMode, segments);
     const source = segments.map((s) => `[${s.kind}] ${s.text}`).join("\n");
     const { data } = await runAiJson<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean }>(

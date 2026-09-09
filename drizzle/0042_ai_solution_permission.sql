@@ -41,6 +41,23 @@ CREATE TABLE IF NOT EXISTS "solution_sessions" (
   "updated_at" timestamptz NOT NULL DEFAULT now()
 );
 
+-- Some production databases received the solution session repair without the
+-- mode-lock table from the original unified-AI migration. Keep this repair
+-- idempotent so mode resolution never turns a valid request into a 500.
+CREATE TABLE IF NOT EXISTS "ai_modes" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "solution_session_id" uuid,
+  "mode" text NOT NULL DEFAULT 'tutor',
+  "source" text NOT NULL DEFAULT 'manual',
+  "locked" boolean NOT NULL DEFAULT false,
+  "reason" text NOT NULL DEFAULT '',
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  "updated_at" timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "ai_mode_user_idx" ON "ai_modes" ("user_id", "updated_at");
+
 ALTER TABLE "solution_sessions"
   ADD COLUMN IF NOT EXISTS "idempotency_key" text NOT NULL DEFAULT '';
 
