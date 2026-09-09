@@ -158,27 +158,41 @@ function categorize(status: number, body: string): FailureCategory {
 const estimate = (s: string) => Math.max(1, Math.ceil(s.length / 4));
 
 async function fetchJson(url: string, init: RequestInit, timeoutMs = 60_000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    const text = await res.text();
-    if (!res.ok) {
-      const reason = safeProviderReason(text);
-      throw new ProviderError(categorize(res.status, text), `provider responded ${res.status}`, reason);
-    }
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      throw new ProviderError("unknown", "provider returned malformed payload");
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      const text = await res.text();
+      if (!res.ok) {
+        const error = new ProviderError(categorize(res.status, text), `provider responded ${res.status}`, safeProviderReason(text));
+        if (attempt === 0 && ["server_error", "timeout", "network"].includes(error.category)) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          continue;
+        }
+        throw error;
+      }
+      try {
+        return JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        throw new ProviderError("unknown", "provider returned malformed payload");
+      }
+    } catch (err) {
+      const error = err instanceof ProviderError
+        ? err
+        : err instanceof Error && err.name === "AbortError"
+          ? new ProviderError("timeout", "provider timeout")
+          : new ProviderError("network", "provider network error");
+      if (attempt === 0 && ["timeout", "network"].includes(error.category)) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        continue;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-  } catch (err) {
-    if (err instanceof ProviderError) throw err;
-    if (err instanceof Error && err.name === "AbortError") throw new ProviderError("timeout", "provider timeout");
-    throw new ProviderError("network", "provider network error");
-  } finally {
-    clearTimeout(timer);
   }
+  throw new ProviderError("unknown", "provider request failed");
 }
 
 /* --------------------------------------------------------- providers */
@@ -319,6 +333,7 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
 
   let fallbackFrom = "";
   let lastCategory: FailureCategory = "unknown";
+  let lastReason = "";
 
   for (const cfg of configs) {
     // 健康狀態／使用量是觀測資料；即使 production migration 尚未同步，也不能阻斷圖片分析本身。
@@ -356,7 +371,9 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       return { ...out, fallbackFrom };
     } catch (err) {
       const category: FailureCategory = err instanceof ProviderError ? err.category : "unknown";
+      lastReason = err instanceof ProviderError ? err.reason || err.message : err instanceof Error ? err.message : "unknown";
       lastCategory = category;
+      console.error("[ai] provider attempt failed", { provider: cfg.name, model: cfg.model, feature: req.feature, category, reason: lastReason });
       try {
         await db
           .update(aiProviderHealth)
@@ -397,7 +414,7 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     : lastCategory === "invalid_request"
       ? "圖片格式或內容不符合目前 AI 模型要求，請改用清晰的 JPG、PNG 或 WebP 圖片後重試。"
       : "AI 圖片分析暫時無法使用，請稍後再試。";
-  throw fail("AI_ALL_UNAVAILABLE", { message, details: { category: lastCategory } });
+  throw fail("AI_ALL_UNAVAILABLE", { message, details: { category: lastCategory, reason: lastReason } });
 }
 
 export function extractJson<T>(raw: string, fallback: T): T {
