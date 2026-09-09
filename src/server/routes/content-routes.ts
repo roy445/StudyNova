@@ -23,6 +23,7 @@ import { badRequest, fail, forbidden, notFound, sanitizeText, slugToken, todaySt
 import { putObject, readObject, deleteObject, signObjectUrl } from "../storage";
 import { consumeFeature, grantLearningReward, progressDailyTask, bumpAchievement } from "../economy";
 import { runAi, runAiJson, aiConfigured, type AiPart } from "../ai";
+import { solveOcrImage } from "../ocr-solver";
 import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
 
@@ -461,24 +462,10 @@ export const contentRoutes: RouteDef[] = [
           const hints = page.highlights.length
             ? `圖片上的螢光筆標記區域（相對座標 0-1）：${JSON.stringify(page.highlights)}。請特別標示這些區域內的文字，於輸出時以 [顏色] 前綴標註。`
             : "";
-          const { data: ocrData, meta: ocrMeta } = await runAiJson<{ text: string; blocks: Array<{ content: string; x: number; y: number; width: number; height: number; confidence: number; page: number; line: number; block: number }> }>(
-            {
-              feature: "ocr",
-              userId: user.userId,
-              system:
-                "你是高精度教育 OCR 引擎，擅長中文課本、講義、考卷、手寫筆記、表格與數學公式。請回傳 JSON，不得猜測看不清楚的文字；不確定內容請在文字加上 [不確定:候選]。公式用 LaTeX。JSON 形狀：{text:string,blocks:[{content,x,y,width,height,confidence,page,line,block}]}。座標必須是圖片相對比例 0-1；每段至少一個 block；page 使用圖片頁序 1；line 與 block 從 1 開始。" + hints,
-              parts: [
-                { kind: "text", text: "辨識圖片全部可見文字，保留題號、選項、段落、表格、公式與標點。" },
-                { kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") },
-              ],
-              temperature: 0.1,
-              maxOutputTokens: 5000,
-            },
-            { text: "", blocks: [] },
-          );
-          const normalizedBlocks = Array.isArray(ocrData.blocks) ? ocrData.blocks.filter((b) => b && typeof b.content === "string").map((b) => ({ ...b, x: Math.max(0, Math.min(1, Number(b.x) || 0)), y: Math.max(0, Math.min(1, Number(b.y) || 0)), width: Math.max(0, Math.min(1, Number(b.width) || 0)), height: Math.max(0, Math.min(1, Number(b.height) || 0)), confidence: Math.max(0, Math.min(1, Number(b.confidence) || 0)), page: Number(b.page) || 1, line: Number(b.line) || 1, block: Number(b.block) || 1 })) : [];
-          const ocrText = sanitizeText(ocrData.text || normalizedBlocks.map((b) => b.content).join("\n"));
-          const ocrConfidence = normalizedBlocks.length ? normalizedBlocks.reduce((sum, b) => sum + b.confidence, 0) / normalizedBlocks.length : ocrMeta.outputTokens > 0 ? 0.5 : 0;
+          const ocrData = await solveOcrImage({ userId: user.userId, data: obj.data, mimeType: obj.mimeType, feature: "ocr", prompt: `辨識圖片全部可見文字，保留題號、選項、段落、表格、公式與標點。${hints}` });
+          const normalizedBlocks = ocrData.blocks;
+          const ocrText = sanitizeText(ocrData.text);
+          const ocrConfidence = normalizedBlocks.length ? normalizedBlocks.reduce((sum, b) => sum + b.confidence, 0) / normalizedBlocks.length : 0.5;
           await db.update(ocrPages).set({ text: ocrText, blocks: normalizedBlocks, status: "completed", confidence: ocrConfidence }).where(eq(ocrPages.id, page.id));
           results.push({ pageId: page.id, ok: true });
         } catch (err) {
@@ -534,23 +521,17 @@ export const contentRoutes: RouteDef[] = [
         const obj = await readObject(page.objectId);
         let ocrText = page.text;
         if (!ocrText.trim()) {
-          const ocr = await runAi({
-            feature: "camera_ocr_stage",
-            userId: user.userId,
-            system: "你是高精度教育 OCR。辨識圖片中可見文字並保留題號、段落、選項、公式與標點；數學公式請使用 LaTeX；無法確認的字以 [不確定:候選] 標記，不要猜測。只輸出文字。",
-            parts: [{ kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") }],
-            maxOutputTokens: 5000,
-            temperature: 0.05,
-          });
+          const ocr = await solveOcrImage({ userId: user.userId, data: obj.data, mimeType: obj.mimeType, feature: "camera_ocr_stage" });
           ocrText = sanitizeText(ocr.text);
-          await db.update(ocrPages).set({ text: ocrText, status: "completed", confidence: 0.85 }).where(eq(ocrPages.id, page.id));
+          const confidence = ocr.blocks.length ? ocr.blocks.reduce((sum, block) => sum + block.confidence, 0) / ocr.blocks.length : 0.5;
+          await db.update(ocrPages).set({ text: ocrText, blocks: ocr.blocks, status: "completed", confidence }).where(eq(ocrPages.id, page.id));
         }
         imageParts.push({ kind: "text", text: `\n--- PAGE ${page.orderIndex + 1} / pageId=${page.id} ---\n既有 OCR：${ocrText || "（影像未取得文字）"}` });
         imageParts.push({ kind: "image", mimeType: obj.mimeType, base64: obj.data.toString("base64") });
         pageContext.push(`pageId=${page.id}; page=${page.orderIndex + 1}; OCR=${ocrText.slice(0, 8000)}`);
       }
       if (!imageParts.length) throw fail("AI_OCR_EMPTY", { message: "圖片內容無法讀取，請重新上傳" });
-      const studentProfile = await db.execute(sql`select school_level, grade, english_level, favorite_subjects from user_settings where user_id = ${user.userId} limit 1`);
+      const studentProfile = await db.execute(sql`select school_level, grade, english_level, favorite_subjects from user_settings where user_id = ${user.userId} limit 1`).catch(() => ({ rows: [] as unknown[] }));
       const profile = (studentProfile.rows[0] ?? {}) as { school_level?: string; grade?: number; english_level?: string; favorite_subjects?: string[] };
       const level = profile.school_level === "senior" ? "高中" : "國中";
       if (body.stage === "preflight") {

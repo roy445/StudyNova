@@ -43,6 +43,12 @@ Content Studio 讓管理員建立可依教育階段隔離的教材版本，設�
 
 正式環境應先套用教材詳細欄位 migration，再使用 OCR。若資料庫尚未完成 migration，教材清單 API 會使用舊欄位 fallback，使後台仍可進入；新增詳細欄位與 OCR 狀態則要等 migration 完成後才能完整保存。
 
+## 使用者 OCR 分析 pipeline
+
+使用者端 OCR 與影像分析共用獨立的 `solveOcrImage` 服務，不直接把 provider 呼叫散落在 route handler。流程為驗證登入、確認檔案 ownership、驗證檔案大小與 magic bytes、呼叫 AI provider、驗證 JSON 結果、正規化座標與信心分數、寫入頁面，再進入後續 Vision 分析。系統不信任 client 傳來的檔名或 MIME type。
+
+單張圖片上限為 12MB，支援 JPEG、PNG 與 WebP。無效圖片會回傳 `SN-AI-6010`，過大圖片回傳 `SN-AI-6011`，空的 OCR 結果回傳 `SN-AI-6006`，AI 回傳無法驗證的 JSON 回傳 `SN-AI-6013`。這些錯誤不會被轉成模糊的成功回應，也不會寫入假的 OCR 文字。
+
 ## References
 
 [1]: https://github.com/roy445/StudyNova "StudyNova repository"
