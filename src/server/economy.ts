@@ -192,7 +192,9 @@ export type QuotaState = {
 export async function featureState(userId: string, feature: string): Promise<QuotaState> {
   let perm: QuotaPermission | undefined;
   try {
-    const rows = await db.select().from(featurePermissions).where(eq(featurePermissions.feature, feature)).limit(1);
+    // `feature` has a unique index; avoid parameterized LIMIT in the production pg path.
+    // Some hosted PostgreSQL proxies have emitted an incomplete `limit` fragment here.
+    const rows = await db.select().from(featurePermissions).where(eq(featurePermissions.feature, feature));
     perm = rows[0] as QuotaPermission | undefined;
   } catch (error) {
     throwQuotaDatabaseError(error, "feature_permissions");
