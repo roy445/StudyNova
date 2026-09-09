@@ -1,5 +1,6 @@
 import { fail } from "./errors";
 import { runAi, runAiJson } from "./ai";
+import { subjectStrategy } from "./subject-strategies";
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -19,13 +20,13 @@ export function validateOcrImage(data: Buffer, mimeType: string) {
   if (data.length < 128) throw fail("IMAGE_INVALID");
 }
 
-export async function solveOcrImage(params: { userId: string; data: Buffer; mimeType: string; feature: string; prompt?: string }) {
+export async function solveOcrImage(params: { userId: string; data: Buffer; mimeType: string; feature: string; prompt?: string; subject?: string }) {
   validateOcrImage(params.data, params.mimeType);
   const { data, meta } = await runAiJson<{ text?: string; blocks?: OcrBlock[] }>(
     {
       feature: params.feature,
       userId: params.userId,
-      system: "你是高精度教育 OCR 引擎。只能辨識影像中實際可見的文字，不得猜測。保留題號、選項、段落、表格、公式與標點；公式使用 LaTeX；不確定文字請標記 [不確定:候選]。只輸出 JSON：{text:string,blocks:[{content:string,x:number,y:number,width:number,height:number,confidence:number,page:number,line:number,block:number}]}。座標為 0 到 1。",
+      system: `你是高精度全科教育 OCR 引擎。${subjectStrategy(params.subject)}只能辨識影像中實際可見的文字，不得猜測。保留題號、選項、段落、表格、公式與標點；公式使用 LaTeX；不確定文字請標記 [不確定:候選]。只輸出 JSON：{text:string,blocks:[{content:string,x:number,y:number,width:number,height:number,confidence:number,page:number,line:number,block:number}]}。座標為 0 到 1。`,
       parts: [{ kind: "text", text: params.prompt ?? "辨識圖片全部可見文字。" }, { kind: "image", mimeType: params.mimeType, base64: params.data.toString("base64") }],
       temperature: 0.05,
       maxOutputTokens: 2200,

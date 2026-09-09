@@ -16,7 +16,7 @@ export function MaterialsPanel() {
   const materialCost = quotas.data?.quotas.find((item) => item.feature === "material_organize")?.novaCost ?? null;
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("英文");
+  const [subject, setSubject] = useState("其他");
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -141,7 +141,7 @@ export function MaterialsPanel() {
       <Modal open={open} onClose={() => setOpen(false)} title="新增教材">
         <div className="space-y-3">
           <Field label="標題" required>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：英文 B3 L2 單字表" />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：數學二次函數講義／歷史第三冊" />
           </Field>
           <Field label="科目">
             <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
@@ -256,6 +256,7 @@ export function OcrPanel() {
   const [searchTerm, setSearchTerm] = useState("");
   const history = useApi<{ documents: Array<{ id: string; title: string; subject: string; analysis_kind: string }> }>(searchTerm.trim() ? `/ocr/search?q=${encodeURIComponent(searchTerm.trim())}` : null, [searchTerm]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [ocrSubject, setOcrSubject] = useState("其他");
   const detail = useApi<{ document: OcrDoc; pages: OcrPage[] }>(activeId ? `/ocr/documents/${activeId}` : null, [activeId]);
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
   const imageOcrCost = quotas.data?.quotas.find((item) => item.feature === "image_ocr")?.novaCost ?? null;
@@ -352,7 +353,7 @@ export function OcrPanel() {
   async function createDoc() {
     setBusy(true);
     try {
-      const res = await apiPost<{ document: OcrDoc }>("/ocr/documents", { title: `辨識 ${new Date().toLocaleDateString("zh-TW")}` });
+      const res = await apiPost<{ document: OcrDoc }>("/ocr/documents", { title: `辨識 ${new Date().toLocaleDateString("zh-TW")}`, subject: ocrSubject });
       setActiveId(res.document.id);
       setLatestBatchIds([]);
       setLatestBatchNumber(null);
@@ -598,6 +599,9 @@ export function OcrPanel() {
               </option>
             ))}
           </Select>
+          <Select value={ocrSubject} onChange={(e) => setOcrSubject(e.target.value)} className="!w-auto !py-1.5 text-xs" aria-label="OCR 科目">
+            {SUBJECTS.map((subject) => <option key={subject}>{subject}</option>)}
+          </Select>
           <Button size="sm" loading={busy} onClick={createDoc}>
             ＋ 新文件
           </Button>
@@ -630,7 +634,7 @@ export function OcrPanel() {
               ✨ 開始 AI 辨識{typeof ocrTotalCost === "number" ? `（扣 ${ocrTotalCost} Nova）` : ""}
             </Button>
             {(detail.data?.pages.length ?? 0) > 1 && <Button size="sm" variant="outline" loading={busy} onClick={() => runOcr(true)}>辨識全部 {detail.data?.pages.length} 張</Button>}
-            <span className="w-full text-[11px] text-muted">建議一次分析 3 張，最多一批 5 張最穩定；頁面太多或不相關內容，請分批並只選要分析的頁面。</span>
+            <span className="w-full text-[11px] text-muted">目前科目：{detail.data?.document.subject ?? ocrSubject}。系統會依科目抓取公式、定義、事件、實驗、圖表或語言重點；建議一次分析 3 張。</span>
             <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
               加入我的教材
             </Button>

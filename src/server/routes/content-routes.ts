@@ -27,14 +27,15 @@ import { solveOcrImage } from "../ocr-solver";
 import { AppError } from "../errors";
 import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
+import { subjectStrategy } from "../subject-strategies";
 
-async function extractText(mime: string, data: Buffer, userId: string): Promise<string> {
+async function extractText(mime: string, data: Buffer, userId: string, subject = "其他"): Promise<string> {
   if (mime.startsWith("text/") || mime === "application/json") return sanitizeText(data.toString("utf8"));
   if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED", { hint: "此檔案需要 AI 視覺辨識。你可以改上傳純文字檔，或請管理員設定 AI Provider。" });
   const res = await runAi({
     feature: mime === "application/pdf" ? "material_pdf_extract" : "ocr",
     userId,
-    system: "你是精準的 OCR 與文件解析引擎。請完整輸出文件中的文字，保留段落、題號與公式（公式用 LaTeX）。只輸出文字，不要加入說明。",
+            system: `你是精準的全科 OCR 與文件解析引擎。${subjectStrategy(subject)}請完整輸出文件中的文字，保留段落、題號與公式（公式用 LaTeX）。只輸出文字，不要加入說明。`,
     parts: [
       { kind: "text", text: "請完整輸出這份文件的文字內容。" },
       { kind: mime === "application/pdf" ? "image" : "image", mimeType: mime, base64: data.toString("base64") },
@@ -102,7 +103,7 @@ export const contentRoutes: RouteDef[] = [
           const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: buf, allow: ["pdf", "text", "image"] });
           const kind = mime === "application/pdf" ? "pdf" : mime.startsWith("image/") ? "image" : "txt";
           if (kind !== "txt") await consumeFeature(user.userId, "material_organize");
-          const text = await extractText(mime, buf, user.userId);
+          const text = await extractText(mime, buf, user.userId, subject);
           await db.insert(studyMaterialPages).values({ materialId: material.id, pageNumber: 1, text, objectId: stored.id });
           await db
             .update(studyMaterials)
@@ -204,8 +205,8 @@ export const contentRoutes: RouteDef[] = [
           {
             feature: "material_organize",
             userId: user.userId,
-            system:
-              '你是台灣國高中教材整理專家。根據教材輸出 JSON：{"summary":"200字摘要","keyPoints":["重點"],"vocabulary":[{"word":"","meaning":""}],"sentences":["重要句子"],"note":"markdown 筆記","tags":["標籤"]}。只根據教材內容，不要杜撰。繁體中文。',
+              system:
+              `你是台灣國高中全科教材整理專家。${subjectStrategy(m.subject)}根據教材輸出 JSON：{"summary":"200字摘要","keyPoints":["重點"],"vocabulary":[{"word":"","meaning":""}],"sentences":["重要句子"],"note":"markdown 筆記","tags":["標籤"]}。對非語言科目 vocabulary 可回傳空陣列，改用公式、定義、事件、實驗或資料重點。只根據教材內容，不要杜撰。繁體中文。`,
             parts: [{ kind: "text", text: `科目：${m.subject}\n標題：${m.title}\n內容：\n${m.content.slice(0, 14000)}` }],
             maxOutputTokens: 2600,
           },
@@ -463,7 +464,7 @@ export const contentRoutes: RouteDef[] = [
           const hints = page.highlights.length
             ? `圖片上的螢光筆標記區域（相對座標 0-1）：${JSON.stringify(page.highlights)}。請特別標示這些區域內的文字，於輸出時以 [顏色] 前綴標註。`
             : "";
-          const ocrData = await solveOcrImage({ userId: user.userId, data: obj.data, mimeType: obj.mimeType, feature: "ocr", prompt: `辨識圖片全部可見文字，保留題號、選項、段落、表格、公式與標點。${hints}` });
+          const ocrData = await solveOcrImage({ userId: user.userId, data: obj.data, mimeType: obj.mimeType, feature: "ocr", subject: doc.subject, prompt: `辨識圖片全部可見文字，保留題號、選項、段落、表格、公式與標點。${subjectStrategy(doc.subject)}${hints}` });
           const normalizedBlocks = ocrData.blocks;
           const ocrText = sanitizeText(ocrData.text);
           const ocrConfidence = normalizedBlocks.length ? normalizedBlocks.reduce((sum, b) => sum + b.confidence, 0) / normalizedBlocks.length : 0.5;
@@ -690,7 +691,7 @@ export const contentRoutes: RouteDef[] = [
         {
           feature: `ocr_${action}`,
           userId: user.userId,
-          system: `你是台灣國高中學習助教。${prompts[action]}。只根據提供文字，不要杜撰。繁體中文。`,
+          system: `你是台灣國高中全科學習助教。${subjectStrategy(doc.subject)}${prompts[action]}。非英文科目不要硬找英文單字，請改抓該科真正重要的術語、公式、定義、事件、資料或解題步驟。只根據提供文字，不要杜撰。繁體中文。`,
           parts: [{ kind: "text", text: doc.combinedText.slice(0, 14000) }],
           maxOutputTokens: 2600,
         },
@@ -704,7 +705,7 @@ export const contentRoutes: RouteDef[] = [
           {
             feature: `ocr_${action}_retry`,
             userId: user.userId,
-            system: `只輸出一個合法 JSON 物件，不要 markdown 或說明文字。${prompts[action]}。資料不足時仍要根據原文產生至少一項結果，不得回傳空陣列。繁體中文。`,
+            system: `只輸出一個合法 JSON 物件，不要 markdown 或說明文字。${subjectStrategy(doc.subject)}${prompts[action]}。資料不足時仍要根據原文產生至少一項結果，不得回傳空陣列。非英文科目請使用該科術語、公式、事件或資料，不要硬套英文單字格式。繁體中文。`,
             parts: [{ kind: "text", text: `原文：\n${doc.combinedText.slice(0, 14000)}` }],
             maxOutputTokens: 1800,
           },
