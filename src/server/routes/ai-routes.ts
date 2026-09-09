@@ -562,8 +562,8 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ contextIds: z.array(z.string().uuid()).min(1).max(8), mode: z.enum(["tutor", "solution", "note"]).optional(), idempotencyKey: z.string().trim().min(1).max(160).optional(), scope: z.object({ includeQuestion: z.boolean().optional(), includeHandwriting: z.boolean().optional(), includeNote: z.boolean().optional(), highlightPriority: z.boolean().optional() }).optional() }));
-      return analyzeSolution({ userId: user.userId, contextIds: body.contextIds, requestedMode: body.mode, idempotencyKey: body.idempotencyKey, scope: body.scope });
+      const body = await ctx.json(z.object({ contextIds: z.array(z.string().uuid()).max(8).default([]), question: z.string().trim().max(30000).optional(), subject: z.string().trim().max(30).optional(), mode: z.enum(["tutor", "solution", "note"]).optional(), idempotencyKey: z.string().trim().min(1).max(160).optional(), scope: z.object({ includeQuestion: z.boolean().optional(), includeHandwriting: z.boolean().optional(), includeNote: z.boolean().optional(), highlightPriority: z.boolean().optional() }).optional() }).refine((value) => value.contextIds.length > 0 || Boolean(value.question?.trim()), { message: "請輸入題目或上傳圖片／檔案" }));
+      return analyzeSolution({ userId: user.userId, contextIds: body.contextIds, question: body.question, subject: body.subject, requestedMode: body.mode, idempotencyKey: body.idempotencyKey, scope: body.scope });
     },
   }),
 

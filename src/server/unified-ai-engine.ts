@@ -60,13 +60,16 @@ export async function resolveMode(userId: string, sessionId: string, requested: 
   return rows[0];
 }
 
-export async function analyzeSolution(params: { userId: string; contextIds: string[]; requestedMode?: string; scope?: Partial<Scope>; idempotencyKey?: string }) {
-  if (!params.contextIds.length) throw fail("REQ_CONTENT_TOO_SHORT", { message: "請先上傳圖片或檔案" });
-  const contexts = await db.select().from(fileContexts).where(and(eq(fileContexts.userId, params.userId), inArray(fileContexts.id, params.contextIds)));
-  if (!contexts.length) throw fail("FILE_NOT_FOUND");
+export async function analyzeSolution(params: { userId: string; contextIds: string[]; question?: string; subject?: string; requestedMode?: string; scope?: Partial<Scope>; idempotencyKey?: string }) {
+  const question = params.question?.trim().slice(0, 30000) ?? "";
+  if (!params.contextIds.length && !question) throw fail("REQ_CONTENT_TOO_SHORT", { message: "請輸入題目或上傳圖片／檔案" });
+  const contexts = params.contextIds.length
+    ? await db.select().from(fileContexts).where(and(eq(fileContexts.userId, params.userId), inArray(fileContexts.id, params.contextIds)))
+    : [];
+  if (params.contextIds.length && !contexts.length) throw fail("FILE_NOT_FOUND");
 
   const scope: Scope = { ...DEFAULT_SCOPE, ...(params.scope ?? {}) };
-  const idempotencyKey = params.idempotencyKey?.trim().slice(0, 160) || createHash("sha256").update(JSON.stringify({ contexts: [...params.contextIds].sort(), mode: params.requestedMode ?? "", scope })).digest("hex");
+  const idempotencyKey = params.idempotencyKey?.trim().slice(0, 160) || createHash("sha256").update(JSON.stringify({ contexts: [...params.contextIds].sort(), question, subject: params.subject ?? "", mode: params.requestedMode ?? "", scope })).digest("hex");
   const existing = (await db.select().from(solutionSessions).where(and(eq(solutionSessions.userId, params.userId), eq(solutionSessions.idempotencyKey, idempotencyKey))).limit(1))[0];
   if (existing?.status === "completed") return { session: existing, result: existing.result ?? {} };
   if (existing?.status === "processing") throw fail("SYS_CONFLICT", { message: "這筆 AI 解題正在分析中，請稍候。" });
@@ -85,7 +88,7 @@ export async function analyzeSolution(params: { userId: string; contextIds: stri
   try {
     const segments = contexts.flatMap((c) => (Array.isArray(c.detected) ? c.detected : []) as Segment[]).filter((s) => (s.kind === "QUESTION" && scope.includeQuestion) || (s.kind === "HANDWRITING" && scope.includeHandwriting) || (s.kind === "NOTE" && scope.includeNote) || (s.kind === "HIGHLIGHT" && scope.highlightPriority));
     const mode = await resolveMode(params.userId, session.id, params.requestedMode, segments);
-    const source = segments.map((s) => `[${s.kind}] ${s.text}`).join("\n");
+    const source = [params.subject ? `科目：${params.subject}` : "", question ? `[題目文字] ${question}` : "", segments.map((s) => `[${s.kind}] ${s.text}`).join("\n")].filter(Boolean).join("\n");
     const { data } = await runAiJson<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean }>(
       { feature: AI_SOLUTION_FEATURE, userId: params.userId, system: `你是 StudyNova Novi。模式是 ${mode.mode}。預設採用引導解題：先給提示與步驟，不直接揭露答案；只有使用者明確要求且政策允許時才提供答案。若偵測多題，needsCrop=true 並請使用者裁切成單題。`, parts: [{ kind: "text", text: `分析範圍：${JSON.stringify(scope)}\n內容：\n${source.slice(0, 30000)}` }], maxOutputTokens: 2600 },
       { reply: "目前無法產生解析。", hint: "請先確認圖片內容清楚。", steps: [], needsCrop: false },

@@ -21,6 +21,7 @@ const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/study", label: "學習", icon: "study" },
   { href: "/textbooks", label: "教材", icon: "study" },
   { href: "/ai", label: "AI", icon: "nova" },
+  { href: "/solve", label: "解題專區", icon: "nova" },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
@@ -36,6 +37,7 @@ const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   "/challenge": "想和好友比一場嗎？可以選每日單字或已開放的每週小考。",
   "/grades": "我可以幫你看成績趨勢，找出下一個最值得補強的科目。",
   "/ai": "把題目或不懂的地方交給我，我可以用更有趣的方式拆解。",
+  "/solve": "其他科目的題目也可以帶到解題專區，我會陪你一步一步看。",
   "/profile": "要調整 Novi、學習設定或查看 PRO 身分嗎？我可以陪你一起設定。",
 };
 
@@ -65,6 +67,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/textbooks", label: "教材專區", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
+  { href: "/solve", label: "解題專區", icon: "nova" },
   { href: "/essay", label: "英文作文批改", icon: "pen" },
   { href: "/compress", label: "智慧壓縮", icon: "archive" },
   { href: "/export", label: "資料匯出", icon: "archive" },
@@ -74,10 +77,11 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/report", label: "學習報告", icon: "report" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
-const FEATURE_BY_PATH: Record<string, string> = { "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/textbooks": "textbooks", "/weekly": "weekly", "/challenge": "challenge", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
+const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/textbooks": "textbooks", "/weekly": "weekly", "/challenge": "challenge", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
 const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   dashboard: { title: "首頁使用提醒", text: "今日建議僅供參考，可依時間與狀態自由選擇，不需要全部完成。" },
   ai: { title: "Novi AI 使用提醒", text: "切換模式後請查看用途說明；涉及成績、錯題、計畫或寫入資料時，請先確認授權與動作預覽。" },
+  solve: { title: "解題專區使用提醒", text: "解題專區開放各科目；可以貼上文字或上傳題目圖片。AI 解析是學習輔助，請先理解步驟再確認答案。" },
   compress: { title: "智慧壓縮使用提醒", text: "請確認原始檔案、目標大小與輸出格式；批次壓縮後請先預覽內容，再下載 ZIP。" },
   export: { title: "資料匯出使用提醒", text: "只會匯出你的資料。請先查看樣本預覽，正式下載前會兩次確認並扣除對應 Nova。" },
   essay: { title: "作文批改使用提醒", text: "AI 建議僅供學習參考，請自行檢查文意、引用與老師要求後再提交。" },
@@ -93,6 +97,7 @@ const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
 const FEATURE_STEPS: Record<string, string[]> = {
   dashboard: ["先看今日進度與待複習數量。", "選一個現在做得到的任務開始，不必一次完成全部。", "完成後勾選任務，系統會記錄進度與獎勵。"],
   ai: ["Novi 可協助英文學習，也能處理你帶來的其他科目題目。", "英文圖片 OCR 請使用清楚的 JPG、PNG 或 WebP；其他科目請直接使用解題模式或詢問 Novi。", "AI 結果僅供學習參考，寫入教材、筆記或題庫前請先確認預覽。"],
+  solve: ["選擇題目科目，再貼上文字或上傳圖片／PDF。", "先選擇引導解題、完整解析或重點整理模式。", "確認 AI 步驟與答案；需要更多協助時可以直接開啟 Novi。"],
   compress: ["選擇圖片或 PDF，確認檔案類型與大小。", "設定目標尺寸或品質後開始處理。", "先預覽結果，再下載單檔或 ZIP。"],
   export: ["選擇要匯出的資料範圍與格式。", "查看樣本與檔案大小估算。", "確認扣除 Nova 後再下載，匯出紀錄會保留。"],
   essay: ["貼上或上傳英文作文，確認題目與字數。", "等待 OCR 與批改完成，查看錯誤分類及修改建議。", "自行複核文意與老師要求，不要直接照抄 AI 結果。"],
