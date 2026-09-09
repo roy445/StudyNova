@@ -7,6 +7,7 @@ import { consumeFeature, featureState, grantNova } from "./economy";
 import { AI_SOLUTION_FEATURE } from "./quota-policy";
 import { readObject } from "./storage";
 import { runAiJson } from "./ai";
+import { subjectStrategy } from "./subject-strategies";
 
 export const SEGMENT_KINDS = ["QUESTION", "HANDWRITING", "NOTE", "HIGHLIGHT", "UNKNOWN"] as const;
 export type SegmentKind = (typeof SEGMENT_KINDS)[number];
@@ -15,7 +16,7 @@ export type Scope = { includeQuestion: boolean; includeHandwriting: boolean; inc
 
 const DEFAULT_SCOPE: Scope = { includeQuestion: true, includeHandwriting: true, includeNote: true, highlightPriority: false };
 
-export async function createFileContext(params: { userId: string; objectId: string; originalName: string; batch: number; scope?: Partial<Scope> }) {
+export async function createFileContext(params: { userId: string; objectId: string; originalName: string; batch: number; scope?: Partial<Scope>; subject?: string }) {
   const object = await readObject(params.objectId);
   if (object.userId !== params.userId) throw fail("PERM_FILE_DENIED");
   const sha256 = createHash("sha256").update(object.data).digest("hex");
@@ -33,7 +34,7 @@ export async function createFileContext(params: { userId: string; objectId: stri
       {
         feature: "ai_solution_segment",
         userId: params.userId,
-        system: "你是 StudyNova 的影像內容分段器。請辨識圖片內每個區塊並只回傳 JSON。kind 只能是 QUESTION、HANDWRITING、NOTE、HIGHLIGHT、UNKNOWN。不要猜測看不清楚的文字；readable=false 時 message 必須是請拍攝的清楚一點。若有兩個以上獨立題目，multipleQuestions=true。",
+        system: `你是 StudyNova 的全科影像內容分段器。${subjectStrategy(params.subject)}請辨識圖片內每個區塊並只回傳 JSON。kind 只能是 QUESTION、HANDWRITING、NOTE、HIGHLIGHT、UNKNOWN。不要猜測看不清楚的文字；readable=false 時 message 必須是請拍攝的清楚一點。若有兩個以上獨立題目，multipleQuestions=true。`,
         parts: [{ kind: object.mimeType.startsWith("image/") ? "image" : "text", ...(object.mimeType.startsWith("image/") ? { mimeType: object.mimeType, base64: object.data.toString("base64") } : { text: object.data.toString("utf8").slice(0, 30000) }) } as never],
         maxOutputTokens: 3000,
       },

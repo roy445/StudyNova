@@ -30,6 +30,7 @@ const CONTEXT_OPTIONS = [
   { key: "tasks", label: "待辦" },
   { key: "materials", label: "指定教材" },
 ];
+const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
 const ACTION_LABEL: Record<string, string> = {
   create_task: "建立任務",
@@ -61,6 +62,7 @@ export default function AiPage() {
   const [uploading, setUploading] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState<{ value: number; label: string } | null>(null);
   const [attachment, setAttachment] = useState<{ contextId: string; name: string; previewUrl: string } | null>(null);
+  const [attachmentSubject, setAttachmentSubject] = useState("");
   const [solutionResult, setSolutionResult] = useState<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean; mode?: string } | null>(null);
   const [scope, setScope] = useState({ includeQuestion: true, includeHandwriting: true, includeNote: true, highlightPriority: false });
   const fileInput = useRef<HTMLInputElement>(null);
@@ -124,6 +126,10 @@ export default function AiPage() {
 
   async function uploadAndAnalyze(files: FileList | null) {
     if (!files?.length || uploading) return;
+    if (!attachmentSubject) {
+      toast.push("info", "請先選擇圖片科目，再加入對話");
+      return;
+    }
     setUploading(true);
     setAnalysisProgress({ value: 8, label: "準備檔案…" });
     setError(null);
@@ -131,6 +137,7 @@ export default function AiPage() {
       const form = new FormData();
       setAnalysisProgress({ value: 20, label: "上傳檔案中…" });
       Array.from(files).slice(0, 8).forEach((file) => form.append("files", file));
+      form.append("subject", attachmentSubject);
       Object.entries(scope).forEach(([key, value]) => form.append(key, String(value)));
       const uploaded = await apiPost<{ results: Array<{ context: FileContext | null; duplicate: boolean; errorCode?: string; error?: string }>; newCount: number; duplicateCount: number }>("/ai/solution/upload", form);
       setAnalysisProgress({ value: 52, label: "圖片已加入對話，請輸入你的需求…" });
@@ -337,6 +344,10 @@ export default function AiPage() {
               )}
               <NovaCostNotice cost={aiContextCost} action="Novi 回覆" />
               <div className="flex items-end gap-2">
+              <select value={attachmentSubject} onChange={(e) => setAttachmentSubject(e.target.value)} className="h-10 rounded-xl border border-[var(--line)] bg-black/20 px-2 text-xs" aria-label="附件科目">
+                <option value="">先選科目</option>
+                {SUBJECTS.map((subject) => <option key={subject}>{subject}</option>)}
+              </select>
               <Button size="sm" variant="outline" loading={uploading} onClick={() => fileInput.current?.click()} title="加入圖片或檔案">＋</Button>
               <Input
                 value={input}

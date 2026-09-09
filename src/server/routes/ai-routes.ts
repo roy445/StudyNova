@@ -26,6 +26,7 @@ import { analysisScopes, fileContexts, solutionSessions } from "@/db/schema";
 import { analyzeSolution, createFileContext } from "../unified-ai-engine";
 import { AppError } from "../errors";
 import { readObject } from "../storage";
+import { SUBJECTS } from "../subject-strategies";
 
 const MODES = {
   teacher: "學習教練模式：像一位有耐心的台灣國高中學習教練，先確認學生理解程度，再一步步教學。",
@@ -513,6 +514,8 @@ export const routes: RouteDef[] = [
       const form = await ctx.formData();
       const files = form.getAll("files").filter((value): value is File => typeof File !== "undefined" && value instanceof File);
       if (!files.length) throw badRequest("請選擇至少一個圖片或 PDF 檔案");
+      const subject = String(form.get("subject") ?? "").trim();
+      if (!SUBJECTS.includes(subject as (typeof SUBJECTS)[number])) throw badRequest("上傳前請先選擇科目");
       if (files.length > 8) throw badRequest("一次最多上傳 8 個檔案");
       const scope = {
         includeQuestion: form.get("includeQuestion") !== "false",
@@ -529,7 +532,7 @@ export const routes: RouteDef[] = [
         try {
           const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
           const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
-          return await createFileContext({ userId: user.userId, objectId: stored.id, originalName: file.name, batch, scope });
+          return await createFileContext({ userId: user.userId, objectId: stored.id, originalName: file.name, batch, scope, subject });
         } catch (error) {
           const code = error instanceof AppError ? error.code : "SN-SYS-9901";
           console.error("[ai-solution-upload] file analysis failed", { filename: file.name, code, error: error instanceof Error ? error.message : String(error) });

@@ -256,7 +256,7 @@ export function OcrPanel() {
   const [searchTerm, setSearchTerm] = useState("");
   const history = useApi<{ documents: Array<{ id: string; title: string; subject: string; analysis_kind: string }> }>(searchTerm.trim() ? `/ocr/search?q=${encodeURIComponent(searchTerm.trim())}` : null, [searchTerm]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [ocrSubject, setOcrSubject] = useState("其他");
+  const [ocrSubject, setOcrSubject] = useState("");
   const detail = useApi<{ document: OcrDoc; pages: OcrPage[] }>(activeId ? `/ocr/documents/${activeId}` : null, [activeId]);
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
   const imageOcrCost = quotas.data?.quotas.find((item) => item.feature === "image_ocr")?.novaCost ?? null;
@@ -351,6 +351,10 @@ export function OcrPanel() {
   }
 
   async function createDoc() {
+    if (!ocrSubject) {
+      toast.push("info", "請先選擇科目，再建立文件與上傳圖片");
+      return;
+    }
     setBusy(true);
     try {
       const res = await apiPost<{ document: OcrDoc }>("/ocr/documents", { title: `辨識 ${new Date().toLocaleDateString("zh-TW")}`, subject: ocrSubject });
@@ -369,6 +373,10 @@ export function OcrPanel() {
 
   async function uploadImages(files: FileList | null) {
     if (!files?.length || !activeId) return;
+    if (!detail.data?.document.subject) {
+      toast.push("info", "此文件尚未設定科目，請重新建立並先選擇科目");
+      return;
+    }
     setBusy(true);
     try {
       const fd = new FormData();
@@ -602,7 +610,7 @@ export function OcrPanel() {
           <Select value={ocrSubject} onChange={(e) => setOcrSubject(e.target.value)} className="!w-auto !py-1.5 text-xs" aria-label="OCR 科目">
             {SUBJECTS.map((subject) => <option key={subject}>{subject}</option>)}
           </Select>
-          <Button size="sm" loading={busy} onClick={createDoc}>
+          <Button size="sm" loading={busy} onClick={createDoc} disabled={!ocrSubject}>
             ＋ 新文件
           </Button>
         </div>
@@ -638,14 +646,12 @@ export function OcrPanel() {
             <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
               加入我的教材
             </Button>
-            <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrVocabulary}>
-              AI 整理並加入單字
-            </Button>
+            {(["國文", "英文"] as string[]).includes(detail.data?.document.subject ?? "") && <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrVocabulary}>AI 整理並加入字詞</Button>}
             {latestBatchNumber && <Badge tone="cyan">目前分析第 {latestBatchNumber} 批（{latestBatchIds.length} 張）</Badge>}
             <Select value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value as typeof analysisMode)} className="!w-auto !py-1.5 text-xs" aria-label="AI 分析模式">
               <option value="auto">智慧讀取（AI 自動判斷）</option>
-              <option value="vocabulary">只分析單字／片語</option>
-              <option value="sentences">只分析句子／句型</option>
+              {(["國文", "英文"] as string[]).includes(detail.data?.document.subject ?? "") && <option value="vocabulary">只分析字詞／術語</option>}
+              {(["國文", "英文"] as string[]).includes(detail.data?.document.subject ?? "") && <option value="sentences">只分析句子／句型</option>}
               <option value="questions">只分析題目</option>
             </Select>
             <label className="flex items-center gap-1.5 rounded-lg border border-[var(--line)] px-2 py-1.5 text-xs">
@@ -801,7 +807,7 @@ export function OcrPanel() {
                 ["translate", "翻譯"],
                 ["wrong", "易錯提醒"],
                 ["plan", "複習計畫"],
-              ].map(([action, label]) => (
+              ].filter(([action]) => action !== "translate" || detail.data?.document.subject !== "數學").map(([action, label]) => (
                 <Button key={action} size="sm" variant="ghost" loading={busy} onClick={() => transform(action)}>
                   {label}{typeof aiContextCost === "number" ? `（扣 ${aiContextCost} Nova）` : ""}
                 </Button>
