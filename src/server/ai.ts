@@ -157,7 +157,9 @@ function categorize(status: number, body: string): FailureCategory {
 
 const estimate = (s: string) => Math.max(1, Math.ceil(s.length / 4));
 
-async function fetchJson(url: string, init: RequestInit, timeoutMs = 60_000) {
+// A provider must not hold the whole learning flow for a full minute. The
+// caller can fall through to the next configured provider after 18 seconds.
+async function fetchJson(url: string, init: RequestInit, timeoutMs = 15_000) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -166,7 +168,7 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs = 60_000) {
       const text = await res.text();
       if (!res.ok) {
         const error = new ProviderError(categorize(res.status, text), `provider responded ${res.status}`, safeProviderReason(text));
-        if (attempt === 0 && ["server_error", "timeout", "network"].includes(error.category)) {
+        if (attempt === 0 && ["server_error", "network"].includes(error.category)) {
           await new Promise((resolve) => setTimeout(resolve, 350));
           continue;
         }
@@ -183,7 +185,7 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs = 60_000) {
         : err instanceof Error && err.name === "AbortError"
           ? new ProviderError("timeout", "provider timeout")
           : new ProviderError("network", "provider network error");
-      if (attempt === 0 && ["timeout", "network"].includes(error.category)) {
+      if (attempt === 0 && error.category === "network") {
         await new Promise((resolve) => setTimeout(resolve, 350));
         continue;
       }
@@ -334,8 +336,14 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   let fallbackFrom = "";
   let lastCategory: FailureCategory = "unknown";
   let lastReason = "";
+  const deadline = Date.now() + 45_000;
 
   for (const cfg of configs) {
+    if (Date.now() >= deadline) {
+      lastCategory = "timeout";
+      lastReason = "AI provider aggregate deadline exceeded";
+      break;
+    }
     // 健康狀態／使用量是觀測資料；即使 production migration 尚未同步，也不能阻斷圖片分析本身。
     let health: Awaited<ReturnType<typeof healthRow>> | undefined;
     try {
@@ -405,6 +413,11 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
               ? "AI 服務本月配額已用完，請稍後再試或切換可用的 AI Provider。"
               : "AI 圖片分析暫時失敗，請稍後再試。";
         throw fail("AI_PROVIDER_ERROR", { message, details: { category, provider: cfg.name } });
+      }
+      if (Date.now() >= deadline) {
+        lastCategory = "timeout";
+        lastReason = "AI provider aggregate deadline exceeded";
+        break;
       }
       fallbackFrom = cfg.name;
     }

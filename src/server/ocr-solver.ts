@@ -1,5 +1,5 @@
 import { fail } from "./errors";
-import { runAiJson } from "./ai";
+import { runAi, runAiJson } from "./ai";
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -41,10 +41,28 @@ export async function solveOcrImage(params: { userId: string; data: Buffer; mime
   // Some vision providers return usable OCR text while ignoring the JSON-only
   // instruction. Preserve that text instead of converting it to SN-AI-6013.
   const providerText = String(meta.text ?? "").replace(/^```(?:text|json)?/i, "").replace(/```$/i, "").trim();
-  const text = String(data.text ?? (blocks.map((block) => block.content).join("\n") || providerText)).trim();
+  let text = String(data.text ?? (blocks.map((block) => block.content).join("\n") || providerText)).trim();
+  if (!text && !blocks.length) {
+    // A few providers return an empty/invalid structured response for vision
+    // requests but can still answer a plain-text OCR request. Retry once with
+    // a small text-only contract before reporting an OCR failure.
+    try {
+      const plain = await runAi({
+        feature: `${params.feature}_text_fallback`,
+        userId: params.userId,
+        system: "你是 OCR 引擎。只輸出圖片中實際看得到的文字，保留題號、選項、段落與標點；不要輸出 JSON、Markdown 或說明。看不清楚的地方標記為 [不確定]。",
+        parts: [{ kind: "image", mimeType: params.mimeType, base64: params.data.toString("base64") }],
+        temperature: 0,
+        maxOutputTokens: 2200,
+      });
+      text = plain.text.trim();
+    } catch (fallbackError) {
+      console.error("[ocr] structured and plain-text fallback failed", { feature: params.feature, error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) });
+    }
+  }
   if (!text && !blocks.length) {
     console.error("[ocr] provider returned no usable text", { feature: params.feature, outputTokens: meta.outputTokens, provider: meta.provider, model: meta.model });
-    throw fail(meta.outputTokens > 0 ? "AI_INVALID_RESPONSE" : "AI_OCR_EMPTY", { details: { provider: meta.provider, model: meta.model, outputTokens: meta.outputTokens } });
+    throw fail("AI_OCR_EMPTY", { details: { provider: meta.provider, model: meta.model, outputTokens: meta.outputTokens } });
   }
   return { text, blocks };
 }
