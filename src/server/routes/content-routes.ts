@@ -668,12 +668,25 @@ export const contentRoutes: RouteDef[] = [
       const action = body.action;
       let vocabularySaved = 0;
       let vocabularyDuplicates = 0;
+      let stage = "request_validation";
+      const logTransformFailure = (error: unknown) => {
+        console.error("[ocr-transform] failed", {
+          route: "/api/v1/ocr/documents/:id/transform",
+          stage,
+          action,
+          userId: user.userId,
+          errorType: error instanceof Error ? error.name : typeof error,
+          error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+        });
+      };
 
-      const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
+      try {
+        stage = "load_document";
+        const doc = (await db.select().from(ocrDocuments).where(eq(ocrDocuments.id, ctx.params.id)).limit(1))[0];
       if (!doc) throw notFound("找不到辨識文件");
+      stage = "ownership_check";
       if (doc.userId !== user.userId) throw forbidden();
       if (doc.combinedText.trim().length < 10) throw fail("AI_OCR_EMPTY", { message: "請先完成 OCR 或手動輸入文字" });
-      await consumeFeature(user.userId, "ai_context");
 
       const prompts: Record<string, string> = {
         notes: '整理成結構化 markdown 筆記。JSON：{"title":"","body":"markdown"}',
@@ -687,32 +700,45 @@ export const contentRoutes: RouteDef[] = [
         plan: '建立 3 天複習計畫。JSON：{"title":"複習計畫","body":"markdown","tasks":["任務"]}',
       };
 
-      let { data } = await runAiJson<Record<string, unknown>>(
-        {
-          feature: `ocr_${action}`,
-          userId: user.userId,
-          system: `你是台灣國高中全科學習助教。${subjectStrategy(doc.subject)}${prompts[action]}。非英文科目不要硬找英文單字，請改抓該科真正重要的術語、公式、定義、事件、資料或解題步驟。只根據提供文字，不要杜撰。繁體中文。`,
-          parts: [{ kind: "text", text: doc.combinedText.slice(0, 14000) }],
-          maxOutputTokens: 2600,
-        },
-        {},
-      );
-      const hasOutput = Object.values(data).some((value) =>
-        (Array.isArray(value) && value.length > 0) || (typeof value === "string" && value.trim().length > 0),
-      );
-      if (!hasOutput) {
-        const retry = await runAiJson<Record<string, unknown>>(
+stage = "ai_provider";
+      let data: Record<string, unknown>;
+      try {
+        const response = await runAiJson<Record<string, unknown>>(
           {
-            feature: `ocr_${action}_retry`,
+            feature: `ocr_${action}`,
             userId: user.userId,
-            system: `只輸出一個合法 JSON 物件，不要 markdown 或說明文字。${subjectStrategy(doc.subject)}${prompts[action]}。資料不足時仍要根據原文產生至少一項結果，不得回傳空陣列。非英文科目請使用該科術語、公式、事件或資料，不要硬套英文單字格式。繁體中文。`,
-            parts: [{ kind: "text", text: `原文：\n${doc.combinedText.slice(0, 14000)}` }],
-            maxOutputTokens: 1800,
+            system: `你是台灣國高中全科學習助教。${subjectStrategy(doc.subject)}${prompts[action]}。非英文科目不要硬找英文單字，請改抓該科真正重要的術語、公式、定義、事件、資料或解題步驟。只根據提供文字，不要杜撰。繁體中文。`,
+            parts: [{ kind: "text", text: doc.combinedText.slice(0, 14000) }],
+            maxOutputTokens: 2600,
           },
           {},
         );
-        if (Object.keys(retry.data).length > 0) data = retry.data;
+        data = response.data && typeof response.data === "object" && !Array.isArray(response.data) ? response.data : {};
+        const hasOutput = Object.values(data).some((value) =>
+          (Array.isArray(value) && value.length > 0) || (typeof value === "string" && value.trim().length > 0),
+        );
+        if (!hasOutput) {
+          const retry = await runAiJson<Record<string, unknown>>(
+            {
+              feature: `ocr_${action}_retry`,
+              userId: user.userId,
+              system: `只輸出一個合法 JSON 物件，不要 markdown 或說明文字。${subjectStrategy(doc.subject)}${prompts[action]}。資料不足時仍要根據原文產生至少一項結果，不得回傳空陣列。非英文科目請使用該科術語、公式、事件或資料，不要硬套英文單字格式。繁體中文。`,
+              parts: [{ kind: "text", text: `原文：\n${doc.combinedText.slice(0, 14000)}` }],
+              maxOutputTokens: 1800,
+            },
+            {},
+          );
+          if (retry.data && typeof retry.data === "object" && !Array.isArray(retry.data) && Object.keys(retry.data).length > 0) data = retry.data;
+        }
+      } catch (error) {
+        logTransformFailure(error);
+        throw error;
       }
+      // Do not consume the quota until the external AI provider has succeeded.
+      stage = "quota_settlement";
+      await consumeFeature(user.userId, "ai_context");
+      stage = "persist_result";
+      
 
       if ((action === "notes" || action === "keypoints" || action === "solve" || action === "translate" || action === "wrong") && data.body) {
         await db.insert(notes).values({
@@ -729,7 +755,9 @@ export const contentRoutes: RouteDef[] = [
         }
       }
       if (action === "vocabulary" && Array.isArray(data.vocabulary)) {
-        for (const item of (data.vocabulary as Array<Record<string, unknown>>).slice(0, 100)) {
+        for (const rawItem of (data.vocabulary as unknown[]).slice(0, 100)) {
+          if (!rawItem || typeof rawItem !== "object" || Array.isArray(rawItem)) continue;
+          const item = rawItem as Record<string, unknown>;
           const word = String(item.word ?? "").trim().slice(0, 200);
           if (!word) continue;
           const inserted = await db.insert(userVocabularies).values({
@@ -749,7 +777,11 @@ export const contentRoutes: RouteDef[] = [
         }
       }
       await db.update(ocrDocuments).set({ aiResult: { ...(doc.aiResult ?? {}), [action]: data }, updatedAt: new Date() }).where(eq(ocrDocuments.id, doc.id));
-      return { action, result: data, saved: vocabularySaved, duplicates: vocabularyDuplicates };
+        return { action, result: data, saved: vocabularySaved, duplicates: vocabularyDuplicates };
+      } catch (error) {
+        logTransformFailure(error);
+        throw error;
+      }
     },
   }),
 
