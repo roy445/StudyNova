@@ -283,7 +283,13 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   let lastCategory: FailureCategory = "unknown";
 
   for (const cfg of configs) {
-    const health = await healthRow(cfg.name, cfg.model);
+    // 健康狀態／使用量是觀測資料；即使 production migration 尚未同步，也不能阻斷圖片分析本身。
+    let health: Awaited<ReturnType<typeof healthRow>> | undefined;
+    try {
+      health = await healthRow(cfg.name, cfg.model);
+    } catch (error) {
+      console.error("[ai] provider health table unavailable; continuing without health state", { provider: cfg.name, error: error instanceof Error ? error.message : "unknown" });
+    }
     if (health && health.enabled === false) continue;
     if (health?.cooldownUntil && new Date(health.cooldownUntil) > new Date()) {
       fallbackFrom = fallbackFrom || cfg.name;
@@ -300,40 +306,60 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
                 ? "https://api.openai.com/v1/chat/completions"
                 : "https://openrouter.ai/api/v1/chat/completions",
             );
-      await db
-        .update(aiProviderHealth)
-        .set({ lastSuccessAt: new Date(), cooldownUntil: null, model: cfg.model, updatedAt: new Date() })
-        .where(eq(aiProviderHealth.provider, cfg.name));
-      await logUsage({ ...out, userId: req.userId, feature: req.feature, success: true, fallbackFrom });
+      try {
+        await db
+          .update(aiProviderHealth)
+          .set({ lastSuccessAt: new Date(), cooldownUntil: null, model: cfg.model, updatedAt: new Date() })
+          .where(eq(aiProviderHealth.provider, cfg.name));
+        await logUsage({ ...out, userId: req.userId, feature: req.feature, success: true, fallbackFrom });
+      } catch (error) {
+        console.error("[ai] provider telemetry write failed after successful completion", { provider: cfg.name, error: error instanceof Error ? error.message : "unknown" });
+      }
       return { ...out, fallbackFrom };
     } catch (err) {
       const category: FailureCategory = err instanceof ProviderError ? err.category : "unknown";
       lastCategory = category;
-      await db
-        .update(aiProviderHealth)
-        .set({
-          lastFailureAt: new Date(),
-          lastFailureCategory: category,
-          updatedAt: new Date(),
-          ...(category === "quota_exhausted" ? { cooldownUntil: nextUtcMonthStart() } : {}),
-        })
-        .where(eq(aiProviderHealth.provider, cfg.name));
-      await logUsage({
-        userId: req.userId,
-        provider: cfg.name,
-        model: cfg.model,
-        feature: req.feature,
-        success: false,
-        failureCategory: category,
-        fallbackFrom,
-      });
+      try {
+        await db
+          .update(aiProviderHealth)
+          .set({
+            lastFailureAt: new Date(),
+            lastFailureCategory: category,
+            updatedAt: new Date(),
+            ...(category === "quota_exhausted" ? { cooldownUntil: nextUtcMonthStart() } : {}),
+          })
+          .where(eq(aiProviderHealth.provider, cfg.name));
+        await logUsage({
+          userId: req.userId,
+          provider: cfg.name,
+          model: cfg.model,
+          feature: req.feature,
+          success: false,
+          failureCategory: category,
+          fallbackFrom,
+        });
+      } catch (telemetryError) {
+        console.error("[ai] provider telemetry write failed after provider error", { provider: cfg.name, category, error: telemetryError instanceof Error ? telemetryError.message : "unknown" });
+      }
       if (!RETRYABLE.includes(category)) {
-        throw fail("AI_PROVIDER_ERROR", { message: "AI 服務暫時無法使用，請稍後再試。" });
+        const message = category === "invalid_request"
+          ? "圖片格式或內容不符合目前 AI 模型要求，請改用清晰的 JPG、PNG 或 WebP 圖片後重試。"
+          : category === "configuration"
+            ? "AI Provider 設定無法使用，請管理員確認 Vercel 的 AI API Key 與模型設定。"
+            : category === "quota_exhausted"
+              ? "AI 服務本月配額已用完，請稍後再試或切換可用的 AI Provider。"
+              : "AI 圖片分析暫時失敗，請稍後再試。";
+        throw fail("AI_PROVIDER_ERROR", { message, details: { category, provider: cfg.name } });
       }
       fallbackFrom = cfg.name;
     }
   }
-  throw fail("AI_ALL_UNAVAILABLE", { message: "AI 服務暫時無法使用，請稍後再試。" });
+  const message = lastCategory === "quota_exhausted"
+    ? "目前可用的 AI Provider 配額都已用完，請稍後再試。"
+    : lastCategory === "invalid_request"
+      ? "圖片格式或內容不符合目前 AI 模型要求，請改用清晰的 JPG、PNG 或 WebP 圖片後重試。"
+      : "AI 圖片分析暫時無法使用，請稍後再試。";
+  throw fail("AI_ALL_UNAVAILABLE", { message, details: { category: lastCategory } });
 }
 
 export function extractJson<T>(raw: string, fallback: T): T {
