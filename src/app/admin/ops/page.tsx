@@ -71,6 +71,7 @@ export default function AdminOpsPage() {
   const ai = useApi<{ providers: Provider[]; failures: Array<{ id: string; provider: string; feature: string; failureCategory: string; createdAt: string }>; byFeature: Array<{ feature: string; c: number; ok: number }>; configured: boolean }>(
     "/admin/ai/health",
   );
+  const policies = useApi<{ policies: Array<{ id: string; feature: string; strategy: string; allowDirectAnswer: boolean; requireDetailedAnalysis: boolean; allowWebSearch: boolean; maxHintLevel: number; systemPolicy: string; version: number; enabled: boolean }> }>("/admin/ai/policies");
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number }> }>("/admin/features");
   const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string; endsAt: string | null; targetFeature: string }> }>("/admin/announcements");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
@@ -278,6 +279,32 @@ export default function AdminOpsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </Card>
+
+          <Card title="⚙ AI 行為政策中心" subtitle="每個功能獨立控制回答策略；儲存後只影響新的 AI request，並保留版本歷史。">
+            {policies.loading && <Skeleton lines={3} />}
+            {policies.error && <ErrorState message={policies.error} onRetry={policies.reload} />}
+            <div className="grid gap-3 lg:grid-cols-2">
+              {policies.data?.policies.map((policy) => (
+                <div key={policy.feature} className="rounded-xl border border-[var(--line)] bg-white/[0.02] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div><p className="font-semibold">{policy.feature}</p><p className="text-[11px] text-muted">Policy v{policy.version}</p></div>
+                    <Badge tone={policy.enabled ? "green" : "muted"}>{policy.enabled ? "啟用" : "停用"}</Badge>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <Field label="回答策略"><Select value={policy.strategy} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { strategy: e.target.value }); await policies.reload(); }}><option value="direct">直接答案</option><option value="guided">引導式</option><option value="teaching">教學模式</option><option value="exam">考試模式</option><option value="structured">結構化</option><option value="custom">自訂</option></Select></Field>
+                    <Field label="最大提示程度"><Select value={String(policy.maxHintLevel)} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { maxHintLevel: Number(e.target.value) }); await policies.reload(); }}><option value="0">0 — 不提示</option><option value="1">1 — 輕提示</option><option value="2">2 — 基本引導</option><option value="3">3 — 步驟提示</option><option value="4">4 — 詳細引導</option><option value="5">5 — 完整教學</option></Select></Field>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={policy.allowDirectAnswer} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { allowDirectAnswer: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />允許直接答案</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={policy.requireDetailedAnalysis} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { requireDetailedAnalysis: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />要求詳細解析</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={policy.allowWebSearch} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { allowWebSearch: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />允許 AI 搜尋</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={policy.enabled} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { enabled: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />啟用政策</label>
+                  </div>
+                  <Button size="sm" variant="ghost" className="mt-3" onClick={async () => { const value = window.prompt("管理員自訂政策（留空代表清除）", policy.systemPolicy); if (value === null) return; await apiPatch(`/admin/ai/policies/${policy.feature}`, { systemPolicy: value }); await policies.reload(); }}>修改自訂政策</Button>
+                </div>
+              ))}
             </div>
           </Card>
 
@@ -674,6 +701,15 @@ export default function AdminOpsPage() {
                   [{q.subject}・{q.bankCategory || "一般"}・{q.sourceLabel || q.origin}・{q.topic || "未分類"}・{q.type}] {q.stem}
                 </span>
                 <span className="shrink-0 text-muted">出現 {q.appearedCount} 次</span>
+                <button
+                  className="shrink-0 text-[#37d3ff]"
+                  onClick={async () => {
+                    try {
+                      const result = await apiPost<{ quality: { passed: boolean; score: number; answerConflict?: boolean } }>(`/admin/questions/${q.id}/analyze`, {});
+                      toast.push(result.quality.passed ? "success" : "info", `分析完成：品質 ${result.quality.score} 分${result.quality.answerConflict ? "；發現答案衝突，請人工確認" : ""}`);
+                    } catch (err) { toast.push("error", errorMessage(err)); }
+                  }}
+                >分析</button>
                 <button
                   className="text-rose-300"
                   onClick={async () => {

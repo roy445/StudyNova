@@ -20,10 +20,13 @@ import {
   systemLogs,
   aiProviderHealth,
   aiUsageLogs,
+  aiPolicies,
+  aiPolicyVersions,
   questions,
   questionBanks,
   questionVersions,
   questionImportJobs,
+  questionAnalysisJobs,
   gradeRecords,
   weeklyExamResults,
   weeklyExamWeeks,
@@ -48,6 +51,8 @@ import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { queue } from "../queue";
 import { providerMetrics, recentAiFailures, aiConfigured, runAiJson } from "../ai";
 import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured, systemAnnouncementEmailTemplate } from "../email";
+import { analysisPrompt, qualityGate } from "../question-analysis";
+import { getAiPolicy, policyInstructions } from "../ai-policy";
 
 function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
   return new Response(toCsv(rows), {
@@ -857,6 +862,46 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/ai/policies",
+    auth: "admin",
+    handler: async () => ({ policies: await db.select().from(aiPolicies).orderBy(asc(aiPolicies.feature)) }),
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/ai/policies/:feature",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        strategy: z.enum(["direct", "guided", "teaching", "exam", "structured", "custom"]).optional(),
+        allowDirectAnswer: z.boolean().optional(),
+        requireDetailedAnalysis: z.boolean().optional(),
+        allowWebSearch: z.boolean().optional(),
+        maxHintLevel: z.number().int().min(0).max(5).optional(),
+        systemPolicy: z.string().max(8000).optional(),
+        enabled: z.boolean().optional(),
+      }));
+      const before = (await db.select().from(aiPolicies).where(eq(aiPolicies.feature, ctx.params.feature)).limit(1))[0];
+      if (!before) throw notFound("找不到 AI Policy");
+      const after = (await db.update(aiPolicies).set({ ...body, version: before.version + 1, updatedBy: admin.userId, updatedAt: new Date() }).where(eq(aiPolicies.id, before.id)).returning())[0];
+      await db.insert(aiPolicyVersions).values({ policyId: before.id, version: after.version, before: before as Record<string, unknown>, after: after as Record<string, unknown>, changedBy: admin.userId });
+      await adminLog({ actorId: admin.userId, action: "ai.policy.update", targetType: "ai_policy", targetId: before.id, before, after, ip: ctx.ip });
+      return { policy: after };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/ai/policies/:feature/versions",
+    auth: "admin",
+    handler: async (ctx) => {
+      const policy = (await db.select({ id: aiPolicies.id }).from(aiPolicies).where(eq(aiPolicies.feature, ctx.params.feature)).limit(1))[0];
+      if (!policy) throw notFound("找不到 AI Policy");
+      return { versions: await db.select().from(aiPolicyVersions).where(eq(aiPolicyVersions.policyId, policy.id)).orderBy(desc(aiPolicyVersions.version)).limit(50) };
+    },
+  }),
+
   /* ----------------------------------------------------- question bank */
   route({
     method: "POST",
@@ -909,6 +954,37 @@ export const routes: RouteDef[] = [
       await adminLog({ actorId: admin.userId, action: "questions.generate.file", targetType: "question_draft", targetId: file.name.slice(0, 120), after: { subject, count, generated: drafts.length }, ip: ctx.ip });
       return { drafts, summary: { requested: count, generated: drafts.length, ready: drafts.filter((item) => item.status === "READY").length, warnings: drafts.filter((item) => item.status === "WARNING").length, errors: drafts.filter((item) => item.status === "ERROR").length } };
     },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/questions/:id/analyze",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const question = (await db.select().from(questions).where(eq(questions.id, ctx.params.id)).limit(1))[0];
+      if (!question) throw notFound("找不到題目");
+      const policy = await getAiPolicy("question_analysis");
+      const job = (await db.insert(questionAnalysisJobs).values({ questionId: question.id, requestedBy: admin.userId, status: "analyzing", attempts: 1 }).returning())[0];
+      try {
+        const result = await runAiJson<Record<string, unknown>>({ feature: "question_analysis", userId: admin.userId, system: `你是 StudyNova 專業題目分析器。${policyInstructions(policy)}\n答案衝突時不要覆蓋題庫答案，請在 answer 欄標記 ANSWER_CONFLICT 並說明推導答案與題庫答案。`, parts: [{ kind: "text", text: analysisPrompt(question) }], maxOutputTokens: 2400, temperature: 0.15 }, {});
+        const quality = qualityGate(result.data, question);
+        const answerConflict = Boolean(result.data.answer && question.answer.length && !question.answer.some((answer) => String(result.data.answer).includes(answer)));
+        const finalQuality = { ...quality, answerConflict, answerConflictStatus: answerConflict ? "ANSWER_CONFLICT" : "MATCHED" };
+        const status = quality.passed ? "completed" : "quality_failed";
+        const updated = (await db.update(questionAnalysisJobs).set({ status, result: result.data, quality: finalQuality, updatedAt: new Date() }).where(eq(questionAnalysisJobs.id, job.id)).returning())[0];
+        await adminLog({ actorId: admin.userId, action: "question.analyze", targetType: "question_analysis_job", targetId: job.id, after: { questionId: question.id, status, quality: finalQuality }, ip: ctx.ip });
+        return { job: updated, quality: finalQuality };
+      } catch (error) {
+        await db.update(questionAnalysisJobs).set({ status: "failed", errorMessage: String(error instanceof Error ? error.message : error).slice(0, 500), updatedAt: new Date() }).where(eq(questionAnalysisJobs.id, job.id));
+        throw error instanceof Error ? error : new Error("題目分析失敗");
+      }
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/questions/:id/analysis",
+    auth: "admin",
+    handler: async (ctx) => ({ analyses: await db.select().from(questionAnalysisJobs).where(eq(questionAnalysisJobs.questionId, ctx.params.id)).orderBy(desc(questionAnalysisJobs.createdAt)).limit(20) }),
   }),
   route({
     method: "GET",

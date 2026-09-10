@@ -436,6 +436,23 @@ export const questionImportJobs = pgTable(
     (t) => [index("question_import_jobs_admin_idx").on(t.adminId, t.createdAt)],
 );
 
+export const questionAnalysisJobs = pgTable(
+  "question_analysis_jobs",
+  {
+    id: id(),
+    questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+    requestedBy: uuid("requested_by").references(() => users.userId, { onDelete: "set null" }),
+    status: text("status").notNull().default("queued"), // queued | analyzing | completed | quality_failed | failed
+    result: jsonb("result").$type<Record<string, unknown> | null>(),
+    quality: jsonb("quality").$type<Record<string, unknown>>().notNull().default({}),
+    attempts: integer("attempts").notNull().default(0),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("question_analysis_question_idx").on(t.questionId, t.createdAt), index("question_analysis_status_idx").on(t.status, t.createdAt)],
+);
+
 export const essayGradingJobs = pgTable(
   "essay_grading_jobs",
   {
@@ -1055,6 +1072,40 @@ export const aiProviderHealth = pgTable("ai_provider_health", {
   outputRatePerMillion: real("output_rate_per_million").notNull().default(0.4),
   updatedAt: updated(),
 });
+
+export const aiPolicies = pgTable(
+  "ai_policies",
+  {
+    id: id(),
+    feature: text("feature").notNull(),
+    strategy: text("strategy").notNull().default("guided"), // direct | guided | teaching | exam | structured | custom
+    allowDirectAnswer: boolean("allow_direct_answer").notNull().default(false),
+    requireDetailedAnalysis: boolean("require_detailed_analysis").notNull().default(false),
+    allowWebSearch: boolean("allow_web_search").notNull().default(false),
+    maxHintLevel: integer("max_hint_level").notNull().default(2),
+    systemPolicy: text("system_policy").notNull().default(""),
+    version: integer("version").notNull().default(1),
+    enabled: boolean("enabled").notNull().default(true),
+    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("ai_policies_feature_uq").on(t.feature), index("ai_policies_enabled_idx").on(t.enabled, t.feature)],
+);
+
+export const aiPolicyVersions = pgTable(
+  "ai_policy_versions",
+  {
+    id: id(),
+    policyId: uuid("policy_id").notNull().references(() => aiPolicies.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    before: jsonb("before").$type<Record<string, unknown>>().notNull().default({}),
+    after: jsonb("after").$type<Record<string, unknown>>().notNull().default({}),
+    changedBy: uuid("changed_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("ai_policy_versions_uq").on(t.policyId, t.version), index("ai_policy_versions_policy_idx").on(t.policyId, t.createdAt)],
+);
 
 /* -------------------------------------------------------------- SOCIAL */
 

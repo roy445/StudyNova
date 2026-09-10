@@ -27,6 +27,7 @@ import { analyzeSolution, createFileContext } from "../unified-ai-engine";
 import { AppError } from "../errors";
 import { readObject } from "../storage";
 import { SUBJECTS } from "../subject-strategies";
+import { getAiPolicy, policyInstructions } from "../ai-policy";
 
 const MODES = {
   teacher: "學習教練模式：像一位有耐心的台灣國高中學習教練，先確認學生理解程度，再一步步教學。",
@@ -207,6 +208,7 @@ export const routes: RouteDef[] = [
       await db.insert(aiMessages).values({ conversationId: conv.id, role: "user", content: body.content });
         const history = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(asc(aiMessages.createdAt)).limit(16);
       const context = await buildContext(user.userId, conv.allowContext, conv.contextMaterialId);
+      const policy = await getAiPolicy("ai_chat");
       const attachment = body.contextId
         ? (await db.select().from(fileContexts).where(and(eq(fileContexts.id, body.contextId), eq(fileContexts.userId, user.userId))).limit(1))[0]
         : null;
@@ -224,6 +226,7 @@ export const routes: RouteDef[] = [
           userId: user.userId,
           system:
             `你是 StudyNova 的 AI 學習助理 Novi，服務台灣國高中學生。${MODES[conv.mode as keyof typeof MODES] ?? MODES.teacher}\n` +
+            policyInstructions(policy, { examMode: conv.mode === "exam" || conv.mode === "hint" }) + "\n" +
             "你不能自行修改使用者資料。若需要建立任務／筆記／測驗或修改讀書計畫，請在 action 欄位提出建議，等使用者確認。\n" +
             '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_quiz|update_plan","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
             "importance 規則：normal 是一般說明；important 是考試重點、常見錯誤或需要特別注意的內容；critical 是安全、截止時間、明確答案或不可忽略的關鍵提醒。回答中請用 markdown 條列與粗體呈現重點。\n" +
