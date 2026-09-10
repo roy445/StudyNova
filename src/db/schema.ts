@@ -341,10 +341,47 @@ export const knowledgeEdges = pgTable(
 
 /* --------------------------------------------------------------- QUIZ */
 
+export const questionBanks = pgTable(
+  "question_banks",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    subject: text("subject").notNull().default("其他"),
+    grade: text("grade").notNull().default(""),
+    educationLevel: text("education_level").notNull().default(""),
+    semester: text("semester").notNull().default(""),
+    publisher: text("publisher").notNull().default(""),
+    source: text("source").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    visibility: text("visibility").notNull().default("private"),
+    status: text("status").notNull().default("draft"),
+    createdBy: uuid("created_by").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("question_banks_subject_idx").on(t.subject, t.status), index("question_banks_creator_idx").on(t.createdBy, t.createdAt)],
+);
+
+export const questionVersions = pgTable(
+  "question_versions",
+  {
+    id: id(),
+    questionId: uuid("question_id").notNull(),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull().default({}),
+    changeReason: text("change_reason").notNull().default(""),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("question_versions_uq").on(t.questionId, t.version), index("question_versions_question_idx").on(t.questionId, t.createdAt)],
+);
+
 export const questions = pgTable(
   "questions",
   {
     id: id(),
+    bankId: uuid("bank_id").references(() => questionBanks.id, { onDelete: "set null" }),
     ownerId: uuid("owner_id").references(() => users.userId, { onDelete: "cascade" }),
     origin: text("origin").notNull().default("ai"), // ai | bank | admin | user
     targetBank: text("target_bank").notNull().default("general"),
@@ -352,6 +389,13 @@ export const questions = pgTable(
     sourceLabel: text("source_label").notNull().default(""),
     subject: text("subject").notNull(),
     topic: text("topic").notNull().default(""),
+    chapter: text("chapter").notNull().default(""),
+    unit: text("unit").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    sourceType: text("source_type").notNull().default("import"),
+    estimatedSeconds: integer("estimated_seconds").notNull().default(90),
+    points: integer("points").notNull().default(1),
+    status: text("status").notNull().default("draft"),
     level: text("level").notNull().default("junior"),
     difficulty: text("difficulty").notNull().default("normal"),
     type: text("type").notNull().default("single"), // single | multiple | fill | truefalse | short | reading
@@ -362,6 +406,7 @@ export const questions = pgTable(
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     fingerprint: text("fingerprint").notNull(),
     createdAt: created(),
+    updatedAt: updated(),
   },
   (t) => [
     uniqueIndex("questions_fingerprint_uq").on(t.fingerprint),

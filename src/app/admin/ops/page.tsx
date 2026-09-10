@@ -103,8 +103,11 @@ export default function AdminOpsPage() {
   const [couponForm, setCouponForm] = useState({ code: "", kind: "nova", value: 100, maxRedemptions: 50 });
   const [importJson, setImportJson] = useState("");
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
+  const [jsonPreview, setJsonPreview] = useState<{ previews: Array<Record<string, unknown>>; summary: { total: number; ready: number; warnings: number; errors: number; duplicates: number }; issues: Array<Record<string, unknown>> } | null>(null);
+  const [aiGenForm, setAiGenForm] = useState({ subject: "數學", grade: "", chapter: "", topic: "", types: "single", count: 10, difficulty: "normal", prompt: "", referenceText: "" });
+  const [aiGenResult, setAiGenResult] = useState<{ drafts: Array<Record<string, unknown>>; summary: Record<string, number> } | null>(null);
   const [bankUploadBusy, setBankUploadBusy] = useState(false);
-  const [bankUploadMeta, setBankUploadMeta] = useState({ category: "高中英文", source: "線上上傳題目檔案", target: "general" });
+  const [bankUploadMeta, setBankUploadMeta] = useState({ category: "綜合題庫", source: "線上上傳題目檔案", target: "general" });
   const [importJob, setImportJob] = useState<{ id: string; status: string; progress: number; processedFiles: number; totalFiles: number; totalQuestions: number; preview: Array<Record<string, unknown>>; errorMessage: string } | null>(null);
   async function patchImportItem(indexes: number[], payload: Record<string, unknown>) {
     if (!importJob) return;
@@ -606,6 +609,7 @@ export default function AdminOpsPage() {
 
       {tab === "bank" && (
         <Card title={`▦ 題庫（目前 ${bank.data?.total ?? 0} 題）`} subtitle="可直接上傳 PDF／圖片，系統會在線上儲存、解析、去重並匯入題庫">
+          <div className="mb-4 rounded-2xl border border-violet-300/30 bg-violet-300/5 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">✦ AI 出題中心（草稿模式）</p><p className="mt-1 text-xs leading-5 text-muted">先生成、驗證與人工審核；不會直接發布給學生。可指定科目、章節、題型、難度與參考資料。</p></div><Badge tone="gold">Human Review</Badge></div><div className="mt-3 grid gap-2 sm:grid-cols-4"><Field label="科目"><Input value={aiGenForm.subject} onChange={(e) => setAiGenForm({ ...aiGenForm, subject: e.target.value })} /></Field><Field label="年級"><Input value={aiGenForm.grade} onChange={(e) => setAiGenForm({ ...aiGenForm, grade: e.target.value })} placeholder="高一" /></Field><Field label="章節／主題"><Input value={aiGenForm.chapter} onChange={(e) => setAiGenForm({ ...aiGenForm, chapter: e.target.value })} placeholder="第三章" /></Field><Field label="題型"><Select value={aiGenForm.types} onChange={(e) => setAiGenForm({ ...aiGenForm, types: e.target.value })}><option value="single">單選</option><option value="multiple">多選</option><option value="truefalse">判斷</option><option value="fill">填空</option><option value="short">簡答</option><option value="calculation">計算</option></Select></Field><Field label="難度"><Select value={aiGenForm.difficulty} onChange={(e) => setAiGenForm({ ...aiGenForm, difficulty: e.target.value })}><option value="easy">簡單</option><option value="normal">中等</option><option value="hard">困難</option><option value="exam">極難／考試</option></Select></Field><Field label="題數（最多 100）"><Input type="number" min={1} max={100} value={aiGenForm.count} onChange={(e) => setAiGenForm({ ...aiGenForm, count: Math.max(1, Math.min(100, Number(e.target.value) || 1)) })} /></Field><Field label="主題"><Input value={aiGenForm.topic} onChange={(e) => setAiGenForm({ ...aiGenForm, topic: e.target.value })} /></Field><div className="flex items-end"><Button full onClick={async () => { try { const result = await apiPost<NonNullable<typeof aiGenResult>>("/admin/questions/generate", { ...aiGenForm, types: [aiGenForm.types], educationLevel: "", referenceText: aiGenForm.referenceText }); setAiGenResult(result); toast.push("success", `已生成 ${result.summary.generated} 題草稿，請逐題審核`); } catch (err) { toast.push("error", errorMessage(err)); } }}>生成草稿</Button></div></div><Textarea className="mt-2" value={aiGenForm.referenceText} onChange={(e) => setAiGenForm({ ...aiGenForm, referenceText: e.target.value })} placeholder="可貼上教材、課綱或筆記；AI 將以此作為參考資料" /><Textarea className="mt-2" value={aiGenForm.prompt} onChange={(e) => setAiGenForm({ ...aiGenForm, prompt: e.target.value })} placeholder="自然語言要求，例如：請加入生活情境並避免重複題目" />{aiGenResult && <div className="mt-3 max-h-80 space-y-2 overflow-auto rounded-xl bg-black/20 p-2 text-xs"><p className="font-semibold">生成 {aiGenResult.summary.generated} 題・通過 {aiGenResult.summary.ready}・警告 {aiGenResult.summary.warnings}・錯誤 {aiGenResult.summary.errors}</p>{aiGenResult.drafts.map((draft, index) => <div key={index} className="rounded-lg border border-white/10 p-2"><div className="flex justify-between gap-2"><span>{index + 1}. {String(draft.stem)}</span><Badge tone={draft.status === "READY" ? "green" : "gold"}>{String(draft.status)}</Badge></div><p className="mt-1 text-muted">{String(draft.type)}・答案：{Array.isArray(draft.answer) ? draft.answer.join("／") : String(draft.answer ?? "未確認")}</p>{Array.isArray(draft.issues) && draft.issues.map((issue, issueIndex) => <p key={issueIndex} className="text-amber-200">{String((issue as Record<string, unknown>).message)}</p>)}</div>)}</div>}</div>
           <div className="mb-4 rounded-2xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">▤ 線上匯入題目檔案</p><p className="mt-1 text-xs leading-5 text-muted">PDF、PNG、JPG、WEBP、MP3、WAV、M4A，單檔最多 50MB。AI 會掃描整份文件與最後幾頁；無法確認的題目保留並標記 NEEDS_REVIEW。</p></div><Badge tone="cyan">Vercel Blob ・ AI OCR</Badge></div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3"><Field label="題庫分類"><Input value={bankUploadMeta.category} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, category: e.target.value })} placeholder="例如：高中英文" /></Field><Field label="來源名稱"><Input value={bankUploadMeta.source} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, source: e.target.value })} placeholder="例如：高一週考 PDF" /></Field><Field label="目標題庫"><Select value={bankUploadMeta.target} onChange={(e) => setBankUploadMeta({ ...bankUploadMeta, target: e.target.value })}><option value="general">一般題庫</option><option value="activity">活動題庫</option><option value="exclusive">專屬題庫</option><option value="weekly">每週小考題庫</option></Select></Field></div>
@@ -624,18 +628,20 @@ export default function AdminOpsPage() {
               onClick={async () => {
                 try {
                   const items = JSON.parse(importJson);
-                  const res = await apiPost<Record<string, unknown>>("/admin/questions/import", { items });
-                  setImportResult(res);
-                  toast.push("success", `匯入完成：${res.imported} 題`);
-                  await bank.reload();
+                  const res = await apiPost<NonNullable<typeof jsonPreview>>("/admin/questions/preview", { items, bankCategory: bankUploadMeta.category, sourceLabel: bankUploadMeta.source });
+                  setJsonPreview(res);
+                  setImportResult(null);
+                  toast.push(res.summary.errors ? "info" : "success", `預覽完成：${res.summary.ready} 題可匯入，${res.summary.errors} 題需要修正`);
                 } catch (err) {
                   toast.push("error", err instanceof SyntaxError ? "JSON 格式錯誤" : errorMessage(err));
                 }
               }}
             >
-              匯入題庫
+              先預覽 JSON
             </Button>
+            {jsonPreview && <Button variant="gold" disabled={jsonPreview.summary.ready === 0} onClick={async () => { try { const res = await apiPost<Record<string, unknown>>("/admin/questions/import", { items: jsonPreview.previews.filter((item) => item.status !== "ERROR" && item.status !== "DUPLICATE") }); setImportResult(res); toast.push("success", `已匯入 ${res.imported} 題；略過 ${res.skipped} 題`); await bank.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>確認匯入可用題目</Button>}
           </div>
+          {jsonPreview && <div className="mt-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs"><p className="font-semibold">匯入預覽：共 {jsonPreview.summary.total} 題・可匯入 {jsonPreview.summary.ready} 題・警告 {jsonPreview.summary.warnings} 題・錯誤 {jsonPreview.summary.errors} 題・重複 {jsonPreview.summary.duplicates} 題</p>{jsonPreview.issues.map((issue, index) => <p key={index} className="mt-1 text-amber-200">{String(issue.message)}</p>)}<div className="mt-2 max-h-72 space-y-1 overflow-auto">{jsonPreview.previews.slice(0, 100).map((item, index) => <div key={index} className="rounded-lg bg-black/20 p-2"><span className="font-medium">第 {Number(item.index) + 1} 題・{String(item.status)}</span><span className="ml-2 text-muted">{String(item.stem || "（缺少題目）").slice(0, 180)}</span>{Array.isArray(item.issues) && item.issues.map((issue, issueIndex) => <p key={issueIndex} className="mt-1 text-amber-200">{String((issue as Record<string, unknown>).field || "欄位")}：{String((issue as Record<string, unknown>).message)}</p>)}</div>)}</div></div>}
           {importResult && <pre className="mt-2 max-h-52 overflow-auto scroll-thin rounded-xl bg-black/30 p-2 text-[11px]">{JSON.stringify(importResult, null, 2)}</pre>}
           <div className="mt-3 max-h-64 space-y-1 overflow-y-auto scroll-thin text-xs">
             {bank.data?.questions.map((q) => (

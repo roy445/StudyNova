@@ -21,6 +21,8 @@ import {
   aiProviderHealth,
   aiUsageLogs,
   questions,
+  questionBanks,
+  questionVersions,
   questionImportJobs,
   gradeRecords,
   weeklyExamResults,
@@ -38,12 +40,13 @@ import {
   linkGenerationLogs,
   emailMessageLogs,
 } from "@/db/schema";
+import { normalizeQuestionRows } from "../question-import";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
 import { adminLog, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { queue } from "../queue";
-import { providerMetrics, recentAiFailures, aiConfigured } from "../ai";
+import { providerMetrics, recentAiFailures, aiConfigured, runAiJson } from "../ai";
 import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured, systemAnnouncementEmailTemplate } from "../email";
 
 function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
@@ -857,6 +860,57 @@ export const routes: RouteDef[] = [
   /* ----------------------------------------------------- question bank */
   route({
     method: "POST",
+    path: "/admin/questions/generate",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ prompt: z.string().max(4000).default(""), subject: z.string().min(1).max(40), educationLevel: z.string().max(40).default(""), grade: z.string().max(40).default(""), chapter: z.string().max(120).default(""), topic: z.string().max(120).default(""), types: z.array(z.string().max(40)).min(1).max(8).default(["single"]), count: z.number().int().min(1).max(100).default(10), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).default("normal"), referenceText: z.string().max(30000).default(""), requireExplanation: z.boolean().default(true) }));
+      const instruction = `請產生 ${body.count} 題${body.subject}題目。教育階段：${body.educationLevel}；年級：${body.grade}；章節：${body.chapter}；主題：${body.topic}；題型可使用：${body.types.join(",")}；難度：${body.difficulty}。${body.prompt}\n${body.referenceText ? `只能根據以下參考資料，不要捏造：\n${body.referenceText}` : ""}`;
+      const result = await runAiJson<unknown[]>({ feature: "admin_question_generation", userId: admin.userId, system: "你是 StudyNova 題庫出題器。只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。答案必須可由題目與資料支持；不要輸出 Markdown。", parts: [{ kind: "text", text: instruction }], maxOutputTokens: Math.min(12000, 900 * body.count) }, []);
+      const normalized = normalizeQuestionRows(result.data, { subject: body.subject, difficulty: body.difficulty, level: "junior", sourceLabel: "AI 生成草稿", bankCategory: "AI 生成待審核" });
+      const previews = normalized.previews.map((item) => ({ ...item, status: item.status === "READY" && body.requireExplanation && !item.explanation ? "WARNING" : item.status, sourceType: "ai", reviewStatus: "draft" }));
+      await adminLog({ actorId: admin.userId, action: "questions.generate", targetType: "question_draft", targetId: "preview", after: { subject: body.subject, count: body.count, generated: previews.length, errors: previews.filter((item) => item.status === "ERROR").length }, ip: ctx.ip });
+      return { drafts: previews, summary: { requested: body.count, generated: previews.length, ready: previews.filter((item) => item.status === "READY").length, warnings: previews.filter((item) => item.status === "WARNING").length, errors: previews.filter((item) => item.status === "ERROR").length } };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/question-banks",
+    auth: "admin",
+    handler: async (ctx) => {
+      const subject = ctx.query.get("subject");
+      const status = ctx.query.get("status");
+      const rows = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id})::int` }).from(questionBanks).where(and(subject ? eq(questionBanks.subject, subject) : sql`true`, status ? eq(questionBanks.status, status) : sql`true`)).orderBy(desc(questionBanks.updatedAt));
+      return { banks: rows };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/question-banks",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(120), description: z.string().max(3000).default(""), subject: z.string().min(1).max(40), grade: z.string().max(40).default(""), educationLevel: z.string().max(40).default(""), semester: z.string().max(40).default(""), publisher: z.string().max(120).default(""), source: z.string().max(300).default(""), tags: z.array(z.string().max(60)).max(30).default([]), visibility: z.enum(["private", "school", "public"]).default("private") }));
+      const rows = await db.insert(questionBanks).values({ ...body, createdBy: admin.userId }).returning();
+      await adminLog({ actorId: admin.userId, action: "question-bank.create", targetType: "question_bank", targetId: rows[0].id, after: body, ip: ctx.ip });
+      return { bank: rows[0] };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/question-banks/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(120).optional(), description: z.string().max(3000).optional(), subject: z.string().min(1).max(40).optional(), grade: z.string().max(40).optional(), educationLevel: z.string().max(40).optional(), semester: z.string().max(40).optional(), publisher: z.string().max(120).optional(), source: z.string().max(300).optional(), tags: z.array(z.string().max(60)).max(30).optional(), visibility: z.enum(["private", "school", "public"]).optional(), status: z.enum(["draft", "review", "published", "archived"]).optional() }));
+      const rows = await db.update(questionBanks).set({ ...body, updatedAt: new Date() }).where(eq(questionBanks.id, ctx.params.id)).returning();
+      if (!rows[0]) throw notFound("找不到題庫");
+      await adminLog({ actorId: admin.userId, action: "question-bank.update", targetType: "question_bank", targetId: rows[0].id, after: body, ip: ctx.ip });
+      return { bank: rows[0] };
+    },
+  }),
+  route({
+    method: "POST",
     path: "/admin/question-imports",
     auth: "admin",
     handler: async (ctx) => {
@@ -936,55 +990,36 @@ export const routes: RouteDef[] = [
   }),
   route({
     method: "POST",
+    path: "/admin/questions/preview",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ items: z.unknown(), subject: z.string().max(20).optional(), bankCategory: z.string().max(40).optional(), sourceLabel: z.string().max(120).optional(), level: z.enum(["junior", "senior"]).optional(), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).optional() }));
+      const result = normalizeQuestionRows(body.items, body);
+      await adminLog({ actorId: admin.userId, action: "questions.preview", targetType: "questions", targetId: "preview", after: { total: result.previews.length, errors: result.previews.filter((item) => item.status === "ERROR").length }, ip: ctx.ip });
+      return { ...result, summary: { total: result.previews.length, ready: result.previews.filter((item) => item.status === "READY").length, warnings: result.previews.filter((item) => item.status === "WARNING").length, errors: result.previews.filter((item) => item.status === "ERROR").length, duplicates: result.previews.filter((item) => item.status === "DUPLICATE").length } };
+    },
+  }),
+  route({
+    method: "POST",
     path: "/admin/questions/import",
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(
-        z.object({
-          items: z.array(z.record(z.string(), z.unknown())).min(1).max(500),
-        }),
-      );
-      const schema = z.object({
-        subject: z.string().min(1).max(20),
-        topic: z.string().max(80).default(""),
-        bankCategory: z.string().max(40).default("general"),
-        sourceLabel: z.string().max(120).default("匯入題庫"),
-        level: z.enum(["junior", "senior"]).default("junior"),
-        difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).default("normal"),
-        type: z.enum(["single", "multiple", "fill", "truefalse", "short", "reading"]).default("single"),
-        stem: z.string().min(1).max(2000),
-        options: z.array(z.string().max(400)).max(8).default([]),
-        answer: z.array(z.string().max(400)).min(1).max(8),
-        explanation: z.string().max(2000).default(""),
-      });
+      const body = await ctx.json(z.object({ items: z.unknown(), subject: z.string().max(20).optional(), bankCategory: z.string().max(40).optional(), sourceLabel: z.string().max(120).optional(), level: z.enum(["junior", "senior"]).optional(), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).optional() }));
+      const preview = normalizeQuestionRows(body.items, body).previews;
       let accepted = 0;
       let imported = 0;
       let skipped = 0;
-      const invalid: Array<{ index: number; subject?: string; error: string }> = [];
-      for (let i = 0; i < body.items.length; i += 1) {
-        const parsed = schema.safeParse(body.items[i]);
-        if (!parsed.success) {
-          invalid.push({ index: i, subject: String((body.items[i] as Record<string, unknown>).subject ?? ""), error: parsed.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; ") });
-          continue;
-        }
-        const q = parsed.data;
-        if ((q.type === "single" || q.type === "multiple") && !q.answer.every((a) => q.options.includes(a))) {
-          invalid.push({ index: i, subject: q.subject, error: "answer 必須是 options 之一" });
-          continue;
-        }
+      const invalid = preview.flatMap((item) => item.issues.filter((issue) => issue.severity === "error").map((issue) => ({ index: item.index, field: issue.field, code: issue.code, error: issue.message })));
+      for (const q of preview) {
+        if (q.status === "ERROR" || q.status === "DUPLICATE") { skipped += 1; continue; }
         accepted += 1;
-        const fp = fingerprint(q.subject, q.stem, q.answer.join("|"));
-        const rows = await db
-          .insert(questions)
-          .values({ ownerId: null, origin: "bank", ...q, fingerprint: fp })
-          .onConflictDoNothing()
-          .returning({ id: questions.id });
-        if (rows[0]) imported += 1;
-        else skipped += 1;
+        const rows = await db.insert(questions).values({ ownerId: null, origin: "bank", targetBank: "general", bankCategory: q.bankCategory, sourceLabel: q.sourceLabel, subject: q.subject, topic: q.topic, level: q.level, difficulty: q.difficulty, type: q.type, stem: q.stem, options: q.options, answer: q.answer, explanation: q.explanation, metadata: q.metadata, fingerprint: q.fingerprint }).onConflictDoNothing().returning({ id: questions.id });
+        if (rows[0]) imported += 1; else skipped += 1;
       }
-      await adminLog({ actorId: admin.userId, action: "questions.import", targetType: "questions", targetId: "bank", after: { submitted: body.items.length, accepted, imported, skipped, invalid: invalid.length }, ip: ctx.ip });
-      return { submitted: body.items.length, accepted, imported, skipped, invalid };
+      await adminLog({ actorId: admin.userId, action: "questions.import", targetType: "questions", targetId: "bank", after: { submitted: preview.length, accepted, imported, skipped, invalid: invalid.length }, ip: ctx.ip });
+      return { submitted: preview.length, accepted, imported, skipped, invalid, warnings: preview.flatMap((item) => item.issues.filter((issue) => issue.severity === "warning").map((issue) => ({ index: item.index, field: issue.field, code: issue.code, warning: issue.message }))) };
     },
   }),
 
@@ -1020,6 +1055,50 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/questions/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const question = (await db.select().from(questions).where(eq(questions.id, ctx.params.id)).limit(1))[0];
+      if (!question) throw notFound("找不到題目");
+      const versions = await db.select().from(questionVersions).where(eq(questionVersions.questionId, question.id)).orderBy(desc(questionVersions.version));
+      return { question, versions };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/questions/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const current = (await db.select().from(questions).where(eq(questions.id, ctx.params.id)).limit(1))[0];
+      if (!current) throw notFound("找不到題目");
+      const body = await ctx.json(z.object({ subject: z.string().min(1).max(20).optional(), topic: z.string().max(120).optional(), chapter: z.string().max(120).optional(), unit: z.string().max(120).optional(), level: z.enum(["junior", "senior"]).optional(), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).optional(), type: z.string().min(1).max(40).optional(), stem: z.string().min(1).max(20000).optional(), options: z.array(z.string().max(2000)).max(20).optional(), answer: z.array(z.string().max(2000)).max(20).optional(), explanation: z.string().max(30000).optional(), tags: z.array(z.string().max(60)).max(30).optional(), points: z.number().int().min(1).max(100).optional(), estimatedSeconds: z.number().int().min(5).max(3600).optional(), status: z.enum(["draft", "review", "published", "archived"]).optional(), changeReason: z.string().max(500).default("管理員編輯") }));
+      const { changeReason, ...patch } = body;
+      if ((patch.type === "single" || patch.type === "multiple") && patch.options && patch.answer && !patch.answer.every((answer) => patch.options!.includes(answer))) throw badRequest("答案必須存在於選項中");
+      const latest = (await db.select({ version: sql<number>`coalesce(max(${questionVersions.version}), 0)::int` }).from(questionVersions).where(eq(questionVersions.questionId, current.id)))[0]?.version ?? 0;
+      await db.insert(questionVersions).values({ questionId: current.id, version: latest + 1, snapshot: current as unknown as Record<string, unknown>, changeReason, createdBy: admin.userId });
+      const rows = await db.update(questions).set({ ...patch, updatedAt: new Date() }).where(eq(questions.id, current.id)).returning();
+      await adminLog({ actorId: admin.userId, action: "question.update", targetType: "question", targetId: current.id, after: patch, ip: ctx.ip });
+      return { question: rows[0], version: latest + 1 };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/questions/:id/publish",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ status: z.enum(["review", "published", "archived"]), note: z.string().max(500).default("") }));
+      const question = (await db.select().from(questions).where(eq(questions.id, ctx.params.id)).limit(1))[0];
+      if (!question) throw notFound("找不到題目");
+      if (body.status === "published" && (!question.stem.trim() || !question.answer.length)) throw badRequest("題目與答案完整後才能發布");
+      const rows = await db.update(questions).set({ status: body.status, updatedAt: new Date() }).where(eq(questions.id, question.id)).returning();
+      await adminLog({ actorId: admin.userId, action: `question.${body.status}`, targetType: "question", targetId: question.id, after: { note: body.note }, ip: ctx.ip });
+      return { question: rows[0] };
+    },
+  }),
   route({
     method: "DELETE",
     path: "/admin/questions/:id",
