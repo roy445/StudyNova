@@ -109,7 +109,9 @@ async function getWord(wordId: string) {
   }
 }
 
-async function generateNaturalExamples(word: typeof dailyWords.$inferSelect, userId: string) {
+type NaturalExampleWord = Pick<typeof dailyWords.$inferSelect, "word" | "partOfSpeech" | "meaning" | "meanings" | "phrases">;
+
+async function generateNaturalExamples(word: NaturalExampleWord, userId: string) {
   const context = `單字：${word.word}\n詞性：${word.partOfSpeech}\n中文義項：${word.meaning}\n其他義項：${JSON.stringify(word.meanings)}\n既有片語：${JSON.stringify(word.phrases)}`;
   const instruction = `請為這個英文單字產生 5 句真正自然、可朗讀、可直接學習用法的英文例句，並提供每句完整繁體中文翻譯。把單字放在真實語境中使用，不要解釋單字本身。情境請在日常生活、朋友對話、家庭、旅行、科技、新聞、運動、工作、學校等之間自然分散；句型可包含肯定、否定、問句、對話、條件句與轉折，但不要刻意湊形式。每句都必須符合指定詞性、常見搭配與其中一個中文義項。禁止以下句型或意思：In the passage...、The word X...、The writer...、The author...、This sentence shows...、The meaning of X...、helps explain the writer's main idea，以及任何「正在介紹這個單字」的句子。不要把單字塞進不自然的句子，也不要五句只替換單字。只回傳 JSON：{"examples":[{"english":"自然英文句子","chinese":"完整繁體中文翻譯","level":"基礎|會考|進階"}]}\n${context}`;
   let last: Array<{ english: string; chinese: string; level: string }> = [];
