@@ -969,6 +969,31 @@ export const routes: RouteDef[] = [
     },
   }),
   route({
+    method: "POST",
+    path: "/admin/question-imports/:id/auto-metadata",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const job = (await db.select().from(questionImportJobs).where(and(eq(questionImportJobs.id, ctx.params.id), eq(questionImportJobs.adminId, admin.userId))).limit(1))[0];
+      if (!job) throw notFound("找不到匯入工作");
+      if (!job.preview.length) throw badRequest("目前沒有可分析的題目");
+      const sample = job.preview.slice(0, 80).map((item, index) => `${index + 1}. [${item.subject || "?"}/${item.type || "?"}] ${item.stem}`).join("\n").slice(0, 28000);
+      const result = await runAiJson<{ name: string; category: string; subject: string; type: string; level: "junior" | "senior" }>({
+        feature: "question_bank_auto_metadata",
+        userId: admin.userId,
+        system: "你是題庫整理助手。只回傳 JSON，欄位 name、category、subject、type、level。根據題目內容判斷主要科目、學段、最常見題型，並取一個清楚且不超過 80 字的繁體中文題庫名稱。不要使用檔名，不要捏造。",
+        parts: [{ kind: "text", text: `請分析以下題庫題目，回傳自動分類資訊：\n${sample}` }],
+        maxOutputTokens: 800,
+      }, { name: "未命名題庫", category: "自動分析題庫", subject: "其他", type: "short", level: "junior" });
+      const metadata = result.data;
+      const name = String(metadata.name || "自動分析題庫").slice(0, 120);
+      const category = String(metadata.category || `${String(metadata.subject || "其他")}題庫`).slice(0, 40);
+      const rows = await db.update(questionImportJobs).set({ sourceLabel: name, bankCategory: category, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id)).returning();
+      await adminLog({ actorId: admin.userId, action: "question-import.auto-metadata", targetType: "question_import_job", targetId: job.id, after: { name, category, subject: metadata.subject, type: metadata.type, level: metadata.level }, ip: ctx.ip });
+      return { metadata: { ...metadata, name, category }, job: rows[0] };
+    },
+  }),
+  route({
     method: "PATCH",
     path: "/admin/question-imports/:id/items",
     auth: "admin",
