@@ -59,27 +59,6 @@ function uniqueExamples<T extends { english: string; chinese?: string }>(items: 
   }).slice(0, max);
 }
 
-function fallbackExamples(word: { word: string; partOfSpeech: string }) {
-  const term = word.word.trim();
-  const partOfSpeech = word.partOfSpeech.toLowerCase();
-  if (partOfSpeech.startsWith("v")) {
-    return [
-      { english: `She decided to ${term} before dinner.`, chinese: `她決定在晚餐前${term}。`, level: "基礎", sourceKind: "generated" },
-      { english: `I try to ${term} whenever I have a few quiet minutes.`, chinese: `只要有幾分鐘安靜的時間，我就會試著${term}。`, level: "基礎", sourceKind: "generated" },
-    ];
-  }
-  if (partOfSpeech.startsWith("adj")) {
-    return [
-      { english: `The ${term} design made the app easier to use.`, chinese: `這個${term}的設計讓應用程式更容易使用。`, level: "基礎", sourceKind: "generated" },
-      { english: `He gave a ${term} answer during the interview.`, chinese: `他在面試時給出了一個${term}的回答。`, level: "基礎", sourceKind: "generated" },
-    ];
-  }
-  return [
-    { english: `The ${term} on the table caught my attention.`, chinese: `桌上的${term}引起了我的注意。`, level: "基礎", sourceKind: "generated" },
-    { english: `We used the ${term} during today's class activity.`, chinese: `我們在今天的課堂活動中使用了這個${term}。`, level: "基礎", sourceKind: "generated" },
-  ];
-}
-
 async function safeRows<T>(load: () => Promise<T[]>): Promise<T[]> {
   try {
     return await load();
@@ -150,7 +129,7 @@ export const routes: RouteDef[] = [
           ? cleanList(explanations.map((item) => ({ explanation: item.explanation, sourceKind: item.sourceKind })), 8)
           : cleanList(word.meanings.length ? word.meanings : [word.meaning], 8).map((explanation) => ({ explanation, sourceKind: "source" })),
         synonyms: cleanList(synonyms.map((item) => ({ word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech, difference: item.difference, usage: item.usage, sourceKind: item.sourceKind })), 8),
-        examples: uniqueExamples((examples.length ? examples : word.example ? [{ english: word.example, chinese: word.exampleZh, level: "一般", sourceKind: "source" }] : fallbackExamples(word)).map((item) => ({ english: item.english, chinese: item.chinese, level: item.level, sourceKind: item.sourceKind })), 6),
+        examples: uniqueExamples((examples.length ? examples : word.example ? [{ english: word.example, chinese: word.exampleZh, level: "一般", sourceKind: "source" }] : []).map((item) => ({ english: item.english, chinese: item.chinese, level: item.level, sourceKind: item.sourceKind })), 6),
         phrases: cleanList((phrases.length ? phrases : word.phrases.map((item) => ({ phrase: item.en, meaning: item.zh, sourceKind: "source" }))).map((item) => ({ phrase: item.phrase, meaning: item.meaning, sourceKind: item.sourceKind })), 10),
         forms: cleanList(forms.map((item) => ({ form: item.form, partOfSpeech: item.partOfSpeech, meaning: item.meaning, sourceKind: item.sourceKind })), 12),
         aiContent: ai[0] ? { content: ai[0].content, model: ai[0].model, generatedAt: ai[0].generatedAt } : null,

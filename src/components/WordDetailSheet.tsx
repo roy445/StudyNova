@@ -91,6 +91,10 @@ function SpeakButton({ text, lang = "en-US", label = "朗讀", spellFirst = fals
   const speak = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
     window.speechSynthesis.cancel();
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = lang === "zh-TW"
+      ? voices.find((voice) => /^zh[-_]TW/i.test(voice.lang)) ?? voices.find((voice) => /台灣|taiwan/i.test(voice.name))
+      : voices.find((voice) => voice.lang.toLowerCase() === lang.toLowerCase());
     if (spellFirst) {
       const spokenText = text.replace(/\s*\/\s*/g, " , ");
       const spelling = new SpeechSynthesisUtterance(spokenText.split("").join(" , "));
@@ -105,6 +109,7 @@ function SpeakButton({ text, lang = "en-US", label = "朗讀", spellFirst = fals
     }
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
+    if (preferredVoice) utterance.voice = preferredVoice;
     window.speechSynthesis.speak(utterance);
   };
   return <button type="button" onClick={speak} aria-label={`${label}：${text}`} className="focus-ring shrink-0 rounded-lg border border-[var(--line)] px-2 py-1 text-[11px] text-muted transition hover:border-[#37d3ff]/50 hover:text-[#b8efff]">🔊 {label}</button>;
@@ -279,6 +284,8 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
       const completeWord = new SpeechSynthesisUtterance(spokenWord);
       spelling.lang = lang;
       completeWord.lang = lang;
+      const voice = window.speechSynthesis.getVoices().find((item) => item.lang.toLowerCase() === lang.toLowerCase());
+      if (voice) { spelling.voice = voice; completeWord.voice = voice; }
       window.speechSynthesis.cancel();
       spelling.onend = () => {
         window.setTimeout(() => window.speechSynthesis.speak(completeWord), 600);
@@ -352,11 +359,12 @@ export function WordDetailSheet({ wordId, preview, onClose }: { wordId: string |
 
                 <Card title="不熟悉這個單字？詢問 AI"><NovaCostNotice cost={aiChatCost} action="詢問單字 AI" /><div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={aiQuestion} onChange={(event) => setAiQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void askAi(); }} placeholder={aiAskPlaceholder} aria-label="想詢問 AI 的單字問題" className="min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-black/15 px-3 py-2 text-sm text-[var(--text)] outline-none placeholder:text-muted focus:border-[#37d3ff]/60" /><Button loading={aiQuestionLoading} onClick={() => void askAi()}>{currentAiReply ? "再次詢問 AI" : "詢問 AI"}</Button></div>{!currentAiReply && <p className="mt-2 text-xs text-muted">按下按鈕會把目前單字、詞性、意思與你的問題一起交給 Novi 解答。</p>}{currentAiReply && <div className="mt-3 whitespace-pre-wrap rounded-xl border border-[#7c5cff]/25 bg-[#7c5cff]/8 p-3 text-sm leading-relaxed text-[#eeeaff]">{currentAiReply}</div>}</Card>
 
-                {allExplanations.length > 0 && <Section title="單字解釋"><div className="grid gap-2 sm:grid-cols-2">{allExplanations.map((item, index) => <div key={`${item.explanation}-${index}`} className="glass-soft flex items-start justify-between gap-3 p-3 text-sm"><span className="min-w-0 flex-1">{index + 1}. {item.explanation}</span><div className="flex shrink-0 items-center gap-2"><SpeakButton text={item.explanation} label="朗讀解釋" /><SourceBadge sourceKind={item.sourceKind} /></div></div>)}</div></Section>}
+                {allExplanations.length > 0 && <Section title="單字解釋"><div className="grid gap-2 sm:grid-cols-2">{allExplanations.map((item, index) => <div key={`${item.explanation}-${index}`} className="glass-soft flex items-start justify-between gap-3 p-3 text-sm"><span className="min-w-0 flex-1 text-[#ffc857]">{index + 1}. {item.explanation}</span><div className="flex shrink-0 items-center gap-2"><SpeakButton text={item.explanation} label="朗讀解釋" lang="zh-TW" /><SourceBadge sourceKind={item.sourceKind} /></div></div>)}</div></Section>}
 
                 {synonyms.length > 0 && <Section title="相似字與近義字"><div className="grid gap-3 md:grid-cols-2">{synonyms.map((item, index) => <div key={`${item.word}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="break-words font-semibold text-[#b8efff]">{item.word}</p><p className="text-xs text-muted">{item.meaning}・{item.partOfSpeech}</p></div><div className="flex shrink-0 items-center gap-2"><SpeakButton text={item.word} label="朗讀單字" spellFirst /><SourceBadge sourceKind={item.sourceKind} /></div></div>{item.difference && <p className="mt-2 text-sm leading-relaxed">差異：{item.difference}</p>}{item.usage && <p className="mt-1 text-xs text-muted">情境：{item.usage}</p>}</div>)}</div></Section>}
 
-                {examples.length > 0 && <Section title="例句"><div className="space-y-3">{examples.map((item, index) => <div key={`${item.english}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="break-words text-sm leading-relaxed">{data.word.word ? <HighlightedExample sentence={item.english} target={data.word.word} /> : item.english}</p><div className="mt-1 flex items-start gap-2"><p className="min-w-0 flex-1 break-words text-sm text-muted">{item.chinese}</p><div className="flex shrink-0 items-center gap-1"><SpeakButton text={item.english} label="朗讀英文例句" lang="en-US" /><SpeakButton text={item.chinese} label="朗讀中文例句" lang="zh-TW" /></div></div></div><Badge tone="muted">{item.level || "一般"}</Badge></div><div className="mt-1"><SourceBadge sourceKind={item.sourceKind} /></div></div>)}</div></Section>}
+                {examples.length > 0 && <Section title="例句"><div className="space-y-3">{examples.map((item, index) => <div key={`${item.english}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="break-words text-sm leading-relaxed text-[#dcecff]">{data.word.word ? <HighlightedExample sentence={item.english} target={data.word.word} /> : item.english}</p>{item.chinese ? <div className="mt-1 flex items-start gap-2"><p className="min-w-0 flex-1 break-words text-sm text-[#ffc857]">{item.chinese}</p><SpeakButton text={item.chinese} label="朗讀中文例句" lang="zh-TW" /></div> : <p className="mt-1 text-xs text-muted">中文整句翻譯尚未建立</p>}<div className="mt-1"><SpeakButton text={item.english} label="朗讀英文例句" lang="en-US" /></div></div><Badge tone="muted">{item.level || "一般"}</Badge></div><div className="mt-1"><SourceBadge sourceKind={item.sourceKind} /></div></div>)}</div></Section>}
+                {examples.length === 0 && <Section title="例句"><div className="glass-soft p-4 text-sm text-muted">該單字目前尚未有例句</div></Section>}
                 {examples.length === 0 && preview && (preview.example || previewExampleZh) && <Section title="例句"><div className="glass-soft p-3 text-sm"><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="break-words"><HighlightedExample sentence={preview.example ?? ""} target={data.word.word} /></p><p className="mt-1 break-words text-muted">{previewExampleZh}</p></div><div className="flex shrink-0 flex-wrap items-center gap-1"><SpeakButton text={preview.example ?? ""} label="朗讀英文例句" lang="en-US" /><SpeakButton text={previewExampleZh} label="朗讀中文例句" lang="zh-TW" /></div></div></div></Section>}
 
                 {phrases.length > 0 && <Section title="常見搭配"><div className="grid gap-2 sm:grid-cols-2">{phrases.map((item, index) => <div key={`${item.phrase}-${index}`} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="break-words font-medium text-[#b8efff]">{item.phrase}</p>{item.meaning && <p className="mt-1 break-words text-xs text-muted">{item.meaning}</p>}</div><div className="flex shrink-0 items-center gap-2"><div className="flex shrink-0 items-center gap-1"><SpeakButton text={item.phrase} label="朗讀片語" lang="en-US" /><SpeakButton text={item.meaning} label="朗讀中文" lang="zh-TW" /></div><SourceBadge sourceKind={item.sourceKind} /></div></div></div>)}</div></Section>}
