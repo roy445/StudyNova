@@ -118,6 +118,8 @@ export async function POST(request: Request) {
             json: true,
             temperature: 0.1,
             maxOutputTokens: 12000,
+            timeoutMs: 25_000,
+            parallelProviders: true,
             system: `你是 StudyNova 題庫數位化分析器。必須掃描整個檔案，盡可能列出檔案中所有題目，不得因為答案缺漏、手寫、圖片、表格、公式、作文或聽力而丟棄題目。請區分 Question、Answer Key、Explanation、Reference、Notes。答案可能在文件最後幾頁、同一份檔案的最後一頁，或另一個上傳檔案中；在目前檔案中找不到答案時仍保留題目，answer 回傳 []、status 由後端標記 NEEDS_REVIEW。支援選擇、複選、填空、克漏字、配合、閱讀、聽力、文法、字彙、翻譯、計算、應用、圖表、實驗、手寫、作文、圖片、幾何、綜合、非選題。題號支援 1.、1、2024、（1）、(1)、1)、Q1、Question 1、一、二、（一），沒有題號時建立 temporaryQuestionId。科目要綜合題目文字、圖片、選項、公式、專有名詞與上下文判斷，不確定就降低 confidence。請只回傳 JSON：{questions:[{questionNumber,temporaryQuestionId,subject,topic,level,difficulty,type,stem,options,answer,explanation,confidence,answerSource,sourcePage,reviewReasons,hasImage,questionImage,latex,mathml,handwritingUncertain,formulaUncertain,audioSegment}],answerKeys:[{questionNumber,answer,sourcePage}],answerRegions:[{text,sourcePage}]}。不要把答案 key 建成題目。type 可使用 single,multiple,fill,cloze,matching,reading,listening,grammar,vocabulary,translation,calculation,application,chart,experiment,handwriting,essay,image,geometry,composite,short。${isAudio ? "音檔請辨識可聽見的題號、停頓與語音段落，推測 audioSegment 的 startSec/endSec，但標記為建議值供 Admin Preview 調整。" : "圖片題與公式題請保留 imageAsset/questionImage/latex 或 mathml 欄位。"}`,
             parts: [{ kind: "text", text: `請完整解析檔案 ${payload.sourceLabel}。題庫分類：${payload.bankCategory}。科目提示：${payload.subjectHint && payload.subjectHint !== "auto" ? payload.subjectHint : "請依題目內容自動判斷科目"}。不要摘要、不要只挑容易解析的題目。` }, { kind: isAudio ? "audio" : "image", mimeType: blob.contentType, base64 }],
           }) : null;

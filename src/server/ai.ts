@@ -26,6 +26,8 @@ export type AiRequest = {
   maxOutputTokens?: number;
   temperature?: number;
   userId?: string | null;
+  timeoutMs?: number;
+  parallelProviders?: boolean;
 };
 
 export type AiResult = {
@@ -222,6 +224,7 @@ async function callGemini(cfg: ProviderConfig, req: AiRequest): Promise<Omit<AiR
   const json = (await fetchJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent`,
     { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": cfg.apiKey! }, body: JSON.stringify(body) },
+    req.timeoutMs,
   )) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
@@ -269,7 +272,7 @@ async function callOpenAiCompatible(cfg: ProviderConfig, req: AiRequest, endpoin
       max_tokens: req.maxOutputTokens ?? 2048,
       ...(req.json ? { response_format: { type: "json_object" } } : {}),
     }),
-  })) as {
+  }, req.timeoutMs)) as {
     choices?: Array<{ message?: { content?: string } }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
@@ -345,6 +348,44 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
 
   if (!configs.length) {
     throw fail("AI_NOT_CONFIGURED");
+  }
+
+  if (req.parallelProviders) {
+    const eligible = (await Promise.all(configs.map(async (cfg) => ({ cfg, health: await healthRow(cfg.name, cfg.model) })))).filter(({ health }) => {
+      if (health?.enabled === false) return false;
+      return !health?.cooldownUntil || new Date(health.cooldownUntil) <= new Date();
+    });
+    if (!eligible.length) throw fail("AI_ALL_UNAVAILABLE", { message: "AI 服務暫時無法使用，請稍後再試。" });
+
+    const attempts = await Promise.all(
+      eligible.map(async ({ cfg }) => {
+        try {
+          const out = cfg.name.startsWith("gemini_")
+            ? await callGemini(cfg, req)
+            : await callOpenAiCompatible(cfg, req, cfg.name === "openai" ? "https://api.openai.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions");
+          return { cfg, out, error: null as ProviderError | null };
+        } catch (error) {
+          return { cfg, out: null, error: error instanceof ProviderError ? error : new ProviderError("unknown", "provider request failed") };
+        }
+      }),
+    );
+    const winner = attempts.find((attempt) => attempt.out)?.out;
+    const winnerProvider = attempts.find((attempt) => attempt.out)?.cfg;
+    for (const attempt of attempts) {
+      if (attempt.out) {
+        await db.update(aiProviderHealth).set({ lastSuccessAt: new Date(), cooldownUntil: null, model: attempt.cfg.model, updatedAt: new Date() }).where(eq(aiProviderHealth.provider, attempt.cfg.name));
+        continue;
+      }
+      const category = attempt.error?.category ?? "unknown";
+      await db.update(aiProviderHealth).set({ lastFailureAt: new Date(), lastFailureCategory: category, updatedAt: new Date(), ...(category === "quota_exhausted" ? { cooldownUntil: nextUtcMonthStart() } : {}) }).where(eq(aiProviderHealth.provider, attempt.cfg.name));
+      await logUsage({ userId: req.userId, provider: attempt.cfg.name, model: attempt.cfg.model, feature: req.feature, success: false, failureCategory: category });
+    }
+    if (winner && winnerProvider) {
+      const fallbackFrom = winnerProvider.priority > eligible[0].cfg.priority ? eligible.filter(({ cfg }) => cfg.priority < winnerProvider.priority).map(({ cfg }) => cfg.name).join(",") : "";
+      await logUsage({ ...winner, userId: req.userId, feature: req.feature, success: true, fallbackFrom });
+      return { ...winner, fallbackFrom };
+    }
+    throw fail("AI_ALL_UNAVAILABLE", { message: "AI 服務暫時無法使用，請稍後再試。" });
   }
 
   let fallbackFrom = "";
