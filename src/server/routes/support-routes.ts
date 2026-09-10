@@ -205,6 +205,7 @@ export const routes: RouteDef[] = [
           body: `[${CATEGORY_LABEL[rows[0].category]}] ${rows[0].title}`,
           link: "/admin/support",
           dedupeKey: `issue-admin:${rows[0].id}:${a.userId}`,
+          push: true,
         });
       }
 

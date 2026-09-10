@@ -6,9 +6,10 @@ import { db } from "@/db";
 import { questionImportJobs, storageObjects } from "@/db/schema";
 import { requireAdmin } from "@/server/auth";
 import { extractJson, runAi } from "@/server/ai";
+import { normalizeQuestionRows } from "@/server/question-import";
 
 export const runtime = "nodejs";
-const ALLOWED = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/heic", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/mp4", "audio/ogg", "audio/webm"];
+const ALLOWED = ["application/pdf", "text/plain", "text/csv", "application/json", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/png", "image/jpeg", "image/webp", "image/heic", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/mp4", "audio/ogg", "audio/webm"];
 const MAX_AI_BYTES = 18 * 1024 * 1024;
 
 type DraftItem = Record<string, unknown> & {
@@ -22,6 +23,22 @@ type DraftItem = Record<string, unknown> & {
 
 function safeText(value: unknown, max: number) {
   return String(value ?? "").trim().slice(0, max);
+}
+
+function parseCsv(text: string): Record<string, unknown>[] {
+  const rows = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (rows.length < 2) return [];
+  const parseLine = (line: string) => line.match(/("(?:[^"]|"")*"|[^,]*)(?:,|$)/g)?.map((part) => part.replace(/,$/, "").trim().replace(/^"|"$/g, "").replace(/""/g, '"')) ?? [];
+  const headers = parseLine(rows[0]);
+  return rows.slice(1).map((line) => Object.fromEntries(parseLine(line).map((value, index) => [headers[index] || `column_${index + 1}`, value])));
+}
+
+function directTextRows(content: string, mimeType: string) {
+  if (mimeType === "application/json" || mimeType.endsWith("+json")) {
+    try { return JSON.parse(content) as unknown; } catch { throw new Error("JSON 檔案格式錯誤，請確認括號與逗號完整"); }
+  }
+  if (mimeType === "text/csv" || mimeType === "application/vnd.ms-excel") return parseCsv(content);
+  return null;
 }
 
 function normalizeItem(item: Record<string, unknown>, sourceObjectId: string, sourcePage?: number): DraftItem | null {
@@ -91,9 +108,11 @@ export async function POST(request: Request) {
           if (metadata.size > MAX_AI_BYTES) throw new Error("檔案超過 AI 單次解析上限 18MB，請拆成較小檔案再上傳");
           const privateBlob = await get(blob.pathname, { access: "private" });
           if (!privateBlob?.stream) throw new Error("無法讀取 Blob 私有檔案內容");
-          const base64 = Buffer.from(await new Response(privateBlob.stream).arrayBuffer()).toString("base64");
+          const rawBuffer = Buffer.from(await new Response(privateBlob.stream).arrayBuffer());
+          const base64 = rawBuffer.toString("base64");
           const isAudio = blob.contentType.startsWith("audio/");
-          const ai = await runAi({
+          const directRows = directTextRows(rawBuffer.toString("utf8"), blob.contentType);
+          const ai = directRows === null ? await runAi({
             userId: payload.userId,
             feature: "admin_question_file_import",
             json: true,
@@ -101,11 +120,12 @@ export async function POST(request: Request) {
             maxOutputTokens: 12000,
             system: `你是 StudyNova 題庫數位化分析器。必須掃描整個檔案，盡可能列出檔案中所有題目，不得因為答案缺漏、手寫、圖片、表格、公式、作文或聽力而丟棄題目。請區分 Question、Answer Key、Explanation、Reference、Notes。答案可能在文件最後幾頁、同一份檔案的最後一頁，或另一個上傳檔案中；在目前檔案中找不到答案時仍保留題目，answer 回傳 []、status 由後端標記 NEEDS_REVIEW。支援選擇、複選、填空、克漏字、配合、閱讀、聽力、文法、字彙、翻譯、計算、應用、圖表、實驗、手寫、作文、圖片、幾何、綜合、非選題。題號支援 1.、1、2024、（1）、(1)、1)、Q1、Question 1、一、二、（一），沒有題號時建立 temporaryQuestionId。科目要綜合題目文字、圖片、選項、公式、專有名詞與上下文判斷，不確定就降低 confidence。請只回傳 JSON：{questions:[{questionNumber,temporaryQuestionId,subject,topic,level,difficulty,type,stem,options,answer,explanation,confidence,answerSource,sourcePage,reviewReasons,hasImage,questionImage,latex,mathml,handwritingUncertain,formulaUncertain,audioSegment}],answerKeys:[{questionNumber,answer,sourcePage}],answerRegions:[{text,sourcePage}]}。不要把答案 key 建成題目。type 可使用 single,multiple,fill,cloze,matching,reading,listening,grammar,vocabulary,translation,calculation,application,chart,experiment,handwriting,essay,image,geometry,composite,short。${isAudio ? "音檔請辨識可聽見的題號、停頓與語音段落，推測 audioSegment 的 startSec/endSec，但標記為建議值供 Admin Preview 調整。" : "圖片題與公式題請保留 imageAsset/questionImage/latex 或 mathml 欄位。"}`,
             parts: [{ kind: "text", text: `請完整解析檔案 ${payload.sourceLabel}。題庫分類：${payload.bankCategory}。科目提示：${payload.subjectHint && payload.subjectHint !== "auto" ? payload.subjectHint : "請依題目內容自動判斷科目"}。不要摘要、不要只挑容易解析的題目。` }, { kind: isAudio ? "audio" : "image", mimeType: blob.contentType, base64 }],
-          });
-          const parsed = extractJson<{ questions?: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>>; answerKeys?: Array<Record<string, unknown>> }>(ai.text, {});
-          const rawItems = Array.isArray(parsed.questions) ? parsed.questions : Array.isArray(parsed.items) ? parsed.items : [];
-          const preview = rawItems.map((item) => normalizeItem(item, object.id, Number(item.sourcePage ?? 0) || undefined)).filter((item): item is DraftItem => Boolean(item)).slice(0, 1000);
-          const answerKeys = Array.isArray(parsed.answerKeys) ? parsed.answerKeys.slice(0, 1000) : [];
+          }) : null;
+          const parsed = directRows === null ? extractJson<{ questions?: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>>; answerKeys?: Array<Record<string, unknown>> }>(ai?.text ?? "", {}) : directRows;
+          const rawItems = Array.isArray(parsed) ? parsed : Array.isArray((parsed as Record<string, unknown>).questions) ? (parsed as { questions: Array<Record<string, unknown>> }).questions : Array.isArray((parsed as Record<string, unknown>).items) ? (parsed as { items: Array<Record<string, unknown>> }).items : [];
+          const normalized = directRows === null ? rawItems.map((item) => normalizeItem(item, object.id, Number(item.sourcePage ?? 0) || undefined)).filter((item): item is DraftItem => Boolean(item)).slice(0, 1000) : normalizeQuestionRows(rawItems, { sourceLabel: payload.sourceLabel, bankCategory: payload.bankCategory }).previews.map((item) => ({ ...item, metadata: { ...item.metadata, sourceObjectId: object.id }, status: item.status === "ERROR" ? "NEEDS_REVIEW" : item.status === "WARNING" ? "NEEDS_REVIEW" : "READY" }));
+          const preview = normalized as DraftItem[];
+          const answerKeys = Array.isArray((parsed as Record<string, unknown>).answerKeys) ? ((parsed as { answerKeys: Array<Record<string, unknown>> }).answerKeys).slice(0, 1000) : [];
           const job = (await db.select().from(questionImportJobs).where(eq(questionImportJobs.id, payload.jobId)).limit(1))[0];
           if (job) {
             const existingKeys = new Set(job.preview.map((item) => `${item.subject}|${item.stem}|${Array.isArray(item.answer) ? item.answer.join("|") : ""}`));

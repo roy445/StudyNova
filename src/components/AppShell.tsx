@@ -675,7 +675,19 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
             else toast.push("info", androidDevice ? "請在 Chrome 選單點「安裝應用程式」；若出現警告，點「了解詳細」確認網址後再按「仍要安裝」。" : "請使用瀏覽器選單的「加入主畫面／安裝應用程式」");
           }}>安裝到主畫面</Button>
           <Button full variant="ghost" onClick={async () => {
-            if ("Notification" in window) { const permission = await Notification.requestPermission(); toast.push(permission === "granted" ? "success" : "info", permission === "granted" ? "通知已開啟" : "請在瀏覽器設定允許通知"); }
+            if (!("Notification" in window) || !("serviceWorker" in navigator)) return toast.push("info", "此瀏覽器不支援 PWA 推播，請改用最新版 Chrome 或 Safari");
+            const permission = await Notification.requestPermission();
+            if (permission !== "granted") return toast.push("info", "請在瀏覽器設定允許通知");
+            try {
+              const config = await apiGet<{ configured: boolean; publicKey: string }>("/push/config");
+              if (!config.configured || !config.publicKey) return toast.push("error", "管理員尚未設定 VAPID 推播金鑰");
+              const registration = await navigator.serviceWorker.ready;
+              const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: config.publicKey });
+              const json = subscription.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+              if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error("瀏覽器沒有回傳完整推播訂閱資料");
+              await apiPost("/push/subscribe", { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } });
+              toast.push("success", "PWA 推播已啟用；新的錯誤回報會立即通知管理員");
+            } catch (error) { toast.push("error", errorMessage(error)); }
           }}>開啟通知</Button>
           <div className="grid gap-2 text-xs text-muted sm:grid-cols-2">
             <div className="glass-soft p-3"><p className="font-semibold text-white">iPhone／iPad</p><p className="mt-1">使用 Safari 開啟網站 → 點底部分享按鈕 → 選「加入主畫面」→ 按「加入」。請先在 iOS 設定 → 通知 → Safari 開啟通知。</p></div>
