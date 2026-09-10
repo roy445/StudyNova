@@ -11,13 +11,18 @@ export function pushConfigured(): boolean {
 
 function ensureVapid() {
   if (vapidReady || !pushConfigured()) return pushConfigured();
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:admin@studynova.ai",
-    process.env.VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!,
-  );
-  vapidReady = true;
-  return true;
+  try {
+    webpush.setVapidDetails(
+      (process.env.VAPID_SUBJECT || "mailto:admin@studynova.ai").trim(),
+      process.env.VAPID_PUBLIC_KEY!.trim(),
+      process.env.VAPID_PRIVATE_KEY!.trim(),
+    );
+    vapidReady = true;
+    return true;
+  } catch (error) {
+    console.error("[push] VAPID configuration invalid", error);
+    return false;
+  }
 }
 
 export type NotifyInput = {
@@ -68,6 +73,7 @@ export async function sendPush(userId: string, payload: { title: string; body: s
       sent += 1;
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
+      console.error("[push] delivery failed", { userId, subscriptionId: sub.id, status, error: err });
       if (status === 404 || status === 410) await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
     }
   }

@@ -16,6 +16,13 @@ export type ShellUser = {
   isPro: boolean;
 };
 
+function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0)).buffer as ArrayBuffer;
+}
+
 const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
@@ -682,7 +689,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
               const config = await apiGet<{ configured: boolean; publicKey: string }>("/push/config");
               if (!config.configured || !config.publicKey) return toast.push("error", "管理員尚未設定 VAPID 推播金鑰");
               const registration = await navigator.serviceWorker.ready;
-              const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: config.publicKey });
+              const existing = await registration.pushManager.getSubscription();
+              const subscription = existing ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyToUint8Array(config.publicKey) });
               const json = subscription.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
               if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error("瀏覽器沒有回傳完整推播訂閱資料");
               await apiPost("/push/subscribe", { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } });

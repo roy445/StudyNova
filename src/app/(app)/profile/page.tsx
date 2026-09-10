@@ -54,7 +54,8 @@ function ProfileInner() {
       const reg = await navigator.serviceWorker.ready;
       const perm = await Notification.requestPermission();
       if (perm !== "granted") return toast.push("error", "你拒絕了通知權限");
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: push.data.publicKey });
+      const existing = await reg.pushManager.getSubscription();
+      const sub = existing ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyToUint8Array(push.data.publicKey) });
       const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
       await apiPost("/push/subscribe", { endpoint: json.endpoint, keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth } });
       toast.push("success", "已開啟推播通知");
@@ -596,6 +597,13 @@ function ProfileInner() {
       )}
     </div>
   );
+}
+
+function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0)).buffer as ArrayBuffer;
 }
 
 export default function ProfilePage() {

@@ -867,10 +867,47 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ prompt: z.string().max(4000).default(""), subject: z.string().min(1).max(40), educationLevel: z.string().max(40).default(""), grade: z.string().max(40).default(""), chapter: z.string().max(120).default(""), topic: z.string().max(120).default(""), types: z.array(z.string().max(40)).min(1).max(8).default(["single"]), count: z.number().int().min(1).max(100).default(10), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).default("normal"), referenceText: z.string().max(30000).default(""), requireExplanation: z.boolean().default(true) }));
       const instruction = `請產生 ${body.count} 題${body.subject}題目。教育階段：${body.educationLevel}；年級：${body.grade}；章節：${body.chapter}；主題：${body.topic}；題型可使用：${body.types.join(",")}；難度：${body.difficulty}。${body.prompt}\n${body.referenceText ? `只能根據以下參考資料，不要捏造：\n${body.referenceText}` : ""}`;
       const result = await runAiJson<unknown[]>({ feature: "admin_question_generation", userId: admin.userId, system: "你是 StudyNova 題庫出題器。只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。答案必須可由題目與資料支持；不要輸出 Markdown。", parts: [{ kind: "text", text: instruction }], maxOutputTokens: Math.min(12000, 900 * body.count) }, []);
-      const normalized = normalizeQuestionRows(result.data, { subject: body.subject, difficulty: body.difficulty, level: "junior", sourceLabel: "AI 生成草稿", bankCategory: "AI 生成待審核" });
+      const level = body.educationLevel.toLowerCase().includes("senior") || body.educationLevel.includes("高中") ? "senior" : "junior";
+      const normalized = normalizeQuestionRows(result.data, { subject: body.subject, difficulty: body.difficulty, level, sourceLabel: "AI 生成草稿", bankCategory: "AI 生成待審核" });
       const previews = normalized.previews.map((item) => ({ ...item, status: item.status === "READY" && body.requireExplanation && !item.explanation ? "WARNING" : item.status, sourceType: "ai", reviewStatus: "draft" }));
       await adminLog({ actorId: admin.userId, action: "questions.generate", targetType: "question_draft", targetId: "preview", after: { subject: body.subject, count: body.count, generated: previews.length, errors: previews.filter((item) => item.status === "ERROR").length }, ip: ctx.ip });
       return { drafts: previews, summary: { requested: body.count, generated: previews.length, ready: previews.filter((item) => item.status === "READY").length, warnings: previews.filter((item) => item.status === "WARNING").length, errors: previews.filter((item) => item.status === "ERROR").length } };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/questions/generate-file",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const form = await ctx.formData();
+      const file = form.get("file");
+      if (!(file instanceof File) || !file.size) throw badRequest("請選擇要分析的檔案");
+      if (file.size > 18 * 1024 * 1024) throw badRequest("檔案不可超過 18MB");
+      const subject = String(form.get("subject") || "").trim();
+      if (!subject) throw badRequest("請先選擇科目");
+      const count = Math.max(1, Math.min(100, Number(form.get("count") || 10)));
+      const rawDifficulty = String(form.get("difficulty") || "normal");
+      const difficulty = (["easy", "normal", "hard", "exam", "advanced"] as const).includes(rawDifficulty as "easy" | "normal" | "hard" | "exam" | "advanced") ? rawDifficulty as "easy" | "normal" | "hard" | "exam" | "advanced" : "normal";
+      const educationLevel = String(form.get("educationLevel") || "junior");
+      const level = educationLevel.toLowerCase().includes("senior") || educationLevel.includes("高中") ? "senior" : "junior";
+      const prompt = String(form.get("prompt") || "").slice(0, 4000);
+      const referenceText = String(form.get("referenceText") || "").slice(0, 30000);
+      const bytes = Buffer.from(await file.arrayBuffer());
+      const isText = file.type.startsWith("text/") || file.type === "application/json" || /\.(json|csv|txt)$/i.test(file.name);
+      const source = isText ? bytes.toString("utf8").slice(0, 30000) : "";
+      const instruction = `請根據附件完整內容產生 ${count} 題${subject}題目。難度：${difficulty}。${prompt}\n${referenceText ? `補充參考資料：\n${referenceText}` : ""}${source ? `\n文字附件內容：\n${source}` : ""}`;
+      const result = await runAiJson<unknown[]>({
+        feature: "admin_question_generation_file",
+        userId: admin.userId,
+        system: "你是 StudyNova 題庫出題器。只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。必須根據附件內容，不得捏造；答案不確定時在 explanation 標記待審核。",
+        parts: isText ? [{ kind: "text", text: instruction }] : [{ kind: "text", text: instruction }, { kind: file.type.startsWith("audio/") ? "audio" : "image", mimeType: file.type || "application/octet-stream", base64: bytes.toString("base64") }],
+        maxOutputTokens: Math.min(12000, 900 * count),
+      }, []);
+      const normalized = normalizeQuestionRows(result.data, { subject, difficulty, level, sourceLabel: file.name, bankCategory: "AI 檔案出題待審核" });
+      const drafts = normalized.previews.map((item) => ({ ...item, sourceType: "file", sourceFile: file.name, reviewStatus: "draft" }));
+      await adminLog({ actorId: admin.userId, action: "questions.generate.file", targetType: "question_draft", targetId: file.name.slice(0, 120), after: { subject, count, generated: drafts.length }, ip: ctx.ip });
+      return { drafts, summary: { requested: count, generated: drafts.length, ready: drafts.filter((item) => item.status === "READY").length, warnings: drafts.filter((item) => item.status === "WARNING").length, errors: drafts.filter((item) => item.status === "ERROR").length } };
     },
   }),
   route({
