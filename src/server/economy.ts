@@ -96,6 +96,20 @@ export async function novaBalance(userId: string): Promise<number> {
   return rows[0]?.balance ?? 0;
 }
 
+/** Admin-only adjustment: unlike normal spending, this may intentionally produce a negative balance. */
+export async function adjustNovaByAdmin(params: { userId: string; amount: number; reason: string; actorId: string; idempotencyKey: string }) {
+  if (!Number.isInteger(params.amount) || params.amount === 0) throw fail("NOVA_INVALID_AMOUNT");
+  return db.transaction(async (tx) => {
+    const existing = await tx.select({ balanceAfter: novaTransactions.balanceAfter }).from(novaTransactions).where(eq(novaTransactions.idempotencyKey, params.idempotencyKey)).limit(1);
+    if (existing[0]) return { applied: false, balance: existing[0].balanceAfter };
+    await tx.insert(novaAccounts).values({ userId: params.userId }).onConflictDoNothing();
+    const updated = await tx.update(novaAccounts).set({ balance: sql`${novaAccounts.balance} + ${params.amount}`, lifetimeEarned: sql`${novaAccounts.lifetimeEarned} + ${params.amount > 0 ? params.amount : 0}`, lifetimeSpent: sql`${novaAccounts.lifetimeSpent} + ${params.amount < 0 ? -params.amount : 0}`, updatedAt: new Date() }).where(eq(novaAccounts.userId, params.userId)).returning({ balance: novaAccounts.balance });
+    if (!updated[0]) throw new Error("找不到使用者");
+    await tx.insert(novaTransactions).values({ userId: params.userId, amount: params.amount, balanceAfter: updated[0].balance, reason: params.reason.slice(0, 200), source: "admin_adjustment", actorId: params.actorId, idempotencyKey: params.idempotencyKey });
+    return { applied: true, balance: updated[0].balance };
+  });
+}
+
 /* ----------------------------------------------------------------- XP */
 
 export async function grantXp(params: { userId: string; amount: number; reason: string; idempotencyKey: string }) {

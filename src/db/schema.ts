@@ -453,6 +453,26 @@ export const questionAnalysisJobs = pgTable(
   (t) => [index("question_analysis_question_idx").on(t.questionId, t.createdAt), index("question_analysis_status_idx").on(t.status, t.createdAt)],
 );
 
+export const questionAnalysisBatches = pgTable(
+  "question_analysis_batches",
+  {
+    id: id(),
+    requestedBy: uuid("requested_by").references(() => users.userId, { onDelete: "set null" }),
+    status: text("status").notNull().default("queued"), // queued | running | completed | partial | failed | cancelled
+    total: integer("total").notNull().default(0),
+    processed: integer("processed").notNull().default(0),
+    succeeded: integer("succeeded").notNull().default(0),
+    failed: integer("failed").notNull().default(0),
+    qualityFailed: integer("quality_failed").notNull().default(0),
+    questionIds: jsonb("question_ids").$type<string[]>().notNull().default([]),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [index("question_analysis_batch_status_idx").on(t.status, t.createdAt), index("question_analysis_batch_user_idx").on(t.requestedBy, t.createdAt)],
+);
+
 export const essayGradingJobs = pgTable(
   "essay_grading_jobs",
   {

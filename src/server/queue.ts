@@ -12,11 +12,15 @@ import {
   focusSessions,
   notifications,
   userSettings,
+  questionAnalysisBatches,
+  questionAnalysisJobs,
+  questions,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
 import { sendAccountEmail, systemAnnouncementEmailTemplate } from "./email";
 import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core";
+import { analyzeQuestionWithAi } from "./question-analysis";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -31,7 +35,9 @@ export type JobName =
   | "compression_process"
   | "compression_batch"
   | "announcement_publish"
-  | "activity_promote";
+  | "activity_promote"
+  | "question_analysis_batch";
+
 
 export type JobPayload = Record<string, unknown>;
 
@@ -263,6 +269,40 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
       if (created) sent += 1;
     }
     return `已推播活動 ${activity.title}，通知 ${sent} 位使用者`;
+  },
+
+  async question_analysis_batch(payload) {
+    const batchId = typeof payload.batchId === "string" ? payload.batchId : "";
+    if (!batchId) throw new Error("缺少批次分析 ID");
+    const batch = (await db.select().from(questionAnalysisBatches).where(eq(questionAnalysisBatches.id, batchId)).limit(1))[0];
+    if (!batch) throw new Error("找不到批次分析");
+    if (["completed", "partial", "cancelled"].includes(batch.status)) return `批次 ${batchId} 已完成`;
+    await db.update(questionAnalysisBatches).set({ status: "running", updatedAt: new Date() }).where(eq(questionAnalysisBatches.id, batchId));
+    let processed = batch.processed;
+    let succeeded = batch.succeeded;
+    let failed = batch.failed;
+    let qualityFailed = batch.qualityFailed;
+    for (const questionId of batch.questionIds.slice(batch.processed)) {
+      const current = (await db.select({ status: questionAnalysisBatches.status }).from(questionAnalysisBatches).where(eq(questionAnalysisBatches.id, batchId)).limit(1))[0];
+      if (current?.status === "cancelled") break;
+      const question = (await db.select().from(questions).where(eq(questions.id, questionId)).limit(1))[0];
+      try {
+        if (!question) throw new Error("題目不存在");
+        const existing = (await db.insert(questionAnalysisJobs).values({ questionId, requestedBy: batch.requestedBy, status: "analyzing", attempts: 1 }).returning())[0];
+        const analysis = await analyzeQuestionWithAi(question, batch.requestedBy ?? "system");
+        await db.update(questionAnalysisJobs).set({ status: analysis.status, result: analysis.result, quality: analysis.quality, updatedAt: new Date() }).where(eq(questionAnalysisJobs.id, existing.id));
+        succeeded += 1;
+        if (!analysis.quality.passed) qualityFailed += 1;
+      } catch (error) {
+        failed += 1;
+        console.error("[question-analysis-batch] item failed", { batchId, questionId, error });
+      }
+      processed += 1;
+      await db.update(questionAnalysisBatches).set({ processed, succeeded, failed, qualityFailed, updatedAt: new Date() }).where(eq(questionAnalysisBatches.id, batchId));
+    }
+    const finalStatus = processed >= batch.total ? (failed ? "partial" : "completed") : "cancelled";
+    await db.update(questionAnalysisBatches).set({ status: finalStatus, processed, succeeded, failed, qualityFailed, completedAt: new Date(), updatedAt: new Date() }).where(eq(questionAnalysisBatches.id, batchId));
+    return `批次分析完成：${succeeded} 成功、${qualityFailed} 品質待審核、${failed} 失敗`;
   },
 };
 

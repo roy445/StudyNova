@@ -27,6 +27,7 @@ import {
   questionVersions,
   questionImportJobs,
   questionAnalysisJobs,
+  questionAnalysisBatches,
   gradeRecords,
   weeklyExamResults,
   weeklyExamWeeks,
@@ -46,7 +47,7 @@ import {
 import { normalizeQuestionRows } from "../question-import";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
-import { adminLog, grantMembership, grantNova, grantXp } from "../economy";
+import { adminLog, adjustNovaByAdmin, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { queue } from "../queue";
 import { providerMetrics, recentAiFailures, aiConfigured, runAiJson } from "../ai";
@@ -69,6 +70,34 @@ async function recordGeneratedLink(values: typeof linkGenerationLogs.$inferInser
   } catch (error) {
     console.error("[support] link log unavailable", error);
   }
+}
+
+const EXPERT_SETTINGS_SCHEMA = z.object({
+  sourceStrictness: z.enum(["strict", "guided", "creative"]).default("strict"),
+  requireAnswerVerification: z.boolean().default(true),
+  requireExplanation: z.boolean().default(true),
+  avoidDuplicates: z.boolean().default(true),
+  avoidSensitiveContent: z.boolean().default(true),
+  bloomLevel: z.enum(["remember", "understand", "apply", "analyze", "evaluate", "create"]).default("understand"),
+  cognitiveSkills: z.array(z.enum(["concept", "application", "reasoning", "calculation", "reading", "comparison"])).min(1).max(6).default(["concept", "application"]),
+  distractorStrategy: z.enum(["plausible", "misconception", "mixed", "none"]).default("plausible"),
+  scenarioStyle: z.enum(["direct", "balanced", "real_world", "exam"]).default("balanced"),
+  language: z.enum(["zh-TW", "en", "bilingual"]).default("zh-TW"),
+  temperature: z.number().min(0).max(0.8).default(0.2),
+  qualityThreshold: z.number().int().min(50).max(100).default(80),
+  maxRetries: z.number().int().min(0).max(3).default(1),
+  outputFormat: z.enum(["structured", "compact"]).default("structured"),
+  referencePriority: z.enum(["reference_only", "reference_first", "knowledge_allowed"]).default("reference_only"),
+});
+
+function expertSettingsInstructions(settings: z.infer<typeof EXPERT_SETTINGS_SCHEMA>) {
+  return `\n【AI Question Studio Expert Settings】\n資料嚴格度：${settings.sourceStrictness}；答案驗證：${settings.requireAnswerVerification ? "必須" : "可選"}；解析：${settings.requireExplanation ? "必須" : "可選"}；避免重複：${settings.avoidDuplicates ? "是" : "否"}；避免敏感內容：${settings.avoidSensitiveContent ? "是" : "否"}；Bloom 層級：${settings.bloomLevel}；認知技能：${settings.cognitiveSkills.join(", ")}；干擾選項：${settings.distractorStrategy}；情境：${settings.scenarioStyle}；語言：${settings.language}；品質門檻：${settings.qualityThreshold}；輸出：${settings.outputFormat}；參考資料優先：${settings.referencePriority}。${settings.requireAnswerVerification ? "每題先獨立驗證答案，不確定就標記 NEEDS_REVIEW，不得猜測。" : "答案仍須與提供資料一致。"}${settings.avoidDuplicates ? "不要產生與參考資料或同批題目高度重複的題目。" : ""}`;
+}
+
+async function loadExpertSettings(input?: unknown) {
+  if (input) return EXPERT_SETTINGS_SCHEMA.parse(input);
+  const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "ai_question_studio_expert_settings")).limit(1))[0];
+  return EXPERT_SETTINGS_SCHEMA.parse(row?.value ?? {});
 }
 
 export const routes: RouteDef[] = [
@@ -335,11 +364,10 @@ export const routes: RouteDef[] = [
             }
             case "gift_nova": {
               if (!body.amount) throw fail("ADMIN_MISSING_PARAM", { message: "請輸入 Nova 數量" });
-              await grantNova({
+              await adjustNovaByAdmin({
                 userId,
                 amount: body.amount,
                 reason: body.reason,
-                source: "admin",
                 actorId: admin.userId,
                 idempotencyKey: `adminnova:${admin.userId}:${userId}:${Date.now()}`,
               });
@@ -382,6 +410,21 @@ export const routes: RouteDef[] = [
         }
       }
       return { results };
+    },
+  }),
+
+  route({
+    method: "PATCH",
+    path: "/admin/users/:id/nova",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ amount: z.number().int().min(-1000000).max(1000000).refine((value) => value !== 0, "Nova 調整不可為 0"), reason: z.string().min(1).max(300) }));
+      const target = (await db.select({ userId: users.userId }).from(users).where(eq(users.userId, ctx.params.id)).limit(1))[0];
+      if (!target) throw notFound("找不到使用者");
+      const result = await adjustNovaByAdmin({ userId: target.userId, amount: body.amount, reason: body.reason, actorId: admin.userId, idempotencyKey: `adminnova-single:${admin.userId}:${target.userId}:${Date.now()}` });
+      await adminLog({ actorId: admin.userId, action: "nova.admin_adjust", targetType: "user", targetId: target.userId, reason: body.reason, after: { amount: body.amount, balance: result.balance }, ip: ctx.ip });
+      return { ...result, userId: target.userId };
     },
   }),
 
@@ -909,9 +952,11 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ prompt: z.string().max(4000).default(""), subject: z.string().min(1).max(40), educationLevel: z.string().max(40).default(""), grade: z.string().max(40).default(""), chapter: z.string().max(120).default(""), topic: z.string().max(120).default(""), types: z.array(z.string().max(40)).min(1).max(8).default(["single"]), count: z.number().int().min(1).max(100).default(10), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).default("normal"), referenceText: z.string().max(30000).default(""), requireExplanation: z.boolean().default(true) }));
-      const instruction = `請產生 ${body.count} 題${body.subject}題目。教育階段：${body.educationLevel}；年級：${body.grade}；章節：${body.chapter}；主題：${body.topic}；題型可使用：${body.types.join(",")}；難度：${body.difficulty}。${body.prompt}\n${body.referenceText ? `只能根據以下參考資料，不要捏造：\n${body.referenceText}` : ""}`;
-      const result = await runAiJson<unknown[]>({ feature: "admin_question_generation", userId: admin.userId, system: "你是 StudyNova 題庫出題器。只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。答案必須可由題目與資料支持；不要輸出 Markdown。", parts: [{ kind: "text", text: instruction }], maxOutputTokens: Math.min(12000, 900 * body.count) }, []);
+      const body = await ctx.json(z.object({ prompt: z.string().max(4000).default(""), subject: z.string().min(1).max(40), educationLevel: z.string().max(40).default(""), grade: z.string().max(40).default(""), chapter: z.string().max(120).default(""), topic: z.string().max(120).default(""), types: z.array(z.string().max(40)).min(1).max(8).default(["single"]), count: z.number().int().min(1).max(100).default(10), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).default("normal"), referenceText: z.string().max(30000).default(""), requireExplanation: z.boolean().default(true), expertSettings: EXPERT_SETTINGS_SCHEMA.optional() }));
+      const expert = await loadExpertSettings(body.expertSettings);
+      const instruction = `請產生 ${body.count} 題${body.subject}題目。教育階段：${body.educationLevel}；年級：${body.grade}；章節：${body.chapter}；主題：${body.topic}；題型可使用：${body.types.join(",")}；難度：${body.difficulty}。${expertSettingsInstructions(expert)}\n${body.prompt}\n${body.referenceText ? `只能根據以下參考資料，不要捏造：\n${body.referenceText}` : ""}`;
+      const policy = await getAiPolicy("question_generation");
+      const result = await runAiJson<unknown[]>({ feature: "admin_question_generation", userId: admin.userId, system: `你是 StudyNova 題庫出題器。${policyInstructions(policy)}\n只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。答案必須可由題目與資料支持；不要輸出 Markdown。`, parts: [{ kind: "text", text: instruction }], maxOutputTokens: Math.min(12000, 900 * body.count), temperature: expert.temperature }, []);
       const level = body.educationLevel.toLowerCase().includes("senior") || body.educationLevel.includes("高中") ? "senior" : "junior";
       const normalized = normalizeQuestionRows(result.data, { subject: body.subject, difficulty: body.difficulty, level, sourceLabel: "AI 生成草稿", bankCategory: "AI 生成待審核" });
       const previews = normalized.previews.map((item) => ({ ...item, status: item.status === "READY" && body.requireExplanation && !item.explanation ? "WARNING" : item.status, sourceType: "ai", reviewStatus: "draft" }));
@@ -937,17 +982,21 @@ export const routes: RouteDef[] = [
       const educationLevel = String(form.get("educationLevel") || "junior");
       const level = educationLevel.toLowerCase().includes("senior") || educationLevel.includes("高中") ? "senior" : "junior";
       const prompt = String(form.get("prompt") || "").slice(0, 4000);
+      const expertRaw = String(form.get("expertSettings") || "{}");
+      const expert = await loadExpertSettings(expertRaw === "{}" ? undefined : JSON.parse(expertRaw));
       const referenceText = String(form.get("referenceText") || "").slice(0, 30000);
       const bytes = Buffer.from(await file.arrayBuffer());
       const isText = file.type.startsWith("text/") || file.type === "application/json" || /\.(json|csv|txt)$/i.test(file.name);
       const source = isText ? bytes.toString("utf8").slice(0, 30000) : "";
-      const instruction = `請根據附件完整內容產生 ${count} 題${subject}題目。難度：${difficulty}。${prompt}\n${referenceText ? `補充參考資料：\n${referenceText}` : ""}${source ? `\n文字附件內容：\n${source}` : ""}`;
+      const instruction = `請根據附件完整內容產生 ${count} 題${subject}題目。難度：${difficulty}。${expertSettingsInstructions(expert)}\n${prompt}\n${referenceText ? `補充參考資料：\n${referenceText}` : ""}${source ? `\n文字附件內容：\n${source}` : ""}`;
+      const policy = await getAiPolicy("question_generation");
       const result = await runAiJson<unknown[]>({
         feature: "admin_question_generation_file",
         userId: admin.userId,
-        system: "你是 StudyNova 題庫出題器。只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。必須根據附件內容，不得捏造；答案不確定時在 explanation 標記待審核。",
+        system: `你是 StudyNova 題庫出題器。${policyInstructions(policy)}\n只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。必須根據附件內容，不得捏造；答案不確定時在 explanation 標記待審核。`,
         parts: isText ? [{ kind: "text", text: instruction }] : [{ kind: "text", text: instruction }, { kind: file.type.startsWith("audio/") ? "audio" : "image", mimeType: file.type || "application/octet-stream", base64: bytes.toString("base64") }],
         maxOutputTokens: Math.min(12000, 900 * count),
+        temperature: expert.temperature,
       }, []);
       const normalized = normalizeQuestionRows(result.data, { subject, difficulty, level, sourceLabel: file.name, bankCategory: "AI 檔案出題待審核" });
       const drafts = normalized.previews.map((item) => ({ ...item, sourceType: "file", sourceFile: file.name, reviewStatus: "draft" }));
@@ -985,6 +1034,44 @@ export const routes: RouteDef[] = [
     path: "/admin/questions/:id/analysis",
     auth: "admin",
     handler: async (ctx) => ({ analyses: await db.select().from(questionAnalysisJobs).where(eq(questionAnalysisJobs.questionId, ctx.params.id)).orderBy(desc(questionAnalysisJobs.createdAt)).limit(20) }),
+  }),
+  route({
+    method: "POST",
+    path: "/admin/questions/analyze-batch",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ questionIds: z.array(z.string().uuid()).min(1).max(500), expertSettings: z.record(z.string(), z.unknown()).optional() }));
+      const ids = (await db.select({ id: questions.id }).from(questions).where(inArray(questions.id, body.questionIds))).map((row) => row.id);
+      if (!ids.length) throw notFound("找不到可分析的題目");
+      const batch = (await db.insert(questionAnalysisBatches).values({ requestedBy: admin.userId, total: ids.length, questionIds: ids, status: "queued" }).returning())[0];
+      const queued = await queue().enqueue({ name: "question_analysis_batch", payload: { batchId: batch.id, expertSettings: body.expertSettings ?? {} }, uniqueKey: `question-analysis-batch:${batch.id}` });
+      if (!queued.queued) throw conflict("批次分析已建立，請查看進度");
+      void queue().drain(1);
+      return { batch };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/questions/analyze-batch/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const batch = (await db.select().from(questionAnalysisBatches).where(eq(questionAnalysisBatches.id, ctx.params.id)).limit(1))[0];
+      if (!batch) throw notFound("找不到批次分析");
+      return { batch, progress: batch.total ? Math.round((batch.processed / batch.total) * 100) : 0 };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/questions/analyze-batch/:id/cancel",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const batch = (await db.select().from(questionAnalysisBatches).where(eq(questionAnalysisBatches.id, ctx.params.id)).limit(1))[0];
+      if (!batch) throw notFound("找不到批次分析");
+      const updated = (await db.update(questionAnalysisBatches).set({ status: "cancelled", errorMessage: `由管理員 ${admin.userId} 取消`, updatedAt: new Date(), completedAt: new Date() }).where(and(eq(questionAnalysisBatches.id, batch.id), eq(questionAnalysisBatches.status, "running"))).returning())[0];
+      return { batch: updated ?? batch, cancelled: Boolean(updated) };
+    },
   }),
   route({
     method: "GET",

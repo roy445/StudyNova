@@ -1,4 +1,6 @@
 import type { questions } from "@/db/schema";
+import { runAiJson } from "./ai";
+import { getAiPolicy, policyInstructions } from "./ai-policy";
 
 export type QuestionRow = typeof questions.$inferSelect;
 
@@ -32,4 +34,19 @@ export function qualityGate(result: Partial<AnalysisResult>, question: QuestionR
   };
   const failed = Object.entries(checks).filter(([, passed]) => !passed).map(([name]) => name);
   return { passed: failed.length === 0, checks, failed, score: Math.round((Object.values(checks).filter(Boolean).length / Object.values(checks).length) * 100) };
+}
+
+export async function analyzeQuestionWithAi(question: QuestionRow, userId: string) {
+  const policy = await getAiPolicy("question_analysis");
+  const response = await runAiJson<Record<string, unknown>>({
+    feature: "question_analysis",
+    userId,
+    system: `你是 StudyNova 專業題目分析器。${policyInstructions(policy)}\n答案衝突時不要覆蓋題庫答案，請在 answer 欄標記 ANSWER_CONFLICT 並說明推導答案與題庫答案。`,
+    parts: [{ kind: "text", text: analysisPrompt(question) }],
+    maxOutputTokens: 2400,
+    temperature: 0.15,
+  }, {});
+  const quality = qualityGate(response.data, question);
+  const answerConflict = Boolean(response.data.answer && question.answer.length && !question.answer.some((answer) => String(response.data.answer).includes(answer)));
+  return { result: response.data, quality: { ...quality, answerConflict, answerConflictStatus: answerConflict ? "ANSWER_CONFLICT" : "MATCHED" }, status: quality.passed ? "completed" : "quality_failed" as const };
 }

@@ -60,7 +60,7 @@ type CompressionSettings = { enabled: boolean; maxOriginalBytes: number; maxBatc
 const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = { enabled: true, maxOriginalBytes: 100 * 1024 * 1024, maxBatchFiles: 20, maxProcessingSeconds: 120, maxPdfPages: 100, maxImagePixels: 144000000, minImageQuality: 35, maxIterations: 8, allowPdf: true, allowImages: true, allowBatch: true, proOnly: false, dailyFree: 10, dailyPro: 100 };
 
 const ACTIONS = [
-  { key: "gift_nova", label: "贈送 Nova", needAmount: true },
+  { key: "gift_nova", label: "調整 Nova（可負數）", needAmount: true },
   { key: "gift_xp", label: "贈送 XP", needAmount: true },
   { key: "grant_pro", label: "授予 Nova Pro", needDays: true },
   { key: "extend_pro", label: "延長 Nova Pro", needDays: true },
@@ -354,7 +354,7 @@ export default function AdminOverviewPage() {
             </Select>
           </Field>
           {currentAction?.needAmount && (
-            <Field label="數量">
+            <Field label={form.action === "gift_nova" ? "調整數量（可輸入負數，例如 -100）" : "數量"}>
               <Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
             </Field>
           )}
