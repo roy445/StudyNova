@@ -59,6 +59,22 @@ function uniqueExamples<T extends { english: string; chinese?: string }>(items: 
   }).slice(0, max);
 }
 
+const FORBIDDEN_EXAMPLE_PATTERNS = [/in the passage/i, /the word\s+["“']/i, /the writer/i, /the author/i, /this sentence shows/i, /the meaning of/i, /helps explain the writer/i, /is used to describe/i];
+
+function exampleQuality(examples: Array<{ english: string; chinese: string }>, word: string) {
+  const seen = new Set<string>();
+  return examples.filter((item) => {
+    const sentence = item.english.trim();
+    const key = sentence.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const hasTarget = new RegExp(`\\b${word.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(sentence);
+    const naturalLength = sentence.split(/\s+/).length >= 5 && sentence.split(/\s+/).length <= 35;
+    const forbidden = FORBIDDEN_EXAMPLE_PATTERNS.some((pattern) => pattern.test(sentence));
+    if (!sentence || !item.chinese.trim() || !hasTarget || !naturalLength || forbidden || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 6);
+}
+
 async function safeRows<T>(load: () => Promise<T[]>): Promise<T[]> {
   try {
     return await load();
@@ -91,6 +107,26 @@ async function getWord(wordId: string) {
     if (!legacy) throw notFound("找不到單字");
     return legacy;
   }
+}
+
+async function generateNaturalExamples(word: typeof dailyWords.$inferSelect, userId: string) {
+  const context = `單字：${word.word}\n詞性：${word.partOfSpeech}\n中文義項：${word.meaning}\n其他義項：${JSON.stringify(word.meanings)}\n既有片語：${JSON.stringify(word.phrases)}`;
+  const instruction = `請為這個英文單字產生 5 句真正自然、可朗讀、可直接學習用法的英文例句，並提供每句完整繁體中文翻譯。把單字放在真實語境中使用，不要解釋單字本身。情境請在日常生活、朋友對話、家庭、旅行、科技、新聞、運動、工作、學校等之間自然分散；句型可包含肯定、否定、問句、對話、條件句與轉折，但不要刻意湊形式。每句都必須符合指定詞性、常見搭配與其中一個中文義項。禁止以下句型或意思：In the passage...、The word X...、The writer...、The author...、This sentence shows...、The meaning of X...、helps explain the writer's main idea，以及任何「正在介紹這個單字」的句子。不要把單字塞進不自然的句子，也不要五句只替換單字。只回傳 JSON：{"examples":[{"english":"自然英文句子","chinese":"完整繁體中文翻譯","level":"基礎|會考|進階"}]}\n${context}`;
+  let last: Array<{ english: string; chinese: string; level: string }> = [];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await runAiJson<{ examples: Array<{ english: string; chinese: string; level: string }> }>({
+      feature: "word_example_generation",
+      userId,
+      system: "你是台灣國高中英文老師與專業英文編輯。你的例句必須像真人在文章、對話或生活中使用英文，不得使用教學解釋模板。輸出繁體中文翻譯。",
+      parts: [{ kind: "text", text: `${instruction}${attempt ? "\n上一版未通過品質檢查，請完全改寫，不要保留相似句型。" : ""}` }],
+      maxOutputTokens: 2200,
+      temperature: 0.75,
+    }, { examples: [] });
+    last = result.data.examples ?? [];
+    const accepted = exampleQuality(last, word.word);
+    if (accepted.length >= 5) return accepted.slice(0, 5);
+  }
+  return exampleQuality(last, word.word).slice(0, 5);
 }
 
 export const routes: RouteDef[] = [
@@ -160,7 +196,7 @@ export const routes: RouteDef[] = [
         {
           feature: "word_detail",
           userId: user.userId,
-          system: "你是 StudyNova 的台灣國高中英文單字老師，也是會陪學生聊天的學習朋友。只提供可驗證、符合該單字詞義與詞性的教學內容。不要硬拆不可靠的字根；沒有可靠資料就輸出空字串。不要把 AI 內容假裝成教材來源。解釋可以自然口語一點，像『這個字在這裡是……』『小提醒：……』，適量加入 1 到 2 個自然符號或表情（例如 💡、✨、🙂），但不要讓表情取代內容，也不要輸出貼圖網址、圖片 Markdown 或虛構貼圖代碼。例句必須是實際生活或校園情境，不要寫『這個字可以用在……』這種沒有示範用法的句子。回傳 JSON，欄位：explanations:string[]、synonyms:{word,meaning,partOfSpeech,difference,usage}[]、examples:{english,chinese,level}[]、phrases:{phrase,meaning}[]、forms:{form,partOfSpeech,meaning}[]、mistakes:{wrong,correct,reason}[]、memoryTip:string、etymology:string。例句 2-3 句，難度可用 基礎／會考／進階。",
+          system: "你是 StudyNova 的台灣國高中英文老師與專業英文編輯。只提供可驗證、符合單字詞義與詞性的內容。例句不是解釋單字，而是像真人在文章、對話或生活中真正使用這個字：必須有具體情境、自然搭配與完整語意。嚴格禁止 In the passage...、The word X...、The writer...、The author...、This sentence shows...、The meaning of X...、helps explain the writer's main idea，以及任何只是在說明『這個字如何使用』的模板句。不要五句只替換單字；請讓情境、主詞、句型與語氣自然變化。回傳 JSON，欄位：explanations:string[]、synonyms:{word,meaning,partOfSpeech,difference,usage}[]、examples:{english,chinese,level}[]、phrases:{phrase,meaning}[]、forms:{form,partOfSpeech,meaning}[]、mistakes:{wrong,correct,reason}[]、memoryTip:string、etymology:string。每句例句都必須有完整繁體中文翻譯，且可直接朗讀。",
           parts: [{ kind: "text", text: `單字：${word.word}\n詞性：${word.partOfSpeech}\n中文：${word.meaning}\n
 英文定義：${"englishDefinition" in word ? word.englishDefinition : ""}
 \n既有例句：${word.example}\n既有片語：${JSON.stringify(word.phrases)}` }],
@@ -171,7 +207,8 @@ export const routes: RouteDef[] = [
       );
       const parsed = aiContentSchema.safeParse(data);
       if (!parsed.success) throw fail("AI_EMPTY_RESULT");
-      const content = parsed.data;
+      const naturalExamples = await generateNaturalExamples(word, user.userId);
+      const content = { ...parsed.data, examples: naturalExamples.length >= 5 ? naturalExamples : parsed.data.examples.filter((item) => exampleQuality([item], word.word).length > 0) };
       const inserted = await db.insert(wordAiContents).values({ wordId: word.id, content, model: meta.model }).onConflictDoUpdate({
         target: wordAiContents.wordId,
         set: { content, model: meta.model, updatedAt: new Date() },
