@@ -71,20 +71,25 @@ export default function AiPage() {
   const fileInput = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const activeMode = MODES.find((mode) => mode.key === (conv?.mode ?? "teacher")) ?? MODES[0];
+  const conversationLoadRef = useRef(0);
 
   useEffect(() => {
+    const requestId = ++conversationLoadRef.current;
     if (!activeId) return;
     const loadingTimer = window.setTimeout(() => setLoadingMsg(true), 0);
     apiGet<{ conversation: Conversation; messages: Message[] }>(`/ai/conversations/${activeId}`)
       .then((res) => {
+        if (requestId !== conversationLoadRef.current) return;
         setLoadingMsg(false);
         setConv(res.conversation);
         setMessages(res.messages);
       })
-      .catch((err) => setError(errorMessage(err)))
+      .catch((err) => {
+        if (requestId === conversationLoadRef.current) setError(errorMessage(err));
+      })
       .finally(() => {
         window.clearTimeout(loadingTimer);
-        setLoadingMsg(false);
+        if (requestId === conversationLoadRef.current) setLoadingMsg(false);
       });
     return () => window.clearTimeout(loadingTimer);
   }, [activeId]);

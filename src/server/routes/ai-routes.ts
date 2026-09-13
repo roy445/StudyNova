@@ -45,6 +45,11 @@ const MODES = {
 
 const CONTEXT_KEYS = ["grades", "wrong", "materials", "plan", "tasks", "settings"] as const;
 
+/** The database query is ordered newest-first; restore chronological order after limiting. */
+export function latestConversationMessages<T>(newestFirstRows: T[], limit = 16): T[] {
+  return newestFirstRows.slice(0, limit).reverse();
+}
+
 async function buildContext(userId: string, allow: string[], materialId: string | null) {
   const parts: string[] = [];
   if (allow.includes("settings")) {
@@ -249,7 +254,9 @@ export const routes: RouteDef[] = [
       await consumeFeature(user.userId, "ai_context");
 
       await db.insert(aiMessages).values({ conversationId: conv.id, role: "user", content: body.content });
-        const history = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(asc(aiMessages.createdAt)).limit(16);
+        // 先取最新 16 筆，再恢復成時間順序；不能用 asc + limit，否則長聊天室會一直把最早的舊對話送給 AI。
+        const historyRows = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(desc(aiMessages.createdAt)).limit(16);
+        const history = latestConversationMessages(historyRows);
       const context = await buildContext(user.userId, conv.allowContext, conv.contextMaterialId);
       const policy = await getAiPolicy("ai_chat");
       const attachment = body.contextId
