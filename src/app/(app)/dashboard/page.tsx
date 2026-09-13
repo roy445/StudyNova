@@ -61,6 +61,7 @@ export default function DashboardPage() {
   const radar = useApi<{ metrics: Array<{ key: string; label: string; value: number; evidence: string }>; weakest: { label: string; value: number; evidence: string } | null }>("/learning/radar");
   const alerts = useApi<{ alerts: Array<{ id: string; title: string; body: string; evidence: Record<string, unknown> }>; enabled: boolean }>("/ai/alerts");
   const patterns = useApi<{ patterns: Array<{ subject: string; reason: string; count: number; questionCount: number; evidence: string }>; enoughData: boolean }>("/learning/error-patterns");
+  const examPolicies = useApi<{ policies: Array<{ id: string; schoolName: string; educationLevel: string; grade: number; term: string; examName: string; examDate: string }> }>("/exam-date-policies");
   const [claiming, setClaiming] = useState<string | null>(null);
   const [appealExam, setAppealExam] = useState<Dashboard["upcomingExams"][number] | null>(null);
   const [appealDate, setAppealDate] = useState("");
@@ -284,6 +285,9 @@ export default function DashboardPage() {
           )}
         </Card>
 
+        <Card title="⌁ 個人段考倒數" subtitle="依你的學校、學制與年級匹配管理員設定的日期。" action={<Link href="/grades" className="text-xs underline text-muted">管理</Link>}>
+          {examPolicies.data?.policies.length ? <div className="space-y-2">{examPolicies.data.policies.map((policy) => <div key={policy.id} className="glass-soft flex items-center justify-between px-3 py-2.5"><div><p className="text-sm font-medium">{policy.examName}</p><p className="text-xs text-muted">{policy.schoolName || "學校通用"}・{policy.term}・{policy.examDate}</p></div><span className="text-xs text-[#7dd3fc]">已匹配</span></div>)}</div> : <EmptyState icon="⌁" title="尚未匹配到段考日期" hint="請確認個人資料的學校、學制與年級，或等待管理員設定。" />}
+        </Card>
         <Card title="⌁ 成績趨勢" action={<Link href="/grades" className="text-xs underline text-muted">完整分析</Link>}>
           {data.stats.length ? (
             <div className="space-y-3">

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import { db } from "@/db";
-import { users, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems, accountAppeals } from "@/db/schema";
+import { users, deletedAccounts, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems, accountAppeals } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import {
   fail,
@@ -53,6 +53,8 @@ export const routes: RouteDef[] = [
       const email = body.email.toLowerCase().trim();
       const existing = await db.select({ id: users.userId }).from(users).where(eq(users.email, email)).limit(1);
       if (existing[0]) throw fail("AUTH_EMAIL_TAKEN");
+      const deletedEmail = await db.select({ id: deletedAccounts.id }).from(deletedAccounts).where(eq(deletedAccounts.identifier, email)).limit(1);
+      if (deletedEmail[0]) throw fail("AUTH_ACCOUNT_DELETED", { message: "此 Email 對應的帳號已遭到刪除，無法重新註冊。" });
 
       const novaId = await createUniqueNovaId();
       const inserted = await db
@@ -100,6 +102,8 @@ export const routes: RouteDef[] = [
         .where(isEmail ? eq(users.email, identifier.toLowerCase()) : eq(users.novaId, identifier.toUpperCase()))
         .limit(1);
       const user = rows[0];
+      const deleted = await db.select().from(deletedAccounts).where(eq(deletedAccounts.identifier, isEmail ? identifier.toLowerCase() : identifier.toUpperCase())).limit(1);
+      if (deleted[0]) throw fail("AUTH_ACCOUNT_DELETED", { message: `此帳號已遭到刪除，原因：${deleted[0].reason}`, details: { reason: deleted[0].reason, deletedAt: deleted[0].deletedAt.toISOString() } });
       // Generic error – never disclose whether the account exists.
       const generic = fail("AUTH_INVALID_CREDENTIALS");
       if (!user) {

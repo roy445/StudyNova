@@ -410,7 +410,13 @@ export const routes: RouteDef[] = [
         result = { plan: rows[0] };
       } else if (action.type === "create_artifact") {
         const parsed = z.object({ kind: z.enum(["pdf", "handwritten_note", "mind_map"]), title: z.string().min(1).max(120), body: z.string().min(1).max(20000) }).parse(payload);
-        const artifact = await createAiArtifact({ userId: user.userId, conversationId: conv.id, messageId: msg.id, ...parsed });
+        let artifact;
+        try {
+          artifact = await createAiArtifact({ userId: user.userId, conversationId: conv.id, messageId: msg.id, ...parsed });
+        } catch (error) {
+          console.error("[ai/artifact] generation failed", error);
+          throw fail("SYS_DB_UNAVAILABLE", { message: "產物服務目前尚未完成資料庫或檔案儲存設定，請先套用最新 migration 後再試。" });
+        }
         result = { artifact, preview: artifact.preview, downloadable: await isProUser(user.userId), openUrl: artifact.objectId ? `/api/files/${artifact.objectId}` : null, studyCenterUrl: "/study?tab=visual-notes" };
       } else {
         throw fail("AI_ACTION_UNSUPPORTED");

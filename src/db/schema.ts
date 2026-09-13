@@ -41,6 +41,8 @@ export const users = pgTable(
     role: text("role").notNull().default("student"), // student | admin | owner
     status: text("status").notNull().default("active"), // active | blocked
     blockedReason: text("blocked_reason").notNull().default(""),
+    deletedReason: text("deleted_reason").notNull().default(""),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     blockedAt: timestamp("blocked_at", { withTimezone: true }),
     blockedUntil: timestamp("blocked_until", { withTimezone: true }),
     avatarSeed: text("avatar_seed").notNull().default("nova"),
@@ -59,6 +61,18 @@ export const users = pgTable(
     uniqueIndex("users_email_uq").on(t.email),
     index("users_role_idx").on(t.role),
   ],
+);
+
+export const deletedAccounts = pgTable(
+  "deleted_accounts",
+  {
+    id: id(),
+    identifierType: text("identifier_type").notNull(),
+    identifier: text("identifier").notNull(),
+    reason: text("reason").notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("deleted_accounts_identifier_uq").on(t.identifierType, t.identifier), index("deleted_accounts_deleted_idx").on(t.deletedAt)],
 );
 
 export const sessions = pgTable(
@@ -192,6 +206,24 @@ export const examDateAppeals = pgTable(
     updatedAt: updated(),
   },
   (t) => [index("exam_date_appeals_user_idx").on(t.userId, t.createdAt), index("exam_date_appeals_status_idx").on(t.status, t.createdAt)],
+);
+
+export const examDatePolicies = pgTable(
+  "exam_date_policies",
+  {
+    id: id(),
+    schoolName: text("school_name").notNull().default(""),
+    educationLevel: text("education_level").notNull(),
+    grade: integer("grade").notNull(),
+    term: text("term").notNull(),
+    examName: text("exam_name").notNull(),
+    examDate: text("exam_date").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_date_policy_uq").on(t.schoolName, t.educationLevel, t.grade, t.term), index("exam_date_policy_match_idx").on(t.schoolName, t.educationLevel, t.grade, t.enabled)],
 );
 
 /* -------------------------------------------------------------- STORAGE */

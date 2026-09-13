@@ -3,6 +3,7 @@ import { and, asc, desc, eq, ilike, or, sql, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   users,
+  deletedAccounts,
   memberships,
   novaAccounts,
   novaTransactions,
@@ -390,6 +391,7 @@ export const routes: RouteDef[] = [
             }
             case "delete_account": {
               if (before.userId === admin.userId) throw fail("ADMIN_TARGET_PROTECTED", { message: "不能刪除目前登入中的管理員帳號" });
+              await db.insert(deletedAccounts).values([{ identifierType: "email", identifier: before.email.toLowerCase(), reason: body.reason }, { identifierType: "nova_id", identifier: before.novaId.toUpperCase(), reason: body.reason }]).onConflictDoUpdate({ target: [deletedAccounts.identifierType, deletedAccounts.identifier], set: { reason: body.reason, deletedAt: new Date() } });
               await db.delete(users).where(eq(users.userId, userId));
               await adminLog({ actorId: admin.userId, action: "user.delete_account", targetType: "user", targetId: userId, reason: body.reason, before, ip: ctx.ip });
               results.push({ userId, ok: true, detail: "帳號與所屬資料已刪除" });

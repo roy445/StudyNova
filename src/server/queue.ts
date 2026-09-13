@@ -16,6 +16,7 @@ import {
   questionAnalysisJobs,
   questions,
   sessions,
+  deletedAccounts,
   aiMemory,
   aiConversations,
   aiMessages,
@@ -215,6 +216,9 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
       } else if ((current?.count ?? 0) === 1 && current?.first && now.getTime() - current.first.getTime() >= 30 * 86400000) {
         await db.update(users).set({ inactiveReminderCount: 2, inactiveSecondNotifiedAt: now, updatedAt: now }).where(eq(users.userId, row.userId));
       } else if ((current?.count ?? 0) >= 2 && current?.second && now.getTime() - current.second.getTime() >= 30 * 86400000) {
+        const reason = "帳號超過一年未使用，經兩次通知後依 StudyNova 非活躍帳號政策刪除。";
+        const account = await db.select({ email: users.email, novaId: users.novaId }).from(users).where(eq(users.userId, row.userId)).limit(1);
+        if (account[0]) await db.insert(deletedAccounts).values([{ identifierType: "email", identifier: account[0].email.toLowerCase(), reason }, { identifierType: "nova_id", identifier: account[0].novaId.toUpperCase(), reason }]).onConflictDoUpdate({ target: [deletedAccounts.identifierType, deletedAccounts.identifier], set: { reason, deletedAt: now } });
         await db.delete(users).where(eq(users.userId, row.userId));
         sent += 1;
         continue;
