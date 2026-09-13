@@ -369,6 +369,8 @@ export function WrongPanel() {
   const [active, setActive] = useState<WrongItem | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [tipLoading, setTipLoading] = useState(false);
+  const [whyLoading, setWhyLoading] = useState(false);
+  const [whyResult, setWhyResult] = useState<{ reason: string; nextStep: string; focus: string; practicePrompt: string } | null>(null);
 
   const items = useMemo(() => {
     const all = data?.items ?? [];
@@ -418,7 +420,7 @@ export function WrongPanel() {
               <span>下次：{new Date(item.nextReviewAt).toLocaleDateString("zh-TW")}</span>
             </div>
             <div className="mt-2 flex gap-1.5">
-              <Button size="sm" onClick={() => { setActive(item); setRevealed(false); }}>
+              <Button size="sm" onClick={() => { setActive(item); setRevealed(false); setWhyResult(null); }}>
                 開始複習
               </Button>
             </div>
@@ -445,6 +447,19 @@ export function WrongPanel() {
                 {active.explanation && <p className="text-muted">{active.explanation}</p>}
                 {active.aiTip && <pre className="whitespace-pre-wrap font-sans text-muted">{active.aiTip}</pre>}
                 <div className="flex flex-wrap gap-1.5 pt-1">
+                  <Button size="sm" loading={whyLoading} onClick={async () => {
+                    setWhyLoading(true);
+                    try {
+                      const res = await apiPost<{ analysis: { reason: string; nextStep: string; focus: string; practicePrompt: string } }>(`/wrong/${active.id}/why`);
+                      setWhyResult(res.analysis);
+                    } catch (err) { toast.push("error", errorMessage(err)); } finally { setWhyLoading(false); }
+                  }}>🤔 我為什麼會錯？</Button>
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    try {
+                      await apiPost(`/wrong/${active.id}/practice`);
+                      toast.push("success", "已建立一題針對相同錯誤的練習題，請到測驗查看");
+                    } catch (err) { toast.push("error", errorMessage(err)); }
+                  }}>再練一題</Button>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -465,6 +480,7 @@ export function WrongPanel() {
                     AI 記憶法／更簡單解法
                   </Button>
                 </div>
+                {whyResult && <div className="mt-2 rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 p-3 text-xs leading-5"><p className="font-semibold text-[#7dd3fc]">可能的錯誤原因</p><p className="mt-1">{whyResult.reason}</p><p className="mt-2 font-semibold text-[#7dd3fc]">下次注意</p><p className="mt-1">{whyResult.nextStep}</p><p className="mt-2 text-muted">針對重點：{whyResult.focus}。{whyResult.practicePrompt}</p><p className="mt-2 text-[10px] text-muted">分析依據：本題題幹、正確答案、最近一次作答與累積錯誤次數。</p></div>}
               </div>
             ) : (
               <Button variant="ghost" onClick={() => setRevealed(true)}>

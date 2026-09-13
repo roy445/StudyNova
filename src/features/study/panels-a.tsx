@@ -22,6 +22,11 @@ export function MaterialsPanel() {
   const [detail, setDetail] = useState<Material | null>(null);
   const [analysis, setAnalysis] = useState<Record<string, unknown> | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [packageMaterial, setPackageMaterial] = useState<Material | null>(null);
+  const [packageSteps, setPackageSteps] = useState<string[]>(["notes", "key_points", "vocabulary", "quiz", "flashcards", "review"]);
+  const [learningPackage, setLearningPackage] = useState<{ id: string; status: string; progress: number; currentStep: string; errors: Record<string, string>; selectedSteps: string[] } | null>(null);
+  const PACKAGE_STEPS = [{ key: "notes", label: "建立筆記" }, { key: "key_points", label: "建立重點" }, { key: "vocabulary", label: "建立單字卡" }, { key: "quiz", label: "建立測驗" }, { key: "flashcards", label: "建立記憶卡" }, { key: "review", label: "建立複習內容" }];
   const [readingProgress, setReadingProgress] = useState<Record<string, number>>(() => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("studynova-reading-progress") ?? "{}"); } catch { return {}; }
@@ -88,6 +93,31 @@ export function MaterialsPanel() {
     }
   }
 
+  async function startLearningPackage() {
+    if (!packageMaterial || !packageSteps.length) return;
+    try {
+      const created = await apiPost<{ package: NonNullable<typeof learningPackage> }>("/learning-packages", { materialId: packageMaterial.id, steps: packageSteps });
+      let current = created.package;
+      setLearningPackage(current);
+      for (const step of packageSteps) {
+        const result = await apiPost<{ package: NonNullable<typeof learningPackage> }>(`/learning-packages/${current.id}/run`, { step });
+        current = result.package;
+        setLearningPackage(current);
+        if (current.errors?.[step]) break;
+      }
+      toast.push("success", current.status === "completed" ? "學習包建立完成，內容已同步到筆記、單字與題庫" : "學習包部分完成，可重試失敗步驟");
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+
+  async function retryPackageStep(step: string) {
+    if (!learningPackage) return;
+    try {
+      const result = await apiPost<{ package: NonNullable<typeof learningPackage> }>(`/learning-packages/${learningPackage.id}/run`, { step });
+      setLearningPackage(result.package);
+      toast.push("success", `${PACKAGE_STEPS.find((item) => item.key === step)?.label ?? step} 已重試`);
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+
   return (
     <Card
       title="📚 我的教材"
@@ -119,6 +149,9 @@ export function MaterialsPanel() {
               </Button>
               <Button size="sm" variant="ghost" onClick={() => analyze(m)}>
                 AI 整理
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setPackageMaterial(m); setPackageOpen(true); setLearningPackage(null); }}>
+                ✨ 學習包
               </Button>
               <Button
                 size="sm"
@@ -158,6 +191,10 @@ export function MaterialsPanel() {
             上傳並處理
           </Button>
         </div>
+      </Modal>
+
+      <Modal open={packageOpen} onClose={() => setPackageOpen(false)} title={`✨ 一鍵變成學習包・${packageMaterial?.title ?? ""}`}>
+        {!learningPackage ? <div className="space-y-3"><p className="text-xs text-muted">請勾選要建立的內容；每個步驟都會保存到目前 StudyNova 的對應系統，失敗時可只重試單一步驟。</p><div className="grid gap-2 sm:grid-cols-2">{PACKAGE_STEPS.map((step) => <label key={step.key} className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><input type="checkbox" checked={packageSteps.includes(step.key)} onChange={(e) => setPackageSteps((current) => e.target.checked ? [...current, step.key] : current.filter((item) => item !== step.key))} className="accent-[#7c5cff]" />{step.label}</label>)}</div><Button full disabled={!packageSteps.length} onClick={startLearningPackage}>開始建立學習包</Button></div> : <div className="space-y-3"><div className="flex items-center justify-between text-xs"><span>處理進度</span><b>{learningPackage.progress}%</b></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all" style={{ width: `${learningPackage.progress}%` }} /></div><div className="space-y-2">{learningPackage.selectedSteps.map((step) => <div key={step} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><span>{PACKAGE_STEPS.find((item) => item.key === step)?.label ?? step}</span>{learningPackage.errors?.[step] ? <Button size="sm" variant="ghost" onClick={() => retryPackageStep(step)}>重試</Button> : <Badge tone={learningPackage.currentStep === step ? "cyan" : learningPackage.progress >= 100 ? "green" : "muted"}>{learningPackage.currentStep === step ? "處理中" : learningPackage.progress >= 100 ? "完成" : "已排入"}</Badge>}</div>)}</div>{learningPackage.status === "completed" && <p className="text-xs text-emerald-200">建立完成：筆記、單字、題目與複習資料已寫入你的帳號。</p>}</div>}
       </Modal>
 
       <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title={detail?.title ?? ""} wide>

@@ -80,6 +80,9 @@ export default function AdminOpsPage() {
   const usage = useApi<{ usage: Array<{ feature: string; total: number; users: number }> }>("/admin/usage");
   const shop = useApi<{ items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; enabled: boolean }> }>("/admin/shop/items");
   const essayService = useApi<{ service: { status: "ENABLED" | "PAUSED" | "DISABLED"; proOnly: boolean; novaCost: number; dailyLimit: number; monthlyLimit: number; maintenanceNotice: string; showScores: boolean } }>("/admin/essay-service");
+  const intelligenceReports = useApi<{ reports: Array<{ report: { id: string; feature: string; contentType: string; reason: string; details: string; status: string; createdAt: string }; userName: string; userEmail: string }> }>("/admin/ai/content-reports");
+  const examPolicies = useApi<{ policies: Array<{ id: string; mode: string; label: string; description: string; rules: Record<string, unknown>; enabled: boolean }> }>("/admin/exam-mode-policies");
+  const featureCustomizations = useApi<{ features: Array<{ feature: string; label: string; enabled: boolean; allowedRoles: string[]; config: Record<string, unknown> }> }>("/admin/feature-customizations");
 
   const [annOpen, setAnnOpen] = useState(false);
   const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", targetFeature: "all", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false, startsAt: "", endsAt: "" });
@@ -162,7 +165,7 @@ export default function AdminOpsPage() {
         <p className="mt-1 text-xs leading-5 text-muted">請先依照目的選擇分類，再調整該分類內的設定。涉及使用權限的項目，請到「功能與權限」逐項決定是否需要 Pro、每日額度，以及每次是否支付 Nova。</p>
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#37d3ff]">系統與權限</p><Tabs tabs={[{ key: "ai", label: "AI 服務", icon: <SymbolIcon name="nova" size={15} /> }, { key: "features", label: "功能與權限", icon: <SymbolIcon name="settings" size={15} /> }, { key: "essay", label: "作文服務", icon: <SymbolIcon name="pen" size={15} /> }]} active={tab} onChange={setTab} /></div>
+        <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#37d3ff]">系統與權限</p><Tabs tabs={[{ key: "ai", label: "AI 服務", icon: <SymbolIcon name="nova" size={15} /> }, { key: "features", label: "功能與權限", icon: <SymbolIcon name="settings" size={15} /> }, { key: "learning", label: "學習智慧", icon: <SymbolIcon name="study" size={15} /> }, { key: "essay", label: "作文服務", icon: <SymbolIcon name="pen" size={15} /> }]} active={tab} onChange={setTab} /></div>
         <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#7c5cff]">內容與營運</p><Tabs tabs={[{ key: "ann", label: "公告", icon: <SymbolIcon name="report" size={15} /> }, { key: "act", label: "活動", icon: <SymbolIcon name="challenge" size={15} /> }, { key: "bank", label: "題庫匯入", icon: <SymbolIcon name="question" size={15} /> }]} active={tab} onChange={setTab} /></div>
         <div className="rounded-2xl border border-[var(--line)] bg-white/[0.02] p-2"><p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#ffc857]">商業化與獎勵</p><Tabs tabs={[{ key: "promo", label: "促銷總覽", icon: <SymbolIcon name="spark" size={15} /> }, { key: "shop", label: "商城管理", icon: <SymbolIcon name="shop" size={15} /> }, { key: "coupon", label: "優惠碼", icon: <SymbolIcon name="badge" size={15} /> }]} active={tab} onChange={setTab} /></div>
       </div>
@@ -338,6 +341,20 @@ export default function AdminOpsPage() {
             </Card>
           </div>
         </>
+      )}
+
+      {tab === "learning" && (
+        <div className="space-y-4">
+          <Card title="⚠️ AI 內容回報" subtitle="確認、修正、忽略都會透過 API 寫入 audit log。">
+            <div className="space-y-2">{intelligenceReports.data?.reports.map(({ report, userName, userEmail }) => <div key={report.id} className="glass-soft rounded-xl p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">{report.reason}・{report.feature}</p><Badge tone={report.status === "pending" ? "gold" : report.status === "fixed" ? "green" : "muted"}>{report.status}</Badge></div><p className="mt-1 text-xs text-muted">{userName}（{userEmail}）・{new Date(report.createdAt).toLocaleString("zh-TW")}</p><p className="mt-2 text-xs">{report.details || "使用者未補充說明"}</p><div className="mt-2 flex flex-wrap gap-1.5">{(["confirmed", "fixed", "ignored"] as const).map((status) => <Button key={status} size="sm" variant={status === "fixed" ? "gold" : "ghost"} onClick={async () => { await apiPatch(`/admin/ai/content-reports/${report.id}`, { status, adminNote: status === "fixed" ? "已人工修正" : "" }); await intelligenceReports.reload(); }}>{status === "confirmed" ? "確認問題" : status === "fixed" ? "修正完成" : "忽略"}</Button>)}</div></div>)}{!intelligenceReports.data?.reports.length && <EmptyState title="目前沒有 AI 回報" hint="使用者回報 AI 內容後會出現在這裡。" />}</div>
+          </Card>
+          <Card title="🎓 考試模式規則" subtitle="學測與國中會考是獨立模式，可在後台調整。">
+            <div className="space-y-2">{examPolicies.data?.policies.map((policy) => <div key={policy.id} className="glass-soft rounded-xl p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold">{policy.label} <span className="text-xs text-muted">({policy.mode})</span></p><Badge tone={policy.enabled ? "green" : "muted"}>{policy.enabled ? "啟用" : "停用"}</Badge></div><p className="mt-1 text-xs text-muted">{policy.description}</p><pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap rounded-lg bg-black/20 p-2 text-[10px]">{JSON.stringify(policy.rules, null, 2)}</pre><Button size="sm" className="mt-2" onClick={async () => { const description = window.prompt("更新模式說明", policy.description); if (description === null) return; await apiPatch(`/admin/exam-mode-policies/${policy.id}`, { description }); await examPolicies.reload(); }}>調整說明</Button></div>)}</div>
+          </Card>
+          <Card title="🔐 學習功能客製化" subtitle="每個功能可設定啟用狀態與允許角色。">
+            <div className="space-y-2">{featureCustomizations.data?.features.map((feature) => <div key={feature.feature} className="glass-soft flex flex-wrap items-center justify-between gap-2 rounded-xl p-3"><div><p className="text-sm font-semibold">{feature.label || feature.feature}</p><p className="text-xs text-muted">允許：{feature.allowedRoles.join("、")}</p></div><Button size="sm" variant={feature.enabled ? "ghost" : "gold"} onClick={async () => { await apiPut(`/admin/feature-customizations/${feature.feature}`, { ...feature, enabled: !feature.enabled }); await featureCustomizations.reload(); }}>{feature.enabled ? "停用" : "啟用"}</Button></div>)}{!featureCustomizations.data?.features.length && <EmptyState title="尚未建立客製化覆寫" hint="建立第一筆設定後會顯示在這裡。" />}</div>
+          </Card>
+        </div>
       )}
 
       {tab === "features" && (

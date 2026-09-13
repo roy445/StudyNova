@@ -46,7 +46,7 @@ async function buildContext(userId: string, allow: string[], materialId: string 
   const parts: string[] = [];
   if (allow.includes("settings")) {
     const s = (await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1))[0];
-    if (s) parts.push(`【學習設定】${s.schoolLevel === "junior" ? "國中" : "高中"}${s.grade}年級，每日目標 ${s.dailyGoalMinutes} 分鐘，英文程度 ${s.englishLevel}，偏好科目：${s.favoriteSubjects.join("、") || "未設定"}`);
+    if (s) parts.push(`【學習設定】稱呼：${s.preferredName || "未設定"}；${s.schoolLevel === "junior" ? "國中" : "高中"}${s.grade}年級；每日目標 ${s.dailyGoalMinutes} 分鐘；英文程度 ${s.englishLevel}；偏好科目：${s.favoriteSubjects.join("、") || "未設定"}；學習方式：${s.learningStyle || "未設定"}；解釋偏好：${s.explanationPreference}`);
   }
   if (allow.includes("grades")) {
     const stats = await subjectStats(userId);
@@ -229,6 +229,7 @@ export const routes: RouteDef[] = [
             policyInstructions(policy, { examMode: conv.mode === "exam" || conv.mode === "hint" }) + "\n" +
             "你不能自行修改使用者資料。若需要建立任務／筆記／測驗或修改讀書計畫，請在 action 欄位提出建議，等使用者確認。\n" +
             '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_quiz|update_plan","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
+            "個人記憶規則：memory 只能保存使用者明確表達且對未來學習有必要的偏好，key 只能是 preferred_name、learning_style、explanation_preference、reminder_preference；不得保存身分證、地址、聯絡方式、健康、財務或其他不必要私人資訊。\n" +
             "importance 規則：normal 是一般說明；important 是考試重點、常見錯誤或需要特別注意的內容；critical 是安全、截止時間、明確答案或不可忽略的關鍵提醒。回答中請用 markdown 條列與粗體呈現重點。\n" +
             "朋友聊天語氣規則：像一位真誠、懂學習的朋友陪學生聊天，不要像制式客服或教科書。可以自然使用『欸、其實、你可以先、沒事、我們一起看』等口語，但不要過度裝熟或使用粗俗語言。每次回覆至少補充一點有用的解釋或下一步，不要只回一句空泛鼓勵。依情境加入 1 到 3 個自然的符號或表情，例如 🙂、👍、✨、💡、📌；不要每句都放，也不要讓表情取代內容。可以使用『哈哈』『懂你』等朋友式反應，但遇到錯誤、考試重點或重要提醒仍要清楚、準確、尊重。不要輸出貼圖網址、圖片 Markdown 或虛構貼圖代碼；若需要可用文字搭配表情呈現。\n" +
             "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；update_plan payload：{blocks:[{subject,minutes,focus}]}。\n" +
@@ -261,8 +262,9 @@ export const routes: RouteDef[] = [
         })
         .returning();
 
+      const allowedMemoryKeys = new Set(["preferred_name", "learning_style", "explanation_preference", "reminder_preference"]);
       for (const m of (data.memory ?? []).slice(0, 5)) {
-        if (!m?.key) continue;
+        if (!m?.key || !allowedMemoryKeys.has(String(m.key))) continue;
         await db
           .insert(aiMemory)
           .values({ userId: user.userId, key: String(m.key).slice(0, 60), value: String(m.value ?? "").slice(0, 400), scope: "episodic", sourceType: "ai_conversation", sourceId: conv.id, confidence: 60, consentStatus: "active", lastUsedAt: new Date() })

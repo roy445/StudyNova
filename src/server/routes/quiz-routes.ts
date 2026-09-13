@@ -12,6 +12,7 @@ import {
   wordProgress,
   sentences,
   sentenceProgress,
+  examModePolicies,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, forbidden, todayStr } from "../core";
@@ -177,6 +178,8 @@ export const routes: RouteDef[] = [
           difficulty,
           type: qType.default("single"),
           timeLimitSec: z.number().int().min(60).max(7200).default(600),
+          examMode: z.string().max(40).default("general"),
+          educationLevel: z.enum(["junior", "senior"]).default("junior"),
         }),
       );
       if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
@@ -189,6 +192,9 @@ export const routes: RouteDef[] = [
       }
       if (sourceText.trim().length < 20) throw fail("REQ_CONTENT_TOO_SHORT");
       await consumeFeature(user.userId, "ai_practice");
+      const policy = (await db.select().from(examModePolicies).where(and(eq(examModePolicies.mode, body.examMode), eq(examModePolicies.enabled, true))).limit(1))[0];
+      if (!policy) throw fail("REQ_VALIDATION", { message: "找不到可用的考試模式" });
+      sourceText = `【正式考試模式：${policy.label}】\n${policy.description}\n模式規則：${JSON.stringify(policy.rules)}\n請依此規則設計題型、閱讀理解與能力取向，不可只更改標籤。\n${sourceText}`;
 
       const ids = await generateQuestions({
         userId: user.userId,
@@ -198,13 +204,13 @@ export const routes: RouteDef[] = [
         count: body.count,
         difficulty: body.difficulty,
         type: body.type,
-        level: "junior",
+        level: body.educationLevel,
       });
       const rows = await db
         .insert(quizzes)
         .values({
           userId: user.userId,
-          title: body.title || `${body.subject} AI 測驗 ${todayStr()}`,
+          title: body.title || `${policy.label}・${body.subject} AI 測驗 ${todayStr()}`,
           subject: body.subject,
           difficulty: body.difficulty,
           source: "ai",
@@ -521,16 +527,20 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ wordId: z.string().uuid(), correct: z.boolean(), mode: z.string().max(20).default("card"), addToWrongBook: z.boolean().default(false) }));
+      const body = await ctx.json(z.object({ wordId: z.string().uuid(), correct: z.boolean(), mode: z.string().max(20).default("card"), selfRating: z.enum(["again", "hard", "good", "easy"]).optional(), addToWrongBook: z.boolean().default(false) }));
       const word = (await db.select().from(dailyWords).where(eq(dailyWords.id, body.wordId)).limit(1))[0];
       if (!word) throw notFound("找不到單字");
-      await db.insert(wordProgress).values({ userId: user.userId, wordId: word.id }).onConflictDoNothing();
+      const now = new Date();
+      await db.insert(wordProgress).values({ userId: user.userId, wordId: word.id, firstSeenAt: now }).onConflictDoNothing();
       const rows = await db
         .update(wordProgress)
         .set({
           familiarity: sql`greatest(0, least(100, ${wordProgress.familiarity} + ${body.correct ? 20 : -10}))`,
           correctCount: sql`${wordProgress.correctCount} + ${body.correct ? 1 : 0}`,
           wrongCount: sql`${wordProgress.wrongCount} + ${body.correct ? 0 : 1}`,
+          reviewCount: sql`${wordProgress.reviewCount} + 1`,
+          lastCorrect: body.correct,
+          selfRating: body.selfRating ?? (body.correct ? "good" : "again"),
           nextReviewAt: new Date(Date.now() + (body.correct ? 2 : 0.5) * 86_400_000),
           updatedAt: new Date(),
         })

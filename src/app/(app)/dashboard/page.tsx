@@ -58,6 +58,9 @@ export default function DashboardPage() {
   const toast = useToast();
   const { data, loading, error, reload } = useApi<Dashboard>("/dashboard");
   const adaptive = useApi<Adaptive>("/adaptive/next");
+  const radar = useApi<{ metrics: Array<{ key: string; label: string; value: number; evidence: string }>; weakest: { label: string; value: number; evidence: string } | null }>("/learning/radar");
+  const alerts = useApi<{ alerts: Array<{ id: string; title: string; body: string; evidence: Record<string, unknown> }>; enabled: boolean }>("/ai/alerts");
+  const patterns = useApi<{ patterns: Array<{ subject: string; reason: string; count: number; questionCount: number; evidence: string }>; enoughData: boolean }>("/learning/error-patterns");
   const [claiming, setClaiming] = useState<string | null>(null);
 
   async function claim(taskId: string) {
@@ -70,16 +73,6 @@ export default function DashboardPage() {
       toast.push("error", err instanceof Error ? err.message : "領取失敗");
     } finally {
       setClaiming(null);
-    }
-  }
-
-  async function toggleBlock(index: number, done: boolean) {
-    try {
-      await apiPost("/plan/block-done", { index, done });
-      toast.push("success", done ? "完成一個學習區塊！" : "已取消完成");
-      await reload();
-    } catch (err) {
-      toast.push("error", err instanceof Error ? err.message : "更新失敗");
     }
   }
 
@@ -198,29 +191,22 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="🗓️ AI 今日讀書計畫" subtitle={data.plan.rationale} action={<Badge tone="cyan">{data.plan.totalMinutes} 分鐘</Badge>}>
-          <div className="space-y-2">
-            {data.plan.blocks.map((b, i) => (
-              <div key={`${b.subject}-${i}`} className="glass-soft flex items-center gap-3 px-3 py-2.5">
-                <input
-                  type="checkbox"
-                  checked={b.done}
-                  onChange={(e) => toggleBlock(i, e.target.checked)}
-                  className="h-4 w-4 accent-[#7c5cff]"
-                  aria-label={`完成 ${b.subject}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-medium ${b.done ? "line-through opacity-60" : ""}`}>
-                    {b.subject} · {b.minutes} 分鐘
-                  </p>
-                  <p className="truncate text-xs text-muted">{b.focus}</p>
-                </div>
-              </div>
-            ))}
-            {!data.plan.blocks.length && <EmptyState title="還沒有計畫" hint="新增成績或錯題後，AI 會自動安排今日讀書計畫。" />}
+        <Card title="🧠 我的學習能力" subtitle={radar.data?.weakest ? `目前最值得補強：${radar.data.weakest.label}` : "完成更多真實學習紀錄後會開始分析"}>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {(radar.data?.metrics ?? []).map((metric) => <div key={metric.key} className="glass-soft rounded-xl p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs">{metric.label}</span><b className="text-[#7dd3fc]">{metric.value}</b></div><Progress value={metric.value} max={100} tone={metric.value < 60 ? "violet" : "cyan"} /><p className="mt-1 line-clamp-2 text-[10px] text-muted">{metric.evidence}</p></div>)}
           </div>
+          {!radar.loading && !radar.data?.metrics.length && <EmptyState title="還沒有足夠資料" hint="完成題目、單字複習或考試後，這裡會使用真實紀錄更新。" />}
         </Card>
+        <Card title="🔍 Novi 發現的錯誤模式" subtitle="只顯示有資料證據的重複錯誤，不憑感覺猜測。">
+          <div className="space-y-2">{patterns.data?.patterns.map((pattern) => <div key={`${pattern.subject}-${pattern.reason}`} className="glass-soft rounded-xl p-3"><p className="text-sm font-semibold">{pattern.subject}・{pattern.reason}</p><p className="mt-1 text-xs text-muted">{pattern.evidence}</p><Link href="/study?tab=wrong" className="mt-2 inline-block text-xs text-[#37d3ff] underline">針對這個問題開始訓練 →</Link></div>)}{patterns.data && !patterns.data.patterns.length && <EmptyState title="目前沒有重複錯誤模式" hint="累積至少幾次錯題分析後，Novi 才會建立證據。" />}</div>
+        </Card>
+      </div>
 
+      <Card title="🤖 Novi 主動提醒" subtitle={alerts.data?.enabled === false ? "主動提醒已關閉，可在個人設定重新開啟。" : "提醒內容只會來自你的實際學習紀錄。"}>
+        <div className="space-y-2">{alerts.data?.alerts.slice(0, 3).map((alert) => <div key={alert.id} className="glass-soft rounded-xl p-3"><p className="text-sm font-semibold">{alert.title}</p><p className="mt-1 text-xs leading-5 text-muted">{alert.body}</p></div>)}{alerts.data?.enabled !== false && !alerts.data?.alerts.length && <p className="text-sm text-muted">目前沒有需要打擾你的提醒，維持自己的節奏就好。</p>}</div>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="✓ 今天不知道做什麼？不妨參考看看" subtitle="挑一件適合現在狀態的事就好，不必追求一次完成全部">
           <div className="space-y-2">
             {data.tasks.map((t) => {

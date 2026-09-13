@@ -15,6 +15,7 @@ export default function OnboardingPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
+    preferredName: "",
     schoolLevel: "junior" as "junior" | "senior",
     schoolName: "",
     grade: 1,
@@ -24,6 +25,9 @@ export default function OnboardingPage() {
     dailyWordCount: 10,
     reminderTime: "20:00",
     aiReminderFrequency: "normal" as "low" | "normal" | "high",
+    learningStyle: "例題＋圖像",
+    explanationPreference: "simple_then_deep" as "simple_then_deep" | "detailed" | "examples_first" | "visual_first",
+    proactiveAiReminders: true,
   });
 
   async function save() {
@@ -65,6 +69,9 @@ export default function OnboardingPage() {
       {step === 0 && (
         <Card title="1／3 學制與年級">
           <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Novi 怎麼稱呼你？（選填）">
+              <Input value={form.preferredName} placeholder="例如：小明" onChange={(e) => setForm({ ...form, preferredName: e.target.value })} />
+            </Field>
             <Field label="學校名稱（選填）">
               <Input value={form.schoolName} placeholder="例如：清水高中" onChange={(e) => setForm({ ...form, schoolName: e.target.value })} />
             </Field>
@@ -153,6 +160,17 @@ export default function OnboardingPage() {
                 <option value="high">高（積極提醒）</option>
               </Select>
             </Field>
+            <Field label="你偏好的學習方式">
+              <Select value={form.learningStyle} onChange={(e) => setForm({ ...form, learningStyle: e.target.value })}>
+                <option>例題＋圖像</option><option>條列重點</option><option>先做題再講解</option><option>逐步推導</option>
+              </Select>
+            </Field>
+            <Field label="Novi 解釋偏好">
+              <Select value={form.explanationPreference} onChange={(e) => setForm({ ...form, explanationPreference: e.target.value as typeof form.explanationPreference })}>
+                <option value="simple_then_deep">先簡單，需要時深入</option><option value="detailed">一開始就詳細</option><option value="examples_first">先看例子</option><option value="visual_first">先用圖像或比喻</option>
+              </Select>
+            </Field>
+            <label className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><input type="checkbox" checked={form.proactiveAiReminders} onChange={(e) => setForm({ ...form, proactiveAiReminders: e.target.checked })} className="accent-[#7c5cff]" />允許 Novi 根據學習紀錄主動提醒</label>
           </div>
           {error && <p className="mt-3 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{error}</p>}
           <div className="mt-4 flex justify-between">

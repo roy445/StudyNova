@@ -86,6 +86,10 @@ export const userSettings = pgTable("user_settings", {
   schoolLevel: text("school_level").notNull().default("junior"), // junior | senior
   schoolName: text("school_name").notNull().default(""),
   grade: integer("grade").notNull().default(1),
+  preferredName: text("preferred_name").notNull().default(""),
+  learningStyle: text("learning_style").notNull().default(""),
+  explanationPreference: text("explanation_preference").notNull().default("simple_then_deep"),
+  proactiveAiReminders: boolean("proactive_ai_reminders").notNull().default(true),
   dailyGoalMinutes: integer("daily_goal_minutes").notNull().default(45),
   favoriteSubjects: jsonb("favorite_subjects").$type<string[]>().notNull().default([]),
   englishLevel: text("english_level").notNull().default("A2"),
@@ -858,6 +862,10 @@ export const wordProgress = pgTable(
     familiarity: integer("familiarity").notNull().default(0),
     correctCount: integer("correct_count").notNull().default(0),
     wrongCount: integer("wrong_count").notNull().default(0),
+    reviewCount: integer("review_count").notNull().default(0),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }),
+    lastCorrect: boolean("last_correct"),
+    selfRating: text("self_rating").notNull().default(""),
     memoryTip: text("memory_tip").notNull().default(""),
     nextReviewAt: timestamp("next_review_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: updated(),
@@ -2138,4 +2146,111 @@ export const challengeSettlements = pgTable(
     createdAt: created(),
   },
   (t) => [uniqueIndex("challenge_settlement_once_uq").on(t.challengeId)],
+);
+
+/* -------------------------------------------------------- PRODUCT EXTENSIONS */
+
+export const examModePolicies = pgTable(
+  "exam_mode_policies",
+  {
+    id: id(),
+    mode: text("mode").notNull(), // general | junior_exam | senior_midterm | gsat | tech_exam | custom
+    label: text("label").notNull(),
+    educationLevel: text("education_level").notNull().default(""),
+    description: text("description").notNull().default(""),
+    rules: jsonb("rules").$type<Record<string, unknown>>().notNull().default({}),
+    enabled: boolean("enabled").notNull().default(true),
+    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_mode_policy_mode_uq").on(t.mode), index("exam_mode_policy_enabled_idx").on(t.enabled)],
+);
+
+export const examModeSelections = pgTable(
+  "exam_mode_selections",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    examId: uuid("exam_id").references(() => exams.id, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    subject: text("subject").notNull().default(""),
+    scope: text("scope").notNull().default(""),
+    settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_mode_selection_user_idx").on(t.userId, t.updatedAt), index("exam_mode_selection_exam_idx").on(t.examId)],
+);
+
+export const learningPackages = pgTable(
+  "learning_packages",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    materialId: uuid("material_id").notNull().references(() => studyMaterials.id, { onDelete: "cascade" }),
+    selectedSteps: jsonb("selected_steps").$type<string[]>().notNull().default([]),
+    status: text("status").notNull().default("queued"), // queued | processing | completed | partial | failed
+    progress: integer("progress").notNull().default(0),
+    currentStep: text("current_step").notNull().default(""),
+    results: jsonb("results").$type<Record<string, unknown>>().notNull().default({}),
+    errors: jsonb("errors").$type<Record<string, string>>().notNull().default({}),
+    createdAt: created(),
+    updatedAt: updated(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [index("learning_packages_user_idx").on(t.userId, t.createdAt), index("learning_packages_material_idx").on(t.materialId)],
+);
+
+export const aiContentReports = pgTable(
+  "ai_content_reports",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    contentType: text("content_type").notNull(),
+    contentId: uuid("content_id"),
+    reason: text("reason").notNull(),
+    details: text("details").notNull().default(""),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull().default({}),
+    status: text("status").notNull().default("pending"), // pending | confirmed | fixed | ignored
+    adminNote: text("admin_note").notNull().default(""),
+    resolvedBy: uuid("resolved_by").references(() => users.userId, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("ai_content_reports_status_idx").on(t.status, t.createdAt), index("ai_content_reports_user_idx").on(t.userId, t.createdAt)],
+);
+
+export const aiProactiveAlerts = pgTable(
+  "ai_proactive_alerts",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    alertType: text("alert_type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+    action: jsonb("action").$type<Record<string, unknown>>().notNull().default({}),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    createdAt: created(),
+  },
+  (t) => [index("ai_proactive_alerts_user_idx").on(t.userId, t.createdAt), index("ai_proactive_alerts_unread_idx").on(t.userId, t.readAt)],
+);
+
+export const adminFeatureCustomizations = pgTable(
+  "admin_feature_customizations",
+  {
+    id: id(),
+    feature: text("feature").notNull(),
+    label: text("label").notNull().default(""),
+    enabled: boolean("enabled").notNull().default(true),
+    allowedRoles: jsonb("allowed_roles").$type<string[]>().notNull().default(["student"]),
+    config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("admin_feature_customization_feature_uq").on(t.feature)],
 );
