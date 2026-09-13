@@ -2,11 +2,14 @@
 
 import React from "react";
 
-function formulaText(value: string) {
+const SUBSCRIPT: Record<string, string> = { "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉", "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎", n: "ₙ", a: "ₐ", e: "ₑ", h: "ₕ", i: "ᵢ", j: "ⱼ", k: "ₖ", l: "ₗ", m: "ₘ", o: "ₒ", p: "ₚ", r: "ᵣ", s: "ₛ", t: "ₜ", u: "ᵤ", v: "ᵥ", x: "ₓ" };
+const SUPERSCRIPT: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾", n: "ⁿ", i: "ⁱ" };
+
+function cleanFormula(value: string) {
   return value
+    .replace(/\$/g, "")
     .replace(/\\(?:text|mathrm|textrm|mbox)\{([^{}]*)\}/g, "$1")
-    .replace(/\\ext\{([^{}]*)\}/g, "$1")
-    .replace(/\\ce\{([^{}]*)\}/g, "$1")
+    .replace(/\\(?:ext|ce)\{([^{}]*)\}/g, "$1")
     .replace(/\\left|\\right/g, "")
     .replace(/\\times/g, "×")
     .replace(/\\rightarrow/g, "→")
@@ -16,25 +19,19 @@ function formulaText(value: string) {
     .replace(/_\{([^{}]+)\}/g, "_$1");
 }
 
-function InlineText({ value }: { value: string }) {
-  const tokens = value.split(/(\$\$[^$]+\$\$|\$[^$]+\$|\\\([^)]*\\\)|\\\[[^\]]*\\\]|\^\{[^}]+\}|_[0-9]+|\^[0-9+−-]+|_[A-Za-z0-9]+)/g).filter(Boolean);
-  return <>{tokens.map((token, index) => {
-    const isMath = (token.startsWith("$") && token.endsWith("$")) || (token.startsWith("\\(") && token.endsWith("\\)")) || (token.startsWith("\\[") && token.endsWith("\\]"));
-    if (isMath) {
-      const raw = token.replace(/^\$\$?|\$\$?$|^\\\(|\\\)$|^\\\[|\\\]$/g, "");
-      return <span key={index} className="font-mono text-[#b9f2ff]" aria-label={`公式 ${raw}`}>{renderFormula(formulaText(raw))}</span>;
-    }
-    const sub = token.match(/^_([0-9A-Za-z]+)$/);
-    if (sub) return <sub key={index}>{sub[1]}</sub>;
-    const sup = token.match(/^\^([0-9+−-]+)$/);
-    if (sup) return <sup key={index}>{sup[1]}</sup>;
-    return <React.Fragment key={index}>{token}</React.Fragment>;
-  })}</>;
+function convertMarks(value: string) {
+  return cleanFormula(value)
+    .replace(/_([0-9A-Za-z()+=[\]-]+)/g, (_, chars: string) => [...chars].map((char) => SUBSCRIPT[char] ?? char).join(""))
+    .replace(/\^([0-9A-Za-z()+=[\]-]+)/g, (_, chars: string) => [...chars].map((char) => SUPERSCRIPT[char] ?? char).join(""));
 }
 
-function renderFormula(value: string) {
-  const parts = value.split(/(_[0-9A-Za-z]+|\^[0-9+−-]+)/g).filter(Boolean);
-  return <>{parts.map((part, index) => part.startsWith("_") ? <sub key={index}>{part.slice(1)}</sub> : part.startsWith("^") ? <sup key={index}>{part.slice(1)}</sup> : <React.Fragment key={index}>{part}</React.Fragment>)}</>;
+function InlineText({ value }: { value: string }) {
+  const tokens = value.split(/(\$\$[^$]+\$\$|\$[^$]+\$|\\\([^)]*\\\)|\\\[[^\]]*\\\])/g).filter(Boolean);
+  return <>{tokens.map((token, index) => {
+    const isMath = (token.startsWith("$") && token.endsWith("$")) || (token.startsWith("\\(") && token.endsWith("\\)")) || (token.startsWith("\\[") && token.endsWith("\\]"));
+    const raw = isMath ? token.replace(/^\$\$?|\$\$?$|^\\\(|\\\)$|^\\\[|\\\]$/g, "") : token;
+    return <React.Fragment key={index}>{convertMarks(raw)}</React.Fragment>;
+  })}</>;
 }
 
 export function ChatRichText({ content, className = "" }: { content: string; className?: string }) {

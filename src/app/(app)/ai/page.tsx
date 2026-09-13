@@ -36,6 +36,7 @@ const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "�
 const ACTION_LABEL: Record<string, string> = {
   create_task: "建立任務",
   create_note: "建立筆記",
+  create_material: "加入教材",
   create_quiz: "建立測驗",
   update_plan: "修改今日讀書計畫",
   create_artifact: "生成手寫重點／心智圖／PDF",
@@ -165,6 +166,7 @@ export default function AiPage() {
     try {
       const applied = await apiPost<{ result?: { downloadable?: boolean; openUrl?: string | null; studyCenterUrl?: string; preview?: string } }>(`/ai/messages/${messageId}/action`, { confirm });
       setMessages((m) => m.map((x) => (x.id === messageId ? { ...x, actionStatus: confirm ? "applied" : "rejected", action: confirm && applied.result && x.action ? { ...x.action, payload: { ...(x.action.payload ?? {}), ...applied.result } } : x.action } : x)));
+      if (confirm && (action?.type === "create_material" || action?.type === "create_note")) await materials.reload();
       toast.push("success", confirm ? "已套用 Novi 的建議" : "已拒絕這個建議");
     } catch (err) {
       toast.push("error", errorMessage(err));

@@ -270,13 +270,13 @@ export const routes: RouteDef[] = [
             `你是 StudyNova 的 AI 學習助理 Novi，服務台灣國高中學生。${MODES[conv.mode as keyof typeof MODES] ?? MODES.teacher}\n` +
             policyInstructions(policy, { examMode: conv.mode === "exam" || conv.mode === "hint" }) + "\n" +
             "你不能自行修改使用者資料。若需要建立任務／筆記／測驗或修改讀書計畫，請在 action 欄位提出建議，等使用者確認。\n" +
-            '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_quiz|update_plan|create_artifact","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
+            '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_material|create_quiz|update_plan|create_artifact","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
             "個人記憶規則：memory 只能保存使用者明確表達且對未來學習有必要的偏好，key 只能是 preferred_name、learning_style、explanation_preference、reminder_preference；不得保存身分證、地址、聯絡方式、健康、財務或其他不必要私人資訊。\n" +
             "importance 規則：normal 是一般說明；important 是考試重點、常見錯誤或需要特別注意的內容；critical 是安全、截止時間、明確答案或不可忽略的關鍵提醒。回答中請用 markdown 條列與粗體呈現重點。\n" +
             "朋友聊天語氣規則：像一位真誠、懂學習的朋友陪學生聊天，不要像制式客服或教科書。可以自然使用『欸、其實、你可以先、沒事、我們一起看』等口語，但不要過度裝熟或使用粗俗語言。每次回覆至少補充一點有用的解釋或下一步，不要只回一句空泛鼓勵。依情境加入 1 到 3 個自然的符號或表情，例如 🙂、👍、✨、💡、📌；不要每句都放，也不要讓表情取代內容。可以使用『哈哈』『懂你』等朋友式反應，但遇到錯誤、考試重點或重要提醒仍要清楚、準確、尊重。不要輸出貼圖網址、圖片 Markdown 或虛構貼圖代碼；若需要可用文字搭配表情呈現。\n" +
-            "化學與數學公式規則：化學式請使用可讀的純文字或 $H_2O$、$CO_2$、$HCl$、$O_3$ 格式；下標用 _，電荷用 ^，不要輸出 \\ext、\\text 的錯誤變體，也不要把公式放進程式碼區塊。元素名稱與元素符號要同時清楚顯示，例如 氫（H）、氧（O）、氯（Cl）。\n" +
+            "化學與數學公式規則：優先直接輸出 Unicode 化學式，例如 H₂O、CO₂、HCl、O₃、SO₄²⁻，不要輸出美元符號、LaTeX 分隔符或程式碼標記；元素名稱與元素符號要同時清楚顯示，例如 氫（H）、氧（O）、氯（Cl）。\n" +
             "產物規則：當學生要求把本次重點做成 PDF、手寫風格圖片、手繪重點或心智圖時，先在 reply 說明你要整理的內容，再提出 create_artifact action 等待確認。payload 必須是 {kind:'pdf'|'handwritten_note'|'mind_map',title,body}；body 只放本次對話已確認的重點，不可杜撰。確認後系統會直接在對話顯示可開啟的產物；只有 Nova Pro 可以下載檔案，免費使用者只能預覽並被引導到學習中心產物專區。\n" +
-            "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；update_plan payload：{blocks:[{subject,minutes,focus}]}。\n" +
+            "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_material payload：{title, subject, content, summary}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；update_plan payload：{blocks:[{subject,minutes,focus}]}。使用者說加入教材或保存教材重點時，提出 create_material；使用者說保存重點、整理筆記時，提出 create_note。\n" +
             "繁體中文回答。不得杜撰使用者資料。若本次訊息附有圖片，必須實際查看圖片；圖片是主要證據，OCR 文字只是輔助。不要回答使用者沒有傳圖片。",
           parts: [
             { kind: "text", text: context ? `使用者已授權的學習資料：\n${context}` : "使用者未授權任何個人資料，只能根據對話內容回答。" },
@@ -289,8 +289,11 @@ export const routes: RouteDef[] = [
       );
 
       const reply = (data.reply ?? "").trim() || "我這次沒有產生內容，請再說一次你的問題。";
-      const actionTypes = ["create_task", "create_note", "create_quiz", "update_plan", "create_artifact"];
-      const action = data.action && actionTypes.includes(String(data.action.type)) ? data.action : null;
+      const actionTypes = ["create_task", "create_note", "create_material", "create_quiz", "update_plan", "create_artifact"];
+      const actionAliases: Record<string, string> = { add_material: "create_material", add_to_materials: "create_material", save_note: "create_note", add_note: "create_note", save_highlight: "create_note" };
+      const rawAction = data.action;
+      const normalizedActionType = rawAction?.type ? (actionAliases[String(rawAction.type)] ?? String(rawAction.type)) : "";
+      const action = rawAction && actionTypes.includes(normalizedActionType) ? { ...rawAction, type: normalizedActionType } : null;
 
       const inserted = await db
         .insert(aiMessages)
@@ -364,10 +367,17 @@ export const routes: RouteDef[] = [
         const rows = await db.insert(tasks).values({ userId: user.userId, title: parsed.title, detail: parsed.detail ?? "", source: "ai" }).returning();
         result = { task: rows[0] };
       } else if (action.type === "create_note") {
-        if (!(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "AI 建立筆記需要 Nova Pro 資格，請先升級後再使用。" });
-        const parsed = z.object({ title: z.string().min(1).max(120), subject: z.string().max(20).default("其他"), body: z.string().max(20000) }).parse(payload);
-        const rows = await db.insert(notes).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, body: parsed.body, source: "ai" }).returning();
+        const parsed = z.object({ title: z.string().min(1).max(120).default("Novi 重點整理"), subject: z.string().max(20).default("其他"), body: z.string().max(20000).optional(), content: z.string().max(20000).optional() }).parse(payload);
+        const noteBody = parsed.body?.trim() || parsed.content?.trim();
+        if (!noteBody) throw fail("REQ_CONTENT_TOO_SHORT", { message: "Novi 沒有收到可保存的重點內容，請再說明要保存哪些重點。" });
+        const rows = await db.insert(notes).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, body: noteBody, source: "ai" }).returning();
         result = { note: rows[0] };
+      } else if (action.type === "create_material") {
+        const parsed = z.object({ title: z.string().min(1).max(160).default("Novi 教材重點"), subject: z.string().max(30).default("其他"), content: z.string().max(30000).optional(), body: z.string().max(30000).optional(), summary: z.string().max(2000).default("") }).parse(payload);
+        const materialContent = parsed.content?.trim() || parsed.body?.trim();
+        if (!materialContent || materialContent.length < 5) throw fail("REQ_CONTENT_TOO_SHORT", { message: "Novi 沒有收到可加入教材的內容，請再說明教材重點。" });
+        const rows = await db.insert(studyMaterials).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, kind: "text", status: "ready", content: materialContent, summary: parsed.summary }).returning();
+        result = { material: rows[0] };
       } else if (action.type === "create_quiz") {
         const parsed = z
           .object({

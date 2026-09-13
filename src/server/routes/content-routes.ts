@@ -68,7 +68,7 @@ export const contentRoutes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const rows = await db.select().from(studyMaterials).where(and(eq(studyMaterials.userId, user.userId), eq(studyMaterials.subject, "英文"))).orderBy(desc(studyMaterials.createdAt)).limit(100);
+      const rows = await db.select().from(studyMaterials).where(eq(studyMaterials.userId, user.userId)).orderBy(desc(studyMaterials.createdAt)).limit(100);
       return { materials: rows };
     },
   }),
