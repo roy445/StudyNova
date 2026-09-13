@@ -50,6 +50,17 @@ export function latestConversationMessages<T>(newestFirstRows: T[], limit = 16):
   return newestFirstRows.slice(0, limit).reverse();
 }
 
+export function normalizeChatReply(data: Record<string, unknown>, rawText: string): string {
+  const fields = [data.reply, data.text, data.content, data.message, data.answer]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .find(Boolean);
+  if (fields) return fields;
+  const cleaned = rawText.trim().replace(/^```(?:json|markdown|md)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  if (!cleaned) return "";
+  if (!cleaned.startsWith("{") && !cleaned.startsWith("[")) return cleaned;
+  return "";
+}
+
 async function buildContext(userId: string, allow: string[], materialId: string | null) {
   const parts: string[] = [];
   if (allow.includes("settings")) {
@@ -297,7 +308,7 @@ export const routes: RouteDef[] = [
       );
 
       const rawProviderText = meta.text.trim();
-      const reply = (data.reply ?? "").trim() || (!rawProviderText.startsWith("{") && !rawProviderText.startsWith("[") ? rawProviderText : "");
+      const reply = normalizeChatReply(data as Record<string, unknown>, rawProviderText);
       if (!reply) {
         const diagnostic = { stage: "chat.reply", feature: "ai_chat", provider: meta.provider, model: meta.model, outputTokens: meta.outputTokens, responsePreview: rawProviderText.slice(0, 240) };
         console.error("[ai/chat] provider returned no usable reply", diagnostic);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latestConversationMessages } from "@/server/routes/ai-routes";
+import { latestConversationMessages, normalizeChatReply } from "@/server/routes/ai-routes";
 
 describe("AI chat history window", () => {
   it("keeps the newest 16 messages and restores chronological order", () => {
@@ -7,6 +7,13 @@ describe("AI chat history window", () => {
     expect(latestConversationMessages(newestFirst).map((item) => item.id)).toEqual(
       Array.from({ length: 16 }, (_, index) => `m-${index + 5}`),
     );
+  });
+
+  it("normalizes provider reply aliases instead of producing SN-AI-6004", () => {
+    expect(normalizeChatReply({ text: "我是 Novi" }, "")).toBe("我是 Novi");
+    expect(normalizeChatReply({ content: "我可以陪你學習" }, "")).toBe("我可以陪你學習");
+    expect(normalizeChatReply({}, "這是一段純文字回答")).toBe("這是一段純文字回答");
+    expect(normalizeChatReply({}, "{\"unexpected\":true}")).toBe("");
   });
 
   it("does not mutate the database result array", () => {
