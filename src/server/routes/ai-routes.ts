@@ -367,16 +367,32 @@ export const routes: RouteDef[] = [
         const rows = await db.insert(tasks).values({ userId: user.userId, title: parsed.title, detail: parsed.detail ?? "", source: "ai" }).returning();
         result = { task: rows[0] };
       } else if (action.type === "create_note") {
-        const parsed = z.object({ title: z.string().min(1).max(120).default("Novi 重點整理"), subject: z.string().max(20).default("其他"), body: z.string().max(20000).optional(), content: z.string().max(20000).optional() }).parse(payload);
+        const parsedResult = z.object({ title: z.string().min(1).max(120).default("Novi 重點整理"), subject: z.string().max(20).default("其他"), body: z.string().max(20000).optional(), content: z.string().max(20000).optional() }).safeParse(payload);
+        if (!parsedResult.success) throw fail("AI_NOTE_PAYLOAD_INVALID", { details: { stage: "notes.payload", actionType: action.type, payloadKeys: Object.keys(payload), issues: parsedResult.error.issues.map((issue) => ({ path: issue.path, message: issue.message })) } });
+        const parsed = parsedResult.data;
         const noteBody = parsed.body?.trim() || parsed.content?.trim();
-        if (!noteBody) throw fail("REQ_CONTENT_TOO_SHORT", { message: "Novi 沒有收到可保存的重點內容，請再說明要保存哪些重點。" });
-        const rows = await db.insert(notes).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, body: noteBody, source: "ai" }).returning();
+        if (!noteBody) throw fail("AI_NOTE_PAYLOAD_INVALID", { details: { stage: "notes.content", actionType: action.type, payloadKeys: Object.keys(payload), missing: "body|content" } });
+        let rows;
+        try {
+          rows = await db.insert(notes).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, body: noteBody, source: "ai" }).returning();
+        } catch (error) {
+          console.error("[ai/action] create_note database write failed", { actionType: action.type, payloadKeys: Object.keys(payload), error });
+          throw fail("AI_NOTE_WRITE_FAILED", { details: { stage: "notes.insert", table: "notes", actionType: action.type, payloadKeys: Object.keys(payload), cause: error instanceof Error ? error.message.slice(0, 240) : "unknown" } });
+        }
         result = { note: rows[0] };
       } else if (action.type === "create_material") {
-        const parsed = z.object({ title: z.string().min(1).max(160).default("Novi 教材重點"), subject: z.string().max(30).default("其他"), content: z.string().max(30000).optional(), body: z.string().max(30000).optional(), summary: z.string().max(2000).default("") }).parse(payload);
+        const parsedResult = z.object({ title: z.string().min(1).max(160).default("Novi 教材重點"), subject: z.string().max(30).default("其他"), content: z.string().max(30000).optional(), body: z.string().max(30000).optional(), summary: z.string().max(2000).default("") }).safeParse(payload);
+        if (!parsedResult.success) throw fail("AI_MATERIAL_PAYLOAD_INVALID", { details: { stage: "materials.payload", actionType: action.type, payloadKeys: Object.keys(payload), issues: parsedResult.error.issues.map((issue) => ({ path: issue.path, message: issue.message })) } });
+        const parsed = parsedResult.data;
         const materialContent = parsed.content?.trim() || parsed.body?.trim();
-        if (!materialContent || materialContent.length < 5) throw fail("REQ_CONTENT_TOO_SHORT", { message: "Novi 沒有收到可加入教材的內容，請再說明教材重點。" });
-        const rows = await db.insert(studyMaterials).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, kind: "text", status: "ready", content: materialContent, summary: parsed.summary }).returning();
+        if (!materialContent || materialContent.length < 5) throw fail("AI_MATERIAL_PAYLOAD_INVALID", { details: { stage: "materials.content", actionType: action.type, payloadKeys: Object.keys(payload), missing: "content|body" } });
+        let rows;
+        try {
+          rows = await db.insert(studyMaterials).values({ userId: user.userId, title: parsed.title, subject: parsed.subject, kind: "text", status: "ready", content: materialContent, summary: parsed.summary }).returning();
+        } catch (error) {
+          console.error("[ai/action] create_material database write failed", { actionType: action.type, payloadKeys: Object.keys(payload), error });
+          throw fail("AI_MATERIAL_WRITE_FAILED", { details: { stage: "materials.insert", table: "study_materials", actionType: action.type, payloadKeys: Object.keys(payload), cause: error instanceof Error ? error.message.slice(0, 240) : "unknown" } });
+        }
         result = { material: rows[0] };
       } else if (action.type === "create_quiz") {
         const parsed = z
@@ -432,7 +448,12 @@ export const routes: RouteDef[] = [
         throw fail("AI_ACTION_UNSUPPORTED");
       }
 
-      await db.update(aiMessages).set({ actionStatus: "applied" }).where(eq(aiMessages.id, msg.id));
+      try {
+        await db.update(aiMessages).set({ actionStatus: "applied" }).where(eq(aiMessages.id, msg.id));
+      } catch (error) {
+        console.error("[ai/action] action status update failed", { actionType: action.type, messageId: msg.id, error });
+        throw fail("AI_ACTION_DIAGNOSTIC", { details: { stage: "ai_messages.status_update", table: "ai_messages", actionType: action.type, messageId: msg.id, cause: error instanceof Error ? error.message.slice(0, 240) : "unknown" } });
+      }
       return { status: "applied", result };
     },
   }),

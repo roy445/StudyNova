@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NoviAvatar, type NoviState } from "@/components/brand";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/ui";
-import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { ApiRequestError, apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { ChatRichText } from "@/components/ChatRichText";
 
@@ -160,7 +160,7 @@ export default function AiPage() {
     }
   }
 
-  async function resolveAction(messageId: string, confirm: boolean) {
+async function resolveAction(messageId: string, confirm: boolean) {
     const action = messages.find((item) => item.id === messageId)?.action;
     if (confirm && action?.type === "create_quiz" && !confirmNovaSpend("Novi 建立測驗", aiPracticeCost)) return;
     try {
@@ -169,6 +169,11 @@ export default function AiPage() {
       if (confirm && (action?.type === "create_material" || action?.type === "create_note")) await materials.reload();
       toast.push("success", confirm ? "已套用 Novi 的建議" : "已拒絕這個建議");
     } catch (err) {
+      if (err instanceof ApiRequestError) {
+        const details = err.details && typeof err.details === "object" ? err.details as { stage?: string; table?: string; payloadKeys?: string[]; cause?: string } : {};
+        const diagnostic = [err.display, err.requestId ? `requestId=${err.requestId}` : "", details.stage ? `stage=${details.stage}` : "", details.table ? `table=${details.table}` : "", details.payloadKeys?.length ? `payload=${details.payloadKeys.join(",")}` : "", details.cause ? `cause=${details.cause}` : ""].filter(Boolean).join("｜");
+        setError(diagnostic);
+      }
       toast.push("error", errorMessage(err));
     }
   }

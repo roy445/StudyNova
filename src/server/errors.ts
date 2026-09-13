@@ -110,7 +110,12 @@ export const ERROR_CATALOG = {
   IMAGE_UNCLEAR: def("SN-AI-6012", 422, "AI", "圖片清晰度不足", "請重新拍攝，讓文字完整、水平且避免反光。"),
   AI_INVALID_RESPONSE: def("SN-AI-6013", 502, "AI", "AI 回傳格式無法驗證", "請重新分析；若持續發生，請回報錯誤代碼與追蹤編號。"),
   AI_ACTION_INVALID: def("SN-AI-6007", 400, "AI", "這個 AI 建議已處理過或沒有可執行動作", "請重新整理對話後再試。"),
-  AI_ACTION_UNSUPPORTED: def("SN-AI-6008", 400, "AI", "不支援的 AI 動作", "Novi 只能建立任務／筆記／測驗或修改今日計畫。"),
+  AI_ACTION_UNSUPPORTED: def("SN-AI-6008", 400, "AI", "不支援的 AI 動作", "Novi 只能建立任務／筆記／教材／測驗或修改今日計畫。"),
+  AI_NOTE_PAYLOAD_INVALID: def("SN-AI-6014", 400, "AI", "AI 筆記內容格式不完整", "請重新要求 Novi 整理重點，並確認回覆中有實際重點內容。"),
+  AI_NOTE_WRITE_FAILED: def("SN-AI-6015", 503, "AI", "AI 筆記儲存失敗", "請附上錯誤代碼與追蹤編號回報，管理員可依 stage 檢查 notes 資料表。"),
+  AI_MATERIAL_PAYLOAD_INVALID: def("SN-AI-6016", 400, "AI", "AI 教材內容格式不完整", "請重新要求 Novi 加入教材，並確認回覆中有教材正文。"),
+  AI_MATERIAL_WRITE_FAILED: def("SN-AI-6017", 503, "AI", "AI 教材儲存失敗", "請附上錯誤代碼與追蹤編號回報，管理員可依 stage 檢查 study_materials 資料表。"),
+  AI_ACTION_DIAGNOSTIC: def("SN-AI-6018", 500, "AI", "AI 動作執行失敗", "請附上 action、stage、錯誤代碼與追蹤編號，系統已記錄完整診斷資訊。"),
   AI_VOICE_REQUIRED: def("SN-AI-6009", 400, "AI", "語音分析需要 AI 服務", "請先請管理員確認 AI 服務設定。"),
 
   /* ---------------------------------------------------------- FILE 7xxx */
