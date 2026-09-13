@@ -8,15 +8,37 @@ const SUPERSCRIPT: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", 
 function cleanFormula(value: string) {
   return value
     .replace(/\$/g, "")
+    .replace(/\\(?:dfrac|tfrac|frac)\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, "($1⁄$2)")
+    .replace(/\\sqrt\s*\[([^\]]+)\]\s*\{([^{}]*)\}/g, "$1√($2)")
+    .replace(/\\sqrt\s*\{([^{}]*)\}/g, "√($1)")
     .replace(/\\(?:text|mathrm|textrm|mbox)\{([^{}]*)\}/g, "$1")
     .replace(/\\(?:ext|ce)\{([^{}]*)\}/g, "$1")
     .replace(/\\left|\\right/g, "")
     .replace(/\\times/g, "×")
+    .replace(/\\cdot/g, "·")
+    .replace(/\\div/g, "÷")
     .replace(/\\rightarrow/g, "→")
+    .replace(/\\longrightarrow/g, "⟶")
+    .replace(/\\pm/g, "±")
+    .replace(/\\neq/g, "≠")
+    .replace(/\\approx/g, "≈")
     .replace(/\\leq/g, "≤")
     .replace(/\\geq/g, "≥")
+    .replace(/\\infty/g, "∞")
+    .replace(/\\pi/g, "π")
+    .replace(/\\(?:alpha|Α)/g, "α")
+    .replace(/\\(?:beta|Β)/g, "β")
+    .replace(/\\(?:gamma|Γ)/g, "γ")
+    .replace(/\\(?:delta|Δ)/g, "δ")
+    .replace(/\\(?:theta|Θ)/g, "θ")
+    .replace(/\\(?:lambda|Λ)/g, "λ")
+    .replace(/\\(?:mu|Μ)/g, "μ")
+    .replace(/\\(?:sigma|Σ)/g, "σ")
+    .replace(/\\(?:omega|Ω)/g, "ω")
+    .replace(/\\(sin|cos|tan|log|ln|lim)\b/g, "$1")
     .replace(/\^\{([^{}]+)\}/g, "^$1")
-    .replace(/_\{([^{}]+)\}/g, "_$1");
+    .replace(/_\{([^{}]+)\}/g, "_$1")
+    .replace(/[{}]/g, "");
 }
 
 function convertMarks(value: string) {

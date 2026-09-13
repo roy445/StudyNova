@@ -35,7 +35,7 @@ async function extractText(mime: string, data: Buffer, userId: string, subject =
   const res = await runAi({
     feature: mime === "application/pdf" ? "material_pdf_extract" : "ocr",
     userId,
-            system: `你是精準的全科 OCR 與文件解析引擎。${subjectStrategy(subject)}請完整輸出文件中的文字，保留段落、題號與公式（公式用 LaTeX）。只輸出文字，不要加入說明。`,
+            system: `你是精準的全科 OCR 與文件解析引擎。${subjectStrategy(subject)}請完整輸出文件中的文字，保留段落、題號與公式；公式與化學式必須直接使用可閱讀的 Unicode（例如 H₂O、x²、√x、a⁄b），不要輸出 LaTeX 或美元符號。只輸出文字，不要加入說明。`,
     parts: [
       { kind: "text", text: "請完整輸出這份文件的文字內容。" },
       { kind: mime === "application/pdf" ? "image" : "image", mimeType: mime, base64: data.toString("base64") },

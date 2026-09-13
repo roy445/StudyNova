@@ -12,4 +12,15 @@ describe("ChatRichText chemistry formulas", () => {
     expect(html).toContain("SO₄²⁻");
     expect(html).not.toContain("$");
   });
+
+  it("renders common mathematics without raw LaTeX commands", () => {
+    const html = renderToStaticMarkup(React.createElement(ChatRichText, { content: "公式：\\frac{a}{b}、\\sqrt{x}、x^2、\\pi、\\leq、\\sin θ。" }));
+    expect(html).toContain("a⁄b");
+    expect(html).toContain("√(x)");
+    expect(html).toContain("x²");
+    expect(html).toContain("π");
+    expect(html).toContain("≤");
+    expect(html).not.toContain("\\frac");
+    expect(html).not.toContain("\\sqrt");
+  });
 });

@@ -5,12 +5,13 @@ import { aiPolicies } from "@/db/schema";
 export type AiPolicy = typeof aiPolicies.$inferSelect;
 
 export const DEFAULT_AI_POLICIES: Record<string, Omit<AiPolicy, "id" | "createdAt" | "updatedAt" | "updatedBy">> = {
-  ai_chat: { feature: "ai_chat", strategy: "guided", allowDirectAnswer: false, requireDetailedAnalysis: false, allowWebSearch: false, maxHintLevel: 2, systemPolicy: "", version: 1, enabled: true },
-  question_analysis: { feature: "question_analysis", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true },
-  exam_hint: { feature: "exam_hint", strategy: "exam", allowDirectAnswer: false, requireDetailedAnalysis: false, allowWebSearch: false, maxHintLevel: 1, systemPolicy: "", version: 1, enabled: true },
-  wrong_answer_review: { feature: "wrong_answer_review", strategy: "teaching", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true },
-  ocr_solution: { feature: "ocr_solution", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true },
-  question_generation: { feature: "question_generation", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true },
+  ai_chat: { feature: "ai_chat", strategy: "guided", allowDirectAnswer: false, requireDetailedAnalysis: false, allowWebSearch: false, maxHintLevel: 2, systemPolicy: "", version: 1, enabled: true, proOnly: false },
+  ai_note_creation: { feature: "ai_note_creation", strategy: "guided", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "AI 建立筆記預設限 Nova Pro；管理員可調整 proOnly。", version: 1, enabled: true, proOnly: true },
+  question_analysis: { feature: "question_analysis", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true, proOnly: false },
+  exam_hint: { feature: "exam_hint", strategy: "exam", allowDirectAnswer: false, requireDetailedAnalysis: false, allowWebSearch: false, maxHintLevel: 1, systemPolicy: "", version: 1, enabled: true, proOnly: false },
+  wrong_answer_review: { feature: "wrong_answer_review", strategy: "teaching", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true, proOnly: false },
+  ocr_solution: { feature: "ocr_solution", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true, proOnly: false },
+  question_generation: { feature: "question_generation", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true, proOnly: false },
 };
 
 export async function getAiPolicy(feature: string): Promise<AiPolicy | null> {

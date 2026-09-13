@@ -16,6 +16,7 @@ import {
   userSettings,
   aiArtifacts,
   storageObjects,
+  aiUsageLogs,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, todayStr } from "../core";
@@ -288,7 +289,18 @@ export const routes: RouteDef[] = [
         {},
       );
 
-      const reply = (data.reply ?? "").trim() || "我這次沒有產生內容，請再說一次你的問題。";
+      const rawProviderText = meta.text.trim();
+      const reply = (data.reply ?? "").trim() || (!rawProviderText.startsWith("{") && !rawProviderText.startsWith("[") ? rawProviderText : "");
+      if (!reply) {
+        const diagnostic = { stage: "chat.reply", feature: "ai_chat", provider: meta.provider, model: meta.model, outputTokens: meta.outputTokens, responsePreview: rawProviderText.slice(0, 240) };
+        console.error("[ai/chat] provider returned no usable reply", diagnostic);
+        try {
+          await db.insert(aiUsageLogs).values({ userId: user.userId, provider: meta.provider, model: meta.model, feature: "ai_chat", success: false, inputTokens: meta.inputTokens, outputTokens: meta.outputTokens, latencyMs: meta.latencyMs, fallbackFrom: meta.fallbackFrom, failureCategory: "empty_response" });
+        } catch (telemetryError) {
+          console.error("[ai/chat] empty-response telemetry failed", telemetryError);
+        }
+        throw fail("AI_EMPTY_RESULT", { message: "AI 這次沒有回傳可用答案，系統已記錄診斷資訊，請重新送出；若持續發生請提供錯誤代碼。", details: diagnostic });
+      }
       const actionTypes = ["create_task", "create_note", "create_material", "create_quiz", "update_plan", "create_artifact"];
       const actionAliases: Record<string, string> = { add_material: "create_material", add_to_materials: "create_material", save_note: "create_note", add_note: "create_note", save_highlight: "create_note" };
       const rawAction = data.action;
@@ -367,6 +379,15 @@ export const routes: RouteDef[] = [
         const rows = await db.insert(tasks).values({ userId: user.userId, title: parsed.title, detail: parsed.detail ?? "", source: "ai" }).returning();
         result = { task: rows[0] };
       } else if (action.type === "create_note") {
+        let notePolicy;
+        try {
+          notePolicy = await getAiPolicy("ai_note_creation");
+        } catch (error) {
+          console.error("[ai/action] note policy lookup failed; using safe Pro-only default", error);
+          notePolicy = { proOnly: true, enabled: true } as { proOnly: boolean; enabled: boolean };
+        }
+        if (notePolicy?.enabled === false) throw fail("AI_ACTION_UNSUPPORTED", { message: "管理員目前停用 AI 建立筆記功能。" });
+        if (notePolicy?.proOnly !== false && !(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "AI 建立筆記目前為 Nova Pro 專屬功能，請先升級或聯絡管理員調整後台權限。", details: { stage: "notes.entitlement", feature: "ai_note_creation", proOnly: true } });
         const parsedResult = z.object({ title: z.string().min(1).max(120).default("Novi 重點整理"), subject: z.string().max(20).default("其他"), body: z.string().max(20000).optional(), content: z.string().max(20000).optional() }).safeParse(payload);
         if (!parsedResult.success) throw fail("AI_NOTE_PAYLOAD_INVALID", { details: { stage: "notes.payload", actionType: action.type, payloadKeys: Object.keys(payload), issues: parsedResult.error.issues.map((issue) => ({ path: issue.path, message: issue.message })) } });
         const parsed = parsedResult.data;

@@ -71,7 +71,7 @@ export default function AdminOpsPage() {
   const ai = useApi<{ providers: Provider[]; failures: Array<{ id: string; provider: string; feature: string; failureCategory: string; createdAt: string }>; byFeature: Array<{ feature: string; c: number; ok: number }>; configured: boolean }>(
     "/admin/ai/health",
   );
-  const policies = useApi<{ policies: Array<{ id: string; feature: string; strategy: string; allowDirectAnswer: boolean; requireDetailedAnalysis: boolean; allowWebSearch: boolean; maxHintLevel: number; systemPolicy: string; version: number; enabled: boolean }> }>("/admin/ai/policies");
+  const policies = useApi<{ policies: Array<{ id: string; feature: string; strategy: string; allowDirectAnswer: boolean; requireDetailedAnalysis: boolean; allowWebSearch: boolean; maxHintLevel: number; systemPolicy: string; version: number; enabled: boolean; proOnly: boolean }> }>("/admin/ai/policies");
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number }> }>("/admin/features");
   const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string; endsAt: string | null; targetFeature: string }> }>("/admin/announcements");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
@@ -305,6 +305,7 @@ export default function AdminOpsPage() {
                     <label className="flex items-center gap-2"><input type="checkbox" checked={policy.requireDetailedAnalysis} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { requireDetailedAnalysis: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />要求詳細解析</label>
                     <label className="flex items-center gap-2"><input type="checkbox" checked={policy.allowWebSearch} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { allowWebSearch: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />允許 AI 搜尋</label>
                     <label className="flex items-center gap-2"><input type="checkbox" checked={policy.enabled} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { enabled: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />啟用政策</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={policy.proOnly} onChange={async (e) => { await apiPatch(`/admin/ai/policies/${policy.feature}`, { proOnly: e.target.checked }); await policies.reload(); }} className="accent-[#7c5cff]" />僅限 Nova Pro</label>
                   </div>
                   <Button size="sm" variant="ghost" className="mt-3" onClick={async () => { const value = window.prompt("管理員自訂政策（留空代表清除）", policy.systemPolicy); if (value === null) return; await apiPatch(`/admin/ai/policies/${policy.feature}`, { systemPolicy: value }); await policies.reload(); }}>修改自訂政策</Button>
                 </div>

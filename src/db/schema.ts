@@ -1194,6 +1194,7 @@ export const aiPolicies = pgTable(
     systemPolicy: text("system_policy").notNull().default(""),
     version: integer("version").notNull().default(1),
     enabled: boolean("enabled").notNull().default(true),
+    proOnly: boolean("pro_only").notNull().default(false),
     updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
     createdAt: created(),
     updatedAt: updated(),

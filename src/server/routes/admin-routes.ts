@@ -953,6 +953,7 @@ export const routes: RouteDef[] = [
         maxHintLevel: z.number().int().min(0).max(5).optional(),
         systemPolicy: z.string().max(8000).optional(),
         enabled: z.boolean().optional(),
+        proOnly: z.boolean().optional(),
       }));
       const before = (await db.select().from(aiPolicies).where(eq(aiPolicies.feature, ctx.params.feature)).limit(1))[0];
       if (!before) throw notFound("找不到 AI Policy");

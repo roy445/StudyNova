@@ -4,10 +4,10 @@ export type StudySubject = (typeof SUBJECTS)[number];
 const STRATEGIES: Record<StudySubject, string> = {
   國文: "重視字詞、文意、修辭、段落結構、主旨、寫作手法與引用證據。",
   英文: "重視單字、片語、文法、句型、閱讀理解、翻譯與上下文證據。",
-  數學: "保留公式與符號，重視已知條件、解題步驟、計算、單位、圖形與答案驗算；不要把數學式當一般文字。",
-  自然: "區分物理、化學、生物與地科概念，重視定義、實驗變因、因果、數據、公式、單位與圖表證據。",
+  數學: "保留公式與符號，重視已知條件、解題步驟、計算、單位、圖形與答案驗算；不要把數學式當一般文字。公式請直接使用 Unicode：分數用 a⁄b、根號用 √x、次方用 x²，禁止輸出 \\frac、\\sqrt 或 $...$。",
+  自然: "區分物理、化學、生物與地科概念，重視定義、實驗變因、因果、數據、公式、單位與圖表證據。化學式請使用 Unicode 下標與上標，例如 H₂O、CO₂、Ca²⁺、SO₄²⁻，禁止輸出 LaTeX 命令或 $...$。",
   社會: "重視時間、地點、人物、制度、因果、比較、史料與圖表證據，區分歷史、地理與公民概念。",
-  理化: "重視物理量、化學式、反應、公式、單位、實驗變因、計算步驟與結果合理性。",
+  理化: "重視物理量、化學式、反應、公式、單位、實驗變因、計算步驟與結果合理性。化學式使用 Unicode 下標與上標（H₂O、Na⁺、SO₄²⁻），數學式使用 √、⁄、上標；禁止輸出 LaTeX 命令或 $...$。",
   生物: "重視構造與功能、分類、遺傳、生態、實驗流程、因果與圖表資料。",
   歷史: "重視時序、人物、事件、背景、因果、影響、史料與不同觀點。",
   地理: "重視位置、地圖、尺度、自然與人文因素、數據圖表、區域比較與因果。",
@@ -17,7 +17,7 @@ const STRATEGIES: Record<StudySubject, string> = {
 
 export function subjectStrategy(subject?: string | null) {
   const normalized = SUBJECTS.includes(subject as StudySubject) ? subject as StudySubject : "其他";
-  return `指定科目：${normalized}。分析策略：${STRATEGIES[normalized]}`;
+  return `指定科目：${normalized}。分析策略：${STRATEGIES[normalized]} 所有科目共同規則：輸出給學生看的內容不得含原始 LaTeX（例如 \\frac、\\sqrt、\\text）或美元符號；請使用可直接閱讀的 Unicode 上下標、希臘字母、√、⁄、×、≤、≥。`;
 }
 
 export function subjectOptions() {
