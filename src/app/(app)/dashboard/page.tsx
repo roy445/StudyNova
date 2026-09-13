@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Progress, Skeleton, Stat, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Skeleton, Stat, Textarea, useToast } from "@/components/ui";
 import { LineChart } from "@/components/charts";
 import { NoviAvatar } from "@/components/brand";
 import { apiPost, useApi } from "@/lib/api";
@@ -62,6 +62,20 @@ export default function DashboardPage() {
   const alerts = useApi<{ alerts: Array<{ id: string; title: string; body: string; evidence: Record<string, unknown> }>; enabled: boolean }>("/ai/alerts");
   const patterns = useApi<{ patterns: Array<{ subject: string; reason: string; count: number; questionCount: number; evidence: string }>; enoughData: boolean }>("/learning/error-patterns");
   const [claiming, setClaiming] = useState<string | null>(null);
+  const [appealExam, setAppealExam] = useState<Dashboard["upcomingExams"][number] | null>(null);
+  const [appealDate, setAppealDate] = useState("");
+  const [appealReason, setAppealReason] = useState("");
+  const [appealSending, setAppealSending] = useState(false);
+
+  async function submitExamAppeal() {
+    if (!appealExam || !appealDate || appealReason.trim().length < 5) return toast.push("error", "請填寫正確日期與至少 5 個字的申請理由");
+    setAppealSending(true);
+    try {
+      await apiPost("/exam-date-appeals", { examId: appealExam.id, examName: appealExam.name, currentExamDate: appealExam.examDate, requestedExamDate: appealDate, reason: appealReason.trim() });
+      toast.push("success", "異議申請已送出，等待管理員審核");
+      setAppealExam(null); setAppealDate(""); setAppealReason("");
+    } catch (err) { toast.push("error", err instanceof Error ? err.message : "申請失敗"); } finally { setAppealSending(false); }
+  }
 
   async function claim(taskId: string) {
     setClaiming(taskId);
@@ -251,7 +265,7 @@ export default function DashboardPage() {
         </section>
       )}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="⌁ 考試倒數" action={<Link href="/grades" className="text-xs underline text-muted">管理</Link>}>
+        <Card title="⌁ 考試倒數" subtitle="日期來自你的考試設定；若學校公告不同，可提出異議申請。" action={<Link href="/grades" className="text-xs underline text-muted">管理</Link>}>
           {data.upcomingExams.length ? (
             <div className="space-y-2">
               {data.upcomingExams.map((e) => (
@@ -259,6 +273,7 @@ export default function DashboardPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{e.name}</p>
                     <p className="text-xs text-muted">{e.examDate}</p>
+                    <button type="button" className="mt-1 text-[11px] text-[#7dd3fc] underline" onClick={() => { setAppealExam(e); setAppealDate(e.examDate); setAppealReason(""); }}>日期不符？提出異議</button>
                   </div>
                   <span className={`shrink-0 text-lg font-bold tabular-nums ${e.daysLeft <= 7 ? "text-[#ffc857]" : "text-[#37d3ff]"}`}>{e.daysLeft} 天</span>
                 </div>
@@ -371,6 +386,9 @@ export default function DashboardPage() {
           </div>
         </Card>
       )}
+      <Modal open={Boolean(appealExam)} onClose={() => setAppealExam(null)} title="段考日期異議申請">
+        {appealExam && <div className="space-y-3"><p className="text-xs text-muted">目前系統日期：{appealExam.examDate}。審核通過後才會更新倒數，送出後請等待管理員確認。</p><Field label="你認為的段考日期"><Input type="date" value={appealDate} onChange={(e) => setAppealDate(e.target.value)} /></Field><Field label="申請理由"><Textarea value={appealReason} onChange={(e) => setAppealReason(e.target.value)} placeholder="例如：學校公告段考延期至……" /></Field><Button full loading={appealSending} onClick={submitExamAppeal}>送出異議申請</Button></div>}
+      </Modal>
     </div>
   );
 }

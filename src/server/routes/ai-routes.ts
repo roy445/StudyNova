@@ -14,6 +14,8 @@ import {
   quizzes,
   gradeRecords,
   userSettings,
+  aiArtifacts,
+  storageObjects,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, todayStr } from "../core";
@@ -79,6 +81,46 @@ async function buildContext(userId: string, allow: string[], materialId: string 
   const mem = await db.select().from(aiMemory).where(and(eq(aiMemory.userId, userId), eq(aiMemory.consentStatus, "active"), isNull(aiMemory.deletedAt), sql`(${aiMemory.expiresAt} is null or ${aiMemory.expiresAt} > now())`)).orderBy(desc(aiMemory.confidence), desc(aiMemory.updatedAt)).limit(20);
   if (mem.length) parts.push(`【長期記憶】${mem.map((m) => `${m.key}: ${m.value}`).join("；")}`);
   return parts.join("\n\n");
+}
+
+async function createAiArtifact(params: { userId: string; conversationId: string; messageId: string; kind: string; title: string; body: string }) {
+  const body = params.body.slice(0, 20000);
+  let data: Buffer;
+  let mimeType: string;
+  let filename: string;
+  if (params.kind === "pdf") {
+    const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    let page = pdf.addPage([595, 842]);
+    let y = 800;
+    const lines = body.replace(/\r/g, "").split("\n").flatMap((line) => line.match(/.{1,72}/g) ?? [""]);
+    for (const line of [`StudyNova · ${params.title}`, "", ...lines]) {
+      if (y < 48) { page = pdf.addPage([595, 842]); y = 800; }
+      page.drawText(line, { x: 42, y, size: line.startsWith("StudyNova") ? 16 : 11, font, color: rgb(0.08, 0.12, 0.22) });
+      y -= line.startsWith("StudyNova") ? 26 : 17;
+    }
+    data = Buffer.from(await pdf.save());
+    mimeType = "application/pdf";
+    filename = `${params.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, "-").slice(0, 80)}.pdf`;
+  } else {
+    const items = body.split("\n").filter(Boolean).slice(0, 14);
+    const isMindMap = params.kind === "mind_map";
+    const svg = isMindMap
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900"><rect width="1400" height="900" fill="#fffdf5"/><g stroke="#8b6f47" stroke-width="5" fill="none" opacity=".75"><path d="M700 450 C480 220 260 180 120 150"/><path d="M700 450 C460 430 250 430 90 450"/><path d="M700 450 C470 650 250 720 120 760"/><path d="M700 450 C930 220 1130 190 1280 150"/><path d="M700 450 C930 430 1140 430 1310 450"/><path d="M700 450 C920 650 1130 720 1280 760"/></g><g font-family="Comic Sans MS, cursive" fill="#25324a"><ellipse cx="700" cy="450" rx="190" ry="70" fill="#ffe79a" stroke="#8b6f47" stroke-width="5"/><text x="700" y="460" text-anchor="middle" font-size="34">${escapeXml(params.title.slice(0, 22))}</text>${items.map((item, index) => { const coords = [[120,150],[90,450],[120,760],[1280,150],[1310,450],[1280,760]][index % 6]; return `<rect x="${coords[0] - 100}" y="${coords[1] - 32}" width="200" height="64" rx="18" fill="#d9f3ff" stroke="#6487a0" stroke-width="3"/><text x="${coords[0]}" y="${coords[1] + 8}" text-anchor="middle" font-size="20">${escapeXml(item.slice(0, 18))}</text>`; }).join("")}</g></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600"><rect width="1200" height="1600" fill="#fffef7"/><path d="M80 120 H1120 M80 220 H1120 M80 320 H1120 M80 420 H1120 M80 520 H1120 M80 620 H1120 M80 720 H1120 M80 820 H1120 M80 920 H1120 M80 1020 H1120 M80 1120 H1120 M80 1220 H1120 M80 1320 H1120 M80 1420 H1120" stroke="#b8d5e6" stroke-width="2"/><text x="80" y="80" font-family="Comic Sans MS, cursive" font-size="38" fill="#263b66">${escapeXml(params.title.slice(0, 32))}</text>${items.map((item, index) => `<text x="100" y="${155 + index * 100}" font-family="Comic Sans MS, cursive" font-size="28" fill="#263b66">${index + 1}. ${escapeXml(item.slice(0, 62))}</text>`).join("")}</svg>`;
+    const sharp = (await import("sharp")).default;
+    data = await sharp(Buffer.from(svg)).png().toBuffer();
+    mimeType = "image/png";
+    filename = `${params.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, "-").slice(0, 80)}.png`;
+  }
+  const stored = await putObject({ userId: params.userId, filename, mimeType, data, allow: params.kind === "pdf" ? ["pdf"] : ["image"] });
+  const rows = await db.insert(aiArtifacts).values({ userId: params.userId, conversationId: params.conversationId, messageId: params.messageId, kind: params.kind, title: params.title, objectId: stored.id, preview: body.slice(0, 500), metadata: { mimeType, filename } }).returning();
+  return rows[0];
+}
+
+function escapeXml(value: string) {
+  return value.replace(/[<>&'"]/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[char] ?? char);
 }
 
 export const routes: RouteDef[] = [
@@ -228,10 +270,12 @@ export const routes: RouteDef[] = [
             `你是 StudyNova 的 AI 學習助理 Novi，服務台灣國高中學生。${MODES[conv.mode as keyof typeof MODES] ?? MODES.teacher}\n` +
             policyInstructions(policy, { examMode: conv.mode === "exam" || conv.mode === "hint" }) + "\n" +
             "你不能自行修改使用者資料。若需要建立任務／筆記／測驗或修改讀書計畫，請在 action 欄位提出建議，等使用者確認。\n" +
-            '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_quiz|update_plan","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
+            '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_quiz|update_plan|create_artifact","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
             "個人記憶規則：memory 只能保存使用者明確表達且對未來學習有必要的偏好，key 只能是 preferred_name、learning_style、explanation_preference、reminder_preference；不得保存身分證、地址、聯絡方式、健康、財務或其他不必要私人資訊。\n" +
             "importance 規則：normal 是一般說明；important 是考試重點、常見錯誤或需要特別注意的內容；critical 是安全、截止時間、明確答案或不可忽略的關鍵提醒。回答中請用 markdown 條列與粗體呈現重點。\n" +
             "朋友聊天語氣規則：像一位真誠、懂學習的朋友陪學生聊天，不要像制式客服或教科書。可以自然使用『欸、其實、你可以先、沒事、我們一起看』等口語，但不要過度裝熟或使用粗俗語言。每次回覆至少補充一點有用的解釋或下一步，不要只回一句空泛鼓勵。依情境加入 1 到 3 個自然的符號或表情，例如 🙂、👍、✨、💡、📌；不要每句都放，也不要讓表情取代內容。可以使用『哈哈』『懂你』等朋友式反應，但遇到錯誤、考試重點或重要提醒仍要清楚、準確、尊重。不要輸出貼圖網址、圖片 Markdown 或虛構貼圖代碼；若需要可用文字搭配表情呈現。\n" +
+            "化學與數學公式規則：化學式請使用可讀的純文字或 $H_2O$、$CO_2$、$HCl$、$O_3$ 格式；下標用 _，電荷用 ^，不要輸出 \\ext、\\text 的錯誤變體，也不要把公式放進程式碼區塊。元素名稱與元素符號要同時清楚顯示，例如 氫（H）、氧（O）、氯（Cl）。\n" +
+            "產物規則：當學生要求把本次重點做成 PDF、手寫風格圖片、手繪重點或心智圖時，先在 reply 說明你要整理的內容，再提出 create_artifact action 等待確認。payload 必須是 {kind:'pdf'|'handwritten_note'|'mind_map',title,body}；body 只放本次對話已確認的重點，不可杜撰。確認後系統會直接在對話顯示可開啟的產物；只有 Nova Pro 可以下載檔案，免費使用者只能預覽並被引導到學習中心產物專區。\n" +
             "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；update_plan payload：{blocks:[{subject,minutes,focus}]}。\n" +
             "繁體中文回答。不得杜撰使用者資料。若本次訊息附有圖片，必須實際查看圖片；圖片是主要證據，OCR 文字只是輔助。不要回答使用者沒有傳圖片。",
           parts: [
@@ -245,7 +289,7 @@ export const routes: RouteDef[] = [
       );
 
       const reply = (data.reply ?? "").trim() || "我這次沒有產生內容，請再說一次你的問題。";
-      const actionTypes = ["create_task", "create_note", "create_quiz", "update_plan"];
+      const actionTypes = ["create_task", "create_note", "create_quiz", "update_plan", "create_artifact"];
       const action = data.action && actionTypes.includes(String(data.action.type)) ? data.action : null;
 
       const inserted = await db
@@ -364,6 +408,10 @@ export const routes: RouteDef[] = [
           .onConflictDoUpdate({ target: [studyPlans.userId, studyPlans.planDate], set: { blocks, totalMinutes: total, rationale: "由 Novi 建議並經你確認後套用", generatedBy: "ai" } })
           .returning();
         result = { plan: rows[0] };
+      } else if (action.type === "create_artifact") {
+        const parsed = z.object({ kind: z.enum(["pdf", "handwritten_note", "mind_map"]), title: z.string().min(1).max(120), body: z.string().min(1).max(20000) }).parse(payload);
+        const artifact = await createAiArtifact({ userId: user.userId, conversationId: conv.id, messageId: msg.id, ...parsed });
+        result = { artifact, preview: artifact.preview, downloadable: await isProUser(user.userId), openUrl: artifact.objectId ? `/api/files/${artifact.objectId}` : null, studyCenterUrl: "/study?tab=visual-notes" };
       } else {
         throw fail("AI_ACTION_UNSUPPORTED");
       }

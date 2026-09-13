@@ -34,6 +34,10 @@ export const users = pgTable(
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
     displayName: text("display_name").notNull(),
+    nameModerationStatus: text("name_moderation_status").notNull().default("clear"), // clear | warned | blocked
+    nameModerationReason: text("name_moderation_reason").notNull().default(""),
+    nameLastCheckedAt: timestamp("name_last_checked_at", { withTimezone: true }),
+    nameWarningCount: integer("name_warning_count").notNull().default(0),
     role: text("role").notNull().default("student"), // student | admin | owner
     status: text("status").notNull().default("active"), // active | blocked
     blockedReason: text("blocked_reason").notNull().default(""),
@@ -43,6 +47,10 @@ export const users = pgTable(
     bio: text("bio").notNull().default(""),
     onboarded: boolean("onboarded").notNull().default(false),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    inactiveReminderCount: integer("inactive_reminder_count").notNull().default(0),
+    inactiveFirstNotifiedAt: timestamp("inactive_first_notified_at", { withTimezone: true }),
+    inactiveSecondNotifiedAt: timestamp("inactive_second_notified_at", { withTimezone: true }),
+    deletionScheduledAt: timestamp("deletion_scheduled_at", { withTimezone: true }),
     createdAt: created(),
     updatedAt: updated(),
   },
@@ -161,6 +169,29 @@ export const examSubjects = pgTable(
     targetScore: real("target_score"),
   },
   (t) => [index("exam_subjects_exam_idx").on(t.examId)],
+);
+
+export const examDateAppeals = pgTable(
+  "exam_date_appeals",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    examId: uuid("exam_id").references(() => exams.id, { onDelete: "cascade" }),
+    examName: text("exam_name").notNull(),
+    subject: text("subject").notNull().default(""),
+    currentExamDate: text("current_exam_date").notNull().default(""),
+    requestedExamDate: text("requested_exam_date").notNull(),
+    requestedDaysRemaining: integer("requested_days_remaining"),
+    reason: text("reason").notNull(),
+    evidenceObjectId: uuid("evidence_object_id"),
+    status: text("status").notNull().default("pending"),
+    adminNote: text("admin_note").notNull().default(""),
+    handledBy: uuid("handled_by").references(() => users.userId, { onDelete: "set null" }),
+    handledAt: timestamp("handled_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_date_appeals_user_idx").on(t.userId, t.createdAt), index("exam_date_appeals_status_idx").on(t.status, t.createdAt)],
 );
 
 /* -------------------------------------------------------------- STORAGE */
@@ -1046,6 +1077,23 @@ export const aiMessages = pgTable(
     createdAt: created(),
   },
   (t) => [index("ai_msg_conv_idx").on(t.conversationId)],
+);
+
+export const aiArtifacts = pgTable(
+  "ai_artifacts",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id").references(() => aiConversations.id, { onDelete: "set null" }),
+    messageId: uuid("message_id").references(() => aiMessages.id, { onDelete: "set null" }),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    objectId: uuid("object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    preview: text("preview").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [index("ai_artifacts_user_idx").on(t.userId, t.createdAt)],
 );
 
 export const aiMemory = pgTable(

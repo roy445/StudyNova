@@ -5,6 +5,7 @@ import { NoviAvatar, type NoviState } from "@/components/brand";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
+import { ChatRichText } from "@/components/ChatRichText";
 
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
 type Message = { id: string; conversationId?: string; role: string; content: string; attachment?: { name: string; previewUrl: string }; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
@@ -37,6 +38,7 @@ const ACTION_LABEL: Record<string, string> = {
   create_note: "建立筆記",
   create_quiz: "建立測驗",
   update_plan: "修改今日讀書計畫",
+  create_artifact: "生成手寫重點／心智圖／PDF",
 };
 
 export default function AiPage() {
@@ -161,8 +163,8 @@ export default function AiPage() {
     const action = messages.find((item) => item.id === messageId)?.action;
     if (confirm && action?.type === "create_quiz" && !confirmNovaSpend("Novi 建立測驗", aiPracticeCost)) return;
     try {
-      await apiPost(`/ai/messages/${messageId}/action`, { confirm });
-      setMessages((m) => m.map((x) => (x.id === messageId ? { ...x, actionStatus: confirm ? "applied" : "rejected" } : x)));
+      const applied = await apiPost<{ result?: { downloadable?: boolean; openUrl?: string | null; studyCenterUrl?: string; preview?: string } }>(`/ai/messages/${messageId}/action`, { confirm });
+      setMessages((m) => m.map((x) => (x.id === messageId ? { ...x, actionStatus: confirm ? "applied" : "rejected", action: confirm && applied.result && x.action ? { ...x.action, payload: { ...(x.action.payload ?? {}), ...applied.result } } : x.action } : x)));
       toast.push("success", confirm ? "已套用 Novi 的建議" : "已拒絕這個建議");
     } catch (err) {
       toast.push("error", errorMessage(err));
@@ -296,7 +298,7 @@ export default function AiPage() {
                   <div className={`max-w-[88%] rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "border-transparent bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : m.importance === "critical" ? "border-rose-300/60 bg-rose-400/15 text-rose-50 shadow-[0_0_24px_rgba(251,113,133,0.14)]" : m.importance === "important" ? "border-amber-300/50 bg-amber-400/12 text-amber-50" : "glass-soft border-transparent"}`}>
                     {m.attachment && <img src={m.attachment.previewUrl} alt={m.attachment.name} className="mb-2 max-h-64 max-w-full rounded-xl object-contain" />}
                     {m.role !== "user" && m.importance && m.importance !== "normal" && <p className={`mb-1 text-[10px] font-bold tracking-wide ${m.importance === "critical" ? "text-rose-200" : "text-amber-200"}`}>{m.importance === "critical" ? "⚠ 關鍵提醒" : "✦ 學習重點"}</p>}
-                    <pre className="whitespace-pre-wrap font-sans">{m.content}</pre>
+                    <ChatRichText content={m.content} />
                     {m.action && (
                       <div className="mt-2 rounded-xl border border-[#ffc857]/40 bg-[#ffc857]/10 p-2.5 text-xs">
                         <p className="font-medium text-[#ffd98a]">✦ Novi 想要：{ACTION_LABEL[m.action.type] ?? m.action.type} {m.action.type === "create_note" && <Badge tone="gold">Nova Pro 專屬</Badge>}</p>
@@ -314,7 +316,7 @@ export default function AiPage() {
                             </Button>
                           </div>
                         ) : (
-                          <Badge tone={m.actionStatus === "applied" ? "green" : "muted"}>{m.actionStatus === "applied" ? "已套用" : "已拒絕"}</Badge>
+                          <div className="flex flex-wrap items-center gap-2"><Badge tone={m.actionStatus === "applied" ? "green" : "muted"}>{m.actionStatus === "applied" ? "已套用" : "已拒絕"}</Badge>{m.actionStatus === "applied" && m.action.type === "create_artifact" && <><p className="basis-full text-xs text-muted">{String(m.action.payload?.preview ?? "已完成產物整理")}</p>{m.action.payload?.downloadable ? <a className="text-xs text-[#7dd3fc] underline" href={String(m.action.payload?.openUrl ?? "#")} target="_blank" rel="noreferrer" download>開啟／下載（Pro）</a> : <a className="text-xs text-amber-200 underline" href={String(m.action.payload?.studyCenterUrl ?? "/study?tab=visual-notes")}>前往學習中心預覽</a>}</>}</div>
                         )}
                       </div>
                     )}

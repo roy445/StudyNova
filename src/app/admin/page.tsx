@@ -72,6 +72,7 @@ const ACTIONS = [
   { key: "set_unlimited", label: "設定功能無限", needFeature: true },
   { key: "set_role", label: "設定角色", needRole: true },
   { key: "send_notification", label: "發送通知／推播", needNotification: true },
+  { key: "delete_account", label: "永久刪除帳號與資料" },
 ];
 
 export default function AdminOverviewPage() {
@@ -89,6 +90,8 @@ export default function AdminOverviewPage() {
   const [actionOpen, setActionOpen] = useState(false);
   const [form, setForm] = useState({ action: "gift_nova", reason: "", amount: 100, days: 30, feature: "", role: "student", title: "🎁 StudyNova 最新通知", message: "Novi 有一則新消息想告訴你！", link: "/dashboard" });
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
+  const [renameReason, setRenameReason] = useState("");
   const [themeForm, setThemeForm] = useState<ChristmasTheme>(DEFAULT_CHRISTMAS_THEME);
   const [compressionForm, setCompressionForm] = useState<CompressionSettings>(DEFAULT_COMPRESSION_SETTINGS);
 
@@ -111,6 +114,7 @@ export default function AdminOverviewPage() {
   async function runBulk() {
     if (!selected.length) return toast.push("error", "請先選擇使用者");
     if (!form.reason.trim()) return toast.push("error", "請填寫操作原因（會寫入 Audit Log）");
+    if (form.action === "delete_account" && !window.confirm(`確定永久刪除已選取的 ${selected.length} 個帳號及其資料？此操作不可復原。`)) return;
     try {
       const res = await apiPost<{ results: Array<{ userId: string; ok: boolean; detail: string }> }>("/admin/users/bulk", {
         userIds: selected,
@@ -242,6 +246,8 @@ export default function AdminOverviewPage() {
                         onClick={async () => {
                           const res = await apiGet<Record<string, unknown>>(`/admin/users/${u.userId}`);
                           setDetail(res);
+                          setNameDraft(String((res.user as { displayName?: string } | undefined)?.displayName ?? ""));
+                          setRenameReason("");
                         }}
                       >
                         詳細
@@ -400,6 +406,7 @@ export default function AdminOverviewPage() {
       </Modal>
 
       <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title="使用者詳細" wide>
+        {Boolean(detail?.user) && <div className="mb-3 space-y-2 rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3"><p className="text-xs font-semibold text-[#b9f2ff]">管理員代改名稱</p><div className="flex flex-wrap gap-2"><Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="新的顯示名稱" className="flex-1" /><Input value={renameReason} onChange={(e) => setRenameReason(e.target.value)} placeholder="修改原因（必填）" className="flex-1" /><Button size="sm" onClick={async () => { const user = detail?.user as { userId?: string } | undefined; if (!user?.userId || !renameReason.trim()) { toast.push("error", "請填寫名稱與修改原因"); return; } try { await apiPatch(`/admin/users/${user.userId}/profile`, { displayName: nameDraft, reason: renameReason }); toast.push("success", "名稱已更新並通知使用者"); setDetail(null); await users.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存名稱</Button></div></div>}
         <pre className="max-h-[60vh] overflow-auto scroll-thin whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-[11px]">{JSON.stringify(detail, null, 2)}</pre>
       </Modal>
     </div>

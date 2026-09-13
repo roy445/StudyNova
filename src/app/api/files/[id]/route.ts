@@ -1,5 +1,9 @@
 import { getSession } from "@/server/auth";
 import { readObject, verifyObjectSignature, objectOwner } from "@/server/storage";
+import { db } from "@/db";
+import { aiArtifacts } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { isProUser } from "@/server/economy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +16,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const viewer = url.searchParams.get("v") ?? "";
 
   const session = await getSession();
+  const artifact = (await db.select({ userId: aiArtifacts.userId }).from(aiArtifacts).where(eq(aiArtifacts.objectId, id)).limit(1))[0];
+  if (artifact && (!session || session.user.userId !== artifact.userId || !(await isProUser(session.user.userId)))) return new Response("Nova Pro required", { status: 402 });
   const owner = await objectOwner(id);
   if (!owner) return new Response("Not found", { status: 404 });
 

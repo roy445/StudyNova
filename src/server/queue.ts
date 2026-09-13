@@ -15,12 +15,18 @@ import {
   questionAnalysisBatches,
   questionAnalysisJobs,
   questions,
+  sessions,
+  aiMemory,
+  aiConversations,
+  aiMessages,
+  fileContexts,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
 import { sendAccountEmail, systemAnnouncementEmailTemplate } from "./email";
 import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core";
 import { analyzeQuestionWithAi } from "./question-analysis";
+import { checkDisplayName } from "./name-moderation";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -36,7 +42,9 @@ export type JobName =
   | "compression_batch"
   | "announcement_publish"
   | "activity_promote"
-  | "question_analysis_batch";
+  | "question_analysis_batch"
+  | "data_retention"
+  | "name_moderation_scan";
 
 
 export type JobPayload = Record<string, unknown>;
@@ -187,8 +195,8 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
   },
 
   async inactive_reminder() {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60_000);
-    const rows = await db.select({ userId: users.userId, displayName: users.displayName }).from(users).where(and(eq(users.status, "active"), eq(users.role, "student"), lt(users.lastLoginAt, cutoff)));
+    const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60_000);
+    const rows = await db.select({ userId: users.userId, displayName: users.displayName }).from(users).where(and(eq(users.status, "active"), eq(users.role, "student")));
     const messages = [
       { title: "🐦 Novi 的小提醒", body: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard" },
       { title: "🪶 小鳥飛來報到", body: "今天還沒看到你，來做 10 個單字，讓記憶不要飛走吧！", link: "/study" },
@@ -198,6 +206,19 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     ];
     let sent = 0;
     for (const row of rows) {
+      const current = (await db.select({ count: users.inactiveReminderCount, first: users.inactiveFirstNotifiedAt, second: users.inactiveSecondNotifiedAt, lastLogin: users.lastLoginAt, created: users.createdAt }).from(users).where(eq(users.userId, row.userId)).limit(1))[0];
+      const inactiveSince = current?.lastLogin ?? current?.created ?? new Date(0);
+      if (inactiveSince > cutoff) continue;
+      const now = new Date();
+      if ((current?.count ?? 0) === 0) {
+        await db.update(users).set({ inactiveReminderCount: 1, inactiveFirstNotifiedAt: now, updatedAt: now }).where(eq(users.userId, row.userId));
+      } else if ((current?.count ?? 0) === 1 && current?.first && now.getTime() - current.first.getTime() >= 30 * 86400000) {
+        await db.update(users).set({ inactiveReminderCount: 2, inactiveSecondNotifiedAt: now, updatedAt: now }).where(eq(users.userId, row.userId));
+      } else if ((current?.count ?? 0) >= 2 && current?.second && now.getTime() - current.second.getTime() >= 30 * 86400000) {
+        await db.delete(users).where(eq(users.userId, row.userId));
+        sent += 1;
+        continue;
+      } else continue;
       const message = messages[Math.abs(row.userId.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % messages.length];
       const created = await notify({
         userId: row.userId,
@@ -211,6 +232,32 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
       if (created) sent += 1;
     }
     return `寄出 ${sent} 則久未登入關懷提醒`;
+  },
+
+  async data_retention() {
+    const now = new Date();
+    const memoryCutoff = new Date(now.getTime() - 180 * 86400000);
+    const deletedCutoff = new Date(now.getTime() - 30 * 86400000);
+    const oldMemory = await db.delete(aiMemory).where(sql`${aiMemory.deletedAt} < ${deletedCutoff} OR (${aiMemory.scope} = 'episodic' AND ${aiMemory.confidence} < 70 AND coalesce(${aiMemory.lastUsedAt}, ${aiMemory.updatedAt}) < ${memoryCutoff})`).returning({ id: aiMemory.id });
+    const archived = await db.select({ id: aiConversations.id }).from(aiConversations).where(and(eq(aiConversations.archived, true), sql`${aiConversations.updatedAt} < ${memoryCutoff}`)).limit(500);
+    for (const conversation of archived) await db.delete(aiMessages).where(eq(aiMessages.conversationId, conversation.id));
+    const contexts = await db.delete(fileContexts).where(sql`${fileContexts.createdAt} < now() - interval '90 days'`).returning({ id: fileContexts.id });
+    return `保守清理完成：刪除 ${oldMemory.length} 筆低價值記憶、${contexts.length} 筆過期檔案分析，清理 ${archived.length} 個封存對話訊息`;
+  },
+
+  async name_moderation_scan() {
+    const rows = await db.select({ userId: users.userId, displayName: users.displayName }).from(users).where(eq(users.status, "active"));
+    let blocked = 0;
+    for (const row of rows) {
+      const check = checkDisplayName(row.displayName);
+      if (check.ok) continue;
+      const now = new Date();
+      await notify({ userId: row.userId, kind: "admin_notice", title: "名稱違反 StudyNova 規範", body: `你的名稱「${row.displayName}」含有不適當內容，帳號已永久封鎖。原因：${check.reason}`, link: "/support", dedupeKey: `name-block:${row.userId}:${now.toISOString().slice(0, 10)}` });
+      await db.update(users).set({ status: "blocked", blockedReason: `名稱審查違規：${check.reason}`, blockedAt: now, blockedUntil: null, nameModerationStatus: "blocked", nameModerationReason: check.reason, nameLastCheckedAt: now, updatedAt: now }).where(eq(users.userId, row.userId));
+      await db.delete(sessions).where(eq(sessions.userId, row.userId));
+      blocked += 1;
+    }
+    return `名稱巡檢完成：檢查 ${rows.length} 個帳號，永久封鎖 ${blocked} 個違規帳號`;
   },
 
   async session_cleanup() {
@@ -447,6 +494,8 @@ export const CRON_TASKS: Array<{ task: JobName; label: string; schedule: string 
   { task: "activity_reminder", label: "活動提醒", schedule: "每日 12:00" },
   { task: "inactive_reminder", label: "久未登入關懷提醒", schedule: "每日 18:30" },
   { task: "session_cleanup", label: "Session / 通知清理", schedule: "每日 03:00" },
+  { task: "data_retention", label: "保守資料保留清理", schedule: "每日 03:30" },
+  { task: "name_moderation_scan", label: "使用者名稱巡檢", schedule: "每 6 小時" },
   { task: "study_reminder", label: "每日讀書提醒", schedule: "每日 20:00" },
 ];
 

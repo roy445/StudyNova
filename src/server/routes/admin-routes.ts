@@ -54,6 +54,7 @@ import { providerMetrics, recentAiFailures, aiConfigured, runAiJson } from "../a
 import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured, systemAnnouncementEmailTemplate } from "../email";
 import { analysisPrompt, qualityGate } from "../question-analysis";
 import { getAiPolicy, policyInstructions } from "../ai-policy";
+import { checkDisplayName } from "../name-moderation";
 
 function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
   return new Response(toCsv(rows), {
@@ -319,7 +320,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({
           userIds: z.array(z.string().uuid()).min(1).max(200),
-          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role", "send_notification", "logout"]),
+          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role", "send_notification", "logout", "delete_account"]),
           reason: z.string().min(1, "請填寫操作原因").max(300),
           amount: z.number().int().min(-100000).max(100000).optional(),
           days: z.number().int().min(1).max(3650).optional(),
@@ -335,7 +336,7 @@ export const routes: RouteDef[] = [
         try {
           const before = (await db.select().from(users).where(eq(users.userId, userId)).limit(1))[0];
           if (!before) throw notFound("找不到使用者");
-          if (before.role === "owner" && ["block", "set_role", "revoke_pro"].includes(body.action) && before.userId !== admin.userId) {
+          if (before.role === "owner" && ["block", "set_role", "revoke_pro", "delete_account"].includes(body.action) && before.userId !== admin.userId) {
             throw fail("ADMIN_TARGET_PROTECTED");
           }
           switch (body.action) {
@@ -386,6 +387,13 @@ export const routes: RouteDef[] = [
             case "logout": {
               await db.delete(sessions).where(eq(sessions.userId, userId));
               break;
+            }
+            case "delete_account": {
+              if (before.userId === admin.userId) throw fail("ADMIN_TARGET_PROTECTED", { message: "不能刪除目前登入中的管理員帳號" });
+              await db.delete(users).where(eq(users.userId, userId));
+              await adminLog({ actorId: admin.userId, action: "user.delete_account", targetType: "user", targetId: userId, reason: body.reason, before, ip: ctx.ip });
+              results.push({ userId, ok: true, detail: "帳號與所屬資料已刪除" });
+              continue;
             }
             case "send_notification": {
               if (!body.title || !body.message) throw fail("ADMIN_MISSING_PARAM", { message: "請輸入通知標題與內容" });
@@ -440,6 +448,24 @@ export const routes: RouteDef[] = [
       const ledger = await db.select().from(novaTransactions).where(eq(novaTransactions.userId, u.userId)).orderBy(desc(novaTransactions.createdAt)).limit(30);
       const usage = await db.select().from(featureUsage).where(eq(featureUsage.userId, u.userId)).orderBy(desc(featureUsage.usageDate)).limit(40);
       return { user: { ...u, passwordHash: undefined }, membership: m, nova, ledger, usage };
+    },
+  }),
+
+  route({
+    method: "PATCH",
+    path: "/admin/users/:id/profile",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ displayName: z.string().min(1).max(40), bio: z.string().max(200).optional(), reason: z.string().min(1).max(300) }));
+      const check = checkDisplayName(body.displayName);
+      if (!check.ok) throw badRequest("管理員設定的名稱也必須符合名稱規範。", { reason: check.reason });
+      const before = (await db.select().from(users).where(eq(users.userId, ctx.params.id)).limit(1))[0];
+      if (!before) throw notFound("找不到使用者");
+      const updated = (await db.update(users).set({ displayName: body.displayName.trim(), ...(body.bio === undefined ? {} : { bio: body.bio }), nameModerationStatus: "clear", nameModerationReason: "", nameLastCheckedAt: new Date(), updatedAt: new Date() }).where(eq(users.userId, before.userId)).returning({ userId: users.userId, displayName: users.displayName, bio: users.bio }))[0];
+      await adminLog({ actorId: admin.userId, action: "user.rename", targetType: "user", targetId: before.userId, reason: body.reason, before: { displayName: before.displayName, bio: before.bio }, after: updated, ip: ctx.ip });
+      await notify({ userId: before.userId, kind: "admin_notice", title: "你的 StudyNova 名稱已由管理員調整", body: `新名稱：${updated.displayName}。原因：${body.reason}`, link: "/profile", dedupeKey: `rename:${before.userId}:${Date.now()}` });
+      return { profile: updated };
     },
   }),
 

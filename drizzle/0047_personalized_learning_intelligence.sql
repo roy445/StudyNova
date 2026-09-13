@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS "exam_mode_policies" (
   "description" text NOT NULL DEFAULT '',
   "rules" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "enabled" boolean NOT NULL DEFAULT true,
-  "updated_by" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+  "updated_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now()
 );
@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS "exam_mode_policy_enabled_idx" ON "exam_mode_policies
 
 CREATE TABLE IF NOT EXISTS "exam_mode_selections" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "exam_id" uuid REFERENCES "exams"("id") ON DELETE CASCADE,
   "mode" text NOT NULL,
   "subject" text NOT NULL DEFAULT '',
@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS "exam_mode_selection_exam_idx" ON "exam_mode_selectio
 
 CREATE TABLE IF NOT EXISTS "learning_packages" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "material_id" uuid NOT NULL REFERENCES "study_materials"("id") ON DELETE CASCADE,
   "selected_steps" jsonb NOT NULL DEFAULT '[]'::jsonb,
   "status" text NOT NULL DEFAULT 'queued',
@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS "learning_packages_material_idx" ON "learning_package
 
 CREATE TABLE IF NOT EXISTS "ai_content_reports" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "feature" text NOT NULL,
   "content_type" text NOT NULL,
   "content_id" uuid,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS "ai_content_reports" (
   "snapshot" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "status" text NOT NULL DEFAULT 'pending',
   "admin_note" text NOT NULL DEFAULT '',
-  "resolved_by" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+  "resolved_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "resolved_at" timestamptz,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now()
@@ -76,7 +76,7 @@ CREATE INDEX IF NOT EXISTS "ai_content_reports_user_idx" ON "ai_content_reports"
 
 CREATE TABLE IF NOT EXISTS "ai_proactive_alerts" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "alert_type" text NOT NULL,
   "title" text NOT NULL,
   "body" text NOT NULL,
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS "admin_feature_customizations" (
   "enabled" boolean NOT NULL DEFAULT true,
   "allowed_roles" jsonb NOT NULL DEFAULT '["student"]'::jsonb,
   "config" jsonb NOT NULL DEFAULT '{}'::jsonb,
-  "updated_by" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+  "updated_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "updated_at" timestamptz NOT NULL DEFAULT now()
 );
 

@@ -20,6 +20,7 @@ import { createSession, destroySession, getSession } from "../auth";
 import { ensureDailyTasks, ensureUserEconomy, allFeatureStates, novaBalance } from "../economy";
 import { notify } from "../notify";
 import { sendPasswordResetEmail } from "../email";
+import { checkDisplayName } from "../name-moderation";
 
 const emailSchema = z.string().email("Email 格式不正確").max(180);
 const passwordSchema = z.string().min(8, "密碼至少 8 個字元").max(128);
@@ -47,6 +48,8 @@ export const routes: RouteDef[] = [
           displayName: z.string().min(1, "請輸入顯示名稱").max(40),
         }),
       );
+      const registrationName = checkDisplayName(body.displayName);
+      if (!registrationName.ok) throw badRequest("這個名稱不符合 StudyNova 名稱規範，請改用不含髒話、不雅文字或聯絡方式的名稱。", { reason: registrationName.reason });
       const email = body.email.toLowerCase().trim();
       const existing = await db.select({ id: users.userId }).from(users).where(eq(users.email, email)).limit(1);
       if (existing[0]) throw fail("AUTH_EMAIL_TAKEN");
@@ -104,6 +107,11 @@ export const routes: RouteDef[] = [
         throw generic;
       }
       if (!verifyPassword(body.password, user.passwordHash)) throw generic;
+      const loginNameCheck = checkDisplayName(user.displayName);
+      if (!loginNameCheck.ok) {
+        await db.update(users).set({ status: "blocked", blockedReason: `名稱審查違規：${loginNameCheck.reason}`, blockedAt: new Date(), blockedUntil: null, nameModerationStatus: "blocked", nameModerationReason: loginNameCheck.reason, nameLastCheckedAt: new Date(), updatedAt: new Date() }).where(eq(users.userId, user.userId));
+        throw fail("AUTH_ACCOUNT_BLOCKED", { message: "此帳號因名稱違反社群規範，已被永久封鎖", details: { userId: user.userId, novaId: user.novaId, reason: loginNameCheck.reason } });
+      }
       if (user.status === "blocked" && user.blockedUntil && new Date(user.blockedUntil) <= new Date()) {
         await db.update(users).set({ status: "active", blockedReason: "", blockedAt: null, blockedUntil: null, updatedAt: new Date() }).where(eq(users.userId, user.userId));
         user.status = "active";
@@ -304,6 +312,10 @@ export const routes: RouteDef[] = [
           reducedMotion: z.boolean().optional(),
         }),
       );
+      if (body.preferredName !== undefined) {
+        const preferredNameCheck = checkDisplayName(body.preferredName);
+        if (!preferredNameCheck.ok) throw badRequest("這個稱呼不符合名稱規範，請改用不含髒話或不雅文字的稱呼。", { reason: preferredNameCheck.reason });
+      }
       await db.insert(userSettings).values({ userId: user.userId }).onConflictDoNothing();
       const updated = await db
         .update(userSettings)
@@ -324,9 +336,13 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({ displayName: z.string().min(1).max(40).optional(), bio: z.string().max(200).optional() }),
       );
+      if (body.displayName !== undefined) {
+        const profileNameCheck = checkDisplayName(body.displayName);
+        if (!profileNameCheck.ok) throw badRequest("這個名稱不符合 StudyNova 名稱規範，請改用不含髒話、不雅文字或聯絡方式的名稱。", { reason: profileNameCheck.reason });
+      }
       const updated = await db
         .update(users)
-        .set({ ...body, updatedAt: new Date() })
+        .set({ ...body, ...(body.displayName ? { nameModerationStatus: "clear", nameModerationReason: "", nameLastCheckedAt: new Date() } : {}), updatedAt: new Date() })
         .where(eq(users.userId, user.userId))
         .returning({ displayName: users.displayName, bio: users.bio, novaId: users.novaId });
       return { profile: updated[0] };

@@ -13,12 +13,17 @@ const NAV_GROUPS: AdminNavGroup[] = [
     label: "核心與使用者",
     items: [
       { href: "/admin", label: "總覽・使用者", icon: "home" },
-      { href: "/admin/features", label: "功能總控台", icon: "admin" },
-      { href: "/admin/support", label: "問題回報", icon: "challenge" },
     ],
   },
   {
-    label: "學習內容",
+    label: "功能與服務",
+    items: [
+      { href: "/admin/features", label: "功能總控台", icon: "admin" },
+      { href: "/admin/ops", label: "AI・會員・內容", icon: "nova" },
+    ],
+  },
+  {
+    label: "學習與內容",
     items: [
       { href: "/admin/weekly", label: "每週小考", icon: "weekly" },
       { href: "/admin/reference-materials", label: "AI 參考資料", icon: "admin" },
@@ -27,15 +32,16 @@ const NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "AI、會員與紀錄",
+    label: "回報與審核",
     items: [
-      { href: "/admin/ops", label: "AI・會員・內容", icon: "nova" },
-      { href: "/admin/audit", label: "Audit Log", icon: "admin" },
+      { href: "/admin/support", label: "回報專區", icon: "challenge" },
+      { href: "/admin/exam-appeals", label: "段考異議", icon: "grades" },
     ],
   },
   {
-    label: "系統與維運",
+    label: "系統與紀錄",
     items: [
+      { href: "/admin/audit", label: "Audit Log", icon: "admin" },
       { href: "/admin/system", label: "系統・測試・匯出", icon: "admin" },
       { href: "/admin/performance", label: "系統效能", icon: "grades" },
     ],
@@ -64,7 +70,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </div>
           </div>
 
-          <nav aria-label="管理員功能分類" className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <nav aria-label="管理員功能分類" className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
             {NAV_GROUPS.map((group) => (
               <section key={group.label} className="min-w-0 rounded-2xl border border-[var(--line)]/80 bg-white/[0.025] p-2">
                 <h2 className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{group.label}</h2>
