@@ -2358,3 +2358,83 @@ export const adminFeatureCustomizations = pgTable(
   },
   (t) => [uniqueIndex("admin_feature_customization_feature_uq").on(t.feature)],
 );
+
+
+/* -------------------------------------------------------- EXAM HUB */
+export const examHubs = pgTable(
+  "exam_hubs",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    educationLevel: text("education_level").notNull(),
+    schoolName: text("school_name").notNull().default(""),
+    grade: integer("grade").notNull(),
+    examNumber: text("exam_number").notNull(),
+    openAt: timestamp("open_at", { withTimezone: true }),
+    closeAt: timestamp("close_at", { withTimezone: true }),
+    status: text("status").notNull().default("draft"),
+    announcement: text("announcement").notNull().default(""),
+    showMarquee: boolean("show_marquee").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_hubs_match_idx").on(t.educationLevel, t.schoolName, t.grade, t.status), index("exam_hubs_window_idx").on(t.openAt, t.closeAt)],
+);
+
+export const examHubWords = pgTable(
+  "exam_hub_words",
+  {
+    id: id(),
+    hubId: uuid("hub_id").notNull().references(() => examHubs.id, { onDelete: "cascade" }),
+    word: text("word").notNull(),
+    normalizedWord: text("normalized_word").notNull(),
+    meaning: text("meaning").notNull().default(""),
+    partOfSpeech: text("part_of_speech").notNull().default(""),
+    synonyms: jsonb("synonyms").$type<string[]>().notNull().default([]),
+    antonyms: jsonb("antonyms").$type<string[]>().notNull().default([]),
+    collocations: jsonb("collocations").$type<string[]>().notNull().default([]),
+    phrases: jsonb("phrases").$type<string[]>().notNull().default([]),
+    example: text("example").notNull().default(""),
+    exampleZh: text("example_zh").notNull().default(""),
+    phonetic: text("phonetic").notNull().default(""),
+    audioUrl: text("audio_url").notNull().default(""),
+    published: boolean("published").notNull().default(true),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_hub_words_uq").on(t.hubId, t.normalizedWord), index("exam_hub_words_hub_idx").on(t.hubId, t.published)],
+);
+
+export const examHubWordProgress = pgTable(
+  "exam_hub_word_progress",
+  {
+    id: id(),
+    hubWordId: uuid("hub_word_id").notNull().references(() => examHubWords.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    familiarity: integer("familiarity").notNull().default(0),
+    wrongCount: integer("wrong_count").notNull().default(0),
+    reviewCount: integer("review_count").notNull().default(0),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_hub_word_progress_uq").on(t.hubWordId, t.userId), index("exam_hub_word_progress_user_idx").on(t.userId, t.updatedAt)],
+);
+
+export const examHubAttempts = pgTable(
+  "exam_hub_attempts",
+  {
+    id: id(),
+    hubId: uuid("hub_id").notNull().references(() => examHubs.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    direction: text("direction").notNull().default("en2zh"),
+    score: integer("score").notNull().default(0),
+    total: integer("total").notNull().default(0),
+    responses: jsonb("responses").$type<Record<string, string>>().notNull().default({}),
+    wrongWordIds: jsonb("wrong_word_ids").$type<string[]>().notNull().default([]),
+    createdAt: created(),
+  },
+  (t) => [index("exam_hub_attempts_user_idx").on(t.userId, t.createdAt), index("exam_hub_attempts_hub_idx").on(t.hubId, t.createdAt)],
+);

@@ -42,6 +42,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
     label: "段考倒數",
     items: [
       { href: "/admin/exam-countdowns", label: "段考日期規則", icon: "grades" },
+      { href: "/admin/exam-hubs", label: "段考專區與英文單字", icon: "weekly" },
     ],
   },
   {

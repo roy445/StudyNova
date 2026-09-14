@@ -114,6 +114,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/intelligence-admin-routes"),
     import("./routes/learning-actions-routes"),
     import("./routes/exam-appeal-routes"),
+    import("./routes/exam-hub-routes"),
   ]);
   compiledRoutes = compile(mods.flatMap((m) => m.routes));
   return compiledRoutes;

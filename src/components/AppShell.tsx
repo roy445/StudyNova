@@ -160,6 +160,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
     "/dashboard",
   );
+  const examHubs = useApi<{ hubs: Array<{ id: string }>; needsProfile: boolean }>("/exam-hubs/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
 
@@ -371,7 +372,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
           <Wordmark size={42} />
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
-          {SIDE_NAV.map((item) => {
+          {(examHubs.data?.hubs.length ? [...SIDE_NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
@@ -510,7 +511,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       {/* Mobile bottom nav */}
       <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
-          {NAV.map((item) => {
+          {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考", icon: "weekly" as SymbolName }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <li key={item.href} className="flex-1">
