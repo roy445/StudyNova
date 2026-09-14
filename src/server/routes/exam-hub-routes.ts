@@ -5,13 +5,16 @@ import { announcements, examHubAttempts, examHubs, examHubWordProgress, examHubW
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 
-const openWindow = and(eq(examHubs.status, "published"), or(isNull(examHubs.openAt), lte(examHubs.openAt, new Date())), or(isNull(examHubs.closeAt), gt(examHubs.closeAt, new Date())));
+function openWindow() {
+  const now = new Date();
+  return and(eq(examHubs.status, "published"), or(isNull(examHubs.openAt), lte(examHubs.openAt, now)), or(isNull(examHubs.closeAt), gt(examHubs.closeAt, now)));
+}
 const wordInput = z.object({ word: z.string().trim().min(1).max(200), meaning: z.string().max(1000).default(""), partOfSpeech: z.string().max(80).default(""), synonyms: z.array(z.string().max(100)).max(30).default([]), antonyms: z.array(z.string().max(100)).max(30).default([]), collocations: z.array(z.string().max(200)).max(30).default([]), phrases: z.array(z.string().max(200)).max(30).default([]), example: z.string().max(1000).default(""), exampleZh: z.string().max(1000).default(""), phonetic: z.string().max(160).default(""), audioUrl: z.string().max(500).default(""), published: z.boolean().default(true) });
 
 async function matchingUserHubs(userId: string) {
   const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1))[0];
   if (!settings) return { settings: null, hubs: [] };
-  const hubs = await db.select().from(examHubs).where(and(openWindow, eq(examHubs.educationLevel, settings.schoolLevel), eq(examHubs.grade, settings.grade), or(eq(examHubs.schoolName, ""), eq(examHubs.schoolName, settings.schoolName)))).orderBy(asc(examHubs.openAt), desc(examHubs.createdAt));
+  const hubs = await db.select().from(examHubs).where(and(openWindow(), eq(examHubs.educationLevel, settings.schoolLevel), eq(examHubs.grade, settings.grade), or(eq(examHubs.schoolName, ""), eq(examHubs.schoolName, settings.schoolName)))).orderBy(asc(examHubs.openAt), desc(examHubs.createdAt));
   return { settings, hubs };
 }
 
