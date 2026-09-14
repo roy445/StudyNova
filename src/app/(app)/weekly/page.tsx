@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Progress, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
+import { MemoryCard } from "@/components/MemoryCard";
 
 type WeekSummary = {
   id: string;
@@ -67,6 +68,7 @@ export default function WeeklyPage() {
   const [showMore, setShowMore] = useState(false);
   const [quickStep, setQuickStep] = useState(0);
   const [quickLeft, setQuickLeft] = useState(0);
+  const [memoryMode, setMemoryMode] = useState(false);
   const [miniMode, setMiniMode] = useState<MiniMode>("choice");
   const [miniIndex, setMiniIndex] = useState(0);
   const [miniInput, setMiniInput] = useState("");
@@ -140,7 +142,7 @@ export default function WeeklyPage() {
         {list.data?.weeks.map((w) => (
           <button
             key={w.id}
-            onClick={() => { setActiveId(w.id); setReview(null); setTab("recite"); }}
+            onClick={() => { setActiveId(w.id); setReview(null); setMemoryMode(false); setTab("recite"); }}
             className={`glass-soft focus-ring p-3 text-left transition hover:bg-white/5 ${activeId === w.id ? "border border-[#37d3ff]/60" : ""}`}
           >
             <div className="flex items-center justify-between gap-2">
@@ -273,18 +275,39 @@ export default function WeeklyPage() {
               )}
 
               {tab === "words" && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {detail.words.map((w) => (
-                    <div key={w.id} className="glass-soft p-3">
-                      <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold">
-                        {w.word} <Badge tone="violet">{detail.week.highlightMap[w.highlightColor] ?? w.highlightColor}</Badge>
-                      </p><Button size="sm" variant="ghost" onClick={() => speak(w.word)}>🔊</Button></div>
-                      <div className="mt-1 flex items-center justify-between gap-2"><p className="text-xs text-muted">{w.meaning}</p><Button size="sm" variant="ghost" onClick={() => speak(w.meaning, "zh-TW")}>🔊 中文</Button></div>
-                      <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[11px] text-[#dcecff]">{w.example || "該單字目前尚未有例句"}</p>{w.example && <Button size="sm" variant="ghost" onClick={() => speak(w.example)}>🔊 例句</Button>}</div>
-                      <p className="mt-2 text-[11px] text-muted">易錯／文法：{grammarHint(w.example)}</p>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">本週單字</p>
+                      <p className="text-xs text-muted">先回想英文，再用中文、朗讀與下一個快速複習。</p>
                     </div>
-                  ))}
-                  {!detail.words.length && <EmptyState icon="⌁" title="本週尚未發布單字" />}
+                    <Button size="sm" variant={memoryMode ? "outline" : "primary"} onClick={() => setMemoryMode((value) => !value)} disabled={!detail.words.length}>
+                      {memoryMode ? "返回單字列表" : "記憶卡"}
+                    </Button>
+                  </div>
+                  {memoryMode ? (
+                    <MemoryCard
+                      key={`weekly-${detail.week.id}`}
+                      words={detail.words}
+                      sourceKey={`weekly-${detail.week.id}`}
+                      title="本週單字記憶卡"
+                      subtitle="點擊中文查看答案，再使用朗讀、上一個與下一個建立背誦節奏。"
+                    />
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {detail.words.map((w) => (
+                        <div key={w.id} className="glass-soft p-3">
+                          <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold">
+                            {w.word} <Badge tone="violet">{detail.week.highlightMap[w.highlightColor] ?? w.highlightColor}</Badge>
+                          </p><Button size="sm" variant="ghost" onClick={() => speak(w.word)}>🔊</Button></div>
+                          <div className="mt-1 flex items-center justify-between gap-2"><p className="text-xs text-muted">{w.meaning}</p><Button size="sm" variant="ghost" onClick={() => speak(w.meaning, "zh-TW")}>🔊 中文</Button></div>
+                          <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[11px] text-[#dcecff]">{w.example || "該單字目前尚未有例句"}</p>{w.example && <Button size="sm" variant="ghost" onClick={() => speak(w.example)}>🔊 例句</Button>}</div>
+                          <p className="mt-2 text-[11px] text-muted">易錯／文法：{grammarHint(w.example)}</p>
+                        </div>
+                      ))}
+                      {!detail.words.length && <EmptyState icon="⌁" title="本週尚未發布單字" />}
+                    </div>
+                  )}
                 </div>
               )}
 

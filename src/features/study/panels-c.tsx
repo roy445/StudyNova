@@ -5,6 +5,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progr
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { WordDetailSheet } from "@/components/WordDetailSheet";
+import { MemoryCard } from "@/components/MemoryCard";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -45,6 +46,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const [tip, setTip] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
   const [detailWord, setDetailWord] = useState<Word | null>(null);
+  const [memoryMode, setMemoryMode] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
   const words = data?.words ?? [];
@@ -98,16 +100,26 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
       title="▤ 每日 10 個單字"
       subtitle={`${track === "senior" ? "高中 7000 單" : track === "junior" ? "國中 2000 單" : `程度 ${data?.level}`}・每日 ${data?.dailyTarget ?? words.length} 個・目前第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
       action={
-        <div className="flex flex-wrap items-center gap-2"><SpeechRateControl rate={speechRate} onChange={setSpeechRate} /><Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !py-1.5 text-xs">
+        <div className="flex flex-wrap items-center gap-2"><SpeechRateControl rate={speechRate} onChange={setSpeechRate} /><Button size="sm" variant={memoryMode ? "outline" : "ghost"} onClick={() => setMemoryMode((value) => !value)}>{memoryMode ? "返回練習" : "記憶卡"}</Button>{!memoryMode && <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !py-1.5 text-xs">
           <option value="card">單字卡</option>
           <option value="en2zh">英 → 中</option>
           <option value="zh2en">中 → 英</option>
           <option value="spell">拼寫</option>
           <option value="timed">限時挑戰</option>
-        </Select></div>
+        </Select>}</div>
       }
-    >
-      <div className="mb-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs"><div className="flex flex-wrap items-center justify-between gap-2"><span>已出現過 {data?.appearedCount ?? words.length} / 共 {data?.totalWords ?? words.length} 個單字</span><span className="text-muted">每日 {data?.resetAt ?? "00:00（台灣時間）"} 重置</span></div><Progress value={data?.appearedCount ?? words.length} max={data?.totalWords ?? words.length} tone="cyan" /><p className="mt-1 text-muted">已出現的單字會保留在「學習中心 → 字詞百科」，每天慢慢解鎖新單字。</p></div>
+        >
+      {memoryMode ? (
+        <MemoryCard
+          words={words}
+          sourceKey={`daily-${track ?? data?.level ?? "default"}`}
+          title="每日單字記憶卡"
+          subtitle="點擊中文查看答案，再使用朗讀、上一個與下一個建立背誦節奏。"
+        />
+      ) : (
+        <>
+      <div className="mb-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs">
+<div className="flex flex-wrap items-center justify-between gap-2"><span>已出現過 {data?.appearedCount ?? words.length} / 共 {data?.totalWords ?? words.length} 個單字</span><span className="text-muted">每日 {data?.resetAt ?? "00:00（台灣時間）"} 重置</span></div><Progress value={data?.appearedCount ?? words.length} max={data?.totalWords ?? words.length} tone="cyan" /><p className="mt-1 text-muted">已出現的單字會保留在「學習中心 → 字詞百科」，每天慢慢解鎖新單字。</p></div>
       {mode === "timed" && (
         <div className="mb-2 flex items-center gap-2 text-xs">
           <Badge tone={timeLeft < 15 ? "rose" : "cyan"}>剩餘 {timeLeft}s</Badge>
@@ -235,11 +247,12 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         >
           ✦ 記憶方法
         </Button>
-      </div>
+            </div>
+        </>
+      )}
     </Card>
   );
 }
-
 type PersonalWord = { id: string; word: string; meaning: string; partOfSpeech: string; phonetic: string; example: string; exampleZh: string; analysis: Record<string, unknown>; familiarity: number; reviewCount: number; updatedAt: string };
 
 export function MyVocabularyPanel() {
@@ -250,6 +263,7 @@ export function MyVocabularyPanel() {
   const [filter, setFilter] = useState("all");
   const [active, setActive] = useState<PersonalWord | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [memoryMode, setMemoryMode] = useState(false);
   const [newWord, setNewWord] = useState({ word: "", meaning: "", partOfSpeech: "", phonetic: "", example: "", exampleZh: "" });
   const { data, loading, error, reload } = useApi<{ items: PersonalWord[]; total: number }>(`/my-vocabulary?q=${encodeURIComponent(q)}`, [q]);
   const items = (data?.items ?? []).filter((item) => filter === "all" || filter === "new" && item.familiarity < 40 || filter === "review" && item.familiarity >= 40 && item.familiarity < 80 || filter === "mastered" && item.familiarity >= 80);
@@ -271,12 +285,26 @@ export function MyVocabularyPanel() {
       await reload();
     } catch (err) { toast.push("error", errorMessage(err)); }
   }
-  return <Card title="我的單字" subtitle={`OCR、教材與手動收藏的單字都集中在這裡・共 ${data?.total ?? 0} 個`} action={<div className="flex flex-wrap items-center gap-1.5"><label className="flex items-center gap-1 text-[11px] text-muted"><input type="checkbox" checked={openDetailOnClick} onChange={(event) => setOpenDetailOnClick(event.target.checked)} /> 點擊直接看詳細</label><Button size="sm" onClick={() => setAddOpen(true)}>＋ 手動新增</Button><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋單字或中文" className="!w-36 !py-1.5 text-xs" /><Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto !py-1.5 text-xs"><option value="all">全部</option><option value="new">需加強</option><option value="review">複習中</option><option value="mastered">已熟悉</option></Select></div>}>
+  return <Card title="我的單字" subtitle={`OCR、教材與手動收藏的單字都集中在這裡・共 ${data?.total ?? 0} 個`} action={<div className="flex flex-wrap items-center gap-1.5"><Button size="sm" variant={memoryMode ? "outline" : "ghost"} onClick={() => setMemoryMode((value) => !value)} disabled={!items.length}>{memoryMode ? "返回單字列表" : "記憶卡"}</Button><label className="flex items-center gap-1 text-[11px] text-muted"><input type="checkbox" checked={openDetailOnClick} onChange={(event) => setOpenDetailOnClick(event.target.checked)} /> 點擊直接看詳細</label><Button size="sm" onClick={() => setAddOpen(true)}>＋ 手動新增</Button>
+<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋單字或中文" className="!w-36 !py-1.5 text-xs" /><Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto !py-1.5 text-xs"><option value="all">全部</option><option value="new">需加強</option><option value="review">複習中</option><option value="mastered">已熟悉</option></Select></div>}>
     <div className="mb-3 grid grid-cols-3 gap-2"><div className="glass-soft p-2"><p className="text-[11px] text-muted">總單字</p><p className="text-lg font-bold">{data?.total ?? 0}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">需要加強</p><p className="text-lg font-bold text-rose-300">{(data?.items ?? []).filter((i) => i.familiarity < 40).length}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">已熟悉</p><p className="text-lg font-bold text-emerald-300">{(data?.items ?? []).filter((i) => i.familiarity >= 80).length}</p></div></div>
+    {memoryMode ? (
+              <MemoryCard
+          key={`my-vocabulary-${filter}`}
+          words={items.map((item) => ({ id: item.id, word: item.word, meaning: item.meaning, part_of_speech: item.partOfSpeech, example: item.example, example_zh: item.exampleZh, familiarity: item.familiarity }))}
+
+        sourceKey={`my-vocabulary-${filter}`}
+        title="我的單字記憶卡"
+        subtitle="先回想英文，再使用中文、朗讀與下一個快速複習。"
+      />
+    ) : (
+      <>
     {loading && <Skeleton lines={4} />}{error && <ErrorState message={error} onRetry={reload} />}{!loading && !items.length && <EmptyState icon="◇" title="還沒有我的單字" hint="從圖片 OCR 或教材分析結果按『加入單字本』開始建立。" />}
     <Modal open={Boolean(active)} onClose={() => setActive(null)} title={active?.word ?? "單字詳細資訊"} fullScreen>{active && <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted">{active.partOfSpeech || "單字"}・熟悉度 {active.familiarity}%・{active.phonetic || ""}</p><div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={() => { if (!speak(active.word)) toast.push("error", "此瀏覽器不支援語音"); }}>朗讀</Button><Button size="sm" onClick={() => review(active, true)}>我會了</Button><Button size="sm" variant="outline" onClick={() => review(active, false)}>加入複習</Button><Button size="sm" variant="ghost" onClick={async () => { if (confirm("確定移除此單字？")) { await apiDelete(`/my-vocabulary/${active.id}`); setActive(null); await reload(); } }}>刪除</Button></div></div><div className="rounded-xl bg-[#37d3ff]/10 p-3"><p className="text-lg font-semibold">{active.meaning || "尚未補上中文釋義"}</p></div>{active.example && <div className="rounded-xl bg-white/5 p-3 text-sm"><p className="text-xs text-muted">例句</p><p className="mt-1">{active.example}</p><p className="text-muted">{active.exampleZh}</p></div>}{(() => { const a = active.analysis ?? {}; const list = (key: string) => Array.isArray(a[key]) ? (a[key] as unknown[]).map(String).filter(Boolean) : []; const confusables = list("confusables"); const synonyms = list("synonyms"); const nearSynonyms = list("nearSynonyms"); const collocations = list("collocations"); return <div className="grid gap-2 text-xs sm:grid-cols-2">{collocations.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">相關片語</p><p className="mt-1 text-muted">{collocations.join("、")}</p></div>}{confusables.length > 0 && <div className="rounded-xl bg-amber-400/10 p-2"><p className="font-semibold">易錯與易混淆</p><p className="mt-1 text-muted">{confusables.join("；")}</p></div>}{synonyms.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">相似字</p><p className="mt-1 text-muted">{synonyms.join("、")}</p></div>}{nearSynonyms.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">近義字</p><p className="mt-1 text-muted">{nearSynonyms.join("、")}</p></div>}</div>; })()}</div>}</Modal>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <button key={item.id} type="button" onClick={() => { if (openDetailOnClick) setActive(item); else speak(item.word); }} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.word}</p><p className="text-xs text-[#7dd3fc]">{item.meaning}</p><p className="mt-1 text-[11px] text-muted">{item.partOfSpeech || "未分類"}・複習 {item.reviewCount} 次</p></div><Badge tone={item.familiarity >= 80 ? "green" : item.familiarity >= 40 ? "cyan" : "rose"}>{item.familiarity}%</Badge></div><Progress value={item.familiarity} max={100} tone={item.familiarity >= 80 ? "green" : "violet"} /></button>)}</div>
     <Modal open={addOpen} onClose={() => setAddOpen(false)} title="手動新增單字"><div className="space-y-3"><Field label="單字" required><Input value={newWord.word} onChange={(e) => setNewWord({ ...newWord, word: e.target.value })} /></Field><Field label="中文意思"><Input value={newWord.meaning} onChange={(e) => setNewWord({ ...newWord, meaning: e.target.value })} /></Field><Field label="詞性／音標"><div className="grid gap-2 sm:grid-cols-2"><Input value={newWord.partOfSpeech} onChange={(e) => setNewWord({ ...newWord, partOfSpeech: e.target.value })} placeholder="例如：noun" /><Input value={newWord.phonetic} onChange={(e) => setNewWord({ ...newWord, phonetic: e.target.value })} placeholder="音標" /></div></Field><Field label="例句"><Textarea value={newWord.example} onChange={(e) => setNewWord({ ...newWord, example: e.target.value })} /></Field><Field label="例句中文"><Input value={newWord.exampleZh} onChange={(e) => setNewWord({ ...newWord, exampleZh: e.target.value })} /></Field><Button full onClick={addWord}>加入我的單字</Button></div></Modal>
+      </>
+    )}
   </Card>;
 }
 
