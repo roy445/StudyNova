@@ -21,7 +21,7 @@ import {
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, todayStr } from "../core";
 import { consumeFeature, isProUser } from "../economy";
-import { runAiJson, aiConfigured } from "../ai";
+import { extractJson, runAiJson, aiConfigured } from "../ai";
 import { subjectStats, buildPlan } from "./learning-routes";
 import { generateQuestions } from "./quiz-routes";
 import { putObject } from "../storage";
@@ -51,14 +51,20 @@ export function latestConversationMessages<T>(newestFirstRows: T[], limit = 16):
 }
 
 export function normalizeChatReply(data: Record<string, unknown>, rawText: string): string {
-  const fields = [data.reply, data.text, data.content, data.message, data.answer]
-    .map((value) => (typeof value === "string" ? value.trim() : ""))
-    .find(Boolean);
-  if (fields) return fields;
+  const readFields = (value: Record<string, unknown>): string =>
+    [value.reply, value.text, value.content, value.message, value.answer]
+      .map((candidate) => (typeof candidate === "string" ? candidate.trim() : ""))
+      .find(Boolean) ?? "";
+  const direct = readFields(data);
+  if (direct) return direct;
+
+  const parsed = extractJson<Record<string, unknown>>(rawText, {});
+  const extracted = readFields(parsed);
+  if (extracted) return extracted;
+
   const cleaned = rawText.trim().replace(/^```(?:json|markdown|md)?\s*/i, "").replace(/\s*```$/i, "").trim();
-  if (!cleaned) return "";
-  if (!cleaned.startsWith("{") && !cleaned.startsWith("[")) return cleaned;
-  return "";
+  if (!cleaned || cleaned.startsWith("{") || cleaned.startsWith("[")) return "";
+  return cleaned;
 }
 
 async function buildContext(userId: string, allow: string[], materialId: string | null) {

@@ -494,10 +494,10 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
 
 export function extractJson<T>(raw: string, fallback: T): T {
   const cleaned = raw
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/i, "")
+    .replace(/^\s*```(?:json|javascript|js)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
     .trim();
-  const attempt = (s: string) => {
+  const attempt = (s: string): T | null => {
     try {
       return JSON.parse(s) as T;
     } catch {
@@ -505,16 +505,40 @@ export function extractJson<T>(raw: string, fallback: T): T {
     }
   };
   const direct = attempt(cleaned);
-  if (direct) return direct;
-  const first = cleaned.indexOf("{");
-  const firstArr = cleaned.indexOf("[");
-  const start = first === -1 ? firstArr : firstArr === -1 ? first : Math.min(first, firstArr);
-  const lastObj = cleaned.lastIndexOf("}");
-  const lastArr = cleaned.lastIndexOf("]");
-  const end = Math.max(lastObj, lastArr);
-  if (start >= 0 && end > start) {
-    const sliced = attempt(cleaned.slice(start, end + 1));
-    if (sliced) return sliced;
+  if (direct !== null) return direct;
+
+  // Find complete JSON values rather than slicing from the first `{` to the
+  // last `}`. The latter breaks when the model includes multiple examples,
+  // trailing prose, or braces inside a JSON string.
+  for (let start = 0; start < cleaned.length; start += 1) {
+    if (cleaned[start] !== "{" && cleaned[start] !== "[") continue;
+    const stack: string[] = [];
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < cleaned.length; i += 1) {
+      const char = cleaned[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === "{" || char === "[") stack.push(char);
+      else if (char === "}" || char === "]") {
+        const opener = stack[stack.length - 1];
+        if ((char === "}" && opener !== "{") || (char === "]" && opener !== "[")) break;
+        stack.pop();
+        if (stack.length === 0) {
+          const parsed = attempt(cleaned.slice(start, i + 1));
+          if (parsed !== null) return parsed;
+          break;
+        }
+      }
+    }
   }
   return fallback;
 }
