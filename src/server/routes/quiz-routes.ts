@@ -40,10 +40,10 @@ export function normalizeQuizOption(value: string): string {
 
 type NormalizedQuestion = { options: string[]; answer: string[]; stem: string };
 export function validateQuizOptionPool(items: NormalizedQuestion[]) {
-  const usedOptions: string[] = []; const counts = new Map<string, number>(); let sameQuestionDuplicate = false;
-  for (const item of items) { const local = new Set<string>(); for (const option of item.options) { const key = normalizeQuizOption(option); if (!key || local.has(key)) sameQuestionDuplicate = true; local.add(key); usedOptions.push(key); counts.set(key, (counts.get(key) ?? 0) + 1); } }
-  const total = usedOptions.length; const repeatedOccurrences = [...counts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
-  return { usedOptions, sameQuestionDuplicate, repeatedOccurrences, excessiveCrossQuestionDuplicates: repeatedOccurrences > Math.max(2, Math.floor(total * 0.2)) };
+  const usedOptions: string[] = []; const counts = new Map<string, number>(); const duplicateQuestionIndexes: number[] = []; let sameQuestionDuplicate = false;
+  for (const [questionIndex, item] of items.entries()) { const local = new Set<string>(); let duplicateInQuestion = false; for (const option of item.options) { const key = normalizeQuizOption(option); if (!key || local.has(key)) { sameQuestionDuplicate = true; duplicateInQuestion = true; } local.add(key); usedOptions.push(key); counts.set(key, (counts.get(key) ?? 0) + 1); } if (duplicateInQuestion) duplicateQuestionIndexes.push(questionIndex); }
+  const totalOptions = usedOptions.length; const uniqueOptions = counts.size; const repeatedOccurrences = [...counts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0); const repeatedRate = totalOptions ? repeatedOccurrences / totalOptions : 0;
+  return { usedOptions, optionUsageCount: Object.fromEntries(counts), totalOptions, uniqueOptions, repeatedOccurrences, repeatedRate, sameQuestionDuplicate, duplicateQuestionIndexes, excessiveCrossQuestionDuplicates: repeatedOccurrences > Math.max(2, Math.floor(totalOptions * 0.2)) };
 }
 
 type CleanQuestion = { type: string; stem: string; options: string[]; answer: string[]; explanation: string; topic: string; metadata: Record<string, unknown> };
@@ -51,6 +51,10 @@ function cleanGeneratedQuestions(raw: GeneratedQuestion[], topic: string): Clean
   return raw.map((q) => { const type = qType.safeParse(q.type ?? "single").success && q.type !== "mixed" ? (q.type as string) : "single"; const answerArr = Array.isArray(q.answer) ? q.answer.map(String) : q.answer ? [String(q.answer)] : []; const options = Array.isArray(q.options) ? q.options.map(String).filter(Boolean) : []; if (!q.stem || !answerArr.length) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && options.length < 2) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && !answerArr.every((a) => options.includes(a))) return null; return { type, stem: String(q.stem).slice(0, 2000), options: options.slice(0, 8), answer: answerArr.slice(0, 8), explanation: String(q.explanation ?? "").slice(0, 2000), metadata: q.metadata ?? {}, topic: String(q.topic ?? topic).slice(0, 60) }; }).filter(Boolean) as CleanQuestion[];
 }
 
+function diversityRepairIndexes(items: CleanQuestion[], optionUsageCount: Record<string, number>): number[] {
+  const overused = new Set(Object.entries(optionUsageCount).filter(([, count]) => count >= 2).map(([option]) => option));
+  return items.map((item, index) => ({ index, repeated: item.options.filter((option) => overused.has(normalizeQuizOption(option))).length })).filter((item) => item.repeated > 0).sort((a, b) => b.repeated - a.repeated).slice(0, Math.max(1, Math.ceil(items.length * 0.25))).map((item) => item.index);
+}
 
 export async function generateQuestions(params: {
   userId: string;
@@ -66,9 +70,19 @@ export async function generateQuestions(params: {
   let usedOptionPool: string[] = [];
   let bestScore = Number.POSITIVE_INFINITY;
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const avoid = usedOptionPool.length ? `本次測驗已使用的選項（請盡量不要重用）：${[...new Set(usedOptionPool)].join("、")}` : "目前尚無已使用選項。";
+    const usage = usedOptionPool.reduce<Record<string, number>>((counts, option) => { counts[option] = (counts[option] ?? 0) + 1; return counts; }, {});
+    const avoid = usedOptionPool.length ? `本次測驗選項使用次數（出現 1 次就優先避免，2 次以上除非沒有合理替代不要再用）：${JSON.stringify(usage)}` : "目前尚無已使用選項。";
     const { data } = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: "你是台灣國高中題目設計引擎。請依教材出題，不得杜撰。回傳 JSON questions。single/part_of_speech/meaning 必須提供 4 個 options。選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。干擾選項優先使用意思相近、易混淆、相同詞性、常見錯誤答案、相同語境可成立但意思不同的字詞；不可為了去重使用不自然或無關選項。整份測驗優先避免重複選項，但若沒有合理替代可少量重複。multiple 的 answer 必須完全等於 options 字串。使用繁體中文（英文科目可用英文）。", parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText.slice(0, 12000)}` }], maxOutputTokens: 3000 }, { questions: [] });
-    const candidate = cleanGeneratedQuestions(data.questions ?? [], params.topic); const validation = validateQuizOptionPool(candidate); const score = (validation.sameQuestionDuplicate ? 1000 : 0) + validation.repeatedOccurrences;
+    let candidate = cleanGeneratedQuestions(data.questions ?? [], params.topic); let validation = validateQuizOptionPool(candidate);
+    if (candidate.length && validation.excessiveCrossQuestionDuplicates && attempt < 2) {
+      const repairIndexes = diversityRepairIndexes(candidate, validation.optionUsageCount);
+      const repairPrompt = repairIndexes.map((index) => `第 ${index + 1} 題：${candidate[index].stem}`).join("\n");
+      const repaired = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate_repair", userId: params.userId, system: "只重新生成指定題目的選項與答案。保留原題意與正確性；避免使用已出現 2 次以上的選項，優先選擇相同詞性、易混淆或相同語境的合理干擾選項。範圍外單字只能作干擾選項，不得變成正式考點。回傳 JSON questions。", parts: [{ kind: "text", text: `已使用選項次數：${JSON.stringify(validation.optionUsageCount)}\n請修復以下題目：\n${repairPrompt}` }], maxOutputTokens: 1800 }, { questions: [] });
+      const replacements = cleanGeneratedQuestions(repaired.data.questions ?? [], params.topic);
+      for (const [position, index] of repairIndexes.entries()) if (replacements[position]) candidate[index] = replacements[position];
+      validation = validateQuizOptionPool(candidate);
+    }
+    const score = (validation.sameQuestionDuplicate ? 1000 : 0) + validation.repeatedOccurrences + Math.round(validation.repeatedRate * 100);
     if (candidate.length && score < bestScore) { cleaned = candidate; bestScore = score; }
     usedOptionPool = validation.usedOptions;
     if (candidate.length >= params.count && !validation.sameQuestionDuplicate && !validation.excessiveCrossQuestionDuplicates) break;
