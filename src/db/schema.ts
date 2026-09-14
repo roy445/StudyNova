@@ -653,6 +653,29 @@ export const userVocabularies = pgTable(
   (t) => [uniqueIndex("user_vocabularies_word_uq").on(t.userId, t.normalizedWord), index("user_vocabularies_user_idx").on(t.userId, t.updatedAt)],
 );
 
+export const vocabularyFolders = pgTable(
+  "vocabulary_folders",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("vocabulary_folders_user_name_uq").on(t.userId, t.name), index("vocabulary_folders_user_idx").on(t.userId, t.updatedAt)],
+);
+
+export const vocabularyFolderItems = pgTable(
+  "vocabulary_folder_items",
+  {
+    id: id(),
+    folderId: uuid("folder_id").notNull().references(() => vocabularyFolders.id, { onDelete: "cascade" }),
+    vocabularyId: uuid("vocabulary_id").notNull().references(() => userVocabularies.id, { onDelete: "cascade" }),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("vocabulary_folder_items_uq").on(t.folderId, t.vocabularyId), index("vocabulary_folder_items_folder_idx").on(t.folderId), index("vocabulary_folder_items_vocab_idx").on(t.vocabularyId)],
+);
+
 /* -------------------------------------------------------- PLAN / STUDY */
 
 export const studyPlans = pgTable(

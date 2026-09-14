@@ -261,12 +261,45 @@ export function MyVocabularyPanel() {
   const [openDetailOnClick, setOpenDetailOnClick] = useState(true);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
+  const [folderId, setFolderId] = useState("all");
+  const [sort, setSort] = useState("recent");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [active, setActive] = useState<PersonalWord | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [memoryMode, setMemoryMode] = useState(false);
   const [newWord, setNewWord] = useState({ word: "", meaning: "", partOfSpeech: "", phonetic: "", example: "", exampleZh: "" });
-  const { data, loading, error, reload } = useApi<{ items: PersonalWord[]; total: number }>(`/my-vocabulary?q=${encodeURIComponent(q)}`, [q]);
+  const foldersApi = useApi<{ folders: Array<{ id: string; name: string; count: number }> }>("/my-vocabulary/folders", []);
+  const folderQuery = folderId === "all" ? "" : `&folderId=${encodeURIComponent(folderId)}`;
+  const { data, loading, error, reload } = useApi<{ items: PersonalWord[]; total: number }>(`/my-vocabulary?q=${encodeURIComponent(q)}&sort=${sort}${folderQuery}`, [q, sort, folderId]);
   const items = (data?.items ?? []).filter((item) => filter === "all" || filter === "new" && item.familiarity < 40 || filter === "review" && item.familiarity >= 40 && item.familiarity < 80 || filter === "mastered" && item.familiarity >= 80);
+  async function createFolder() {
+    const name = window.prompt("輸入新資料夾名稱");
+    if (!name?.trim()) return;
+    try { await apiPost("/my-vocabulary/folders", { name: name.trim() }); toast.push("success", "資料夾已建立"); await foldersApi.reload(); } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+  async function addSelectedToFolder() {
+    if (!selectedIds.length) return toast.push("error", "請先選取單字");
+    const options = foldersApi.data?.folders ?? [];
+    const choice = window.prompt(`加入哪個資料夾？\n${options.map((folder, index) => `${index + 1}. ${folder.name}`).join("\n")}\n輸入編號，或輸入 new 建立資料夾`);
+    if (!choice) return;
+    let target = options[Number(choice) - 1];
+    if (choice.toLowerCase() === "new") { const name = window.prompt("輸入新資料夾名稱"); if (!name?.trim()) return; try { const result = await apiPost<{ folder: { id: string } }>("/my-vocabulary/folders", { name: name.trim() }); target = { ...result.folder, name: name.trim(), count: 0 }; await foldersApi.reload(); } catch (err) { toast.push("error", errorMessage(err)); return; } }
+    if (!target) return toast.push("error", "找不到這個資料夾");
+    try { await apiPost(`/my-vocabulary/folders/${target.id}/items`, { vocabularyIds: selectedIds }); setSelectedIds([]); toast.push("success", `已加入「${target.name}」`); await foldersApi.reload(); } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+  async function deleteFolder() {
+    if (folderId === "all") return;
+    const folder = foldersApi.data?.folders.find((item) => item.id === folderId);
+    if (!folder || !window.confirm(`刪除「${folder.name}」？單字本身不會被刪除。`)) return;
+    try { await apiDelete(`/my-vocabulary/folders/${folder.id}`); setFolderId("all"); await foldersApi.reload(); toast.push("success", "資料夾已刪除，單字仍保留在我的單字庫"); } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+  async function renameFolder() {
+    if (folderId === "all") return;
+    const folder = foldersApi.data?.folders.find((item) => item.id === folderId);
+    const name = folder && window.prompt("輸入新的資料夾名稱", folder.name);
+    if (!folder || !name?.trim()) return;
+    try { await apiPatch(`/my-vocabulary/folders/${folder.id}`, { name: name.trim() }); await foldersApi.reload(); toast.push("success", "資料夾已重新命名"); } catch (err) { toast.push("error", errorMessage(err)); }
+  }
   async function review(item: PersonalWord, known: boolean) {
     try {
       await apiPatch(`/my-vocabulary/${item.id}`, { familiarity: Math.max(0, Math.min(100, item.familiarity + (known ? 20 : -10))), review: true });
@@ -285,8 +318,9 @@ export function MyVocabularyPanel() {
       await reload();
     } catch (err) { toast.push("error", errorMessage(err)); }
   }
-  return <Card title="我的單字" subtitle={`OCR、教材與手動收藏的單字都集中在這裡・共 ${data?.total ?? 0} 個`} action={<div className="flex flex-wrap items-center gap-1.5"><Button size="sm" variant={memoryMode ? "outline" : "ghost"} onClick={() => setMemoryMode((value) => !value)} disabled={!items.length}>{memoryMode ? "返回單字列表" : "記憶卡"}</Button><label className="flex items-center gap-1 text-[11px] text-muted"><input type="checkbox" checked={openDetailOnClick} onChange={(event) => setOpenDetailOnClick(event.target.checked)} /> 點擊直接看詳細</label><Button size="sm" onClick={() => setAddOpen(true)}>＋ 手動新增</Button>
+  return <Card title="我的單字" subtitle={`OCR、教材與手動收藏的單字都集中在這裡・共 ${data?.total ?? 0} 個`} action={<div className="flex flex-wrap items-center gap-1.5"><Button size="sm" variant="outline" onClick={createFolder}>＋ 資料夾</Button><Button size="sm" variant="ghost" onClick={addSelectedToFolder} disabled={!selectedIds.length}>批次加入資料夾</Button><Button size="sm" variant={memoryMode ? "outline" : "ghost"} onClick={() => setMemoryMode((value) => !value)} disabled={!items.length}>{memoryMode ? "返回單字列表" : "記憶卡"}</Button><label className="flex items-center gap-1 text-[11px] text-muted"><input type="checkbox" checked={openDetailOnClick} onChange={(event) => setOpenDetailOnClick(event.target.checked)} /> 點擊直接看詳細</label><Button size="sm" onClick={() => setAddOpen(true)}>＋ 手動新增</Button>
 <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋單字或中文" className="!w-36 !py-1.5 text-xs" /><Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto !py-1.5 text-xs"><option value="all">全部</option><option value="new">需加強</option><option value="review">複習中</option><option value="mastered">已熟悉</option></Select></div>}>
+    <div className="mb-3 space-y-2 rounded-2xl border border-[var(--line)] bg-white/5 p-3"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-semibold">我的資料夾</span><Select value={folderId} onChange={(e) => setFolderId(e.target.value)} className="!w-auto"><option value="all">全部單字</option>{(foldersApi.data?.folders ?? []).map((folder) => <option key={folder.id} value={folder.id}>{folder.name}（{folder.count}）</option>)}</Select><Select value={sort} onChange={(e) => setSort(e.target.value)} className="!w-auto"><option value="recent">最近加入</option><option value="name">名稱</option><option value="familiarity">熟悉度</option><option value="lastReviewed">最後複習</option></Select>{folderId !== "all" && <><Button size="sm" variant="ghost" onClick={renameFolder}>重新命名</Button><Button size="sm" variant="ghost" onClick={deleteFolder}>刪除目前資料夾</Button></>}</div><p className="text-[11px] text-muted">同一個單字可以加入多個資料夾；刪除資料夾不會刪除單字本身。</p></div>
     <div className="mb-3 grid grid-cols-3 gap-2"><div className="glass-soft p-2"><p className="text-[11px] text-muted">總單字</p><p className="text-lg font-bold">{data?.total ?? 0}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">需要加強</p><p className="text-lg font-bold text-rose-300">{(data?.items ?? []).filter((i) => i.familiarity < 40).length}</p></div><div className="glass-soft p-2"><p className="text-[11px] text-muted">已熟悉</p><p className="text-lg font-bold text-emerald-300">{(data?.items ?? []).filter((i) => i.familiarity >= 80).length}</p></div></div>
     {memoryMode ? (
               <MemoryCard
@@ -301,7 +335,7 @@ export function MyVocabularyPanel() {
       <>
     {loading && <Skeleton lines={4} />}{error && <ErrorState message={error} onRetry={reload} />}{!loading && !items.length && <EmptyState icon="◇" title="還沒有我的單字" hint="從圖片 OCR 或教材分析結果按『加入單字本』開始建立。" />}
     <Modal open={Boolean(active)} onClose={() => setActive(null)} title={active?.word ?? "單字詳細資訊"} fullScreen>{active && <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted">{active.partOfSpeech || "單字"}・熟悉度 {active.familiarity}%・{active.phonetic || ""}</p><div className="flex flex-wrap gap-1.5"><Button size="sm" variant="ghost" onClick={() => { if (!speak(active.word)) toast.push("error", "此瀏覽器不支援語音"); }}>朗讀</Button><Button size="sm" onClick={() => review(active, true)}>我會了</Button><Button size="sm" variant="outline" onClick={() => review(active, false)}>加入複習</Button><Button size="sm" variant="ghost" onClick={async () => { if (confirm("確定移除此單字？")) { await apiDelete(`/my-vocabulary/${active.id}`); setActive(null); await reload(); } }}>刪除</Button></div></div><div className="rounded-xl bg-[#37d3ff]/10 p-3"><p className="text-lg font-semibold">{active.meaning || "尚未補上中文釋義"}</p></div>{active.example && <div className="rounded-xl bg-white/5 p-3 text-sm"><p className="text-xs text-muted">例句</p><p className="mt-1">{active.example}</p><p className="text-muted">{active.exampleZh}</p></div>}{(() => { const a = active.analysis ?? {}; const list = (key: string) => Array.isArray(a[key]) ? (a[key] as unknown[]).map(String).filter(Boolean) : []; const confusables = list("confusables"); const synonyms = list("synonyms"); const nearSynonyms = list("nearSynonyms"); const collocations = list("collocations"); return <div className="grid gap-2 text-xs sm:grid-cols-2">{collocations.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">相關片語</p><p className="mt-1 text-muted">{collocations.join("、")}</p></div>}{confusables.length > 0 && <div className="rounded-xl bg-amber-400/10 p-2"><p className="font-semibold">易錯與易混淆</p><p className="mt-1 text-muted">{confusables.join("；")}</p></div>}{synonyms.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">相似字</p><p className="mt-1 text-muted">{synonyms.join("、")}</p></div>}{nearSynonyms.length > 0 && <div className="rounded-xl bg-white/5 p-2"><p className="font-semibold">近義字</p><p className="mt-1 text-muted">{nearSynonyms.join("、")}</p></div>}</div>; })()}</div>}</Modal>
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <button key={item.id} type="button" onClick={() => { if (openDetailOnClick) setActive(item); else speak(item.word); }} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.word}</p><p className="text-xs text-[#7dd3fc]">{item.meaning}</p><p className="mt-1 text-[11px] text-muted">{item.partOfSpeech || "未分類"}・複習 {item.reviewCount} 次</p></div><Badge tone={item.familiarity >= 80 ? "green" : item.familiarity >= 40 ? "cyan" : "rose"}>{item.familiarity}%</Badge></div><Progress value={item.familiarity} max={100} tone={item.familiarity >= 80 ? "green" : "violet"} /></button>)}</div>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <label key={item.id} className="glass-soft rounded-xl p-3 text-left transition hover:border-[#37d3ff]/50"><div className="mb-2 flex items-center justify-between"><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => setSelectedIds((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])} /><button type="button" className="text-xs text-[#7dd3fc]" onClick={() => { if (openDetailOnClick) setActive(item); else speak(item.word); }}>查看</button></div><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.word}</p><p className="text-xs text-[#7dd3fc]">{item.meaning}</p><p className="mt-1 text-[11px] text-muted">{item.partOfSpeech || "未分類"}・複習 {item.reviewCount} 次</p></div><Badge tone={item.familiarity >= 80 ? "green" : item.familiarity >= 40 ? "cyan" : "rose"}>{item.familiarity}%</Badge></div><Progress value={item.familiarity} max={100} tone={item.familiarity >= 80 ? "green" : "violet"} /></label>)}</div>
     <Modal open={addOpen} onClose={() => setAddOpen(false)} title="手動新增單字"><div className="space-y-3"><Field label="單字" required><Input value={newWord.word} onChange={(e) => setNewWord({ ...newWord, word: e.target.value })} /></Field><Field label="中文意思"><Input value={newWord.meaning} onChange={(e) => setNewWord({ ...newWord, meaning: e.target.value })} /></Field><Field label="詞性／音標"><div className="grid gap-2 sm:grid-cols-2"><Input value={newWord.partOfSpeech} onChange={(e) => setNewWord({ ...newWord, partOfSpeech: e.target.value })} placeholder="例如：noun" /><Input value={newWord.phonetic} onChange={(e) => setNewWord({ ...newWord, phonetic: e.target.value })} placeholder="音標" /></div></Field><Field label="例句"><Textarea value={newWord.example} onChange={(e) => setNewWord({ ...newWord, example: e.target.value })} /></Field><Field label="例句中文"><Input value={newWord.exampleZh} onChange={(e) => setNewWord({ ...newWord, exampleZh: e.target.value })} /></Field><Button full onClick={addWord}>加入我的單字</Button></div></Modal>
       </>
     )}

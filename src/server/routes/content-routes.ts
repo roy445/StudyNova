@@ -8,6 +8,8 @@ import {
   ocrPages,
   notes,
   userVocabularies,
+  vocabularyFolders,
+  vocabularyFolderItems,
   voiceRecords,
   voiceTranscripts,
   voiceAnalysis,
@@ -791,6 +793,50 @@ stage = "ai_provider";
     },
   }),
 
+  /* ----------------------------------------------- vocabulary folders */
+  route({ method: "GET", path: "/my-vocabulary/folders", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const folders = await db.select().from(vocabularyFolders).where(eq(vocabularyFolders.userId, user.userId)).orderBy(asc(vocabularyFolders.name));
+    const counts = await db.select({ folderId: vocabularyFolderItems.folderId, count: sql<number>`count(*)::int` }).from(vocabularyFolderItems).innerJoin(vocabularyFolders, eq(vocabularyFolderItems.folderId, vocabularyFolders.id)).where(eq(vocabularyFolders.userId, user.userId)).groupBy(vocabularyFolderItems.folderId);
+    const countMap = new Map(counts.map((row) => [row.folderId, row.count]));
+    return { folders: folders.map((folder) => ({ ...folder, count: countMap.get(folder.id) ?? 0 })) };
+  }}),
+  route({ method: "POST", path: "/my-vocabulary/folders", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const body = await ctx.json(z.object({ name: z.string().trim().min(1).max(80) }));
+    const rows = await db.insert(vocabularyFolders).values({ userId: user.userId, name: body.name }).onConflictDoNothing().returning();
+    if (!rows[0]) throw fail("SYS_CONFLICT", { message: "這個資料夾名稱已經存在" });
+    return { folder: { ...rows[0], count: 0 } };
+  }}),
+  route({ method: "PATCH", path: "/my-vocabulary/folders/:id", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const body = await ctx.json(z.object({ name: z.string().trim().min(1).max(80) }));
+    const rows = await db.update(vocabularyFolders).set({ name: body.name, updatedAt: new Date() }).where(and(eq(vocabularyFolders.id, ctx.params.id), eq(vocabularyFolders.userId, user.userId))).returning();
+    if (!rows[0]) throw notFound("找不到資料夾");
+    return { folder: rows[0] };
+  }}),
+  route({ method: "DELETE", path: "/my-vocabulary/folders/:id", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const rows = await db.delete(vocabularyFolders).where(and(eq(vocabularyFolders.id, ctx.params.id), eq(vocabularyFolders.userId, user.userId))).returning({ id: vocabularyFolders.id });
+    if (!rows[0]) throw notFound("找不到資料夾");
+    return { deleted: true };
+  }}),
+  route({ method: "POST", path: "/my-vocabulary/folders/:id/items", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const body = await ctx.json(z.object({ vocabularyIds: z.array(z.string().uuid()).min(1).max(300) }));
+    const folder = (await db.select({ id: vocabularyFolders.id }).from(vocabularyFolders).where(and(eq(vocabularyFolders.id, ctx.params.id), eq(vocabularyFolders.userId, user.userId))).limit(1))[0];
+    if (!folder) throw notFound("找不到資料夾");
+    const owned = await db.select({ id: userVocabularies.id }).from(userVocabularies).where(and(eq(userVocabularies.userId, user.userId), inArray(userVocabularies.id, body.vocabularyIds)));
+    await db.insert(vocabularyFolderItems).values(owned.map((item) => ({ folderId: folder.id, vocabularyId: item.id }))).onConflictDoNothing();
+    return { added: owned.length };
+  }}),
+  route({ method: "DELETE", path: "/my-vocabulary/folders/:id/items/:vocabularyId", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const folder = (await db.select({ id: vocabularyFolders.id }).from(vocabularyFolders).where(and(eq(vocabularyFolders.id, ctx.params.id), eq(vocabularyFolders.userId, user.userId))).limit(1))[0];
+    if (!folder) throw notFound("找不到資料夾");
+    await db.delete(vocabularyFolderItems).where(and(eq(vocabularyFolderItems.folderId, folder.id), eq(vocabularyFolderItems.vocabularyId, ctx.params.vocabularyId)));
+    return { removed: true };
+  }}),
   /* ---------------------------------------------------- my vocabulary */
   route({
     method: "POST",
@@ -806,6 +852,7 @@ stage = "ai_provider";
         example: z.string().max(1000).default(""),
         exampleZh: z.string().max(1000).default(""),
         analysis: z.record(z.string(), z.unknown()).optional(),
+        folderId: z.string().uuid().nullable().optional(),
       }));
       const word = body.word.trim();
       const inserted = await db.insert(userVocabularies).values({
@@ -820,6 +867,11 @@ stage = "ai_provider";
         analysis: body.analysis ?? {},
       }).onConflictDoNothing().returning();
       if (!inserted[0]) throw fail("SYS_CONFLICT", { message: `「${word}」已經在我的單字中` });
+      if (body.folderId) {
+        const folder = (await db.select({ id: vocabularyFolders.id }).from(vocabularyFolders).where(and(eq(vocabularyFolders.id, body.folderId), eq(vocabularyFolders.userId, user.userId))).limit(1))[0];
+        if (!folder) throw notFound("找不到資料夾");
+        await db.insert(vocabularyFolderItems).values({ folderId: folder.id, vocabularyId: inserted[0].id }).onConflictDoNothing();
+      }
       return { item: inserted[0] };
     },
   }),
@@ -830,8 +882,13 @@ stage = "ai_provider";
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const q = (ctx.query.get("q") ?? "").trim().slice(0, 80);
-      const rows = await db.select().from(userVocabularies).where(and(eq(userVocabularies.userId, user.userId), q ? sql`(${userVocabularies.word} ilike ${`%${q}%`} or ${userVocabularies.meaning} ilike ${`%${q}%`})` : sql`true`)).orderBy(desc(userVocabularies.updatedAt)).limit(300);
-      return { items: rows, total: rows.length };
+      const folderId = ctx.query.get("folderId");
+      const sort = ctx.query.get("sort") ?? "recent";
+      const conditions = [eq(userVocabularies.userId, user.userId), q ? sql`(${userVocabularies.word} ilike ${`%${q}%`} or ${userVocabularies.meaning} ilike ${`%${q}%`})` : sql`true`];
+      const base = db.select({ item: userVocabularies }).from(userVocabularies);
+      const query = folderId ? base.innerJoin(vocabularyFolderItems, eq(vocabularyFolderItems.vocabularyId, userVocabularies.id)).innerJoin(vocabularyFolders, and(eq(vocabularyFolders.id, vocabularyFolderItems.folderId), eq(vocabularyFolders.userId, user.userId))).where(and(...conditions, eq(vocabularyFolderItems.folderId, folderId))) : base.where(and(...conditions));
+      const rows = await query.orderBy(sort === "name" ? asc(userVocabularies.word) : sort === "familiarity" ? desc(userVocabularies.familiarity) : sort === "lastReviewed" ? desc(userVocabularies.lastReviewedAt) : desc(userVocabularies.updatedAt)).limit(300);
+      return { items: rows.map((row) => "item" in row ? row.item : row), total: rows.length };
     },
   }),
   route({
