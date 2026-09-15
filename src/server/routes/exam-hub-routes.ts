@@ -2,11 +2,13 @@ import { and, asc, desc, eq, inArray, isNull, lte, or, gt } from "drizzle-orm";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { db } from "@/db";
-import { announcements, examHubAttempts, examHubs, examHubWordProgress, examHubWords, userSettings, questionBanks, questionBankMemberships, questionSources, questions, studyMaterials, examQuestionGenerationJobs, examQuestionGenerationItems } from "@/db/schema";
+import { announcements, examHubAttempts, examHubs, examHubWordProgress, examHubWords, userSettings, questionBanks, questionBankMemberships, questionSources, questions, studyMaterials, studyMaterialPages, examQuestionGenerationJobs, examQuestionGenerationItems } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 import { createAiBackgroundJob } from "../ai-background";
 import { queue } from "../queue";
+import { putObject } from "../storage";
+import { extractText } from "./content-routes";
 
 function openWindow() {
   const now = new Date();
@@ -75,6 +77,27 @@ export const routes: RouteDef[] = [
   route({ method: "GET", path: "/admin/exam-hubs", auth: "admin", handler: async () => ({ hubs: await db.select().from(examHubs).orderBy(desc(examHubs.createdAt)) }) }),
   route({ method: "POST", path: "/admin/exam-hubs", auth: "admin", handler: async (ctx) => { const admin = ctx.requireUser(); const body = await ctx.json(z.object({ name: z.string().min(1).max(120), educationLevel: z.enum(["junior", "senior"]), schoolName: z.string().max(120).default(""), grade: z.number().int().min(1).max(3), examNumber: z.string().min(1).max(40), openAt: z.string().datetime().nullable().optional(), closeAt: z.string().datetime().nullable().optional(), status: z.enum(["draft", "published", "closed"]).default("draft"), announcement: z.string().max(2000).default(""), showMarquee: z.boolean().default(false) })); const row = (await db.insert(examHubs).values({ ...body, openAt: body.openAt ? new Date(body.openAt) : null, closeAt: body.closeAt ? new Date(body.closeAt) : null, createdBy: admin.userId }).returning())[0]; if (body.showMarquee) await db.insert(announcements).values({ title: "📢 段考專區已開放", body: body.announcement || `${body.name} 已開放，現在可以開始複習英文單字。`, audience: "all", audienceIds: [], pinned: false, marquee: true, notify: true, push: false, sortOrder: 0, startsAt: body.openAt ? new Date(body.openAt) : new Date(), endsAt: body.closeAt ? new Date(body.closeAt) : null, createdBy: admin.userId, link: `/exam-hubs/${row.id}`, targetFeature: "dashboard" }).catch(() => undefined); return { hub: row }; } }),
   route({ method: "PATCH", path: "/admin/exam-hubs/:id", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ name: z.string().min(1).max(120).optional(), status: z.enum(["draft", "published", "closed"]).optional(), openAt: z.string().datetime().nullable().optional(), closeAt: z.string().datetime().nullable().optional(), announcement: z.string().max(2000).optional(), showMarquee: z.boolean().optional() })); const { openAt, closeAt, ...patch } = body; const row = (await db.update(examHubs).set({ ...patch, ...(openAt !== undefined ? { openAt: openAt ? new Date(openAt) : null } : {}), ...(closeAt !== undefined ? { closeAt: closeAt ? new Date(closeAt) : null } : {}), updatedAt: new Date() }).where(eq(examHubs.id, ctx.params.id)).returning())[0]; if (!row) throw notFound("找不到段考專區"); return { hub: row }; } }),
+  route({ method: "POST", path: "/admin/exam-hubs/:id/materials/upload", auth: "admin", rate: { limit: 20, windowSec: 3600 }, handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const hub = (await db.select({ id: examHubs.id, name: examHubs.name }).from(examHubs).where(eq(examHubs.id, ctx.params.id)).limit(1))[0];
+    if (!hub) throw notFound("找不到段考專區");
+    const form = await ctx.formData();
+    const files = form.getAll("files").filter((value): value is File => value instanceof File);
+    if (!files.length) throw fail("REQ_NO_FILE", { message: "請至少選擇一個 PDF、TXT、圖片或支援的教材檔案。" });
+    if (files.length > 100) throw fail("REQ_VALIDATION", { message: "單次最多上傳 100 個檔案。" });
+    const results: Array<{ materialId: string; filename: string; status: string; chars: number }> = [];
+    for (const file of files) {
+      if (file.size > 25 * 1024 * 1024) throw fail("REQ_VALIDATION", { message: `${file.name} 超過 25MB。` });
+      const data = Buffer.from(await file.arrayBuffer());
+      const mime = file.type || "application/octet-stream";
+      const stored = await putObject({ userId: admin.userId, filename: `exam-${hub.id}-${file.name}`, mimeType: mime, data, allow: ["pdf", "text", "image"] });
+      const text = await extractText(mime, data, admin.userId, "其他");
+      const material = (await db.insert(studyMaterials).values({ userId: admin.userId, title: `${hub.name}｜${file.name}`.slice(0, 120), subject: "其他", kind: mime === "application/pdf" ? "pdf" : mime.startsWith("image/") ? "image" : "txt", status: "ready", content: text }).returning())[0];
+      await db.insert(studyMaterialPages).values({ materialId: material.id, pageNumber: 1, text, objectId: stored.id });
+      results.push({ materialId: material.id, filename: file.name, status: "ready", chars: text.length });
+    }
+    return { uploaded: results.length, materials: results, materialIds: results.map((item) => item.materialId) };
+  }}),
   route({ method: "GET", path: "/admin/exam-hubs/:id/words", auth: "admin", handler: async (ctx) => ({ words: await db.select().from(examHubWords).where(eq(examHubWords.hubId, ctx.params.id)).orderBy(asc(examHubWords.word)) }) }),
   route({ method: "POST", path: "/admin/exam-hubs/:id/words", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ words: z.array(wordInput).min(1).max(1000) })); const rows = await db.insert(examHubWords).values(body.words.map((word) => ({ ...word, hubId: ctx.params.id, normalizedWord: word.word.toLocaleLowerCase("en-US") }))).onConflictDoNothing().returning(); return { words: rows, added: rows.length }; } }),
   route({ method: "DELETE", path: "/admin/exam-hubs/:hubId/words/:id", auth: "admin", handler: async (ctx) => { await db.delete(examHubWords).where(and(eq(examHubWords.id, ctx.params.id), eq(examHubWords.hubId, ctx.params.hubId))); return { deleted: true }; } }),

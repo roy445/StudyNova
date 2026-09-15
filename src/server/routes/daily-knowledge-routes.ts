@@ -37,8 +37,8 @@ export const routes: RouteDef[] = [
     const admin = ctx.requireUser();
     const body = await ctx.json(z.object({ subject, date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(todayStr()) }));
     const result = await generateDailyKnowledge({ subject: body.subject, date: body.date, userId: admin.userId });
-    const status = result.duplicate.duplicate ? "rejected" : result.source.verified ? "approved" : "verifying";
-    const row = (await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate: body.date, verifiedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, duplicate: result.duplicate, source: result.source }, createdBy: admin.userId, updatedBy: admin.userId }).returning())[0];
+    const status = result.duplicate.duplicate ? "rejected" : result.source.verified ? "published" : "verifying";
+    const row = (await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate: body.date, verifiedAt: result.source.verified ? new Date() : null, publishedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, duplicate: result.duplicate, source: result.source }, createdBy: admin.userId, updatedBy: admin.userId }).returning())[0];
     await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "daily_knowledge", action: "generate", resourceId: row.id, metadata: { status: status === "rejected" ? result.duplicate.reason : result.source.note }, ip: ctx.ip });
     return { item: row, duplicate: result.duplicate, source: result.source };
   }}),

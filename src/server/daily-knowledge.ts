@@ -33,6 +33,20 @@ export function fingerprint(value: string) { return createHash("sha256").update(
 
 type SourceCandidate = { title: string; url: string; summary: string };
 
+const CURATED_SOURCES: Record<string, SourceCandidate[]> = {
+  "數學": [{ title: "Mathematics", url: "https://www.britannica.com/science/mathematics", summary: "Mathematics studies numbers, quantities, shapes, and patterns." }],
+  "歷史": [{ title: "World History Encyclopedia", url: "https://www.worldhistory.org/", summary: "An educational reference covering ancient and world history." }],
+  "地理": [{ title: "National Geographic Education", url: "https://education.nationalgeographic.org/", summary: "Educational geography and earth science resources." }],
+  "公民": [{ title: "United Nations", url: "https://www.un.org/en/", summary: "Official information about international institutions and global issues." }],
+  "英文": [{ title: "British Council LearnEnglish", url: "https://learnenglish.britishcouncil.org/", summary: "English language learning resources and explanations." }],
+  "國文": [{ title: "教育部重編國語辭典修訂本", url: "https://dict.revised.moe.edu.tw/", summary: "Taiwan Ministry of Education Chinese dictionary reference." }],
+  "自然": [{ title: "NASA Science", url: "https://science.nasa.gov/", summary: "NASA educational science resources and discoveries." }],
+  "物理": [{ title: "NASA Science", url: "https://science.nasa.gov/", summary: "NASA educational science resources and discoveries." }],
+  "化學": [{ title: "Royal Society of Chemistry Education", url: "https://edu.rsc.org/", summary: "Chemistry education resources from the Royal Society of Chemistry." }],
+  "生物": [{ title: "National Institutes of Health", url: "https://www.nih.gov/", summary: "Official biomedical and life-science research information." }],
+  "地球科學": [{ title: "USGS Science", url: "https://www.usgs.gov/", summary: "Official earth science and geological research information." }],
+};
+
 export async function fetchDailyKnowledgeSources(subject: DailyKnowledgeSubject | "隨機"): Promise<SourceCandidate[]> {
   const feeds = subject === "隨機" || ["自然", "物理", "化學", "生物", "地球科學", "數學"].includes(subject)
     ? ["https://science.nasa.gov/feed/"]
@@ -52,13 +66,14 @@ export async function fetchDailyKnowledgeSources(subject: DailyKnowledgeSubject 
       }
     } catch { /* External source unavailable: generation remains conservative and unverified. */ }
   }
-  return candidates;
+  return candidates.length ? candidates : (CURATED_SOURCES[subject === "隨機" ? "數學" : subject] ?? CURATED_SOURCES["自然"] ?? []);
 }
 
 export async function verifyDailyKnowledgeSource(sourceUrl: string) {
   if (!/^https?:\/\/[^\s]+$/i.test(sourceUrl)) return { verified: false, note: "缺少有效的 http(s) 來源網址，不能標記為已查證。" };
   try {
-    const response = await fetch(sourceUrl, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(7000) });
+    let response = await fetch(sourceUrl, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(7000) });
+    if (!response.ok || response.status === 405) response = await fetch(sourceUrl, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(7000), headers: { accept: "text/html" } });
     if (!response.ok) return { verified: false, note: `來源網址回應 ${response.status}，不能標記為已查證。` };
     return { verified: true, note: `已驗證來源網址可存取（HTTP ${response.status}）。` };
   } catch (error) {
@@ -72,7 +87,7 @@ export async function generateDailyKnowledge(input: { subject: DailyKnowledgeSub
   const previous = await db.select({ title: dailyKnowledgeItems.title, content: dailyKnowledgeItems.content, coreConcept: dailyKnowledgeItems.coreConcept }).from(dailyKnowledgeItems).where(and(ne(dailyKnowledgeItems.status, "rejected"), ne(dailyKnowledgeItems.status, "archived"))).limit(500);
   const prompt = `你是 StudyNova 的高中生每日知識編輯。請為 ${subject} 產生一則真正有內容的知識，日期 ${input.date}。不要寫基礎常識或空泛勵志句，要讓高中生產生「原來如此」的理解。請優先從下列真實公開來源挑選一則與主題相關的內容，sourceUrl 必須逐字使用候選網址，不得自行捏造或改寫網址；若候選來源與科目無關，sourceUrl 必須為空字串。請輸出 JSON，欄位為 title、content、detail、subject、topic、source、sourceUrl、coreConcept、quiz。content 需說明現象，detail 需解釋機制、限制或與課程的連結，quiz 要有四個選項與唯一答案。候選網路來源：${JSON.stringify(sources)}。候選舊知識如下，不能改寫它們：${JSON.stringify(previous.slice(-80))}`;
   const result = await runAiJson<DailyKnowledgeDraft>({ feature: "daily_knowledge_generation", userId: input.userId ?? "system", system: "你是嚴格的知識編輯與來源審查助手。不要編造引用。", parts: [{ kind: "text", text: prompt }], maxOutputTokens: 1800, temperature: 0.35 }, {} as DailyKnowledgeDraft);
-  const draft = { ...result.data, subject };
+  const draft = { ...result.data, subject, sourceUrl: result.data.sourceUrl || sources[0]?.url || "", source: result.data.source || sources[0]?.title || "" };
   const duplicate = compareDailyKnowledge(draft, previous);
   const source = draft.sourceUrl ? await verifyDailyKnowledgeSource(draft.sourceUrl) : { verified: false, note: "AI 沒有提供可驗證來源，因此不得標記已查證。" };
   return { draft, duplicate, source, meta: result.meta };

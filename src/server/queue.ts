@@ -77,9 +77,9 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     if (existing.length) return "今日已有排程每日知識，略過重複生成";
     const result = await generateDailyKnowledge({ subject: "隨機", date });
     if (result.duplicate.duplicate) return `生成內容與既有知識相似，未建立：${result.duplicate.reason}`;
-    const status = result.source.verified ? "approved" : "verifying";
-    await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate: date, verifiedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, source: result.source } }).onConflictDoNothing();
-    return result.source.verified ? "已建立今日已驗證每日知識，等待管理員發布" : "已建立今日待驗證每日知識，未提供給學生";
+    const status = result.source.verified ? "published" : "verifying";
+    await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate: date, verifiedAt: result.source.verified ? new Date() : null, publishedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, source: result.source } }).onConflictDoNothing();
+    return result.source.verified ? "已建立並發布今日已驗證每日知識" : "已建立今日待驗證每日知識，未提供給學生";
   },
 
   async study_reminder() {

@@ -31,7 +31,7 @@ import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
 import { subjectStrategy } from "../subject-strategies";
 
-async function extractText(mime: string, data: Buffer, userId: string, subject = "其他"): Promise<string> {
+export async function extractText(mime: string, data: Buffer, userId: string, subject = "其他"): Promise<string> {
   if (mime.startsWith("text/") || mime === "application/json") return sanitizeText(data.toString("utf8"));
   if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED", { hint: "此檔案需要 AI 視覺辨識。你可以改上傳純文字檔，或請管理員設定 AI Provider。" });
   const res = await runAi({
