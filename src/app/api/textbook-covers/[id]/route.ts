@@ -1,9 +1,12 @@
 import { readObject } from "@/server/storage";
+import { getMaintenanceState } from "@/server/maintenance";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const maintenance = await getMaintenanceState();
+  if (maintenance.enabled) return Response.json({ ok: false, code: "SERVICE_MAINTENANCE", message: maintenance.notice, estimatedRecoveryAt: maintenance.estimatedRecoveryAt }, { status: 503 });
   try {
     const { id } = await context.params;
     const object = await readObject(id);

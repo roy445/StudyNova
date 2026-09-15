@@ -478,8 +478,18 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async () => {
       const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "service_control")).limit(1))[0];
-      const value = (row?.value ?? {}) as { enabled?: boolean; message?: string };
-      return { enabled: value.enabled !== false, message: value.message ?? "服務目前暫停中，請稍後再試。" };
+      const value = (row?.value ?? {}) as Record<string, unknown>;
+      return {
+        enabled: value.enabled !== false,
+        title: typeof value.title === "string" ? value.title : "系統施工中",
+        description: typeof value.description === "string" ? value.description : "StudyNova 目前正在進行系統維護與更新，暫時無法使用。",
+        badgeText: typeof value.badgeText === "string" ? value.badgeText : "系統維護中，請稍候",
+        estimatedRecoveryAt: typeof value.estimatedRecoveryAt === "string" ? value.estimatedRecoveryAt : null,
+        message: typeof value.message === "string" ? value.message : "請稍後再回來看看！",
+        startedAt: typeof value.startedAt === "string" ? value.startedAt : null,
+        updatedByName: typeof value.updatedByName === "string" ? value.updatedByName : null,
+        updatedAt: row?.updatedAt?.toISOString?.() ?? null,
+      };
     },
   }),
   route({
@@ -488,10 +498,27 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ enabled: z.boolean(), message: z.string().max(240).default("服務目前暫停中，請稍後再試。") }));
-      await db.insert(platformSettings).values({ key: "service_control", value: body, updatedAt: new Date() }).onConflictDoUpdate({ target: platformSettings.key, set: { value: body, updatedAt: new Date() } });
-      await adminLog({ actorId: admin.userId, action: body.enabled ? "service.enable" : "service.disable", targetType: "platform", targetId: "service_control", after: body, ip: ctx.ip });
-      return body;
+      const existing = (await db.select().from(platformSettings).where(eq(platformSettings.key, "service_control")).limit(1))[0];
+      const current = (existing?.value ?? {}) as Record<string, unknown>;
+      const body = await ctx.json(z.object({
+        enabled: z.boolean(),
+        title: z.string().trim().min(1).max(120).default("系統施工中"),
+        description: z.string().trim().max(1000).default("StudyNova 目前正在進行系統維護與更新，暫時無法使用。"),
+        badgeText: z.string().trim().max(120).default("系統維護中，請稍候"),
+        estimatedRecoveryAt: z.string().datetime().nullable().default(null),
+        message: z.string().trim().max(500).default("請稍後再回來看看！"),
+      }));
+      const now = new Date().toISOString();
+      const value = {
+        ...current,
+        ...body,
+        startedAt: body.enabled ? null : (typeof current.startedAt === "string" ? current.startedAt : now),
+        updatedByName: admin.displayName,
+        updatedAt: now,
+      };
+      await db.insert(platformSettings).values({ key: "service_control", value, updatedAt: new Date() }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } });
+      await adminLog({ actorId: admin.userId, action: body.enabled ? "service.enable" : "service.disable", targetType: "platform", targetId: "service_control", after: value, ip: ctx.ip });
+      return { ...value, updatedAt: now };
     },
   }),
   route({

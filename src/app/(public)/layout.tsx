@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/brand";
+import { MaintenanceScreen } from "@/components/MaintenanceScreen";
+import { getMaintenanceState } from "@/server/maintenance";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,9 @@ const LINKS = [
   { href: "/terms", label: "使用條款" },
 ];
 
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
+export default async function PublicLayout({ children }: { children: React.ReactNode }) {
+  const maintenance = await getMaintenanceState();
+  if (maintenance.enabled) return <MaintenanceScreen state={maintenance} />;
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/88 backdrop-blur-xl">

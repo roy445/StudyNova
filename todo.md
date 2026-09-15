@@ -133,3 +133,18 @@
 - [x] 建立分析歷史分類與搜尋，並確保所有查詢遵守使用者擁有權
 - [ ] 整合題目相似題、錯題分析與文章閱讀測驗建立流程
 - [ ] 補充第 4 組功能測試、型別檢查、手機版驗證與 GitHub 推送
+
+## 2026-09-15 全站停止服務／施工模式
+
+- [x] 盤點 middleware、authentication、session、routing、layout、dashboard、API、admin、public、server actions、cron、background jobs、Web Push 與直接入口
+- [x] 建立持久化 maintenance mode 設定：狀態、施工標題、說明、封條文字、預計恢復時間、自訂通知、開始／修改資訊
+- [x] 實作 server-side 全站頁面攔截，不載入一般首頁、Dashboard、導覽列或主要內容
+- [x] 確保維護模式不刪除 session、不清除 cookie、不 revoke session、不要求重新登入
+- [x] 讓後端驗證的管理員在維護模式仍可進入控制頁並手動恢復服務
+- [x] 阻擋學生主要 API 並回傳 SERVICE_MAINTENANCE、message、estimatedRecoveryAt，不回傳 HTML
+- [x] 維護模式不依賴預計恢復時間自動開放，過期時清楚標示仍在維護
+- [x] 保持背景工作、已開始的 AI 工作、Web Push 與資料狀態不因頁面攔截遺失
+- [x] 建立維護畫面與管理員狀態／設定 UI，支援開始施工、修改、立即恢復
+- [x] 補充頁面、API、session、管理員例外、恢復流程與背景工作測試
+- [x] 執行 typecheck、test、build 與安全回歸檢查
+- [x] 提交並推送施工模式修正版至 GitHub main

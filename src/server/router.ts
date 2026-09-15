@@ -80,13 +80,13 @@ export function errorResponse(err: AppError) {
 }
 
 let compiledRoutes: Compiled[] | null = null;
-let serviceControlCache: { enabled: boolean; message: string; expiresAt: number } | null = null;
+let serviceControlCache: { enabled: boolean; message: string; estimatedRecoveryAt: string | null; expiresAt: number } | null = null;
 
 async function serviceControl() {
   if (serviceControlCache && serviceControlCache.expiresAt > Date.now()) return serviceControlCache;
   const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "service_control")).limit(1))[0];
-  const value = (row?.value ?? {}) as { enabled?: boolean; message?: string };
-  serviceControlCache = { enabled: value.enabled !== false, message: value.message || "服務目前暫停中，請稍後再試。", expiresAt: Date.now() + 10_000 };
+  const value = (row?.value ?? {}) as { enabled?: boolean; message?: string; description?: string; estimatedRecoveryAt?: string | null };
+  serviceControlCache = { enabled: value.enabled !== false, message: value.message || value.description || "服務目前暫停中，請稍後再試。", estimatedRecoveryAt: value.estimatedRecoveryAt ?? null, expiresAt: Date.now() + 1_000 };
   return serviceControlCache;
 }
 
@@ -135,9 +135,9 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     else if (def.auth === "user") user = await requireUser();
     else if (def.auth === "optional") user = (await getSession())?.user ?? null;
 
-    if (def.auth !== "admin" && !def.path.startsWith("/auth") && def.path !== "/health") {
+    if (def.auth !== "admin" && !def.path.startsWith("/auth") && def.path !== "/health" && def.path !== "/system/cron") {
       const control = await serviceControl();
-      if (!control.enabled) throw fail("SERVICE_MAINTENANCE", { message: control.message });
+      if (!control.enabled) throw fail("SERVICE_MAINTENANCE", { message: control.message, details: { estimatedRecoveryAt: control.estimatedRecoveryAt } });
     }
 
     if (def.rate) {
