@@ -35,14 +35,6 @@ async function uploadQuestionFiles(files: File[], uploadOne: (file: File) => Pro
   await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, () => worker()));
 }
 
-const ANNOUNCEMENT_TEMPLATES = [
-  { key: "weekly", label: "每週小考開放", title: "每週小考已開放！", body: "本週單字、句子與多元題型測驗已上線，現在就開始挑戰。", link: "/weekly", marquee: true },
-  { key: "knowledge", label: "每日知識更新", title: "今日課外知識已更新", body: "前往每日知識，閱讀跨學科內容並完成素養小測驗。", link: "/dashboard#daily-knowledge", marquee: false },
-  { key: "challenge", label: "好友挑戰開放", title: "好友挑戰等你來戰！", body: "邀請同學一起進行公平對戰，題目與選項將保持一致。", link: "/challenges", marquee: true },
-  { key: "activity", label: "限時活動開始", title: "StudyNova 限時活動開始", body: "活動題庫已開放，完成任務即可獲得 Nova 與 XP 獎勵。", link: "/activities", marquee: true },
-  { key: "maintenance", label: "系統維護通知", title: "系統維護通知", body: "StudyNova 將進行例行維護，請提前保存學習進度。", link: "/dashboard", marquee: false },
-] as const;
-
 type Provider = {
   provider: string;
   priority: number;
@@ -73,7 +65,8 @@ export default function AdminOpsPage() {
   );
   const policies = useApi<{ policies: Array<{ id: string; feature: string; strategy: string; allowDirectAnswer: boolean; requireDetailedAnalysis: boolean; allowWebSearch: boolean; maxHintLevel: number; systemPolicy: string; version: number; enabled: boolean; proOnly: boolean }> }>("/admin/ai/policies");
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number }> }>("/admin/features");
-  const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string; endsAt: string | null; targetFeature: string }> }>("/admin/announcements");
+  const anns = useApi<{ announcements: Array<{ id: string; title: string; body: string; link: string; audience: string; pinned: boolean; marquee: boolean; startsAt: string; endsAt: string | null; targetFeature: string; status: string }> }>("/admin/announcements");
+  const announcementTemplates = useApi<{ templates: Array<{ id: string; name: string; title: string; body: string; announcementType: string; icon: string; ctaLabel: string; ctaUrl: string; defaultSettings: Record<string, unknown> }> }>("/admin/announcement-templates");
   const acts = useApi<{ activities: Array<{ id: string; title: string; cover: string; kind: string; goalMetric: string; goalValue: number; rewardNova: number; rewardXp: number; published: boolean; startsAt: string; endsAt: string; participants: number; completed: number }> }>("/admin/activities");
   const coupons = useApi<{ coupons: Array<{ id: string; code: string; kind: string; value: number; maxRedemptions: number; redeemedCount: number; enabled: boolean }> }>("/admin/coupons");
   const bank = useApi<{ questions: Array<{ id: string; subject: string; topic: string; bankCategory: string; sourceLabel: string; origin: string; type: string; stem: string; difficulty: string; appearedCount: number }>; total: number }>("/admin/questions");
@@ -157,6 +150,14 @@ export default function AdminOpsPage() {
       await uploadQuestionFiles(files, async (file) => { await upload(file.name, file, { access: "private", handleUploadUrl: "/api/blob/question-bank-upload", clientPayload: JSON.stringify({ jobId: created.jobId, bankCategory: category, sourceLabel: source, subjectHint: "auto" }), multipart: file.size > 5 * 1024 * 1024 }); });
       setPendingBankFiles([]); toast.push("success", "檔案已上傳，開始分析題目內容"); void watchImport(created.jobId, mode === "auto");
     } catch (err) { toast.push("error", errorMessage(err)); } finally { setBankUploadBusy(false); }
+  }
+  async function saveAnnouncement(status: "draft" | "published") {
+    try {
+      const res = await apiPost<{ notified: number; scheduled: boolean }>("/admin/announcements", { ...annForm, status, startsAt: annForm.startsAt ? new Date(annForm.startsAt).toISOString() : undefined, endsAt: annForm.endsAt ? new Date(annForm.endsAt).toISOString() : null });
+      toast.push("success", status === "draft" ? "公告草稿已儲存；尚未顯示給學生" : `公告已發布，通知 ${res.notified} 位學生`);
+      setAnnOpen(false);
+      await anns.reload();
+    } catch (err) { toast.push("error", errorMessage(err)); }
   }
   return (
     <div className="space-y-4">
@@ -490,9 +491,10 @@ export default function AdminOpsPage() {
 
       {tab === "ann" && (
         <>
-        <Card title="▤ 公告範例" subtitle="以下範例尚未發布；可在發布視窗快速套用並修改。">
+        <Card title="▤ 公告範例｜模板庫" subtitle="預先建立的公告模板，套用後只會填入編輯器，不會直接發布，也不會出現在學生端。">
+          {announcementTemplates.loading && <Skeleton lines={3} />}
           <div className="grid gap-2 sm:grid-cols-2">
-            {ANNOUNCEMENT_TEMPLATES.map((preset) => <button key={preset.key} type="button" className="glass-soft text-left p-3 transition hover:bg-white/10" onClick={() => { setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.link, marquee: preset.marquee }); setAnnOpen(true); }}><p className="text-sm font-semibold">{preset.title}</p><p className="mt-1 text-xs text-muted">{preset.body}</p><p className="mt-1 text-[11px] text-[#7dd3fc]">點擊跳轉：{preset.link}</p></button>)}
+            {announcementTemplates.data?.templates.map((preset) => <div key={preset.id} className="glass-soft p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{preset.icon} {preset.name}</p><p className="mt-1 text-xs text-muted">{preset.body}</p></div><Badge tone="muted">模板</Badge></div><p className="mt-2 text-[11px] text-[#7dd3fc]">預設 CTA：{preset.ctaLabel || "無"}・{preset.ctaUrl || "無連結"}</p><Button size="sm" variant="outline" className="mt-3" onClick={() => { const settings = preset.defaultSettings ?? {}; setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.ctaUrl || annForm.link, announcementType: preset.announcementType, ctaLabel: preset.ctaLabel, ctaUrl: preset.ctaUrl, marquee: settings.marquee === true, importance: typeof settings.importance === "string" ? settings.importance : annForm.importance, status: "draft" }); setAnnOpen(true); }}>套用此範例</Button></div>)}
           </div>
         </Card>
         <Card title="⌁ 推播測試" subtitle="可選擇全部使用者、PRO、一般使用者或管理員／後台權力擁有者；每位符合條件者都會建立站內通知並嘗試發送 Web Push。">
@@ -519,7 +521,7 @@ export default function AdminOpsPage() {
           <Button size="sm" className="mt-2" onClick={async () => { try { const result = await apiPost<{ targets: number; notified: number; pushSent: number; configured: boolean }>("/admin/push/test", pushForm); setPushResult(result); toast.push("success", `已通知 ${result.notified} 人，Web Push 發送 ${result.pushSent} 台裝置`); } catch (err) { toast.push("error", errorMessage(err)); } }}>立即發送給選定身分組</Button>
           {pushResult && <p className="mt-2 text-xs text-muted">最近一次：目標 {pushResult.targets} 人・站內通知 {pushResult.notified} 人・Web Push {pushResult.pushSent} 台・VAPID {pushResult.configured ? "已設定" : "未設定（僅站內通知）"}</p>}
         </Card>
-        <Card title="▤ 公告" action={<Button size="sm" onClick={() => setAnnOpen(true)}>＋ 發布公告</Button>}>
+        <Card title="▤ 公告管理｜實際公告" subtitle="這裡管理已建立、發布、草稿、排程或已過期的實際公告；只有這裡的公告資料會影響學生端。" action={<Button size="sm" onClick={() => { setAnnForm({ ...annForm, status: "draft", title: "", body: "", ctaLabel: "", ctaUrl: "" }); setAnnOpen(true); }}>＋ 建立公告</Button>}>
           {anns.loading && <Skeleton lines={3} />}
           <div className="space-y-2">
             {anns.data?.announcements.map((a) => (
@@ -530,6 +532,7 @@ export default function AdminOpsPage() {
                     {a.title}
                   </span>
                   <div className="flex gap-1.5">
+                    <Badge tone={a.status === "published" ? "green" : a.status === "scheduled" ? "cyan" : a.status === "archived" ? "rose" : "muted"}>{a.status === "published" ? "已發布" : a.status === "scheduled" ? "已排程" : a.status === "archived" ? "已停用" : "草稿"}</Badge>
                     <Badge tone="muted">{a.audience}</Badge>
                     {a.marquee && <Badge tone="cyan">跑馬燈</Badge>}
                     <Badge tone="violet">{a.targetFeature === "all" ? "全站" : `功能：${a.targetFeature}`}</Badge>
@@ -762,10 +765,10 @@ export default function AdminOpsPage() {
 
       <Modal open={annOpen} onClose={() => setAnnOpen(false)} title="發布公告">
         <div className="space-y-3">
-          <Field label="快速套用範例">
-            <Select value="" onChange={(e) => { const preset = ANNOUNCEMENT_TEMPLATES.find((item) => item.key === e.target.value); if (preset) setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.link, marquee: preset.marquee }); }}>
-              <option value="">選擇公告範例…</option>
-              {ANNOUNCEMENT_TEMPLATES.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
+          <Field label="從公告模板建立（只會填入草稿編輯器）">
+            <Select value="" onChange={(e) => { const preset = announcementTemplates.data?.templates.find((item) => item.id === e.target.value); if (preset) { const settings = preset.defaultSettings ?? {}; setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.ctaUrl || annForm.link, announcementType: preset.announcementType, ctaLabel: preset.ctaLabel, ctaUrl: preset.ctaUrl, marquee: settings.marquee === true, status: "draft" }); } }}>
+              <option value="">選擇公告模板…</option>
+              {announcementTemplates.data?.templates.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
             </Select>
           </Field>
           <Field label="標題" required>
@@ -818,21 +821,7 @@ export default function AdminOpsPage() {
               </label>
             ))}
           </div>
-          <Button
-            full
-            onClick={async () => {
-              try {
-                const res = await apiPost<{ notified: number; scheduled: boolean }>("/admin/announcements", { ...annForm, startsAt: annForm.startsAt ? new Date(annForm.startsAt).toISOString() : undefined, endsAt: annForm.endsAt ? new Date(annForm.endsAt).toISOString() : null });
-                toast.push("success", `公告已發布，通知 ${res.notified} 位學生`);
-                setAnnOpen(false);
-                await anns.reload();
-              } catch (err) {
-                toast.push("error", errorMessage(err));
-              }
-            }}
-          >
-            發布
-          </Button>
+          <div className="grid gap-2 sm:grid-cols-2"><Button full variant="outline" onClick={() => void saveAnnouncement("draft")}>儲存草稿</Button><Button full onClick={() => void saveAnnouncement("published")}>發布公告</Button></div>
         </div>
       </Modal>
 

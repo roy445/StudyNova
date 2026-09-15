@@ -14,6 +14,7 @@ import {
   coupons,
   couponRedemptions,
   announcements,
+  announcementTemplates,
   activities,
   activityParticipants,
   activityQuestions,
@@ -608,6 +609,33 @@ export const routes: RouteDef[] = [
   }),
 
   /* -------------------------------------------------- announcements */
+  route({
+    method: "GET",
+    path: "/admin/announcement-templates",
+    auth: "admin",
+    handler: async () => ({ templates: await db.select().from(announcementTemplates).where(eq(announcementTemplates.enabled, true)).orderBy(asc(announcementTemplates.name)) }),
+  }),
+  route({
+    method: "POST",
+    path: "/admin/announcement-templates",
+    auth: "admin",
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(120), title: z.string().min(1).max(120), body: z.string().max(4000).default(""), announcementType: z.string().max(30).default("general"), icon: z.string().max(20).default("▤"), ctaLabel: z.string().max(80).default(""), ctaUrl: z.string().max(400).default(""), defaultSettings: z.record(z.string(), z.unknown()).default({}) }));
+      const template = (await db.insert(announcementTemplates).values(body).returning())[0];
+      return { template };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/announcement-templates/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(120).optional(), title: z.string().min(1).max(120).optional(), body: z.string().max(4000).optional(), announcementType: z.string().max(30).optional(), icon: z.string().max(20).optional(), ctaLabel: z.string().max(80).optional(), ctaUrl: z.string().max(400).optional(), defaultSettings: z.record(z.string(), z.unknown()).optional(), enabled: z.boolean().optional() }));
+      const template = (await db.update(announcementTemplates).set({ ...body, updatedAt: new Date() }).where(eq(announcementTemplates.id, ctx.params.id)).returning())[0];
+      if (!template) throw notFound("找不到公告範例");
+      return { template };
+    },
+  }),
   route({
     method: "GET",
     path: "/admin/announcements",

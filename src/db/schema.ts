@@ -1954,6 +1954,25 @@ export const announcements = pgTable(
   (t) => [index("announcements_idx").on(t.pinned, t.startsAt)],
 );
 
+export const announcementTemplates = pgTable(
+  "announcement_templates",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    announcementType: text("type").notNull().default("general"),
+    icon: text("icon").notNull().default("▤"),
+    ctaLabel: text("cta_label").notNull().default(""),
+    ctaUrl: text("cta_url").notNull().default(""),
+    defaultSettings: jsonb("default_settings").$type<Record<string, unknown>>().notNull().default({}),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("announcement_templates_enabled_idx").on(t.enabled, t.updatedAt)],
+);
+
 export const examHubMaterialImports = pgTable(
   "exam_hub_material_imports",
   {
