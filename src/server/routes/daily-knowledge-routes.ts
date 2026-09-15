@@ -21,10 +21,20 @@ export const routes: RouteDef[] = [
     const parsedSubject = subject.safeParse(requested);
     const chosen = requested === "隨機" ? null : parsedSubject.success && parsedSubject.data !== "隨機" ? parsedSubject.data : null;
     const recentDate = new Date(`${date}T00:00:00+08:00`); recentDate.setDate(recentDate.getDate() - 30);
-    const recent = await db.select({ itemId: dailyKnowledgeViews.itemId }).from(dailyKnowledgeViews).where(and(eq(dailyKnowledgeViews.userId, user.userId), gte(dailyKnowledgeViews.viewedAt, recentDate)));
+    let recent: Array<{ itemId: string }> = [];
+    try {
+      recent = await db.select({ itemId: dailyKnowledgeViews.itemId }).from(dailyKnowledgeViews).where(and(eq(dailyKnowledgeViews.userId, user.userId), gte(dailyKnowledgeViews.viewedAt, recentDate)));
+    } catch (error) {
+      console.error("[daily-knowledge] history lookup unavailable; continuing without history", { error: error instanceof Error ? error.message : "unknown" });
+    }
     const seenIds = new Set(recent.map((row) => row.itemId));
     // 只讀 0055 已存在的核心欄位；這讓 migration 0059 尚未在某個 deployment 執行時，學生端仍可正常取得內容。
-    const pool = await db.select({ id: dailyKnowledgeItems.id, title: dailyKnowledgeItems.title, content: dailyKnowledgeItems.content, detail: dailyKnowledgeItems.detail, subject: dailyKnowledgeItems.subject, topic: dailyKnowledgeItems.topic, source: dailyKnowledgeItems.source, sourceUrl: dailyKnowledgeItems.sourceUrl, publishedAt: dailyKnowledgeItems.publishedAt, verifiedAt: dailyKnowledgeItems.verifiedAt, verificationNote: dailyKnowledgeItems.verificationNote, status: dailyKnowledgeItems.status, scheduledDate: dailyKnowledgeItems.scheduledDate, coreConcept: dailyKnowledgeItems.coreConcept, titleFingerprint: dailyKnowledgeItems.titleFingerprint, contentFingerprint: dailyKnowledgeItems.contentFingerprint, quiz: dailyKnowledgeItems.quiz, generationMetadata: dailyKnowledgeItems.generationMetadata }).from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), or(isNull(dailyKnowledgeItems.scheduledDate), lte(dailyKnowledgeItems.scheduledDate, date)))).orderBy(desc(dailyKnowledgeItems.publishedAt)).limit(500);
+    let pool: Array<{ id: string; title: string; content: string; detail: string; subject: string; topic: string; source: string; sourceUrl: string; publishedAt: Date | null; verifiedAt: Date | null; verificationNote: string; status: string; scheduledDate: string | null; coreConcept: string; titleFingerprint: string; contentFingerprint: string; quiz: { question: string; options: string[]; answer: number; explanation: string } | null; generationMetadata: Record<string, unknown> }> = [];
+    try {
+      pool = await db.select({ id: dailyKnowledgeItems.id, title: dailyKnowledgeItems.title, content: dailyKnowledgeItems.content, detail: dailyKnowledgeItems.detail, subject: dailyKnowledgeItems.subject, topic: dailyKnowledgeItems.topic, source: dailyKnowledgeItems.source, sourceUrl: dailyKnowledgeItems.sourceUrl, publishedAt: dailyKnowledgeItems.publishedAt, verifiedAt: dailyKnowledgeItems.verifiedAt, verificationNote: dailyKnowledgeItems.verificationNote, status: dailyKnowledgeItems.status, scheduledDate: dailyKnowledgeItems.scheduledDate, coreConcept: dailyKnowledgeItems.coreConcept, titleFingerprint: dailyKnowledgeItems.titleFingerprint, contentFingerprint: dailyKnowledgeItems.contentFingerprint, quiz: dailyKnowledgeItems.quiz, generationMetadata: dailyKnowledgeItems.generationMetadata }).from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), or(isNull(dailyKnowledgeItems.scheduledDate), lte(dailyKnowledgeItems.scheduledDate, date)))).orderBy(desc(dailyKnowledgeItems.publishedAt)).limit(500);
+    } catch (error) {
+      console.error("[daily-knowledge] pool lookup unavailable; migration may be pending", { error: error instanceof Error ? error.message : "unknown" });
+    }
     const related = chosen ? ({ "自然": ["物理", "化學", "生物", "地球科學"], "物理": ["自然", "地球科學"], "化學": ["自然", "生物"], "生物": ["自然", "化學"], "地球科學": ["自然", "地理"], "歷史": ["公民", "地理"], "地理": ["歷史", "自然"], "公民": ["歷史", "地理"], "國文": ["英文"], "英文": ["國文"] } as Record<string, string[]>)[chosen] ?? [] : [];
     const ordered = chosen ? [...pool.filter((item) => item.subject === chosen), ...pool.filter((item) => related.includes(item.subject)), ...pool.filter((item) => !related.includes(item.subject) && item.subject !== chosen)] : pool;
     let fresh = ordered.find((item) => !seenIds.has(item.id));

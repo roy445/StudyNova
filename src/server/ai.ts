@@ -391,7 +391,9 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   let fallbackFrom = "";
   let lastCategory: FailureCategory = "unknown";
   let lastReason = "";
-  const deadline = Date.now() + 45_000;
+  // 每日知識是背景補充內容，不應讓多個失效 provider 連續佔用整個 request；
+  // 其他互動式 AI 功能維持較寬鬆的既有 deadline。
+  const deadline = Date.now() + (req.feature === "daily_knowledge_generation" ? 18_000 : 45_000);
 
   for (const cfg of configs) {
     if (Date.now() >= deadline) {
