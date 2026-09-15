@@ -2,7 +2,7 @@
 -- Safe additive migration: does not alter or delete existing data.
 CREATE TABLE IF NOT EXISTS public.ai_background_jobs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES public.users(user_id) ON DELETE SET NULL,
+  user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
   kind text NOT NULL,
   feature text NOT NULL,
   status text NOT NULL DEFAULT 'queued',
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS public.ai_background_usage_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id uuid NOT NULL REFERENCES public.ai_background_jobs(id) ON DELETE CASCADE,
   item_id uuid NOT NULL REFERENCES public.ai_background_items(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES public.users(user_id) ON DELETE SET NULL,
+  user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
   idempotency_key text NOT NULL,
   units integer NOT NULL DEFAULT 1,
   status text NOT NULL DEFAULT 'claimed',

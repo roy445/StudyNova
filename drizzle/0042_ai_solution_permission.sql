@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS "feature_permissions" (
 
 CREATE TABLE IF NOT EXISTS "feature_usage" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "feature" text NOT NULL,
   "usage_date" text NOT NULL,
   "count" integer NOT NULL DEFAULT 0,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS "feature_usage" (
 
 CREATE TABLE IF NOT EXISTS "solution_sessions" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "mode" text NOT NULL DEFAULT 'tutor',
   "mode_locked" boolean NOT NULL DEFAULT false,
   "status" text NOT NULL DEFAULT 'active',
