@@ -490,6 +490,11 @@ export default function AdminOpsPage() {
 
       {tab === "ann" && (
         <>
+        <Card title="▤ 公告範例" subtitle="以下範例尚未發布；可在發布視窗快速套用並修改。">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ANNOUNCEMENT_TEMPLATES.map((preset) => <button key={preset.key} type="button" className="glass-soft text-left p-3 transition hover:bg-white/10" onClick={() => { setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.link, marquee: preset.marquee }); setAnnOpen(true); }}><p className="text-sm font-semibold">{preset.title}</p><p className="mt-1 text-xs text-muted">{preset.body}</p><p className="mt-1 text-[11px] text-[#7dd3fc]">點擊跳轉：{preset.link}</p></button>)}
+          </div>
+        </Card>
         <Card title="⌁ 推播測試" subtitle="可選擇全部使用者、PRO、一般使用者或管理員／後台權力擁有者；每位符合條件者都會建立站內通知並嘗試發送 Web Push。">
           <div className="grid gap-2 sm:grid-cols-3">
             <Field label="測試範例">
@@ -513,11 +518,6 @@ export default function AdminOpsPage() {
           <Field label="通知內容"><Textarea value={pushForm.message} onChange={(e) => setPushForm({ ...pushForm, message: e.target.value })} /></Field>
           <Button size="sm" className="mt-2" onClick={async () => { try { const result = await apiPost<{ targets: number; notified: number; pushSent: number; configured: boolean }>("/admin/push/test", pushForm); setPushResult(result); toast.push("success", `已通知 ${result.notified} 人，Web Push 發送 ${result.pushSent} 台裝置`); } catch (err) { toast.push("error", errorMessage(err)); } }}>立即發送給選定身分組</Button>
           {pushResult && <p className="mt-2 text-xs text-muted">最近一次：目標 {pushResult.targets} 人・站內通知 {pushResult.notified} 人・Web Push {pushResult.pushSent} 台・VAPID {pushResult.configured ? "已設定" : "未設定（僅站內通知）"}</p>}
-        </Card>
-        <Card title="▤ 公告範例" subtitle="以下範例尚未發布；可在發布視窗快速套用並修改。">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {ANNOUNCEMENT_TEMPLATES.map((preset) => <button key={preset.key} type="button" className="glass-soft text-left p-3 transition hover:bg-white/10" onClick={() => { setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.link, marquee: preset.marquee }); setAnnOpen(true); }}><p className="text-sm font-semibold">{preset.title}</p><p className="mt-1 text-xs text-muted">{preset.body}</p><p className="mt-1 text-[11px] text-[#7dd3fc]">點擊跳轉：{preset.link}</p></button>)}
-          </div>
         </Card>
         <Card title="▤ 公告" action={<Button size="sm" onClick={() => setAnnOpen(true)}>＋ 發布公告</Button>}>
           {anns.loading && <Skeleton lines={3} />}
