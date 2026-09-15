@@ -30,7 +30,7 @@ import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core
 import { analyzeQuestionWithAi } from "./question-analysis";
 import { checkDisplayName } from "./name-moderation";
 import { processAiBackgroundBatch } from "./ai-background";
-import { generateDailyKnowledge, fingerprint } from "./daily-knowledge";
+import { DAILY_KNOWLEDGE_SUBJECTS, generateDailyKnowledge, fingerprint } from "./daily-knowledge";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -73,13 +73,18 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
 
   async daily_knowledge_refresh() {
     const date = todayStr();
-    const existing = await db.select({ id: dailyKnowledgeItems.id }).from(dailyKnowledgeItems).where(eq(dailyKnowledgeItems.scheduledDate, date)).limit(1);
-    if (existing.length) return "今日已有排程每日知識，略過重複生成";
-    const result = await generateDailyKnowledge({ subject: "隨機", date });
-    if (result.duplicate.duplicate) return `生成內容與既有知識相似，未建立：${result.duplicate.reason}`;
-    const status = result.source.verified ? "published" : "verifying";
-    await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate: date, verifiedAt: result.source.verified ? new Date() : null, publishedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, source: result.source } }).onConflictDoNothing();
-    return result.source.verified ? "已建立並發布今日已驗證每日知識" : "已建立今日待驗證每日知識，未提供給學生";
+    let published = 0; let skipped = 0;
+    for (const subject of DAILY_KNOWLEDGE_SUBJECTS) {
+      const existing = await db.select({ id: dailyKnowledgeItems.id }).from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.scheduledDate, date), eq(dailyKnowledgeItems.subject, subject))).limit(1);
+      if (existing.length) { skipped += 1; continue; }
+      try {
+        const result = await generateDailyKnowledge({ subject, date });
+        if (result.duplicate.duplicate || !result.source.verified) { skipped += 1; continue; }
+        const row = await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", sourceType: result.draft.sourceType ?? "unknown", sourceId: result.draft.sourceId ?? "", licenseInfo: result.draft.licenseInfo ?? "", originalTitle: result.draft.originalTitle ?? result.draft.title, fetchedAt: new Date(), status: "published", scheduledDate: date, verifiedAt: new Date(), publishedAt: new Date(), verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, automation: "approved_by_automation", source: result.source } }).onConflictDoNothing().returning({ id: dailyKnowledgeItems.id });
+        if (row.length) published += 1; else skipped += 1;
+      } catch { skipped += 1; }
+    }
+    return `每日知識自動化完成：發布 ${published} 科，略過或等待重試 ${skipped} 科`;
   },
 
   async study_reminder() {

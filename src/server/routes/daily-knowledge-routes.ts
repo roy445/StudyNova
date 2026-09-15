@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { dailyKnowledgeItems, dailyKnowledgeViews } from "@/db/schema";
@@ -18,13 +18,26 @@ export const routes: RouteDef[] = [
     const user = ctx.requireUser();
     const date = dateFromQuery(ctx.query.get("date"));
     const requested = ctx.query.get("subject") ?? "隨機";
-    const chosen = requested === "隨機" ? null : subject.safeParse(requested).success ? requested : null;
-    const candidates = await db.select().from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), chosen ? eq(dailyKnowledgeItems.subject, chosen) : undefined, or(eq(dailyKnowledgeItems.scheduledDate, date), isNull(dailyKnowledgeItems.scheduledDate)))).orderBy(desc(dailyKnowledgeItems.scheduledDate), desc(dailyKnowledgeItems.publishedAt));
-    const seen = await db.select({ itemId: dailyKnowledgeViews.itemId }).from(dailyKnowledgeViews).where(eq(dailyKnowledgeViews.userId, user.userId));
-    const seenIds = new Set(seen.map((row) => row.itemId));
-    const fresh = candidates.find((item) => !seenIds.has(item.id)) ?? candidates[0];
+    const parsedSubject = subject.safeParse(requested);
+    const chosen = requested === "隨機" ? null : parsedSubject.success && parsedSubject.data !== "隨機" ? parsedSubject.data : null;
+    const recentDate = new Date(`${date}T00:00:00+08:00`); recentDate.setDate(recentDate.getDate() - 30);
+    const recent = await db.select({ itemId: dailyKnowledgeViews.itemId }).from(dailyKnowledgeViews).where(and(eq(dailyKnowledgeViews.userId, user.userId), gte(dailyKnowledgeViews.viewedAt, recentDate)));
+    const seenIds = new Set(recent.map((row) => row.itemId));
+    const pool = await db.select().from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), or(isNull(dailyKnowledgeItems.scheduledDate), lte(dailyKnowledgeItems.scheduledDate, date)))).orderBy(desc(dailyKnowledgeItems.publishedAt)).limit(500);
+    const related = chosen ? ({ "自然": ["物理", "化學", "生物", "地球科學"], "物理": ["自然", "地球科學"], "化學": ["自然", "生物"], "生物": ["自然", "化學"], "地球科學": ["自然", "地理"], "歷史": ["公民", "地理"], "地理": ["歷史", "自然"], "公民": ["歷史", "地理"], "國文": ["英文"], "英文": ["國文"] } as Record<string, string[]>)[chosen] ?? [] : [];
+    const ordered = chosen ? [...pool.filter((item) => item.subject === chosen), ...pool.filter((item) => related.includes(item.subject)), ...pool.filter((item) => !related.includes(item.subject) && item.subject !== chosen)] : pool;
+    let fresh = ordered.find((item) => !seenIds.has(item.id));
+    if (!fresh) fresh = ordered[0];
+    if (!fresh) {
+      try {
+        const generated = await generateDailyKnowledge({ subject: chosen ?? "隨機", date, userId: user.userId });
+        if (!generated.duplicate.duplicate && generated.source.verified) {
+          fresh = (await db.insert(dailyKnowledgeItems).values({ ...generated.draft, sourceUrl: generated.draft.sourceUrl, sourceType: generated.draft.sourceType ?? "unknown", sourceId: generated.draft.sourceId ?? "", licenseInfo: generated.draft.licenseInfo ?? "", originalTitle: generated.draft.originalTitle ?? generated.draft.title, fetchedAt: new Date(), status: "published", scheduledDate: date, verifiedAt: new Date(), publishedAt: new Date(), verificationNote: generated.source.note, titleFingerprint: fingerprint(generated.draft.title), contentFingerprint: fingerprint(generated.draft.content), generationMetadata: { provider: generated.meta.provider, model: generated.meta.model, automation: "approved_by_automation", duplicate: generated.duplicate, source: generated.source } }).onConflictDoNothing().returning())[0];
+        }
+      } catch { /* request must remain safe when the external source or AI is temporarily unavailable */ }
+    }
     if (!fresh) return { item: null, subject: chosen ?? "隨機", date, availableSubjects: DAILY_KNOWLEDGE_SUBJECTS };
-    await db.insert(dailyKnowledgeViews).values({ itemId: fresh.id, userId: user.userId }).onConflictDoNothing();
+    await db.insert(dailyKnowledgeViews).values({ itemId: fresh.id, userId: user.userId, subject: fresh.subject, deliveryDate: date }).onConflictDoNothing();
     return { item: fresh, subject: chosen ?? fresh.subject, date, availableSubjects: DAILY_KNOWLEDGE_SUBJECTS };
   }}),
   route({ method: "GET", path: "/admin/daily-knowledge", auth: "admin", handler: async (ctx) => {
