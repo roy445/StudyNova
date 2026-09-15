@@ -23,7 +23,8 @@ function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0)).buffer as ArrayBuffer;
 }
 
-const NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
+type NavItem = { href: string; label: string; icon: SymbolName; special?: boolean; closeAt?: string | null };
+const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
   { href: "/textbooks", label: "教材", icon: "study" },
@@ -160,7 +161,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
     "/dashboard",
   );
-  const examHubs = useApi<{ hubs: Array<{ id: string }>; needsProfile: boolean }>("/exam-hubs/available");
+  const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
 
@@ -511,17 +512,20 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
       {/* Mobile bottom nav */}
       <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
-          {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考", icon: "weekly" as SymbolName }] : NAV).map((item) => {
+          {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
             return (
               <li key={item.href} className="flex-1">
                 <Link
                   href={item.href}
                   aria-label={item.label}
-                  className={`mobile-nav-item focus-ring flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"}`}
+                  className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${item.special ? "exam-nav-item" : ""} ${active && item.special ? "exam-nav-item-active" : ""}`}
                 >
-                  <SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" />
+                  {item.special && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
+                  <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>
                   <span className="max-w-full truncate">{item.label}</span>
+                  {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
                 </Link>
               </li>
             );
