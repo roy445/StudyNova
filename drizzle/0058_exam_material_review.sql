@@ -1,14 +1,14 @@
 CREATE TABLE IF NOT EXISTS "exam_hub_material_imports" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "exam_hub_id" uuid NOT NULL REFERENCES "exam_hubs"("id") ON DELETE CASCADE,
-  "uploaded_by" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "uploaded_by" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "filename" text NOT NULL,
   "mime_type" text NOT NULL DEFAULT 'application/octet-stream',
   "object_id" uuid REFERENCES "storage_objects"("id") ON DELETE SET NULL,
   "extracted_text" text NOT NULL DEFAULT '',
   "status" text NOT NULL DEFAULT 'pending',
   "material_id" uuid REFERENCES "study_materials"("id") ON DELETE SET NULL,
-  "reviewed_by" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+  "reviewed_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "reviewed_at" timestamptz,
   "created_at" timestamptz NOT NULL DEFAULT now()
 );
