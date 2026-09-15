@@ -296,8 +296,8 @@ select {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   opacity: .72;
-  filter: blur(.15px) drop-shadow(0 0 12px rgba(124, 92, 255, .42));
-  animation: memory-card-spectrum 7s linear infinite;
+  filter: blur(1.2px) drop-shadow(0 0 16px rgba(124, 92, 255, .42));
+  animation: memory-card-spectrum 12s linear infinite;
   pointer-events: none;
 }
 .memory-card-rainbow::after {
@@ -309,7 +309,7 @@ select {
   background: radial-gradient(ellipse, rgba(55, 211, 255, .16), transparent 68%);
   filter: blur(22px);
   opacity: .85;
-  animation: memory-card-breathe 3.8s ease-in-out infinite;
+  animation: memory-card-breathe 5.5s cubic-bezier(.4,0,.2,1) infinite;
   pointer-events: none;
 }
 .memory-card-spark {
@@ -317,9 +317,21 @@ select {
   text-shadow: 0 0 8px #ffc857, 0 0 18px #ff70aa;
   animation: memory-card-sparkle 2.2s ease-in-out infinite;
 }
-@keyframes memory-card-spectrum { to { transform: rotate(360deg); } }
-@keyframes memory-card-breathe { 0%, 100% { opacity: .45; transform: scale(.92); } 50% { opacity: 1; transform: scale(1.06); } }
-@keyframes memory-card-sparkle { 0%, 100% { opacity: .45; transform: scale(.82) rotate(0deg); } 50% { opacity: 1; transform: scale(1.18) rotate(14deg); } }
+@keyframes memory-card-spectrum { 0% { transform: rotate(0deg) scale(.99); } 50% { transform: rotate(180deg) scale(1.01); } 100% { transform: rotate(360deg) scale(.99); } }
+@keyframes memory-card-breathe { 0%, 100% { opacity: .42; transform: scale(.94); } 50% { opacity: .9; transform: scale(1.04); } }
+@keyframes memory-card-sparkle { 0%, 100% { opacity: .55; transform: scale(.9) rotate(0deg); } 50% { opacity: 1; transform: scale(1.1) rotate(8deg); } }
+
+.memory-card-action {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--memory-accent, #37d3ff) 46%, var(--line));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--memory-accent, #37d3ff) 16%, transparent), rgba(255,255,255,.045));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--memory-accent, #37d3ff) 18%, transparent), 0 0 22px color-mix(in srgb, var(--memory-accent, #37d3ff) 18%, transparent);
+  transition: transform .28s cubic-bezier(.22,1,.36,1), box-shadow .28s ease, background .28s ease;
+}
+.memory-card-action::after { content: ""; position: absolute; inset: -60% -20%; border-radius: 999px; background: radial-gradient(ellipse, color-mix(in srgb, var(--memory-accent, #37d3ff) 24%, transparent), transparent 66%); opacity: .45; transform: translateX(-45%); transition: transform .7s cubic-bezier(.22,1,.36,1); pointer-events: none; }
+.memory-card-action:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px color-mix(in srgb, var(--memory-accent, #37d3ff) 35%, transparent), 0 0 30px color-mix(in srgb, var(--memory-accent, #37d3ff) 30%, transparent); }
+.memory-card-action:hover::after { transform: translateX(45%); }
 
 .novi-core-glow {
   animation: nova-core-glow 2.2s ease-in-out infinite;

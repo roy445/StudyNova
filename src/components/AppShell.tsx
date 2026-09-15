@@ -7,6 +7,8 @@ import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
 import { SymbolIcon, type SymbolName } from "./Symbol";
 import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
 import { apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { MaintenanceNotice } from "@/components/MaintenanceNotice";
+import type { MaintenanceState } from "@/server/maintenance";
 
 export type ShellUser = {
   userId: string;
@@ -122,7 +124,7 @@ const FEATURE_STEPS: Record<string, string[]> = {
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 
-export function AppShell({ user, children }: { user: ShellUser; children: React.ReactNode }) {
+export function AppShell({ user, children, maintenance }: { user: ShellUser; children: React.ReactNode; maintenance?: MaintenanceState | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const featureKey = Object.entries(FEATURE_BY_PATH).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "all";
@@ -141,6 +143,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
+  const [updateApplying, setUpdateApplying] = useState(false);
+  const [updateComplete, setUpdateComplete] = useState(false);
   const [usageGuideOpen, setUsageGuideOpen] = useState(false);
   const [inAppBrowser] = useState(() => typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|Line\/|Twitter|MicroMessenger|; wv\)|WebView/i.test(navigator.userAgent || ""));
   const [androidDevice] = useState(() => typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || ""));
@@ -174,6 +178,17 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
   useEffect(() => {
     let registration: ServiceWorkerRegistration | undefined;
+    if (sessionStorage.getItem("sn-update-complete") === "1") {
+      sessionStorage.removeItem("sn-update-complete");
+      window.setTimeout(() => {
+        setUpdateComplete(true);
+        window.setTimeout(() => setUpdateComplete(false), 9000);
+      }, 0);
+    }
+    const onControllerChange = () => {
+      if (updateApplying) window.location.reload();
+    };
+    navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").then((value) => {
         registration = value;
@@ -194,8 +209,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
     const guideTimer = !standalone && !localStorage.getItem("sn-install-guide-seen") ? window.setTimeout(() => setInstallGuideOpen(true), 0) : undefined;
     const onInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", onInstall);
-    return () => { if (guideTimer) window.clearTimeout(guideTimer); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("online", syncOfflineQueue); };
-  }, []);
+    return () => { if (guideTimer) window.clearTimeout(guideTimer); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("online", syncOfflineQueue); navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); };
+  }, [updateApplying]);
 
   useEffect(() => {
     if (typeof window === "undefined" || installGuideOpen) return;
@@ -378,7 +393,10 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
   return (
     <div className="min-h-dvh lg:flex">
-      {updateReady && <div className="fixed inset-x-3 top-3 z-[100] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#37d3ff]/40 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_28px_rgba(55,211,255,0.2)] backdrop-blur-xl"><span><strong className="text-[#b9f2ff]">StudyNova 有新版本了</strong><span className="ml-2 text-xs text-muted">你的資料不會被清除</span></span><Button size="sm" onClick={() => { updateReady.waiting?.postMessage({ type: "SKIP_WAITING" }); window.location.reload(); }}>立即更新</Button></div>}
+      {maintenance?.enabled && <MaintenanceNotice state={maintenance} />}
+      {updateReady && !updateApplying && <div className="fixed inset-x-3 top-3 z-[100] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#37d3ff]/40 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_28px_rgba(55,211,255,0.2)] backdrop-blur-xl"><span><strong className="text-[#b9f2ff]">StudyNova 有新版本了</strong><span className="ml-2 text-xs text-muted">你的資料不會被清除</span></span><Button size="sm" onClick={() => { setUpdateApplying(true); setUpdateReady(null); sessionStorage.setItem("sn-update-complete", "1"); updateReady.waiting?.postMessage({ type: "SKIP_WAITING" }); window.setTimeout(() => window.location.reload(), 3500); }}>立即更新</Button></div>}
+      {updateApplying && <div className="fixed inset-0 z-[110] grid place-items-center bg-[#060915]/90 p-6 backdrop-blur-md"><div className="rounded-3xl border border-[#37d3ff]/30 bg-[#0b1226] px-8 py-7 text-center shadow-[0_0_60px_rgba(55,211,255,.2)]"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#37d3ff]/25 border-t-[#37d3ff]" /><p className="mt-4 font-bold text-white">正在套用 StudyNova 更新</p><p className="mt-1 text-xs text-muted">請稍候，登入狀態與學習資料會保留。</p></div></div>}
+      {updateComplete && <div className="fixed inset-x-3 top-3 z-[105] mx-auto max-w-xl rounded-2xl border border-emerald-300/30 bg-[#0b1226]/95 p-5 shadow-[0_0_35px_rgba(52,211,153,.16)] backdrop-blur-xl"><p className="font-bold text-emerald-200">更新完成</p><p className="mt-1 text-sm text-slate-200">StudyNova 已更新，這次包含：</p><ul className="mt-2 list-disc pl-5 text-xs leading-6 text-muted"><li>每日知識內容與來源驗證改善</li><li>維護資訊提示不再阻擋網站使用</li><li>記憶卡背景與互動效果更流暢</li></ul><button type="button" onClick={() => setUpdateComplete(false)} className="mt-3 text-xs text-emerald-200 underline">關閉更新摘要</button></div>}
       {pwaNotice && <div className="fixed inset-x-3 bottom-3 z-[90] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#ffc857]/35 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_24px_rgba(255,200,87,0.14)] backdrop-blur-xl"><div className="min-w-0"><p className="truncate font-semibold text-[#ffe7ad]">{pwaNotice.title}</p><p className="mt-0.5 line-clamp-2 text-xs text-muted">{pwaNotice.body}</p></div>{pwaNotice.ctaUrl && <Link href={pwaNotice.ctaUrl} className="shrink-0 text-xs text-[#ffc857] underline">{pwaNotice.ctaLabel || "查看詳情"}</Link>}</div>}
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-[var(--line)] bg-black/20 px-3 py-4 lg:flex">

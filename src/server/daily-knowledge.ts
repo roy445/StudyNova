@@ -31,6 +31,30 @@ export function compareDailyKnowledge(candidate: Pick<DailyKnowledgeDraft, "titl
 
 export function fingerprint(value: string) { return createHash("sha256").update(normalize(value)).digest("hex"); }
 
+type SourceCandidate = { title: string; url: string; summary: string };
+
+export async function fetchDailyKnowledgeSources(subject: DailyKnowledgeSubject | "隨機"): Promise<SourceCandidate[]> {
+  const feeds = subject === "隨機" || ["自然", "物理", "化學", "生物", "地球科學", "數學"].includes(subject)
+    ? ["https://science.nasa.gov/feed/"]
+    : ["https://www.smithsonianmag.com/rss/" ];
+  const candidates: SourceCandidate[] = [];
+  for (const feed of feeds) {
+    try {
+      const response = await fetch(feed, { signal: AbortSignal.timeout(8000), headers: { accept: "application/rss+xml, application/xml, text/xml" } });
+      if (!response.ok) continue;
+      const xml = await response.text();
+      for (const item of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
+        const block = item[1];
+        const read = (tag: string) => (block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"))?.[1] ?? "").replace(/<!\[CDATA\[|\]\]>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#8217;/g, "’").replace(/&#8220;|&#8221;/g, '"').replace(/\s+/g, " ").trim();
+        const title = read("title"); const url = read("link"); const summary = read("description");
+        if (title && /^https?:\/\//i.test(url)) candidates.push({ title, url, summary: summary.slice(0, 900) });
+        if (candidates.length >= 8) break;
+      }
+    } catch { /* External source unavailable: generation remains conservative and unverified. */ }
+  }
+  return candidates;
+}
+
 export async function verifyDailyKnowledgeSource(sourceUrl: string) {
   if (!/^https?:\/\/[^\s]+$/i.test(sourceUrl)) return { verified: false, note: "缺少有效的 http(s) 來源網址，不能標記為已查證。" };
   try {
@@ -44,8 +68,9 @@ export async function verifyDailyKnowledgeSource(sourceUrl: string) {
 
 export async function generateDailyKnowledge(input: { subject: DailyKnowledgeSubject | "隨機"; date: string; userId?: string }) {
   const subject = input.subject === "隨機" ? DAILY_KNOWLEDGE_SUBJECTS[Math.floor(Math.random() * DAILY_KNOWLEDGE_SUBJECTS.length)] : input.subject;
+  const sources = await fetchDailyKnowledgeSources(input.subject);
   const previous = await db.select({ title: dailyKnowledgeItems.title, content: dailyKnowledgeItems.content, coreConcept: dailyKnowledgeItems.coreConcept }).from(dailyKnowledgeItems).where(and(ne(dailyKnowledgeItems.status, "rejected"), ne(dailyKnowledgeItems.status, "archived"))).limit(500);
-  const prompt = `你是 StudyNova 的高中生每日知識編輯。請為 ${subject} 產生一則真正有內容的知識，日期 ${input.date}。不要寫基礎常識或空泛勵志句，要讓高中生產生「原來如此」的理解。內容必須能由公開可靠來源支持。不可捏造 source 或 sourceUrl；若不能提出可靠來源，sourceUrl 必須為空字串。請輸出 JSON，欄位為 title、content、detail、subject、topic、source、sourceUrl、coreConcept、quiz。content 需說明現象，detail 需解釋機制、限制或與課程的連結，quiz 要有四個選項與唯一答案。候選舊知識如下，不能改寫它們：${JSON.stringify(previous.slice(-80))}`;
+  const prompt = `你是 StudyNova 的高中生每日知識編輯。請為 ${subject} 產生一則真正有內容的知識，日期 ${input.date}。不要寫基礎常識或空泛勵志句，要讓高中生產生「原來如此」的理解。請優先從下列真實公開來源挑選一則與主題相關的內容，sourceUrl 必須逐字使用候選網址，不得自行捏造或改寫網址；若候選來源與科目無關，sourceUrl 必須為空字串。請輸出 JSON，欄位為 title、content、detail、subject、topic、source、sourceUrl、coreConcept、quiz。content 需說明現象，detail 需解釋機制、限制或與課程的連結，quiz 要有四個選項與唯一答案。候選網路來源：${JSON.stringify(sources)}。候選舊知識如下，不能改寫它們：${JSON.stringify(previous.slice(-80))}`;
   const result = await runAiJson<DailyKnowledgeDraft>({ feature: "daily_knowledge_generation", userId: input.userId ?? "system", system: "你是嚴格的知識編輯與來源審查助手。不要編造引用。", parts: [{ kind: "text", text: prompt }], maxOutputTokens: 1800, temperature: 0.35 }, {} as DailyKnowledgeDraft);
   const draft = { ...result.data, subject };
   const duplicate = compareDailyKnowledge(draft, previous);

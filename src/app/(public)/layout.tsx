@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/brand";
-import { MaintenanceScreen } from "@/components/MaintenanceScreen";
+import { MaintenanceNotice } from "@/components/MaintenanceNotice";
 import { getMaintenanceState } from "@/server/maintenance";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +14,9 @@ const LINKS = [
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const maintenance = await getMaintenanceState();
-  if (maintenance.enabled) return <MaintenanceScreen state={maintenance} />;
   return (
     <div className="min-h-dvh">
+      {maintenance.enabled && <MaintenanceNotice state={maintenance} />}
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 py-2.5">
           <Link href="/" className="focus-ring rounded-lg">

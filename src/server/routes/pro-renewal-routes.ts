@@ -28,7 +28,7 @@ export const routes: RouteDef[] = [
   }}),
   route({ method: "GET", path: "/admin/pro-renewals", auth: "admin", handler: async (ctx) => {
     const status = ctx.query.get("status") ?? "all";
-    const rows = await db.select({ request: proRenewalRequests, user: { userId: users.userId, displayName: users.displayName, email: users.email }, membership: memberships }).from(users).leftJoin(proRenewalRequests, eq(proRenewalRequests.userId, users.userId)).leftJoin(memberships, eq(memberships.userId, users.userId)).where(and(eq(users.role, "student"), eq(users.status, "active"), status === "pending" ? eq(proRenewalRequests.wantsRenewal, true) : undefined)).orderBy(desc(proRenewalRequests.updatedAt), asc(users.displayName)).limit(500);
+    const rows = await db.select({ request: proRenewalRequests, user: { userId: users.userId, displayName: users.displayName, email: users.email }, membership: memberships }).from(users).leftJoin(proRenewalRequests, eq(proRenewalRequests.userId, users.userId)).leftJoin(memberships, eq(memberships.userId, users.userId)).where(and(eq(users.status, "active"), status === "pending" ? eq(proRenewalRequests.wantsRenewal, true) : undefined)).orderBy(desc(proRenewalRequests.updatedAt), asc(users.displayName)).limit(500);
     return { requests: rows };
   }}),
   route({ method: "POST", path: "/admin/pro-renewals/:userId/extend", auth: "admin", handler: async (ctx) => {

@@ -30,7 +30,7 @@ function reindeerSignature(payload: string) {
 }
 
 function christmasSetting(value: Record<string, unknown> | undefined) {
-  return { enabled: true, reindeer: true, reindeerNova: 8, reindeerXp: 12, ...(value ?? {}) };
+  return { enabled: false, reindeer: false, reindeerNova: 8, reindeerXp: 12, ...(value ?? {}) };
 }
 
 export const routes: RouteDef[] = [

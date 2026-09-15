@@ -471,7 +471,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const records = await db.select().from(gradeRecords).where(eq(gradeRecords.userId, user.userId)).orderBy(desc(gradeRecords.examDate));
       const goals = await db.select().from(grades).where(eq(grades.userId, user.userId));
-      return { records, goals, stats: await subjectStats(user.userId), gradeInputWindow: await getGradeInputWindow() };
+      return { records, goals, stats: await subjectStats(user.userId), gradeInputWindow: await getGradeInputWindow(), examDateInputWindow: await getExamDateInputWindow() };
     },
   }),
 
@@ -629,6 +629,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      await assertExamDateInputOpen();
       const body = await ctx.json(
         z.object({
           name: z.string().min(1).max(60),
@@ -1219,6 +1220,23 @@ async function assertGradeInputOpen() {
   if (!window.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: "目前未開放成績輸入，請等待管理員開放。" });
   if (window.startsAt && new Date(window.startsAt).getTime() > Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: `成績輸入將於 ${new Date(window.startsAt).toLocaleString("zh-TW")} 開放。` });
   if (window.endsAt && new Date(window.endsAt).getTime() < Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: "本次成績輸入時段已結束，請等待管理員重新開放。" });
+}
+
+async function getExamDateInputWindow(): Promise<GradeInputWindow> {
+  const setting = (await db.select().from(platformSettings).where(eq(platformSettings.key, "exam_date_input_window")).limit(1))[0];
+  const value = (setting?.value ?? {}) as { enabled?: boolean; startsAt?: string | null; endsAt?: string | null };
+  const startsAt = value.startsAt || null;
+  const endsAt = value.endsAt || null;
+  const now = Date.now();
+  const open = value.enabled !== false && (!startsAt || Number.isNaN(new Date(startsAt).getTime()) || new Date(startsAt).getTime() <= now) && (!endsAt || Number.isNaN(new Date(endsAt).getTime()) || new Date(endsAt).getTime() >= now);
+  return { enabled: value.enabled !== false, startsAt, endsAt, open };
+}
+
+async function assertExamDateInputOpen() {
+  const window = await getExamDateInputWindow();
+  if (!window.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: "目前未開放段考日期輸入，請等待管理員開放。" });
+  if (window.startsAt && new Date(window.startsAt).getTime() > Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: `段考日期輸入將於 ${new Date(window.startsAt).toLocaleString("zh-TW")} 開放。` });
+  if (window.endsAt && new Date(window.endsAt).getTime() < Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: "本次段考日期輸入時段已結束，請等待管理員重新開放。" });
 }
 
 function buildNoviAdvice(input: {

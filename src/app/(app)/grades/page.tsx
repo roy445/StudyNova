@@ -20,7 +20,7 @@ type Goal = { id: string; subject: string; targetScore: number | null; baselineS
 
 export default function GradesPage() {
   const toast = useToast();
-  const grades = useApi<{ records: Record_[]; goals: Goal[]; stats: Stats[]; gradeInputWindow?: { enabled: boolean; startsAt: string | null; endsAt: string | null; open: boolean } }>("/grades");
+  const grades = useApi<{ records: Record_[]; goals: Goal[]; stats: Stats[]; gradeInputWindow?: { enabled: boolean; startsAt: string | null; endsAt: string | null; open: boolean }; examDateInputWindow?: { enabled: boolean; startsAt: string | null; endsAt: string | null; open: boolean } }>("/grades");
   const exams = useApi<{ exams: Array<{ id: string; name: string; examDate: string; daysLeft: number; note: string; subjects: Array<{ subject: string; scope: string; targetScore: number | null }> }> }>("/exams");
   const [open, setOpen] = useState(false);
   const [examOpen, setExamOpen] = useState(false);
@@ -31,12 +31,17 @@ export default function GradesPage() {
   const [examForm, setExamForm] = useState({ name: "", examDate: "", note: "", subject: "英文", scope: "" });
   const [goalForm, setGoalForm] = useState({ subject: "數學", targetScore: 85, baselineScore: 72 });
   const gradeInputOpen = grades.data?.gradeInputWindow?.open ?? false;
+  const examDateInputOpen = grades.data?.examDateInputWindow?.open ?? false;
   const gradeInputMessage = "目前尚未開放成績輸入，請等待管理員開放。";
   const guardGradeInput = (action: () => void) => {
     if (!gradeInputOpen) {
       toast.push("info", gradeInputMessage);
       return;
     }
+    action();
+  };
+  const guardExamDateInput = (action: () => void) => {
+    if (!examDateInputOpen) { toast.push("info", "目前尚未開放段考日期輸入，請等待管理員開放。"); return; }
     action();
   };
 
@@ -50,7 +55,7 @@ export default function GradesPage() {
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Button size="sm" onClick={() => guardGradeInput(() => setOpen(true))}>＋ 新增成績</Button>
-          <Button size="sm" variant="ghost" onClick={() => guardGradeInput(() => setExamOpen(true))}>＋ 考試倒數</Button>
+          <Button size="sm" variant="ghost" onClick={() => guardExamDateInput(() => setExamOpen(true))}>＋ 考試倒數</Button>
           <Button size="sm" variant="ghost" onClick={() => guardGradeInput(() => setGoalOpen(true))}>◇ 目標分數</Button>
         </div>
       </header>

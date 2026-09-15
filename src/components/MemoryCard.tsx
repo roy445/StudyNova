@@ -135,7 +135,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
             <button
               type="button"
               onClick={toggleFavorite}
-              className={`focus-ring inline-flex min-h-9 items-center gap-1 rounded-xl border px-3 transition ${favorites.has(current.id) ? "border-[#ffc857]/60 bg-[#ffc857]/10 text-[#ffc857]" : "border-[var(--line)] bg-white/5 text-muted hover:bg-white/10"}`}
+              className={`memory-card-action focus-ring inline-flex min-h-9 items-center gap-1 rounded-xl border px-3 transition ${favorites.has(current.id) ? "[--memory-accent:#ffc857] text-[#ffc857]" : "[--memory-accent:#37d3ff] text-muted"}`}
               title={favoriteLabel}
               aria-label={favoriteLabel}
             >
@@ -189,7 +189,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
           <button
             type="button"
             onClick={() => setLoop((value) => !value)}
-            className={`focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${loop ? "border-[#37d3ff]/50 bg-[#37d3ff]/10" : "border-[var(--line)] bg-white/5"}`}
+            className={`memory-card-action focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${loop ? "[--memory-accent:#37d3ff]" : "[--memory-accent:#7c5cff]"}`}
           >
             <span><span className="mr-2 text-base" aria-hidden="true">↻</span>全部循環</span>
             <span className="text-muted">{loop ? "開啟" : "關閉"}</span>
@@ -197,7 +197,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
           <button
             type="button"
             onClick={() => setAutoPlay((value) => !value)}
-            className={`focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${autoPlay ? "border-[#a78bfa]/60 bg-[#a78bfa]/10" : "border-[var(--line)] bg-white/5"}`}
+            className={`memory-card-action focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${autoPlay ? "[--memory-accent:#a78bfa]" : "[--memory-accent:#ff70aa]"}`}
           >
             <span><span className="mr-2 text-base" aria-hidden="true">▷</span>連續播放</span>
             <span className="text-muted">{autoPlay ? "播放中" : "關閉"}</span>
