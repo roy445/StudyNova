@@ -23,7 +23,8 @@ export const routes: RouteDef[] = [
     const recentDate = new Date(`${date}T00:00:00+08:00`); recentDate.setDate(recentDate.getDate() - 30);
     const recent = await db.select({ itemId: dailyKnowledgeViews.itemId }).from(dailyKnowledgeViews).where(and(eq(dailyKnowledgeViews.userId, user.userId), gte(dailyKnowledgeViews.viewedAt, recentDate)));
     const seenIds = new Set(recent.map((row) => row.itemId));
-    const pool = await db.select().from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), or(isNull(dailyKnowledgeItems.scheduledDate), lte(dailyKnowledgeItems.scheduledDate, date)))).orderBy(desc(dailyKnowledgeItems.publishedAt)).limit(500);
+    // 只讀 0055 已存在的核心欄位；這讓 migration 0059 尚未在某個 deployment 執行時，學生端仍可正常取得內容。
+    const pool = await db.select({ id: dailyKnowledgeItems.id, title: dailyKnowledgeItems.title, content: dailyKnowledgeItems.content, detail: dailyKnowledgeItems.detail, subject: dailyKnowledgeItems.subject, topic: dailyKnowledgeItems.topic, source: dailyKnowledgeItems.source, sourceUrl: dailyKnowledgeItems.sourceUrl, publishedAt: dailyKnowledgeItems.publishedAt, verifiedAt: dailyKnowledgeItems.verifiedAt, verificationNote: dailyKnowledgeItems.verificationNote, status: dailyKnowledgeItems.status, scheduledDate: dailyKnowledgeItems.scheduledDate, coreConcept: dailyKnowledgeItems.coreConcept, titleFingerprint: dailyKnowledgeItems.titleFingerprint, contentFingerprint: dailyKnowledgeItems.contentFingerprint, quiz: dailyKnowledgeItems.quiz, generationMetadata: dailyKnowledgeItems.generationMetadata }).from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), or(isNull(dailyKnowledgeItems.scheduledDate), lte(dailyKnowledgeItems.scheduledDate, date)))).orderBy(desc(dailyKnowledgeItems.publishedAt)).limit(500);
     const related = chosen ? ({ "自然": ["物理", "化學", "生物", "地球科學"], "物理": ["自然", "地球科學"], "化學": ["自然", "生物"], "生物": ["自然", "化學"], "地球科學": ["自然", "地理"], "歷史": ["公民", "地理"], "地理": ["歷史", "自然"], "公民": ["歷史", "地理"], "國文": ["英文"], "英文": ["國文"] } as Record<string, string[]>)[chosen] ?? [] : [];
     const ordered = chosen ? [...pool.filter((item) => item.subject === chosen), ...pool.filter((item) => related.includes(item.subject)), ...pool.filter((item) => !related.includes(item.subject) && item.subject !== chosen)] : pool;
     let fresh = ordered.find((item) => !seenIds.has(item.id));
@@ -37,7 +38,12 @@ export const routes: RouteDef[] = [
       } catch { /* request must remain safe when the external source or AI is temporarily unavailable */ }
     }
     if (!fresh) return { item: null, subject: chosen ?? "隨機", date, availableSubjects: DAILY_KNOWLEDGE_SUBJECTS };
-    await db.insert(dailyKnowledgeViews).values({ itemId: fresh.id, userId: user.userId, subject: fresh.subject, deliveryDate: date }).onConflictDoNothing();
+    try {
+      await db.insert(dailyKnowledgeViews).values({ itemId: fresh.id, userId: user.userId, subject: fresh.subject, deliveryDate: date }).onConflictDoNothing();
+    } catch {
+      // 0055 的舊版 views 表仍可記錄閱讀；0059 完成後會自動使用上方的新欄位。
+      await db.insert(dailyKnowledgeViews).values({ itemId: fresh.id, userId: user.userId }).onConflictDoNothing();
+    }
     return { item: fresh, subject: chosen ?? fresh.subject, date, availableSubjects: DAILY_KNOWLEDGE_SUBJECTS };
   }}),
   route({ method: "GET", path: "/admin/daily-knowledge", auth: "admin", handler: async (ctx) => {
