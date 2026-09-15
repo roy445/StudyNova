@@ -20,6 +20,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { href: "/admin/features", label: "功能總控台", icon: "admin" },
       { href: "/admin/ops", label: "AI・會員・內容", icon: "nova" },
+      { href: "/admin/ai-jobs", label: "AI 背景工作", icon: "nova" },
     ],
   },
   {

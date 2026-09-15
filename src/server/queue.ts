@@ -28,6 +28,7 @@ import { sendAccountEmail, systemAnnouncementEmailTemplate } from "./email";
 import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core";
 import { analyzeQuestionWithAi } from "./question-analysis";
 import { checkDisplayName } from "./name-moderation";
+import { processAiBackgroundBatch } from "./ai-background";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -44,6 +45,7 @@ export type JobName =
   | "announcement_publish"
   | "activity_promote"
   | "question_analysis_batch"
+  | "ai_background_batch"
   | "data_retention"
   | "name_moderation_scan";
 
@@ -320,6 +322,21 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
       if (created) sent += 1;
     }
     return `已推播活動 ${activity.title}，通知 ${sent} 位使用者`;
+  },
+
+  async ai_background_batch(payload) {
+    const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
+    if (!jobId) throw new Error("缺少 AI 背景工作 ID");
+    const progress = await processAiBackgroundBatch(jobId);
+    if (progress && progress.remainingItems > 0 && ["queued", "processing"].includes(progress.status)) {
+      await queue().enqueue({
+        name: "ai_background_batch",
+        payload: { jobId },
+        uniqueKey: `ai-background:${jobId}:continue:${progress.nextRunAt?.getTime() ?? Date.now()}`,
+        runAt: progress.nextRunAt ?? new Date(),
+      });
+    }
+    return progress ? `AI 背景工作進度 ${progress.completedItems}/${progress.totalItems}` : "AI 背景工作不存在";
   },
 
   async question_analysis_batch(payload) {

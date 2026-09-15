@@ -148,3 +148,18 @@
 - [x] 補充頁面、API、session、管理員例外、恢復流程與背景工作測試
 - [x] 執行 typecheck、test、build 與安全回歸檢查
 - [x] 提交並推送施工模式修正版至 GitHub main
+
+## 2026-09-15 大型 AI 分析 Background Job 基礎架構
+
+- [x] 盤點並保留既有 PostgreSQL／Redis queue adapter 與 cron worker
+- [x] 建立通用 AI jobs、batches、items 與 idempotency／usage reservation schema
+- [x] 支援 queued、processing、paused、completed、partial、failed、cancelled 狀態
+- [x] 實作 batch 分片、item 持久化、worker claim lock 與真實進度計算
+- [x] 實作可重試錯誤分類、backoff、最大重試與不可重試錯誤終止
+- [x] 實作使用者提交、查詢、離頁恢復、取消與失敗項目重跑 API
+- [x] 實作同一工作／項目／分析的 idempotency，避免 retry 重複扣 AI 額度
+- [x] 實作使用者 AI 工作中心與進度呈現
+- [x] 實作管理員 Job 清單、明細、錯誤、取消與失敗項目重跑
+- [x] 確保 background job 不依賴前端頁面存活，並保留既有 cron／Web Push 工作
+- [x] 補充 Background Job 核心測試、型別檢查與 production build
+- [x] 提交並推送 Background Job 基礎架構至 GitHub main

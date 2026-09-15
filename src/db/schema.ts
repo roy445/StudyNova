@@ -1943,6 +1943,100 @@ export const jobQueue = pgTable(
   (t) => [uniqueIndex("job_unique_uq").on(t.uniqueKey), index("job_status_idx").on(t.status, t.runAt)],
 );
 
+export const aiBackgroundJobs = pgTable(
+  "ai_background_jobs",
+  {
+    id: id(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    kind: text("kind").notNull(),
+    feature: text("feature").notNull(),
+    status: text("status").notNull().default("queued"), // queued | processing | paused | completed | partial | failed | cancelled
+    totalItems: integer("total_items").notNull().default(0),
+    completedItems: integer("completed_items").notNull().default(0),
+    failedItems: integer("failed_items").notNull().default(0),
+    skippedItems: integer("skipped_items").notNull().default(0),
+    batchSize: integer("batch_size").notNull().default(20),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull().default({}),
+    provider: text("provider").notNull().default(""),
+    model: text("model").notNull().default(""),
+    idempotencyKey: text("idempotency_key").notNull(),
+    lastErrorCode: text("last_error_code").notNull().default(""),
+    lastErrorMessage: text("last_error_message").notNull().default(""),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("ai_background_job_idem_uq").on(t.userId, t.idempotencyKey), index("ai_background_job_user_idx").on(t.userId, t.createdAt), index("ai_background_job_status_idx").on(t.status, t.updatedAt)],
+);
+
+export const aiBackgroundBatches = pgTable(
+  "ai_background_batches",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => aiBackgroundJobs.id, { onDelete: "cascade" }),
+    batchIndex: integer("batch_index").notNull(),
+    status: text("status").notNull().default("queued"), // queued | processing | paused | completed | partial | failed | cancelled
+    totalItems: integer("total_items").notNull().default(0),
+    completedItems: integer("completed_items").notNull().default(0),
+    failedItems: integer("failed_items").notNull().default(0),
+    retryCount: integer("retry_count").notNull().default(0),
+    lockedBy: text("locked_by").notNull().default(""),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull().defaultNow(),
+    errorCode: text("error_code").notNull().default(""),
+    errorMessage: text("error_message").notNull().default(""),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("ai_background_batch_order_uq").on(t.jobId, t.batchIndex), index("ai_background_batch_status_idx").on(t.status, t.nextRunAt)],
+);
+
+export const aiBackgroundItems = pgTable(
+  "ai_background_items",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => aiBackgroundJobs.id, { onDelete: "cascade" }),
+    batchId: uuid("batch_id").notNull().references(() => aiBackgroundBatches.id, { onDelete: "cascade" }),
+    itemIndex: integer("item_index").notNull(),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull().default({}),
+    output: jsonb("output").$type<Record<string, unknown> | null>(),
+    status: text("status").notNull().default("queued"), // queued | processing | completed | failed | cancelled
+    errorCode: text("error_code").notNull().default(""),
+    errorMessage: text("error_message").notNull().default(""),
+    retryCount: integer("retry_count").notNull().default(0),
+    maxRetries: integer("max_retries").notNull().default(3),
+    idempotencyKey: text("idempotency_key").notNull(),
+    provider: text("provider").notNull().default(""),
+    model: text("model").notNull().default(""),
+    latencyMs: integer("latency_ms").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("ai_background_item_idem_uq").on(t.jobId, t.idempotencyKey), uniqueIndex("ai_background_item_order_uq").on(t.jobId, t.itemIndex), index("ai_background_item_status_idx").on(t.batchId, t.status)],
+);
+
+export const aiBackgroundUsageClaims = pgTable(
+  "ai_background_usage_claims",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => aiBackgroundJobs.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id").notNull().references(() => aiBackgroundItems.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    units: integer("units").notNull().default(1),
+    status: text("status").notNull().default("claimed"), // claimed | committed | released
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("ai_background_usage_claim_idem_uq").on(t.idempotencyKey), index("ai_background_usage_claim_job_idx").on(t.jobId)],
+);
+
 export const rateLimits = pgTable(
   "rate_limits",
   {
