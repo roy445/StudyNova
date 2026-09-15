@@ -1,5 +1,5 @@
 /* StudyNova service worker – push notifications + offline-first learning shell */
-const CACHE = "studynova-v2";
+const CACHE = "studynova-v3";
 const API_CACHE = "studynova-api-v1";
 const QUEUE_DB = "studynova-offline-queue";
 const QUEUE_STORE = "requests";
@@ -70,13 +70,12 @@ async function replayQueue() {
 }
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/icon.png", "/manifest.webmanifest"]).catch(() => undefined)));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/icon.png", "/manifest.webmanifest"]).catch(() => undefined)));
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => ![CACHE, API_CACHE].includes(key)).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
   );
 });
 
@@ -84,12 +83,20 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Never serve a cached HTML document: the server-side maintenance gate must
+  // see every navigation, including PWA launches, refreshes, and deep links.
+  if (request.mode === "navigate") {
+    event.respondWith(fetch(request, { cache: "no-store" }).catch(() => new Response("目前無法連線，請稍後重新整理。", { status: 503, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } })));
+    return;
+  }
   if (url.pathname.startsWith("/api/v1/") && request.method === "GET") {
     event.respondWith((async () => {
       const cache = await caches.open(API_CACHE);
       try {
         const response = await fetch(request);
-        if (response.ok) await cache.put(request, response.clone());
+        if (response.headers.get("x-studynova-error") === "SERVICE_MAINTENANCE" || response.status === 503) {
+          await cache.delete(request);
+        } else if (response.ok) await cache.put(request, response.clone());
         return response;
       } catch (_) {
         const cached = await cache.match(request);
@@ -135,5 +142,6 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
   if (event.data?.type === "STUDYNOVA_SYNC_NOW") event.waitUntil(replayQueue());
 });

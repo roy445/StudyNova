@@ -85,7 +85,7 @@ export default function AdminOpsPage() {
   const featureCustomizations = useApi<{ features: Array<{ feature: string; label: string; enabled: boolean; allowedRoles: string[]; config: Record<string, unknown> }> }>("/admin/feature-customizations");
 
   const [annOpen, setAnnOpen] = useState(false);
-  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", targetFeature: "all", category: "general", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false, startsAt: "", endsAt: "" });
+  const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", targetFeature: "all", category: "general", announcementType: "general", importance: "normal", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false, showHome: true, showPwa: false, ctaLabel: "", ctaUrl: "", status: "published", startsAt: "", endsAt: "" });
   const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard", audience: "all" });
   const [pushResult, setPushResult] = useState<{ targets: number; notified: number; pushSent: number; configured: boolean } | null>(null);
   const [actOpen, setActOpen] = useState(false);
@@ -783,6 +783,10 @@ export default function AdminOpsPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="公告分類"><Select value={annForm.category} onChange={(e) => setAnnForm({ ...annForm, category: e.target.value })}><option value="general">一般公告</option><option value="exam">考試／每週小考</option><option value="challenge">挑戰與競賽</option><option value="activity">活動</option><option value="reward">獎勵與 Pro</option><option value="system">系統與維護</option><option value="knowledge">每日知識</option><option value="policy">規則與政策</option></Select></Field>
             <Field label="自訂標籤" hint="以逗號分隔，例如：高中,重要,限時"><Input value={annForm.tags} onChange={(e) => setAnnForm({ ...annForm, tags: e.target.value })} placeholder="高中,重要,限時" /></Field>
+            <Field label="公告類型"><Select value={annForm.announcementType} onChange={(e) => setAnnForm({ ...annForm, announcementType: e.target.value })}><option value="maintenance">系統維護</option><option value="update">系統更新</option><option value="feature">新功能</option><option value="exam">段考</option><option value="activity">活動</option><option value="ai">AI</option><option value="pwa">PWA</option><option value="security">安全</option><option value="general">一般公告</option></Select></Field>
+            <Field label="重要程度"><Select value={annForm.importance} onChange={(e) => setAnnForm({ ...annForm, importance: e.target.value })}><option value="low">低</option><option value="normal">一般</option><option value="high">重要</option><option value="critical">關鍵</option></Select></Field>
+            <Field label="CTA 文字"><Input value={annForm.ctaLabel} onChange={(e) => setAnnForm({ ...annForm, ctaLabel: e.target.value })} placeholder="例如：查看詳情" /></Field>
+            <Field label="CTA URL"><Input value={annForm.ctaUrl} onChange={(e) => setAnnForm({ ...annForm, ctaUrl: e.target.value })} placeholder="留空則沿用跳轉頁面" /></Field>
           </div>
           <div className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">排程說明：開始時間前不會顯示公告，也不會發送通知；留空代表立即發布。結束時間後公告會自動隱藏。Web Push／Email 會在開始時間到達時送出。</div>
           <div className="grid gap-3 sm:grid-cols-2"><Field label="開始時間" hint="留空＝立即發布"><Input type="datetime-local" value={annForm.startsAt} onChange={(e) => setAnnForm({ ...annForm, startsAt: e.target.value })} /></Field><Field label="結束時間" hint="留空＝不自動結束"><Input type="datetime-local" value={annForm.endsAt} onChange={(e) => setAnnForm({ ...annForm, endsAt: e.target.value })} /></Field></div>
@@ -792,6 +796,7 @@ export default function AdminOpsPage() {
               <option value="pro">Nova Pro 會員</option>
             </Select>
           </Field>
+          <Field label="內容狀態"><Select value={annForm.status} onChange={(e) => setAnnForm({ ...annForm, status: e.target.value })}><option value="draft">草稿</option><option value="scheduled">已排程</option><option value="published">已發布</option><option value="archived">已封存</option></Select></Field>
           <div className="flex flex-wrap gap-3 text-xs">
             {([
               ["pinned", "置頂"],
@@ -799,6 +804,8 @@ export default function AdminOpsPage() {
               ["notify", "站內通知"],
               ["push", "Web Push"],
               ["email", "Email 通知"],
+              ["showHome", "顯示在首頁"],
+              ["showPwa", "顯示在 PWA"],
             ] as const).map(([key, label]) => (
               <label key={key} className="flex items-center gap-1.5">
                 <input

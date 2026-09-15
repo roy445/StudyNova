@@ -6,10 +6,9 @@ import { Badge, Button, Card, EmptyState, Select, Skeleton, Tabs, useToast } fro
 import { apiPost, useApi } from "@/lib/api";
 import { MaterialsPanel, NotesPanel, OcrPanel } from "@/features/study/panels-a";
 import { QuizPanel, WrongPanel } from "@/features/study/panels-b";
-import { FocusPanel, MyVocabularyPanel, PlanPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, VisualNotesPanel, WordLibraryPanel, WordsPanel } from "@/features/study/panels-c";
+import { FocusPanel, MyVocabularyPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, VisualNotesPanel, WordLibraryPanel, WordsPanel } from "@/features/study/panels-c";
 
 const TABS = [
-  { key: "plan", label: "今日計畫", icon: "▤" },
   { key: "timeline", label: "我的學習足跡", icon: "◷" },
   { key: "one-page", label: "考前一頁紙", icon: "▤" },
   { key: "materials", label: "教材", icon: "▦" },
@@ -56,7 +55,7 @@ function OnePagePanel() {
 
 function StudyInner() {
   const params = useSearchParams();
-  const [tab, setTab] = useState(params.get("tab") ?? "plan");
+  const [tab, setTab] = useState(params.get("tab") === "plan" ? "timeline" : (params.get("tab") ?? "timeline"));
   const contentRef = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
 
@@ -79,7 +78,6 @@ function StudyInner() {
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       <div ref={contentRef} className={`scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))] ${tab === "words" || tab === "word-library" || tab === "my-vocabulary" || tab === "visual-notes" ? "study-vocabulary-fullbleed" : ""}`}>
-        {tab === "plan" && <PlanPanel />}
         {tab === "timeline" && <TimelinePanel />}
         {tab === "one-page" && <OnePagePanel />}
         {tab === "materials" && <MaterialsPanel />}

@@ -5,10 +5,13 @@ import {
   aiBackgroundItems,
   aiBackgroundJobs,
   aiBackgroundUsageClaims,
+  examQuestionGenerationJobs,
+  examQuestionGenerationItems,
   questions,
 } from "@/db/schema";
 import { consumeFeature } from "./economy";
 import { analyzeQuestionWithAi } from "./question-analysis";
+import { generateExamQuestion } from "./exam-question-generation";
 
 export type AiBackgroundStatus = "queued" | "processing" | "paused" | "completed" | "partial" | "failed" | "cancelled";
 export type AiBackgroundItemStatus = "queued" | "processing" | "completed" | "failed" | "cancelled";
@@ -145,6 +148,24 @@ async function processItem(job: typeof aiBackgroundJobs.$inferSelect, item: type
     if (!question) throw new AiBackgroundError("AI_INPUT_NOT_FOUND", "找不到待分析題目。");
     return analyzeQuestionWithAi(question, job.userId ?? "system");
   }
+  if (job.kind === "exam_question_generation") {
+    const generationItemId = typeof input.generationItemId === "string" ? input.generationItemId : "";
+    const requirements = (job.input?.requirements ?? {}) as Parameters<typeof generateExamQuestion>[0]["requirements"];
+    if (!generationItemId || !requirements.subject) throw new AiBackgroundError("AI_INPUT_INVALID", "缺少段考生成工作必要資料。");
+    const result = await generateExamQuestion({
+      requirements,
+      itemIndex: Number(input.itemIndex ?? 0),
+      candidates: Array.isArray(job.input?.candidates) ? job.input.candidates as Array<Record<string, unknown>> : [],
+      materialText: typeof job.input?.materialText === "string" ? job.input.materialText : "",
+      userId: job.userId ?? "system",
+      sourcePolicy: (job.input?.sourcePolicy ?? {}) as Record<string, unknown>,
+    });
+    const itemStatus = result.quality.answerConflict ? "answer_conflict" : result.quality.passed ? "generated" : "quality_failed";
+    await db.update(examQuestionGenerationItems).set({ draft: result.draft, quality: result.quality, analysis: (result.draft.analysis ?? {}) as Record<string, unknown>, sourceMetadata: (result.draft.sourceMetadata ?? {}) as Record<string, unknown>, status: itemStatus, updatedAt: new Date() }).where(eq(examQuestionGenerationItems.id, generationItemId));
+    const counts = (await db.select({ total: sql<number>`count(*)::int`, done: sql<number>`count(*) filter (where ${examQuestionGenerationItems.status} in ('generated','quality_failed','answer_conflict'))::int`, failed: sql<number>`count(*) filter (where ${examQuestionGenerationItems.status} in ('quality_failed','answer_conflict'))::int` }).from(examQuestionGenerationItems).where(eq(examQuestionGenerationItems.jobId, job.input?.generationJobId as string)))[0];
+    if (counts && Number(counts.total) === Number(counts.done)) await db.update(examQuestionGenerationJobs).set({ status: Number(counts.failed) ? "partially_failed" : "ready", qualitySummary: { total: counts.total, failed: counts.failed }, updatedAt: new Date() }).where(eq(examQuestionGenerationJobs.id, job.input?.generationJobId as string));
+    return result;
+  }
   throw new AiBackgroundError("AI_PROCESSOR_NOT_REGISTERED", `尚未註冊背景分析類型：${job.kind}`);
 }
 
@@ -202,7 +223,8 @@ export async function processAiBackgroundBatch(jobId: string, workerId = `worker
     try {
       await claimUsage(job, claimedItem);
       const output = await processItem(job, claimedItem);
-      await db.update(aiBackgroundItems).set({ status: "completed", output: (output?.result ?? output) as Record<string, unknown>, latencyMs: Date.now() - started, completedAt: new Date(), updatedAt: new Date() }).where(eq(aiBackgroundItems.id, claimedItem.id));
+      const outputRecord = output as { result?: unknown };
+      await db.update(aiBackgroundItems).set({ status: "completed", output: (outputRecord.result ?? output) as Record<string, unknown>, latencyMs: Date.now() - started, completedAt: new Date(), updatedAt: new Date() }).where(eq(aiBackgroundItems.id, claimedItem.id));
     } catch (error) {
       const failure = classifyAiBackgroundError(error);
       const nextRetry = claimedItem.retryCount + 1;

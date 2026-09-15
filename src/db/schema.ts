@@ -423,6 +423,9 @@ export const questionBanks = pgTable(
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     visibility: text("visibility").notNull().default("private"),
     status: text("status").notNull().default("draft"),
+    scope: text("scope").notNull().default("global"), // global | exam:<id> | activity:<id> | challenge:<id> | other:<id>
+    bankKind: text("bank_kind").notNull().default("global"), // global | exam | activity | challenge | other
+    scopeMetadata: jsonb("scope_metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdBy: uuid("created_by").notNull().references(() => users.userId, { onDelete: "cascade" }),
     createdAt: created(),
     updatedAt: updated(),
@@ -479,6 +482,35 @@ export const questions = pgTable(
     uniqueIndex("questions_fingerprint_uq").on(t.fingerprint),
     index("questions_subject_idx").on(t.subject, t.difficulty),
   ],
+);
+
+export const questionBankMemberships = pgTable(
+  "question_bank_memberships",
+  {
+    id: id(),
+    bankId: uuid("bank_id").notNull().references(() => questionBanks.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+    relation: text("relation").notNull().default("included"),
+    sourceMetadata: jsonb("source_metadata").$type<Record<string, unknown>>().notNull().default({}),
+    addedBy: uuid("added_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("question_bank_membership_uq").on(t.bankId, t.questionId), index("question_bank_membership_question_idx").on(t.questionId), index("question_bank_membership_bank_idx").on(t.bankId, t.createdAt)],
+);
+
+export const questionSources = pgTable(
+  "question_sources",
+  {
+    id: id(),
+    questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+    sourceType: text("source_type").notNull(),
+    sourceId: uuid("source_id"),
+    sourceLabel: text("source_label").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+  },
+  (t) => [index("question_sources_question_idx").on(t.questionId, t.createdAt), index("question_sources_type_idx").on(t.sourceType, t.sourceId)],
 );
 
 export const questionImportJobs = pgTable(
@@ -1550,6 +1582,25 @@ export const memberships = pgTable("memberships", {
   updatedAt: updated(),
 });
 
+export const proRenewalRequests = pgTable(
+  "pro_renewal_requests",
+  {
+    id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    wantsRenewal: boolean("wants_renewal").notNull(), reason: text("reason").notNull().default(""),
+    requestedFeatures: jsonb("requested_features").$type<string[]>().notNull().default([]), otherFeedback: text("other_feedback").notNull().default(""), submittedAt: created(), updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("pro_renewal_request_user_uq").on(t.userId), index("pro_renewal_request_date_idx").on(t.submittedAt)],
+);
+
+export const proExtensionAudits = pgTable("pro_extension_audits", {
+  id: id(), adminUserId: uuid("admin_user_id").references(() => users.userId, { onDelete: "set null" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+  beforeExpiresAt: timestamp("before_expires_at", { withTimezone: true }), afterExpiresAt: timestamp("after_expires_at", { withTimezone: true }), days: integer("days").notNull(), reason: text("reason").notNull(), adminNote: text("admin_note").notNull().default(""), createdAt: created(),
+}, (t) => [index("pro_extension_audit_user_idx").on(t.userId, t.createdAt), index("pro_extension_audit_admin_idx").on(t.adminUserId, t.createdAt)]);
+
+export const proActivationLinks = pgTable("pro_activation_links", {
+  id: id(), tokenHash: text("token_hash").notNull(), targetUserId: uuid("target_user_id").references(() => users.userId, { onDelete: "set null" }), targetEmail: text("target_email").notNull().default(""), days: integer("days").notNull().default(3), expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), usedAt: timestamp("used_at", { withTimezone: true }), createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }), createdAt: created(),
+}, (t) => [uniqueIndex("pro_activation_link_hash_uq").on(t.tokenHash), index("pro_activation_link_expiry_idx").on(t.expiresAt), index("pro_activation_link_target_idx").on(t.targetUserId)]);
+
 export const novaProExchangePlans = pgTable("nova_pro_exchange_plans", {
   id: id(),
   days: integer("days").notNull(),
@@ -1878,6 +1929,8 @@ export const announcements = pgTable(
     link: text("link").notNull().default("/dashboard"),
     targetFeature: text("target_feature").notNull().default("all"),
     category: text("category").notNull().default("general"),
+    announcementType: text("type").notNull().default("general"),
+    importance: text("importance").notNull().default("normal"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     image: text("image").notNull().default(""),
     audience: text("audience").notNull().default("all"), // all | pro | users | group
@@ -1888,6 +1941,11 @@ export const announcements = pgTable(
     notify: boolean("notify").notNull().default(true),
     push: boolean("push").notNull().default(false),
     email: boolean("email").notNull().default(false),
+    showHome: boolean("show_home").notNull().default(true),
+    showPwa: boolean("show_pwa").notNull().default(false),
+    ctaLabel: text("cta_label").notNull().default(""),
+    ctaUrl: text("cta_url").notNull().default(""),
+    status: text("status").notNull().default("published"),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull().defaultNow(),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
@@ -2469,6 +2527,8 @@ export const examHubs = pgTable(
     status: text("status").notNull().default("draft"),
     announcement: text("announcement").notNull().default(""),
     showMarquee: boolean("show_marquee").notNull().default(false),
+    formalScope: jsonb("formal_scope").$type<{ educationLevel: string; schoolName: string; grade: number; subject: string; examNumber: string; chapters: string[]; units: string[]; vocabularyRange: string[]; questionTypes: string[]; difficulty: string }>().notNull().default({ educationLevel: "", schoolName: "", grade: 1, subject: "", examNumber: "", chapters: [], units: [], vocabularyRange: [], questionTypes: [], difficulty: "normal" }),
+    questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "set null" }),
     createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
     createdAt: created(),
     updatedAt: updated(),
@@ -2531,4 +2591,83 @@ export const examHubAttempts = pgTable(
     createdAt: created(),
   },
   (t) => [index("exam_hub_attempts_user_idx").on(t.userId, t.createdAt), index("exam_hub_attempts_hub_idx").on(t.hubId, t.createdAt)],
+);
+
+export const examQuestionGenerationJobs = pgTable(
+  "exam_question_generation_jobs",
+  {
+    id: id(),
+    examHubId: uuid("exam_hub_id").notNull().references(() => examHubs.id, { onDelete: "cascade" }),
+    requestedBy: uuid("requested_by").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    status: text("status").notNull().default("draft"), // draft | generating | ready | partially_failed | confirmed | cancelled
+    requirements: jsonb("requirements").$type<Record<string, unknown>>().notNull().default({}),
+    sourcePolicy: jsonb("source_policy").$type<{ useGlobalBank: boolean; useMaterials: boolean; useExisting: boolean; generateNew: boolean; materialIds: string[]; questionIds: string[] }>().notNull().default({ useGlobalBank: true, useMaterials: false, useExisting: true, generateNew: true, materialIds: [], questionIds: [] }),
+    qualitySummary: jsonb("quality_summary").$type<Record<string, unknown>>().notNull().default({}),
+    backgroundJobId: uuid("background_job_id").references(() => aiBackgroundJobs.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedBy: uuid("confirmed_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_question_generation_hub_idx").on(t.examHubId, t.createdAt), index("exam_question_generation_status_idx").on(t.status, t.createdAt)],
+);
+
+export const examQuestionGenerationItems = pgTable(
+  "exam_question_generation_items",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => examQuestionGenerationJobs.id, { onDelete: "cascade" }),
+    itemIndex: integer("item_index").notNull(),
+    status: text("status").notNull().default("queued"), // queued | generated | quality_failed | answer_conflict | approved | rejected
+    draft: jsonb("draft").$type<Record<string, unknown>>().notNull().default({}),
+    quality: jsonb("quality").$type<Record<string, unknown>>().notNull().default({}),
+    analysis: jsonb("analysis").$type<Record<string, unknown>>().notNull().default({}),
+    sourceMetadata: jsonb("source_metadata").$type<Record<string, unknown>>().notNull().default({}),
+    questionId: uuid("question_id").references(() => questions.id, { onDelete: "set null" }),
+    adminNote: text("admin_note").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_question_generation_item_uq").on(t.jobId, t.itemIndex), index("exam_question_generation_item_status_idx").on(t.jobId, t.status)],
+);
+
+/* ------------------------------------------------ DAILY KNOWLEDGE */
+export const dailyKnowledgeItems = pgTable(
+  "daily_knowledge_items",
+  {
+    id: id(),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    detail: text("detail").notNull().default(""),
+    subject: text("subject").notNull(),
+    topic: text("topic").notNull().default(""),
+    source: text("source").notNull().default(""),
+    sourceUrl: text("source_url").notNull().default(""),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verificationNote: text("verification_note").notNull().default(""),
+    status: text("status").notNull().default("draft"),
+    scheduledDate: text("scheduled_date"),
+    coreConcept: text("core_concept").notNull().default(""),
+    titleFingerprint: text("title_fingerprint").notNull().default(""),
+    contentFingerprint: text("content_fingerprint").notNull().default(""),
+    quiz: jsonb("quiz").$type<{ question: string; options: string[]; answer: number; explanation: string } | null>(),
+    generationMetadata: jsonb("generation_metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("daily_knowledge_subject_status_idx").on(t.subject, t.status, t.publishedAt), uniqueIndex("daily_knowledge_schedule_uq").on(t.scheduledDate, t.subject), index("daily_knowledge_fingerprint_idx").on(t.titleFingerprint, t.contentFingerprint)],
+);
+
+export const dailyKnowledgeViews = pgTable(
+  "daily_knowledge_views",
+  {
+    id: id(),
+    itemId: uuid("item_id").notNull().references(() => dailyKnowledgeItems.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    viewedAt: created(),
+  },
+  (t) => [uniqueIndex("daily_knowledge_view_uq").on(t.itemId, t.userId), index("daily_knowledge_view_user_idx").on(t.userId, t.viewedAt)],
 );

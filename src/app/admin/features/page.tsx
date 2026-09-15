@@ -28,7 +28,8 @@ export default function AdminFeaturesPage() {
   const [maintenanceDraft, setMaintenanceDraft] = useState({ title: "系統施工中", description: "StudyNova 目前正在進行系統維護與更新，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "請稍後再回來看看！" });
   useEffect(() => {
     if (!service.data) return;
-    setMaintenanceDraft({ title: service.data.title, description: service.data.description, badgeText: service.data.badgeText, estimatedRecoveryAt: service.data.estimatedRecoveryAt ? service.data.estimatedRecoveryAt.slice(0, 16) : "", message: service.data.message });
+    const timer = window.setTimeout(() => setMaintenanceDraft({ title: service.data!.title, description: service.data!.description, badgeText: service.data!.badgeText, estimatedRecoveryAt: service.data!.estimatedRecoveryAt ? service.data!.estimatedRecoveryAt.slice(0, 16) : "", message: service.data!.message }), 0);
+    return () => window.clearTimeout(timer);
   }, [service.data]);
   const features = useMemo(() => (state.data?.features ?? []).filter((feature) => (category === "全部" || categoryOf(feature.feature) === category) && `${feature.feature} ${feature.label}`.toLowerCase().includes(query.toLowerCase())), [category, query, state.data]);
   async function update(feature: Feature, patch: Record<string, unknown>) {

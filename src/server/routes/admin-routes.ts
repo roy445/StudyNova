@@ -616,6 +616,8 @@ export const routes: RouteDef[] = [
           link: z.string().max(300).default("/dashboard"),
           targetFeature: z.string().min(1).max(60).default("all"),
           category: z.string().min(1).max(40).default("general"),
+          announcementType: z.enum(["maintenance", "update", "feature", "exam", "activity", "ai", "pwa", "security", "general"]).default("general"),
+          importance: z.enum(["low", "normal", "high", "critical"]).default("normal"),
           tags: z.union([z.array(z.string().max(30)), z.string()]).transform((value) => (Array.isArray(value) ? value : value.split(",")).map((tag) => tag.trim()).filter(Boolean).slice(0, 12)),
           image: z.string().max(400).default(""),
           audience: z.enum(["all", "pro", "users", "group"]).default("all"),
@@ -625,6 +627,11 @@ export const routes: RouteDef[] = [
           notify: z.boolean().default(true),
           push: z.boolean().default(false),
           email: z.boolean().default(false),
+          showHome: z.boolean().default(true),
+          showPwa: z.boolean().default(false),
+          ctaLabel: z.string().max(80).default(""),
+          ctaUrl: z.string().max(400).default(""),
+          status: z.enum(["draft", "scheduled", "published", "archived"]).default("published"),
           sortOrder: z.number().int().min(0).max(999).default(0),
           startsAt: z.string().datetime().optional(),
           endsAt: z.string().datetime().nullable().optional(),
@@ -638,6 +645,8 @@ export const routes: RouteDef[] = [
           link: body.link,
           targetFeature: body.targetFeature,
           category: body.category,
+          announcementType: body.announcementType,
+          importance: body.importance,
           tags: body.tags,
           image: body.image,
           audience: body.audience,
@@ -647,6 +656,11 @@ export const routes: RouteDef[] = [
           notify: body.notify,
           push: body.push,
           email: body.email,
+          showHome: body.showHome,
+          showPwa: body.showPwa,
+          ctaLabel: body.ctaLabel,
+          ctaUrl: body.ctaUrl,
+          status: body.status,
           sortOrder: body.sortOrder,
           startsAt: body.startsAt ? new Date(body.startsAt) : new Date(),
           endsAt: body.endsAt ? new Date(body.endsAt) : null,
@@ -654,6 +668,7 @@ export const routes: RouteDef[] = [
         })
         .returning();
       const scheduled = Boolean(body.startsAt && new Date(body.startsAt) > new Date());
+      if (scheduled && rows[0].status !== "scheduled") await db.update(announcements).set({ status: "scheduled" }).where(eq(announcements.id, rows[0].id));
       if (scheduled) await queue().enqueue({ name: "announcement_publish", payload: { announcementId: rows[0].id }, uniqueKey: `announcement-publish:${rows[0].id}`, runAt: new Date(body.startsAt!) });
       let notified = 0;
       let emailSent = 0;
@@ -692,11 +707,12 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const body = await ctx.json(
-        z.object({ pinned: z.boolean().optional(), marquee: z.boolean().optional(), sortOrder: z.number().int().min(0).max(999).optional(), title: z.string().min(1).max(120).optional(), body: z.string().max(4000).optional(), link: z.string().max(300).optional(), targetFeature: z.string().min(1).max(60).optional(), endsAt: z.string().datetime().nullable().optional() }),
+      z.object({ pinned: z.boolean().optional(), marquee: z.boolean().optional(), sortOrder: z.number().int().min(0).max(999).optional(), title: z.string().min(1).max(120).optional(), body: z.string().max(4000).optional(), link: z.string().max(300).optional(), targetFeature: z.string().min(1).max(60).optional(), category: z.string().min(1).max(40).optional(), announcementType: z.string().max(30).optional(), importance: z.enum(["low", "normal", "high", "critical"]).optional(), showHome: z.boolean().optional(), showPwa: z.boolean().optional(), ctaLabel: z.string().max(80).optional(), ctaUrl: z.string().max(400).optional(), status: z.enum(["draft", "scheduled", "published", "archived"]).optional(), startsAt: z.string().datetime().nullable().optional(), endsAt: z.string().datetime().nullable().optional() }),
       );
-      const { endsAt, ...patch } = body;
-      const rows = await db.update(announcements).set({ ...patch, ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}) }).where(eq(announcements.id, ctx.params.id)).returning();
+      const { startsAt, endsAt, ...patch } = body;
+      const rows = await db.update(announcements).set({ ...patch, ...(startsAt !== undefined ? { startsAt: startsAt ? new Date(startsAt) : new Date() } : {}), ...(endsAt !== undefined ? { endsAt: endsAt ? new Date(endsAt) : null } : {}) }).where(eq(announcements.id, ctx.params.id)).returning();
       if (!rows[0]) throw notFound("找不到公告");
+      if (startsAt && new Date(startsAt) > new Date() && rows[0].status !== "archived" && rows[0].status !== "draft") await queue().enqueue({ name: "announcement_publish", payload: { announcementId: rows[0].id }, uniqueKey: `announcement-publish:${rows[0].id}:${new Date(startsAt).getTime()}`, runAt: new Date(startsAt) });
       return { announcement: rows[0] };
     },
   }),

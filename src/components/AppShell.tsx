@@ -140,6 +140,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [usageGuideOpen, setUsageGuideOpen] = useState(false);
   const [inAppBrowser] = useState(() => typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|Line\/|Twitter|MicroMessenger|; wv\)|WebView/i.test(navigator.userAgent || ""));
   const [androidDevice] = useState(() => typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || ""));
@@ -161,6 +162,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
     "/dashboard",
   );
+  const pwaAnnouncements = useApi<{ announcements: Array<{ id: string; title: string; body: string; ctaLabel: string; ctaUrl: string; importance: string }> }>("/pwa/announcements");
   const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
@@ -173,7 +175,15 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   useEffect(() => {
     let registration: ServiceWorkerRegistration | undefined;
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").then((value) => { registration = value; }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js").then((value) => {
+        registration = value;
+        const inspect = () => { if (value.waiting && navigator.serviceWorker.controller) setUpdateReady(value); };
+        inspect();
+        value.addEventListener("updatefound", () => {
+          const worker = value.installing;
+          worker?.addEventListener("statechange", inspect);
+        });
+      }).catch(() => {});
     }
     const syncOfflineQueue = () => {
       registration?.active?.postMessage({ type: "STUDYNOVA_SYNC_NOW" });
@@ -359,6 +369,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
   const nova = summary.data?.nova ?? 0;
   const level = summary.data?.novi?.level ?? 1;
   const featureNotices = (summary.data?.announcements ?? []).filter((item) => item.targetFeature === "all" || item.targetFeature === featureKey).slice(0, 3);
+  const pwaNotice = pwaAnnouncements.data?.announcements[0] ?? null;
 
   const kindLabel = useMemo(
     () => ({ material: "教材", note: "筆記", quiz: "測驗", question: "題目", activity: "活動" }) as Record<string, string>,
@@ -367,6 +378,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
 
   return (
     <div className="min-h-dvh lg:flex">
+      {updateReady && <div className="fixed inset-x-3 top-3 z-[100] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#37d3ff]/40 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_28px_rgba(55,211,255,0.2)] backdrop-blur-xl"><span><strong className="text-[#b9f2ff]">StudyNova 有新版本了</strong><span className="ml-2 text-xs text-muted">你的資料不會被清除</span></span><Button size="sm" onClick={() => { updateReady.waiting?.postMessage({ type: "SKIP_WAITING" }); window.location.reload(); }}>立即更新</Button></div>}
+      {pwaNotice && <div className="fixed inset-x-3 bottom-3 z-[90] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#ffc857]/35 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_24px_rgba(255,200,87,0.14)] backdrop-blur-xl"><div className="min-w-0"><p className="truncate font-semibold text-[#ffe7ad]">{pwaNotice.title}</p><p className="mt-0.5 line-clamp-2 text-xs text-muted">{pwaNotice.body}</p></div>{pwaNotice.ctaUrl && <Link href={pwaNotice.ctaUrl} className="shrink-0 text-xs text-[#ffc857] underline">{pwaNotice.ctaLabel || "查看詳情"}</Link>}</div>}
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-[var(--line)] bg-black/20 px-3 py-4 lg:flex">
         <Link href="/dashboard" className="focus-ring mb-4 rounded-xl px-2 py-1">
@@ -682,10 +695,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
           {inAppBrowser && <div className="rounded-xl border-2 border-rose-300/70 bg-rose-400/15 p-3 text-xs leading-5 text-rose-50"><p className="font-black">目前是在 App 內建瀏覽器中</p><p className="mt-1">為了避免安裝失敗或被誤判，請點右上角／右下角的「⋯」或分享按鈕，選擇「在 Chrome／Safari 開啟」，再回到這裡安裝。StudyNova 不會要求下載任何不明檔案。</p></div>}
           {androidDevice && <div className="rounded-xl border-2 border-[#ffc857]/70 bg-[#ffc857]/10 p-3 text-xs leading-5 text-[#fff1c7]"><p className="font-black">Android 安裝提醒</p><p className="mt-1">若 Chrome 顯示安全警告，請先點「了解詳細」，確認網址是你的 StudyNova 網站，再按「仍要安裝」。請勿在網址不正確或來源不明時繼續。</p></div>}
           <p className="text-muted">為了即時收到限定功能、每週小考與 Novi 提醒，請先開啟通知，再把網站安裝到手機主畫面。</p>
-          <Button full onClick={async () => {
-            if (installPrompt) { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); }
-            else toast.push("info", androidDevice ? "請在 Chrome 選單點「安裝應用程式」；若出現警告，點「了解詳細」確認網址後再按「仍要安裝」。" : "請使用瀏覽器選單的「加入主畫面／安裝應用程式」");
-          }}>安裝到主畫面</Button>
+          {installPrompt && <Button full onClick={async () => { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); }}>📱 把 StudyNova 加到主畫面</Button>}
+          {!installPrompt && <p className="rounded-xl border border-[var(--line)] bg-white/5 p-3 text-xs text-muted">目前瀏覽器沒有提供可操作的安裝流程。若要安裝，請使用瀏覽器原生的「加入主畫面／安裝應用程式」選單；StudyNova 不會製造假的安裝按鈕。</p>}
           <Button full variant="ghost" onClick={async () => {
             if (!("Notification" in window) || !("serviceWorker" in navigator)) return toast.push("info", "此瀏覽器不支援 PWA 推播，請改用最新版 Chrome 或 Safari");
             const permission = await Notification.requestPermission();

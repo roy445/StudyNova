@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiGet, apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
@@ -26,13 +26,24 @@ function ProfileInner() {
   const nova = useApi<{ account: { balance: number; lifetimeEarned: number; lifetimeSpent: number }; ledger: Array<{ id: string; amount: number; reason: string; createdAt: string; balanceAfter: number }>; xp: Array<{ id: string; amount: number; reason: string; createdAt: string }> }>("/nova");
   const achievements = useApi<{ achievements: Array<{ id: string; code: string; title: string; description: string; icon: string; target: number; progress: number; unlockedAt: string | null; rewardNova: number }> }>("/achievements");
   const membership = useApi<{ membership: { tier: string; expiresAt: string | null } | null; isPro: boolean; quotas: Array<{ feature: string; label: string; used: number; limit: number; unlimited: boolean; proOnly: boolean }>; comparison: Array<{ feature: string; label: string; free: number; pro: number; proOnly: boolean }>; history: Array<{ id: string; action: string; days: number; reason: string; createdAt: string }> }>("/membership");
+  const renewal = useApi<{ membership: { expiresAt: string | null } | null; isPro: boolean; daysRemaining: number | null; request: { wantsRenewal: boolean; reason: string; requestedFeatures: string[]; otherFeedback: string } | null }>("/membership/renewal");
   const proPlans = useApi<{ plans: Array<{ id: string; days: number; priceNova: number }> }>("/membership/pro-exchange-plans");
   const push = useApi<{ configured: boolean; publicKey: string; subscriptions: number }>("/push/config");
   const settings = useApi<{ settings: Record<string, unknown> }>("/account/settings");
 
   const [displayName, setDisplayName] = useState("");
   const [coupon, setCoupon] = useState("");
+  const [renewalReason, setRenewalReason] = useState("");
+  const [renewalFeedback, setRenewalFeedback] = useState("");
+  const [renewalFeatures, setRenewalFeatures] = useState<string[]>([]);
   const autoRedeemed = useRef(false);
+
+  useEffect(() => {
+    const token = params.get("proActivation");
+    if (!token || autoRedeemed.current) return;
+    autoRedeemed.current = true;
+    void apiPost("/membership/pro-activation/redeem", { token }).then(() => { toast.push("success", "Nova Pro 3 天已啟用"); void Promise.all([membership.reload(), renewal.reload(), me.reload()]); }).catch((err) => toast.push("error", errorMessage(err)));
+  }, [params, toast, membership, renewal, me]);
   const [pwd, setPwd] = useState({ current: "", next: "" });
 
   const profile = novi.data?.profile;
@@ -548,6 +559,13 @@ function ProfileInner() {
                 </div>
               </Field>
             </div>
+            {renewal.data?.daysRemaining !== null && renewal.data?.daysRemaining !== undefined && renewal.data.daysRemaining <= 3 && renewal.data.daysRemaining >= 0 && (
+              <div className="mt-4 rounded-2xl border border-[#ffc857]/40 bg-[#ffc857]/10 p-4">
+                <p className="font-semibold text-[#ffe4a3]">Nova Pro 還有 {renewal.data.daysRemaining} 天到期</p>
+                <p className="mt-1 text-xs leading-6 text-muted">Nova Pro 只能由管理員授予或延長。你可以留下續約意願與回饋，管理員會在後台處理。</p>
+                <div className="mt-3 grid gap-2"><Field label="是否希望續約"><Select value={renewal.data.request?.wantsRenewal ? "yes" : "no"} onChange={(e) => { const wants = e.target.value === "yes"; void apiPost("/membership/renewal", { wantsRenewal: wants, reason: renewalReason, requestedFeatures: renewalFeatures, otherFeedback: renewalFeedback }).then(() => { toast.push("success", "續約意願已送出"); void renewal.reload(); }).catch((err) => toast.push("error", errorMessage(err))); }}><option value="yes">我想續約</option><option value="no">目前不需要</option></Select></Field><Field label="原因／回饋"><Textarea value={renewalReason || renewal.data.request?.reason || ""} onChange={(e) => setRenewalReason(e.target.value)} placeholder="例如：希望繼續使用 AI 題目分析" /></Field><Field label="想使用的功能"><Input value={renewalFeatures.join("、")} onChange={(e) => setRenewalFeatures(e.target.value.split(/[、,]/).map((v) => v.trim()).filter(Boolean))} placeholder="AI 分析、錯題洞察、每週小考" /></Field><Field label="其他意見"><Textarea value={renewalFeedback || renewal.data.request?.otherFeedback || ""} onChange={(e) => setRenewalFeedback(e.target.value)} /></Field><Button size="sm" onClick={async () => { try { await apiPost("/membership/renewal", { wantsRenewal: true, reason: renewalReason, requestedFeatures: renewalFeatures, otherFeedback: renewalFeedback }); toast.push("success", "續約意願已送出"); await renewal.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>送出續約意願</Button></div>
+              </div>
+            )}
             <div className="mt-3 space-y-1 text-xs text-muted">
               {membership.data?.history.map((h) => (
                 <p key={h.id}>

@@ -408,7 +408,7 @@ export const routes: RouteDef[] = [
       const anns = await db
         .select()
         .from(announcements)
-        .where(and(lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`))
+        .where(and(eq(announcements.status, "published"), eq(announcements.showHome, true), lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`))
         .orderBy(desc(announcements.pinned), asc(announcements.sortOrder), desc(announcements.startsAt))
         .limit(8);
 

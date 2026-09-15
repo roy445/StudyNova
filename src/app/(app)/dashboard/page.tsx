@@ -8,7 +8,6 @@ import { NoviAvatar } from "@/components/brand";
 import { apiPost, useApi } from "@/lib/api";
 import { NovaCostNotice } from "@/components/NovaCostNotice";
 import { WordsPanel } from "@/features/study/panels-c";
-import { DAILY_SUBJECTS, dailyKnowledgeBySubject } from "@/data/daily-knowledge";
 
 type SubjectStat = {
   subject: string;
@@ -57,6 +56,8 @@ const TREND_LABEL = { up: "↗ 上升", down: "↘ 下降", flat: "→ 持平", 
 export default function DashboardPage() {
   const toast = useToast();
   const { data, loading, error, reload } = useApi<Dashboard>("/dashboard");
+  const [dailySubject, setDailySubject] = useState("隨機");
+  const daily = useApi<{ item: { id: string; subject: string; title: string; content: string; topic: string; source: string; sourceUrl: string } | null; availableSubjects: string[] }>(`/daily-knowledge?date=${encodeURIComponent(data?.today ?? "")}&subject=${encodeURIComponent(dailySubject)}`, [data?.today, dailySubject]);
   const adaptive = useApi<Adaptive>("/adaptive/next");
   const radar = useApi<{ metrics: Array<{ key: string; label: string; value: number; evidence: string }>; weakest: { label: string; value: number; evidence: string } | null }>("/learning/radar");
   const alerts = useApi<{ alerts: Array<{ id: string; title: string; body: string; evidence: Record<string, unknown> }>; enabled: boolean }>("/ai/alerts");
@@ -190,18 +191,9 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <WordsPanel />
-        <Card title="💡 每日知識" subtitle="科普新知、跨科理解與學測重點；每天各一則，附解析與小測驗">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {DAILY_SUBJECTS.map((subject) => {
-              const item = dailyKnowledgeBySubject(data.today, subject);
-              return <article key={subject} className="glass-soft min-h-[180px] p-4">
-                <div className="flex items-center justify-between gap-2"><Badge tone="cyan">{item.subject}</Badge><span className="text-[11px] text-muted">{item.tag}</span></div>
-                <p className="mt-3 text-base font-semibold text-[#37d3ff]">{item.title}</p>
-                <p className="mt-2 line-clamp-3 text-sm leading-7 text-muted">{item.body}</p>
-                <div className="mt-3 flex flex-wrap gap-3 text-xs"><Link href={`/knowledge/${data.today}?subject=${encodeURIComponent(subject)}`} className="text-[#37d3ff] underline">完整解析與測驗 →</Link><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="text-muted underline">來源 ↗</a></div>
-              </article>;
-            })}
-          </div>
+        <Card title="💡 每日知識" subtitle="每天一則真正有內容的科目知識；只有通過來源與相似度檢查的內容才會出現">
+          <div className="mb-3 flex items-center gap-2"><select className="rounded-lg border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={dailySubject} onChange={(e) => setDailySubject(e.target.value)}><option value="隨機">隨機</option>{(daily.data?.availableSubjects ?? []).map((subject) => <option key={subject} value={subject}>{subject}</option>)}</select></div>
+          {daily.data?.item ? <article className="glass-soft min-h-[180px] p-4"><div className="flex items-center justify-between gap-2"><Badge tone="cyan">{daily.data.item.subject}</Badge><span className="text-[11px] text-muted">{daily.data.item.topic}</span></div><p className="mt-3 text-base font-semibold text-[#37d3ff]">{daily.data.item.title}</p><p className="mt-2 line-clamp-3 text-sm leading-7 text-muted">{daily.data.item.content}</p><div className="mt-3 flex flex-wrap gap-3 text-xs"><Link href={`/knowledge/${data.today}?subject=${encodeURIComponent(dailySubject)}`} className="text-[#37d3ff] underline">完整解析與測驗 →</Link>{daily.data.item.sourceUrl && <a href={daily.data.item.sourceUrl} target="_blank" rel="noreferrer" className="text-muted underline">來源 ↗</a>}</div></article> : <p className="text-sm text-muted">今天這個科目尚未有核准且未重複的內容。</p>}
         </Card>
       </div>
 

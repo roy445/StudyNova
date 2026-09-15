@@ -21,6 +21,7 @@ import {
   aiConversations,
   aiMessages,
   fileContexts,
+  dailyKnowledgeItems,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
@@ -29,9 +30,11 @@ import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core
 import { analyzeQuestionWithAi } from "./question-analysis";
 import { checkDisplayName } from "./name-moderation";
 import { processAiBackgroundBatch } from "./ai-background";
+import { generateDailyKnowledge, fingerprint } from "./daily-knowledge";
 
 export type JobName =
   | "daily_tasks_refresh"
+  | "daily_knowledge_refresh"
   | "review_reminder"
   | "weekly_exam_open"
   | "weekly_report"
@@ -66,6 +69,17 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     const rows = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
     for (const r of rows) await ensureDailyTasks(r.userId);
     return `已為 ${rows.length} 位使用者建立今日任務`;
+  },
+
+  async daily_knowledge_refresh() {
+    const date = todayStr();
+    const existing = await db.select({ id: dailyKnowledgeItems.id }).from(dailyKnowledgeItems).where(eq(dailyKnowledgeItems.scheduledDate, date)).limit(1);
+    if (existing.length) return "今日已有排程每日知識，略過重複生成";
+    const result = await generateDailyKnowledge({ subject: "隨機", date });
+    if (result.duplicate.duplicate) return `生成內容與既有知識相似，未建立：${result.duplicate.reason}`;
+    const status = result.source.verified ? "approved" : "verifying";
+    await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate: date, verifiedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, source: result.source } }).onConflictDoNothing();
+    return result.source.verified ? "已建立今日已驗證每日知識，等待管理員發布" : "已建立今日待驗證每日知識，未提供給學生";
   },
 
   async study_reminder() {
@@ -151,18 +165,20 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
   },
 
   async membership_expiry() {
-    const soon = new Date(Date.now() + 3 * 86_400_000);
+    const now = new Date();
+    const soon = new Date(now.getTime() + 3 * 86_400_000);
+    const threeDayWindowStart = new Date(now.getTime() + 2 * 86_400_000);
     const rows = await db
       .select()
       .from(memberships)
-      .where(and(eq(memberships.tier, "pro"), sql`${memberships.expiresAt} is not null`, lte(memberships.expiresAt, soon)));
+      .where(and(eq(memberships.tier, "pro"), sql`${memberships.expiresAt} is not null`, gte(memberships.expiresAt, threeDayWindowStart), lte(memberships.expiresAt, soon)));
     let sent = 0;
     for (const m of rows) {
       const created = await notify({
         userId: m.userId,
         kind: "membership",
         title: "⏳ Nova Pro 即將到期",
-        body: `你的 Nova Pro 將於 ${m.expiresAt?.toISOString().slice(0, 10)} 到期，請聯絡管理員續期。`,
+        body: `你的 Nova Pro 還有約 3 天到期（${m.expiresAt?.toISOString().slice(0, 10)}），如果希望續約，請填寫續約意願。`,
         link: "/profile?tab=pass",
         dedupeKey: `proexp:${m.userId}:${m.expiresAt?.toISOString().slice(0, 10)}`,
         push: true,
@@ -293,6 +309,8 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     const id = typeof payload.announcementId === "string" ? payload.announcementId : "";
     const announcement = id ? (await db.select().from(announcements).where(eq(announcements.id, id)).limit(1))[0] : null;
     if (!announcement) throw new Error("找不到排程公告");
+    if (announcement.status === "archived" || announcement.status === "draft") return `公告 ${announcement.title} 仍為${announcement.status === "draft" ? "草稿" : "封存"}，未發布`;
+    if (announcement.status !== "published") await db.update(announcements).set({ status: "published" }).where(eq(announcements.id, announcement.id));
     const allUsers = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
     const proUsers = await db.select({ userId: memberships.userId, expiresAt: memberships.expiresAt }).from(memberships).where(eq(memberships.tier, "pro"));
     const proIds = new Set(proUsers.filter((row) => !row.expiresAt || new Date(row.expiresAt) > new Date()).map((row) => row.userId));
@@ -508,6 +526,7 @@ export function queue(): QueueAdapter {
 
 export const CRON_TASKS: Array<{ task: JobName; label: string; schedule: string }> = [
   { task: "daily_tasks_refresh", label: "重建每日任務", schedule: "每日 00:05" },
+  { task: "daily_knowledge_refresh", label: "每日知識生成與驗證", schedule: "每日 00:10" },
   { task: "review_reminder", label: "錯題複習提醒", schedule: "每日 19:00" },
   { task: "weekly_exam_open", label: "每週小考開放通知", schedule: "每 30 分鐘" },
   { task: "weekly_report", label: "每週學習報告", schedule: "每週一 09:00" },

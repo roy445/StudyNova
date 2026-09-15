@@ -710,9 +710,20 @@ export const routes: RouteDef[] = [
       const rows = await db
         .select()
         .from(announcements)
-        .where(and(lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`))
+        .where(and(eq(announcements.status, "published"), lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`))
         .orderBy(desc(announcements.pinned), asc(announcements.sortOrder))
         .limit(20);
+      return { announcements: rows };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/pwa/announcements",
+    auth: "optional",
+    handler: async () => {
+      const now = new Date();
+      const rows = await db.select().from(announcements).where(and(eq(announcements.status, "published"), eq(announcements.showPwa, true), lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`)).orderBy(desc(announcements.pinned), desc(announcements.importance), asc(announcements.sortOrder), desc(announcements.startsAt)).limit(20);
       return { announcements: rows };
     },
   }),

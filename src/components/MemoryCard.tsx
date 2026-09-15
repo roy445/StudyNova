@@ -147,11 +147,12 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
 
         <button
           type="button"
-          className="group relative min-h-[310px] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(55,211,255,0.14),transparent_42%),linear-gradient(145deg,rgba(19,29,57,0.98),rgba(10,14,31,0.98))] px-5 py-8 text-center shadow-[0_24px_80px_-40px_rgba(55,211,255,0.8)] transition hover:border-[#37d3ff]/40 sm:min-h-[360px] sm:px-10"
+          className={`memory-card-rainbow group relative min-h-[310px] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(55,211,255,0.14),transparent_42%),linear-gradient(145deg,rgba(19,29,57,0.98),rgba(10,14,31,0.98))] px-5 py-8 text-center shadow-[0_24px_80px_-40px_rgba(55,211,255,0.8)] transition hover:border-[#37d3ff]/40 sm:min-h-[360px] sm:px-10`}
           onClick={() => setRevealed((value) => !value)}
           aria-label={revealed ? "隱藏中文" : "顯示中文"}
         >
           <span className="absolute left-5 top-5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#37d3ff]/70">StudyNova / Memory</span>
+          <span className="memory-card-spark absolute right-5 top-12" aria-hidden="true">✦</span>
           <span className="absolute right-5 top-5 text-xs text-muted">{revealed ? "中英對照" : "英文提示"}</span>
           <span className="flex min-h-[250px] flex-col items-center justify-center gap-3">
             <span className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl">{current.word}</span>
