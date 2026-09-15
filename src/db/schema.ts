@@ -2671,3 +2671,39 @@ export const dailyKnowledgeViews = pgTable(
   },
   (t) => [uniqueIndex("daily_knowledge_view_uq").on(t.itemId, t.userId), index("daily_knowledge_view_user_idx").on(t.userId, t.viewedAt)],
 );
+
+export const customizationCategories = pgTable(
+  "customization_categories",
+  {
+    id: id(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    icon: text("icon").notNull().default("spark"),
+    routePath: text("route_path").notNull().default(""),
+    componentKey: text("component_key").notNull().default("page"),
+    enabled: boolean("enabled").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    status: text("status").notNull().default("draft"),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("customization_category_slug_uq").on(t.slug), index("customization_category_order_idx").on(t.enabled, t.sortOrder)],
+);
+export const customizationVersions = pgTable(
+  "customization_versions",
+  {
+    id: id(),
+    categoryId: uuid("category_id").notNull().references(() => customizationCategories.id, { onDelete: "cascade" }),
+    versionNo: integer("version_no").notNull(),
+    status: text("status").notNull().default("draft"),
+    tokens: jsonb("tokens").$type<Record<string, string>>().notNull().default({}),
+    responsive: jsonb("responsive").$type<Record<string, unknown>>().notNull().default({}),
+    changeNote: text("change_note").notNull().default(""),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("customization_version_no_uq").on(t.categoryId, t.versionNo), index("customization_version_category_idx").on(t.categoryId, t.versionNo)],
+);

@@ -26,6 +26,10 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --motion-fast: 140ms;
   --motion-standard: 220ms;
+  --custom-radius: 22px;
+  --custom-button-radius: 14px;
+  --custom-shadow: var(--shadow);
+  --custom-motion: 220ms;
 }
 
 html[data-theme="light"] {
@@ -104,8 +108,8 @@ html[data-theme="light"] body::before {
 .glass {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow: var(--shadow);
+  border-radius: var(--custom-radius);
+  box-shadow: var(--custom-shadow);
   backdrop-filter: blur(16px);
 }
 
@@ -530,3 +534,10 @@ html[data-christmas-particles="off"] .novi-festive-particles { display: none; }
 @keyframes exam-nav-breathe { 0%, 100% { filter: blur(9px); opacity: .42; } 50% { filter: blur(12px); opacity: .7; } }
 @keyframes exam-nav-sparkle { 0%, 75%, 100% { opacity: .25; transform: scale(.8) rotate(0deg); } 84% { opacity: .95; transform: scale(1.12) rotate(12deg); } }
 @media (prefers-reduced-motion: reduce) { .exam-nav-item::before, .exam-nav-icon, .exam-nav-sparkle { animation: none; } }
+
+/* Published Customization Center tokens. */
+button:not(:disabled) { border-radius: var(--custom-button-radius, 14px); transition-duration: var(--custom-motion, 220ms); }
+button:not(:disabled):hover { box-shadow: var(--custom-glow, none); }
+button:not(:disabled).bg-gradient-to-r { background-image: linear-gradient(120deg, var(--custom-primary, #7c5cff), var(--custom-secondary, #37d3ff)); }
+input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary, #37d3ff); }
+.bottom-nav { box-shadow: var(--custom-shadow, var(--shadow)); }

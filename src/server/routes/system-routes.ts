@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { pushSubscriptions, notifications, users, novaTransactions, questions, jobQueue, weeklyExamWeeks, storageObjects, featurePermissions, platformSettings } from "@/db/schema";
+import { pushSubscriptions, notifications, users, novaTransactions, questions, jobQueue, weeklyExamWeeks, storageObjects, featurePermissions, platformSettings, customizationCategories, customizationVersions } from "@/db/schema";
 import { route, type Ctx, type RouteDef } from "../router";
 import { badRequest, fail, hashPassword, verifyPassword, generateNovaId, toCsv, todayStr } from "../core";
 import { listNotifications, markRead, unreadCount, pushConfigured, sendPush } from "../notify";
@@ -39,6 +39,16 @@ async function handleCron(ctx: Ctx) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/customization/active",
+    auth: "user",
+    handler: async () => {
+      const categories = await db.select().from(customizationCategories).where(and(eq(customizationCategories.enabled, true), eq(customizationCategories.status, "published"))).orderBy(customizationCategories.sortOrder);
+      const versions = await db.select().from(customizationVersions).where(eq(customizationVersions.status, "published"));
+      return { categories: categories.map((category) => ({ slug: category.slug, routePath: category.routePath, componentKey: category.componentKey, tokens: versions.find((version) => version.categoryId === category.id)?.tokens ?? {} })) };
+    },
+  }),
   route({
     method: "GET",
     path: "/theme/christmas",

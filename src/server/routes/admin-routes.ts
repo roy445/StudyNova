@@ -44,6 +44,8 @@ import {
   sessions,
   linkGenerationLogs,
   emailMessageLogs,
+  customizationCategories,
+  customizationVersions,
 } from "@/db/schema";
 import { normalizeQuestionRows } from "../question-import";
 import { route, type RouteDef } from "../router";
@@ -56,6 +58,16 @@ import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured
 import { analysisPrompt, qualityGate } from "../question-analysis";
 import { getAiPolicy, policyInstructions } from "../ai-policy";
 import { checkDisplayName } from "../name-moderation";
+
+function validateCustomizationTokens(tokens: Record<string, string>) {
+  const allowed = new Set(["primary", "secondary", "accent", "surface", "line", "radius", "shadow", "glow", "buttonRadius", "motion", "pageBackground", "fontSize", "fontWeight", "spacing"]);
+  for (const [key, value] of Object.entries(tokens)) {
+    if (!allowed.has(key)) throw badRequest(`不支援的客製化 token：${key}`);
+    if (value.length > 240 || /[;{}<>]|url\s*\(/i.test(value)) throw badRequest(`token ${key} 含有不支援的樣式內容`);
+    if (["radius", "buttonRadius", "motion", "fontSize", "spacing", "fontWeight"].includes(key) && !/^[0-9.]+(px|rem|ms)?$/.test(value)) throw badRequest(`token ${key} 的數值格式錯誤`);
+    if (["primary", "secondary", "accent"].includes(key) && !/^#[0-9a-fA-F]{6}$/.test(value)) throw badRequest(`token ${key} 必須是六碼色碼`);
+  }
+}
 
 function csvResponse(filename: string, rows: Array<Record<string, unknown>>) {
   return new Response(toCsv(rows), {
@@ -1017,6 +1029,82 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  /* ----------------------------------------------- customization center */
+  route({ method: "GET", path: "/admin/customization/categories", auth: "admin", handler: async () => {
+    const categories = await db.select().from(customizationCategories).orderBy(asc(customizationCategories.sortOrder), asc(customizationCategories.name));
+    const versions = await db.select().from(customizationVersions).orderBy(desc(customizationVersions.versionNo));
+    return { categories: categories.map((category) => ({ ...category, versions: versions.filter((version) => version.categoryId === category.id).slice(0, 10) })) };
+  }}),
+  route({ method: "POST", path: "/admin/customization/categories", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const body = await ctx.json(z.object({ slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/), name: z.string().min(1).max(80), description: z.string().max(500).default(""), icon: z.string().max(30).default("spark"), routePath: z.string().max(120).default(""), componentKey: z.string().max(80).default("page"), sortOrder: z.number().int().min(0).max(9999).default(100) }));
+    const category = (await db.insert(customizationCategories).values({ ...body, createdBy: admin.userId, status: "draft" }).returning())[0];
+    const version = (await db.insert(customizationVersions).values({ categoryId: category.id, versionNo: 1, createdBy: admin.userId, tokens: {}, responsive: {} }).returning())[0];
+    await adminLog({ actorId: admin.userId, action: "customization.category.create", targetType: "customization_category", targetId: category.id, after: { category, version }, ip: ctx.ip });
+    return { category: { ...category, versions: [version] } };
+  }}),
+  route({ method: "PATCH", path: "/admin/customization/categories/:id", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const body = await ctx.json(z.object({ name: z.string().min(1).max(80).optional(), description: z.string().max(500).optional(), icon: z.string().max(30).optional(), routePath: z.string().max(120).optional(), componentKey: z.string().max(80).optional(), enabled: z.boolean().optional(), sortOrder: z.number().int().min(0).max(9999).optional(), status: z.enum(["draft", "published", "disabled"]).optional() }));
+    const before = (await db.select().from(customizationCategories).where(eq(customizationCategories.id, ctx.params.id)).limit(1))[0];
+    if (!before) throw notFound("找不到客製化分類");
+    const category = (await db.update(customizationCategories).set({ ...body, updatedAt: new Date() }).where(eq(customizationCategories.id, before.id)).returning())[0];
+    await adminLog({ actorId: admin.userId, action: "customization.category.update", targetType: "customization_category", targetId: before.id, before, after: body, ip: ctx.ip });
+    return { category };
+  }}),
+  route({ method: "GET", path: "/admin/customization/categories/:id/versions", auth: "admin", handler: async (ctx) => ({ versions: await db.select().from(customizationVersions).where(eq(customizationVersions.categoryId, ctx.params.id)).orderBy(desc(customizationVersions.versionNo)) }) }),
+  route({ method: "PATCH", path: "/admin/customization/versions/:id", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const body = await ctx.json(z.object({ tokens: z.record(z.string(), z.string()).default({}), responsive: z.record(z.string(), z.unknown()).default({}), changeNote: z.string().max(500).default("") }));
+    validateCustomizationTokens(body.tokens);
+    const current = (await db.select().from(customizationVersions).where(eq(customizationVersions.id, ctx.params.id)).limit(1))[0];
+    if (!current) throw notFound("找不到客製化版本");
+    const version = current.status === "published"
+      ? (await db.insert(customizationVersions).values({ categoryId: current.categoryId, versionNo: ((await db.select({ max: sql<number>`coalesce(max(${customizationVersions.versionNo}), 0)::int` }).from(customizationVersions).where(eq(customizationVersions.categoryId, current.categoryId)))[0]?.max ?? 0) + 1, status: "draft", tokens: body.tokens, responsive: body.responsive, changeNote: body.changeNote || `從 v${current.versionNo} 建立草稿`, createdBy: admin.userId }).returning())[0]
+      : (await db.update(customizationVersions).set({ ...body }).where(eq(customizationVersions.id, current.id)).returning())[0];
+    await adminLog({ actorId: admin.userId, action: "customization.version.draft", targetType: "customization_version", targetId: version.id, after: { ...body, sourceVersionId: current.id }, ip: ctx.ip });
+    return { version };
+  }}),
+  route({ method: "POST", path: "/admin/customization/versions/:id/publish", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const current = (await db.select().from(customizationVersions).where(eq(customizationVersions.id, ctx.params.id)).limit(1))[0];
+    if (!current) throw notFound("找不到客製化版本");
+    validateCustomizationTokens(current.tokens);
+    await db.update(customizationVersions).set({ status: "draft" }).where(and(eq(customizationVersions.categoryId, current.categoryId), eq(customizationVersions.status, "published")));
+    const version = (await db.update(customizationVersions).set({ status: "published", publishedAt: new Date() }).where(eq(customizationVersions.id, current.id)).returning())[0];
+    await db.update(customizationCategories).set({ status: "published", enabled: true, updatedAt: new Date() }).where(eq(customizationCategories.id, current.categoryId));
+    await adminLog({ actorId: admin.userId, action: "customization.version.publish", targetType: "customization_version", targetId: current.id, after: version, ip: ctx.ip });
+    return { version };
+  }}),
+  route({ method: "POST", path: "/admin/customization/versions/:id/restore", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const old = (await db.select().from(customizationVersions).where(eq(customizationVersions.id, ctx.params.id)).limit(1))[0];
+    if (!old) throw notFound("找不到歷史版本");
+    const [latest] = await db.select({ max: sql<number>`coalesce(max(${customizationVersions.versionNo}), 0)::int` }).from(customizationVersions).where(eq(customizationVersions.categoryId, old.categoryId));
+    const version = (await db.insert(customizationVersions).values({ categoryId: old.categoryId, versionNo: (latest?.max ?? 0) + 1, status: "draft", tokens: old.tokens, responsive: old.responsive, changeNote: `從 v${old.versionNo} 恢復`, createdBy: admin.userId }).returning())[0];
+    await adminLog({ actorId: admin.userId, action: "customization.version.restore", targetType: "customization_version", targetId: version.id, after: { restoredFrom: old.id, version }, ip: ctx.ip });
+    return { version };
+  }}),
+  route({ method: "GET", path: "/admin/customization/versions/:id/export", auth: "admin", handler: async (ctx) => {
+    const version = (await db.select().from(customizationVersions).where(eq(customizationVersions.id, ctx.params.id)).limit(1))[0];
+    if (!version) throw notFound("找不到客製化版本");
+    const category = (await db.select().from(customizationCategories).where(eq(customizationCategories.id, version.categoryId)).limit(1))[0];
+    return new Response(JSON.stringify({ schemaVersion: 1, category, version }, null, 2), { headers: { "content-type": "application/json; charset=utf-8", "content-disposition": `attachment; filename="studynova-customization-v${version.versionNo}.json"` } });
+  }}),
+  route({ method: "POST", path: "/admin/customization/import", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const body = await ctx.json(z.object({ mode: z.enum(["new", "overwrite"]), categoryId: z.string().uuid().optional(), payload: z.object({ category: z.object({ slug: z.string().min(2).max(80), name: z.string().min(1).max(80), description: z.string().max(500).default(""), icon: z.string().max(30).default("spark"), routePath: z.string().max(120).default(""), componentKey: z.string().max(80).default("page") }), version: z.object({ tokens: z.record(z.string(), z.string()).default({}), responsive: z.record(z.string(), z.unknown()).default({}), changeNote: z.string().max(500).default("") }) }) }));
+    validateCustomizationTokens(body.payload.version.tokens);
+    let category = body.categoryId ? (await db.select().from(customizationCategories).where(eq(customizationCategories.id, body.categoryId)).limit(1))[0] : undefined;
+    if (body.mode === "overwrite" && !category) throw badRequest("覆蓋草稿需要指定分類");
+    if (!category) category = (await db.insert(customizationCategories).values({ ...body.payload.category, createdBy: admin.userId, status: "draft" }).returning())[0];
+    const existingDraft = body.mode === "overwrite" ? (await db.select().from(customizationVersions).where(and(eq(customizationVersions.categoryId, category.id), eq(customizationVersions.status, "draft"))).orderBy(desc(customizationVersions.versionNo)).limit(1))[0] : undefined;
+    const version = existingDraft
+      ? (await db.update(customizationVersions).set({ tokens: body.payload.version.tokens, responsive: body.payload.version.responsive, changeNote: body.payload.version.changeNote || "JSON 覆蓋草稿" }).where(eq(customizationVersions.id, existingDraft.id)).returning())[0]
+      : (await db.insert(customizationVersions).values({ categoryId: category.id, versionNo: ((await db.select({ max: sql<number>`coalesce(max(${customizationVersions.versionNo}), 0)::int` }).from(customizationVersions).where(eq(customizationVersions.categoryId, category.id)))[0]?.max ?? 0) + 1, status: "draft", tokens: body.payload.version.tokens, responsive: body.payload.version.responsive, changeNote: body.payload.version.changeNote || "JSON 匯入", createdBy: admin.userId }).returning())[0];
+    await adminLog({ actorId: admin.userId, action: "customization.import", targetType: "customization_version", targetId: version.id, after: { mode: body.mode, categoryId: category.id }, ip: ctx.ip });
+    return { category, version, summary: { name: category.name, tokenCount: Object.keys(version.tokens).length, versionNo: version.versionNo, status: version.status } };
+  }}),
   /* ----------------------------------------------------- question bank */
   route({
     method: "POST",
