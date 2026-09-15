@@ -2691,6 +2691,7 @@ export const dailyKnowledgeItems = pgTable(
     verificationNote: text("verification_note").notNull().default(""),
     status: text("status").notNull().default("draft"),
     scheduledDate: text("scheduled_date"),
+    immediateDisplay: boolean("immediate_display").notNull().default(false),
     coreConcept: text("core_concept").notNull().default(""),
     titleFingerprint: text("title_fingerprint").notNull().default(""),
     contentFingerprint: text("content_fingerprint").notNull().default(""),

@@ -9,7 +9,7 @@ import { DAILY_KNOWLEDGE_SUBJECTS, compareDailyKnowledge, fingerprint, generateD
 
 const subject = z.enum(["國文", "英文", "數學", "自然", "歷史", "地理", "公民", "物理", "化學", "生物", "地球科學", "隨機"]);
 const quiz = z.object({ question: z.string().min(1).max(1000), options: z.array(z.string().min(1).max(300)).length(4), answer: z.number().int().min(0).max(3), explanation: z.string().min(1).max(2000) });
-const draftSchema = z.object({ title: z.string().min(8).max(240), content: z.string().min(80).max(8000), detail: z.string().min(80).max(12000), subject: subject.exclude(["隨機"]), topic: z.string().min(1).max(160), source: z.string().max(240), sourceUrl: z.string().url().or(z.literal("")), coreConcept: z.string().min(8).max(500), quiz: quiz.nullable().default(null), scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional() });
+const draftSchema = z.object({ title: z.string().min(8).max(240), content: z.string().min(80).max(8000), detail: z.string().min(80).max(12000), subject: subject.exclude(["隨機"]), topic: z.string().min(1).max(160), source: z.string().max(240), sourceUrl: z.string().url().or(z.literal("")), coreConcept: z.string().min(8).max(500), quiz: quiz.nullable().default(null), scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), immediateDisplay: z.boolean().default(false) });
 
 function dateFromQuery(value: string | null) { return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : todayStr(); }
 
@@ -29,9 +29,9 @@ export const routes: RouteDef[] = [
     }
     const seenIds = new Set(recent.map((row) => row.itemId));
     // 只讀 0055 已存在的核心欄位；這讓 migration 0059 尚未在某個 deployment 執行時，學生端仍可正常取得內容。
-    let pool: Array<{ id: string; title: string; content: string; detail: string; subject: string; topic: string; source: string; sourceUrl: string; publishedAt: Date | null; verifiedAt: Date | null; verificationNote: string; status: string; scheduledDate: string | null; coreConcept: string; titleFingerprint: string; contentFingerprint: string; quiz: { question: string; options: string[]; answer: number; explanation: string } | null; generationMetadata: Record<string, unknown> }> = [];
+    let pool: Array<{ id: string; title: string; content: string; detail: string; subject: string; topic: string; source: string; sourceUrl: string; publishedAt: Date | null; verifiedAt: Date | null; verificationNote: string; status: string; scheduledDate: string | null; immediateDisplay: boolean; coreConcept: string; titleFingerprint: string; contentFingerprint: string; quiz: { question: string; options: string[]; answer: number; explanation: string } | null; generationMetadata: Record<string, unknown> }> = [];
     try {
-      pool = await db.select({ id: dailyKnowledgeItems.id, title: dailyKnowledgeItems.title, content: dailyKnowledgeItems.content, detail: dailyKnowledgeItems.detail, subject: dailyKnowledgeItems.subject, topic: dailyKnowledgeItems.topic, source: dailyKnowledgeItems.source, sourceUrl: dailyKnowledgeItems.sourceUrl, publishedAt: dailyKnowledgeItems.publishedAt, verifiedAt: dailyKnowledgeItems.verifiedAt, verificationNote: dailyKnowledgeItems.verificationNote, status: dailyKnowledgeItems.status, scheduledDate: dailyKnowledgeItems.scheduledDate, coreConcept: dailyKnowledgeItems.coreConcept, titleFingerprint: dailyKnowledgeItems.titleFingerprint, contentFingerprint: dailyKnowledgeItems.contentFingerprint, quiz: dailyKnowledgeItems.quiz, generationMetadata: dailyKnowledgeItems.generationMetadata }).from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), or(isNull(dailyKnowledgeItems.scheduledDate), lte(dailyKnowledgeItems.scheduledDate, date)))).orderBy(desc(dailyKnowledgeItems.publishedAt)).limit(500);
+      pool = await db.select({ id: dailyKnowledgeItems.id, title: dailyKnowledgeItems.title, content: dailyKnowledgeItems.content, detail: dailyKnowledgeItems.detail, subject: dailyKnowledgeItems.subject, topic: dailyKnowledgeItems.topic, source: dailyKnowledgeItems.source, sourceUrl: dailyKnowledgeItems.sourceUrl, publishedAt: dailyKnowledgeItems.publishedAt, verifiedAt: dailyKnowledgeItems.verifiedAt, verificationNote: dailyKnowledgeItems.verificationNote, status: dailyKnowledgeItems.status, scheduledDate: dailyKnowledgeItems.scheduledDate, immediateDisplay: dailyKnowledgeItems.immediateDisplay, coreConcept: dailyKnowledgeItems.coreConcept, titleFingerprint: dailyKnowledgeItems.titleFingerprint, contentFingerprint: dailyKnowledgeItems.contentFingerprint, quiz: dailyKnowledgeItems.quiz, generationMetadata: dailyKnowledgeItems.generationMetadata }).from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.status, "published"), or(eq(dailyKnowledgeItems.immediateDisplay, true), isNull(dailyKnowledgeItems.scheduledDate), lte(dailyKnowledgeItems.scheduledDate, date)))).orderBy(desc(dailyKnowledgeItems.publishedAt)).limit(500);
     } catch (error) {
       console.error("[daily-knowledge] pool lookup unavailable; migration may be pending", { error: error instanceof Error ? error.message : "unknown" });
     }
@@ -64,12 +64,23 @@ export const routes: RouteDef[] = [
   }}),
   route({ method: "POST", path: "/admin/daily-knowledge/generate", auth: "admin", handler: async (ctx) => {
     const admin = ctx.requireUser();
-    const body = await ctx.json(z.object({ subject, date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(todayStr()) }));
-    const result = await generateDailyKnowledge({ subject: body.subject, date: body.date, userId: admin.userId });
-    const status = result.duplicate.duplicate ? "rejected" : result.source.verified ? "published" : "verifying";
-    const row = (await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate: body.date, verifiedAt: result.source.verified ? new Date() : null, publishedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, duplicate: result.duplicate, source: result.source }, createdBy: admin.userId, updatedBy: admin.userId }).returning())[0];
-    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "daily_knowledge", action: "generate", resourceId: row.id, metadata: { status: status === "rejected" ? result.duplicate.reason : result.source.note }, ip: ctx.ip });
-    return { item: row, duplicate: result.duplicate, source: result.source };
+    const body = await ctx.json(z.object({ subject, date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(todayStr()), days: z.number().int().min(1).max(7).default(1), immediateDisplay: z.boolean().default(false) }));
+    const items = [];
+    for (let offset = 0; offset < body.days; offset += 1) {
+      const targetDate = new Date(`${body.date}T00:00:00Z`);
+      targetDate.setUTCDate(targetDate.getUTCDate() + offset);
+      const scheduledDate = targetDate.toISOString().slice(0, 10);
+      try {
+        const result = await generateDailyKnowledge({ subject: body.subject, date: scheduledDate, userId: admin.userId });
+        const status = result.duplicate.duplicate ? "rejected" : result.source.verified ? "published" : "verifying";
+        const row = (await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", status, scheduledDate, immediateDisplay: body.immediateDisplay, verifiedAt: result.source.verified ? new Date() : null, publishedAt: result.source.verified ? new Date() : null, verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, duplicate: result.duplicate, source: result.source }, createdBy: admin.userId, updatedBy: admin.userId }).returning())[0];
+        items.push(row);
+        await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "daily_knowledge", action: "generate", resourceId: row.id, metadata: { scheduledDate, status }, ip: ctx.ip });
+      } catch (error) {
+        console.error("[daily-knowledge] batch generation item failed", { scheduledDate, error: error instanceof Error ? error.message : "unknown" });
+      }
+    }
+    return { items, generated: items.length, requested: body.days };
   }}),
   route({ method: "POST", path: "/admin/daily-knowledge", auth: "admin", handler: async (ctx) => {
     const admin = ctx.requireUser(); const body = await ctx.json(draftSchema);
