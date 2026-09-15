@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, lte, or, gt } from "drizzle-orm";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { db } from "@/db";
-import { announcements, examHubAttempts, examHubs, examHubWordProgress, examHubWords, userSettings, questionBanks, questionBankMemberships, questionSources, questions, studyMaterials, studyMaterialPages, examQuestionGenerationJobs, examQuestionGenerationItems } from "@/db/schema";
+import { announcements, examHubAttempts, examHubs, examHubWordProgress, examHubWords, userSettings, questionBanks, questionBankMemberships, questionSources, questions, studyMaterials, studyMaterialPages, examHubMaterialImports, examQuestionGenerationJobs, examQuestionGenerationItems } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 import { createAiBackgroundJob } from "../ai-background";
@@ -85,18 +85,39 @@ export const routes: RouteDef[] = [
     const files = form.getAll("files").filter((value): value is File => value instanceof File);
     if (!files.length) throw fail("REQ_NO_FILE", { message: "請至少選擇一個 PDF、TXT、圖片或支援的教材檔案。" });
     if (files.length > 100) throw fail("REQ_VALIDATION", { message: "單次最多上傳 100 個檔案。" });
-    const results: Array<{ materialId: string; filename: string; status: string; chars: number }> = [];
+    const results: Array<{ importId: string; filename: string; status: string; chars: number }> = [];
     for (const file of files) {
       if (file.size > 25 * 1024 * 1024) throw fail("REQ_VALIDATION", { message: `${file.name} 超過 25MB。` });
       const data = Buffer.from(await file.arrayBuffer());
       const mime = file.type || "application/octet-stream";
       const stored = await putObject({ userId: admin.userId, filename: `exam-${hub.id}-${file.name}`, mimeType: mime, data, allow: ["pdf", "text", "image"] });
       const text = await extractText(mime, data, admin.userId, "其他");
-      const material = (await db.insert(studyMaterials).values({ userId: admin.userId, title: `${hub.name}｜${file.name}`.slice(0, 120), subject: "其他", kind: mime === "application/pdf" ? "pdf" : mime.startsWith("image/") ? "image" : "txt", status: "ready", content: text }).returning())[0];
-      await db.insert(studyMaterialPages).values({ materialId: material.id, pageNumber: 1, text, objectId: stored.id });
-      results.push({ materialId: material.id, filename: file.name, status: "ready", chars: text.length });
+      const pending = (await db.insert(examHubMaterialImports).values({ examHubId: hub.id, uploadedBy: admin.userId, filename: file.name, mimeType: mime, objectId: stored.id, extractedText: text, status: "pending" }).returning())[0];
+      results.push({ importId: pending.id, filename: file.name, status: "pending", chars: text.length });
     }
-    return { uploaded: results.length, materials: results, materialIds: results.map((item) => item.materialId) };
+    return { uploaded: results.length, imports: results };
+  }}),
+  route({ method: "GET", path: "/admin/exam-hubs/:id/material-imports", auth: "admin", handler: async (ctx) => {
+    const hub = (await db.select({ id: examHubs.id }).from(examHubs).where(eq(examHubs.id, ctx.params.id)).limit(1))[0];
+    if (!hub) throw notFound("找不到段考專區");
+    const imports = await db.select({ id: examHubMaterialImports.id, filename: examHubMaterialImports.filename, mimeType: examHubMaterialImports.mimeType, status: examHubMaterialImports.status, extractedText: examHubMaterialImports.extractedText, materialId: examHubMaterialImports.materialId, createdAt: examHubMaterialImports.createdAt }).from(examHubMaterialImports).where(eq(examHubMaterialImports.examHubId, hub.id)).orderBy(desc(examHubMaterialImports.createdAt)).limit(200);
+    return { imports };
+  }}),
+  route({ method: "POST", path: "/admin/exam-hubs/:id/material-imports/confirm", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const body = await ctx.json(z.object({ importIds: z.array(z.string().uuid()).min(1).max(100) }));
+    const pending = await db.select().from(examHubMaterialImports).where(and(eq(examHubMaterialImports.examHubId, ctx.params.id), inArray(examHubMaterialImports.id, body.importIds), eq(examHubMaterialImports.status, "pending")));
+    if (!pending.length) throw fail("SYS_CONFLICT", { message: "沒有可確認匯入的待審核檔案。" });
+    const imported: string[] = [];
+    await db.transaction(async (tx) => {
+      for (const item of pending) {
+        const material = (await tx.insert(studyMaterials).values({ userId: admin.userId, title: `段考資料｜${item.filename}`.slice(0, 120), subject: "其他", kind: item.mimeType === "application/pdf" ? "pdf" : item.mimeType.startsWith("image/") ? "image" : "txt", status: "ready", content: item.extractedText, visibility: "private" }).returning())[0];
+        await tx.insert(studyMaterialPages).values({ materialId: material.id, pageNumber: 1, text: item.extractedText, objectId: item.objectId });
+        await tx.update(examHubMaterialImports).set({ status: "imported", materialId: material.id, reviewedBy: admin.userId, reviewedAt: new Date() }).where(eq(examHubMaterialImports.id, item.id));
+        imported.push(material.id);
+      }
+    });
+    return { imported: imported.length, materialIds: imported };
   }}),
   route({ method: "GET", path: "/admin/exam-hubs/:id/words", auth: "admin", handler: async (ctx) => ({ words: await db.select().from(examHubWords).where(eq(examHubWords.hubId, ctx.params.id)).orderBy(asc(examHubWords.word)) }) }),
   route({ method: "POST", path: "/admin/exam-hubs/:id/words", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ words: z.array(wordInput).min(1).max(1000) })); const rows = await db.insert(examHubWords).values(body.words.map((word) => ({ ...word, hubId: ctx.params.id, normalizedWord: word.word.toLocaleLowerCase("en-US") }))).onConflictDoNothing().returning(); return { words: rows, added: rows.length }; } }),

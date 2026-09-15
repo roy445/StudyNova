@@ -1954,6 +1954,25 @@ export const announcements = pgTable(
   (t) => [index("announcements_idx").on(t.pinned, t.startsAt)],
 );
 
+export const examHubMaterialImports = pgTable(
+  "exam_hub_material_imports",
+  {
+    id: id(),
+    examHubId: uuid("exam_hub_id").notNull().references(() => examHubs.id, { onDelete: "cascade" }),
+    uploadedBy: uuid("uploaded_by").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    mimeType: text("mime_type").notNull().default("application/octet-stream"),
+    objectId: uuid("object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    extractedText: text("extracted_text").notNull().default(""),
+    status: text("status").notNull().default("pending"),
+    materialId: uuid("material_id").references(() => studyMaterials.id, { onDelete: "set null" }),
+    reviewedBy: uuid("reviewed_by").references(() => users.userId, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: created(),
+  },
+  (t) => [index("exam_material_import_hub_idx").on(t.examHubId, t.status), index("exam_material_import_user_idx").on(t.uploadedBy, t.createdAt)],
+);
+
 export const adminLogs = pgTable(
   "admin_logs",
   {
