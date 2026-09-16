@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "referrals" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "inviter_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
-  "invitee_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "inviter_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "invitee_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "share_id" uuid REFERENCES "shares"("id") ON DELETE SET NULL,
   "status" text NOT NULL DEFAULT 'clicked',
   "qualified_at" timestamptz,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS "software_releases" (
   "migration_required" boolean NOT NULL DEFAULT false,
   "minimum_supported_version" text NOT NULL DEFAULT '1.0.0',
   "released_at" timestamptz,
-  "created_by" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+  "created_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "status" text NOT NULL DEFAULT 'DRAFT',
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now()
