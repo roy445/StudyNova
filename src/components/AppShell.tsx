@@ -125,7 +125,7 @@ const FEATURE_STEPS: Record<string, string[]> = {
 
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.APP_VERSION ?? "1.0.0";
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.APP_VERSION ?? "1.1.0";
 
 export function AppShell({ user, children, maintenance }: { user: ShellUser; children: React.ReactNode; maintenance?: MaintenanceState | null }) {
   const pathname = usePathname();

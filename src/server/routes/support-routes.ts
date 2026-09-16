@@ -179,7 +179,7 @@ export const routes: RouteDef[] = [
           requestId: (body.requestId ?? "").slice(0, 40),
           pageUrl: (body.pageUrl ?? "").slice(0, 300),
           userAgent: (ctx.req.headers.get("user-agent") ?? "").slice(0, 300),
-          appVersion: process.env.APP_VERSION || "1.0.0",
+          appVersion: process.env.APP_VERSION || "1.1.0",
           attachmentId,
         })
         .returning();

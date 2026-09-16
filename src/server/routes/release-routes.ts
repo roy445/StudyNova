@@ -9,7 +9,7 @@ import { adminLog } from "../economy";
 const versionSchema = z.string().regex(/^v?\d+\.\d+\.\d+$/, "版本必須使用 major.minor.patch");
 function semver(value: string) { const match = value.replace(/^v/, "").split(".").map(Number); return match.length === 3 && match.every(Number.isInteger) ? match : null; }
 export function compareVersions(left: string, right: string) { const a = semver(left); const b = semver(right); if (!a || !b) return 0; for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1; return 0; }
-const currentVersion = () => process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.APP_VERSION ?? "1.0.0";
+const currentVersion = () => process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.APP_VERSION ?? "1.1.0";
 
 export const routes: RouteDef[] = [
   route({ method: "GET", path: "/admin/releases", auth: "admin", handler: async () => ({ releases: await db.select().from(softwareReleases).orderBy(desc(softwareReleases.createdAt)) }) }),
