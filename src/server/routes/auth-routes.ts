@@ -218,8 +218,9 @@ export const routes: RouteDef[] = [
       const origin = process.env.NEXT_PUBLIC_APP_URL ?? new URL(ctx.req.url).origin;
       const emailResult = await sendPasswordResetEmail({ to: rows[0].email, displayName: rows[0].displayName, link: `${origin}${link}`, expiresText: "30 分鐘" });
       if (emailResult.sent) return generic;
-      // 沒有設定 Gmail SMTP 時，保留開發／手動寄送用連結。
-      return { ...generic, devResetLink: link };
+      // 不可把 token 放進未驗證請求的 response；寄信失敗只記錄安全診斷，維持 generic response。
+      console.error("[auth] password reset delivery failed");
+      return generic;
     },
   }),
 

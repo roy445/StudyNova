@@ -420,20 +420,28 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ questionIndex: z.number().int().min(0).max(200), correct: z.boolean(), response: z.string().max(500).default("") }));
       const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
       if (!challenge || challenge.status !== "open") throw notFound("找不到進行中的挑戰");
+      if (challenge.expiresAt && new Date(challenge.expiresAt) <= new Date()) throw badRequest("這個挑戰已經結束");
+      const allowedIds = await friendIds(user.userId);
+      if (challenge.creatorId !== user.userId && !allowedIds.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
+      const challengePayload = challenge.payload as { items?: Array<Record<string, unknown>> };
+      const item = challengePayload.items?.[body.questionIndex];
+      if (!item) throw badRequest("題目不存在或已失效");
+      const expected = String(item.answer ?? "").trim().toLocaleLowerCase();
+      const actualCorrect = expected.length > 0 && expected === body.response.trim().toLocaleLowerCase();
       await db.insert(challengeParticipants).values({ challengeId: challenge.id, userId: user.userId }).onConflictDoNothing();
-      const inserted = await db.insert(challengeAnswers).values({ challengeId: challenge.id, userId: user.userId, questionIndex: body.questionIndex, correct: body.correct, response: body.response }).onConflictDoNothing().returning();
+      const inserted = await db.insert(challengeAnswers).values({ challengeId: challenge.id, userId: user.userId, questionIndex: body.questionIndex, correct: actualCorrect, response: body.response }).onConflictDoNothing().returning();
       if (!inserted[0]) {
         const current = (await db.select({ points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount }).from(challengeParticipants).where(and(eq(challengeParticipants.challengeId, challenge.id), eq(challengeParticipants.userId, user.userId))).limit(1))[0];
         return { accepted: false, points: current?.points ?? 0, correctCount: current?.correctCount ?? 0, wrongCount: current?.wrongCount ?? 0, reason: "這一題已經提交過" };
       }
       let pointsAwarded = 0;
-      if (body.correct) {
+      if (actualCorrect) {
         const firstCorrect = await db.select({ id: challengeAnswers.id }).from(challengeAnswers).where(and(eq(challengeAnswers.challengeId, challenge.id), eq(challengeAnswers.questionIndex, body.questionIndex), eq(challengeAnswers.correct, true))).orderBy(asc(challengeAnswers.answeredAt)).limit(1);
         pointsAwarded = firstCorrect[0]?.id === inserted[0].id ? 1 : 0;
         await db.update(challengeAnswers).set({ pointsAwarded }).where(eq(challengeAnswers.id, inserted[0].id));
       }
-      const updated = await db.update(challengeParticipants).set({ points: sql`${challengeParticipants.points} + ${pointsAwarded}`, correctCount: sql`${challengeParticipants.correctCount} + ${body.correct ? 1 : 0}`, wrongCount: sql`${challengeParticipants.wrongCount} + ${body.correct ? 0 : 1}`, score: sql`${challengeParticipants.score} + ${pointsAwarded}` }).where(and(eq(challengeParticipants.challengeId, challenge.id), eq(challengeParticipants.userId, user.userId))).returning({ points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount });
-      return { accepted: true, pointsAwarded, points: updated[0]?.points ?? pointsAwarded, correctCount: updated[0]?.correctCount ?? (body.correct ? 1 : 0), wrongCount: updated[0]?.wrongCount ?? (body.correct ? 0 : 1), firstCorrect: pointsAwarded === 1 };
+      const updated = await db.update(challengeParticipants).set({ points: sql`${challengeParticipants.points} + ${pointsAwarded}`, correctCount: sql`${challengeParticipants.correctCount} + ${actualCorrect ? 1 : 0}`, wrongCount: sql`${challengeParticipants.wrongCount} + ${actualCorrect ? 0 : 1}`, score: sql`${challengeParticipants.score} + ${pointsAwarded}` }).where(and(eq(challengeParticipants.challengeId, challenge.id), eq(challengeParticipants.userId, user.userId))).returning({ points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount });
+      return { accepted: true, pointsAwarded, points: updated[0]?.points ?? pointsAwarded, correctCount: updated[0]?.correctCount ?? (actualCorrect ? 1 : 0), wrongCount: updated[0]?.wrongCount ?? (actualCorrect ? 0 : 1), firstCorrect: pointsAwarded === 1 };
     },
   }),
 
@@ -448,15 +456,23 @@ export const routes: RouteDef[] = [
       if (!c) throw notFound("找不到挑戰");
       if (c.status !== "open") throw fail("SOCIAL_CHALLENGE_ENDED", { message: "這個挑戰目前已暫停或關閉" });
       if (new Date(c.expiresAt) < new Date()) throw fail("SOCIAL_CHALLENGE_ENDED");
+      const submitFriendIds = await friendIds(user.userId);
+      if (c.creatorId !== user.userId && !submitFriendIds.includes(c.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
+      const payload = c.payload as { items?: Array<Record<string, unknown>> };
+      const verifiedRecords = body.records.map((record) => {
+        const item = payload.items?.find((candidate) => String(candidate.word ?? "") === record.word);
+        const expectedAnswer = String(item?.answer ?? record.expected ?? "").trim().toLocaleLowerCase();
+        const actualCorrect = !record.timedOut && expectedAnswer.length > 0 && expectedAnswer === record.response.trim().toLocaleLowerCase();
+        return { ...record, correct: actualCorrect, item };
+      });
       await db.insert(challengeParticipants).values({ challengeId: c.id, userId: user.userId }).onConflictDoNothing();
       const rows = await db
         .update(challengeParticipants)
-        .set({ score: body.records.length ? sql`${challengeParticipants.points}` : body.score, durationSec: body.durationSec, finishedAt: new Date() })
+        .set({ score: verifiedRecords.length ? verifiedRecords.filter((record) => record.correct).length : 0, durationSec: body.durationSec, finishedAt: new Date() })
         .where(and(eq(challengeParticipants.challengeId, c.id), eq(challengeParticipants.userId, user.userId)))
         .returning();
-      const payload = c.payload as { items?: Array<Record<string, unknown>> };
-      for (const record of body.records) {
-        const item = payload.items?.find((candidate) => String(candidate.word ?? "") === record.word);
+      for (const record of verifiedRecords) {
+        const item = record.item;
         const options = Array.isArray(item?.options) ? item.options.map(String) : [];
         await db.insert(challengeQuestionHistory).values({ userId: user.userId, challengeId: c.id, questionFingerprint: challengeQuestionFingerprint(item ?? { word: record.word, meaning: record.prompt, options }), options }).onConflictDoNothing();
       }
@@ -468,9 +484,9 @@ export const routes: RouteDef[] = [
         .returning({ id: challengeParticipants.id });
       let reward = null;
       if (claimed[0]) {
-        const wrongCount = body.records.filter((record) => !record.correct && !record.timedOut).length;
-        const timedOutCount = body.records.filter((record) => record.timedOut).length;
-        const total = Math.max(1, body.records.length);
+        const wrongCount = verifiedRecords.filter((record) => !record.correct && !record.timedOut).length;
+        const timedOutCount = verifiedRecords.filter((record) => record.timedOut).length;
+        const total = Math.max(1, verifiedRecords.length);
         const accuracy = Math.max(0, Math.min(1, (total - wrongCount - timedOutCount) / total));
         const nova = Math.max(5, Math.round(10 + accuracy * 30 - wrongCount * 2));
         const xp = Math.max(10, Math.round(20 + accuracy * 60 - wrongCount * 4));

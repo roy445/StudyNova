@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { shares, users } from "@/db/schema";
+import { friends, shares, users } from "@/db/schema";
 import { LogoMark, StarField } from "@/components/brand";
+import { getSession } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,13 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
   const rows = await db.select().from(shares).where(eq(shares.slug, slug)).limit(1);
   const share = rows[0];
   if (!share) notFound();
+  const session = await getSession();
+  if (share.visibility === "private" && session?.user.userId !== share.userId) notFound();
+  if (share.visibility === "friends" && session?.user.userId !== share.userId) {
+    if (!session) notFound();
+    const friendship = await db.select({ userId: friends.userId }).from(friends).where(or(and(eq(friends.userId, session.user.userId), eq(friends.friendId, share.userId)), and(eq(friends.userId, share.userId), eq(friends.friendId, session.user.userId)))).limit(1);
+    if (!friendship[0]) notFound();
+  }
   await db.update(shares).set({ viewCount: sql`${shares.viewCount} + 1` }).where(eq(shares.id, share.id));
   const owner = (await db.select({ displayName: users.displayName, novaId: users.novaId }).from(users).where(eq(users.userId, share.userId)).limit(1))[0];
   const payload = share.payload as Record<string, unknown>;
@@ -36,7 +44,7 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
         <p className="mt-2 text-xs tracking-[0.2em] text-muted">STUDYNOVA AI · {KIND_LABEL[share.kind] ?? share.kind}</p>
         <h1 className="mt-2 text-xl font-bold">{share.title}</h1>
         <p className="mt-1 text-xs text-muted">
-          來自 {owner?.displayName}（{owner?.novaId}）· {new Date(share.createdAt).toLocaleDateString("zh-TW")}
+          來自 {share.visibility === "public" ? owner?.displayName : "StudyNova 使用者"} · {new Date(share.createdAt).toLocaleDateString("zh-TW")}
         </p>
 
         <div className="mt-4 space-y-2 text-left text-sm">

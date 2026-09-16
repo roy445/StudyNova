@@ -62,7 +62,8 @@ async function replayQueue() {
   for (const item of await readQueuedRequests()) {
     try {
       const response = await fetch(item.url, { method: item.method, headers: item.headers, body: item.body, credentials: "include" });
-      if (response.ok || response.status < 500) await deleteQueuedRequest(item.id);
+      // 只有成功完成的請求才可移除；401/403/422/429 必須保留並交由前端／使用者處理。
+      if (response.ok) await deleteQueuedRequest(item.id);
     } catch (_) {
       // Keep the item for the next Background Sync attempt.
     }
@@ -90,20 +91,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (url.pathname.startsWith("/api/v1/") && request.method === "GET") {
-    event.respondWith((async () => {
-      const cache = await caches.open(API_CACHE);
-      try {
-        const response = await fetch(request);
-        if (response.headers.get("x-studynova-error") === "SERVICE_MAINTENANCE" || response.status === 503) {
-          await cache.delete(request);
-        } else if (response.ok) await cache.put(request, response.clone());
-        return response;
-      } catch (_) {
-        const cached = await cache.match(request);
-        if (cached) return cached;
-        return new Response(JSON.stringify({ ok: false, error: { code: "SN-OFFLINE-001", message: "目前離線，請稍後重新整理。" } }), { status: 503, headers: { "content-type": "application/json" } });
-      }
-    })());
+    // API 回應可能包含帳號、學習與通知資料，禁止 SW 跨 session 持久化或離線回放。
+    event.respondWith(fetch(request, { cache: "no-store" }).catch(() => new Response(JSON.stringify({ ok: false, error: { code: "SN-OFFLINE-001", message: "目前離線，請稍後重新整理。" } }), { status: 503, headers: { "content-type": "application/json", "cache-control": "no-store" } })));
     return;
   }
   if (url.pathname.startsWith("/api/v1/") && ["POST", "PUT", "PATCH"].includes(request.method)) {
