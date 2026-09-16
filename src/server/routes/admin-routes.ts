@@ -47,6 +47,7 @@ import {
   emailMessageLogs,
   customizationCategories,
   customizationVersions,
+  pushSubscriptions,
 } from "@/db/schema";
 import { normalizeQuestionRows } from "../question-import";
 import { route, type RouteDef } from "../router";
@@ -1771,18 +1772,23 @@ export const routes: RouteDef[] = [
       const title = body?.title ?? "StudyNova 測試推播";
       const message = body?.message ?? "推播設定正常運作 ✅";
       const targets = await resolveAudience(body?.audience ?? "all", body?.audienceIds ?? []);
+      const subscribedRows = targets.length ? await db.select({ userId: pushSubscriptions.userId }).from(pushSubscriptions).where(inArray(pushSubscriptions.userId, targets)) : [];
+      const subscribedUsers = new Set(subscribedRows.map((row) => row.userId));
       let notified = 0;
       let pushSent = 0;
+      let pushAttempted = 0;
+      let pushFailed = 0;
       for (const userId of targets) {
         const created = await notify({ userId, kind: "admin_push_test", title, body: message, link: body?.link ?? "/dashboard", push: false, dedupeKey: `push-test:${admin.userId}:${Date.now()}:${userId}` });
-        if (created) {
-          notified += 1;
-          const result = await sendPush(userId, { title, body: message, link: body?.link ?? "/dashboard", vibrate: [120, 60, 120] });
-          pushSent += result.sent;
-        }
+        if (created) notified += 1;
+        if (!subscribedUsers.has(userId)) continue;
+        pushAttempted += 1;
+        const result = await sendPush(userId, { title, body: message, link: body?.link ?? "/dashboard", vibrate: [120, 60, 120] });
+        pushSent += result.sent;
+        pushFailed += result.failed;
       }
-      await adminLog({ actorId: admin.userId, action: "push.test", targetType: "audience", targetId: body?.audience ?? "all", after: { title, message, targets: targets.length, notified, pushSent, configured: pushConfigured() }, ip: ctx.ip });
-      return { targets: targets.length, notified, pushSent, configured: pushConfigured() };
+      await adminLog({ actorId: admin.userId, action: "push.test", targetType: "audience", targetId: body?.audience ?? "all", after: { title, message, targets: targets.length, subscribedUsers: subscribedUsers.size, pushAttempted, pushFailed, notified, pushSent, configured: pushConfigured() }, ip: ctx.ip });
+      return { targets: targets.length, subscribedUsers: subscribedUsers.size, pushAttempted, pushFailed, notified, pushSent, configured: pushConfigured() };
     },
   }),
 ];

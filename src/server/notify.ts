@@ -61,9 +61,10 @@ export async function notify(input: NotifyInput): Promise<boolean> {
 }
 
 export async function sendPush(userId: string, payload: { title: string; body: string; link: string; vibrate?: number[] }) {
-  if (!ensureVapid()) return { sent: 0, configured: false };
+  if (!ensureVapid()) return { sent: 0, failed: 0, configured: false };
   const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
   let sent = 0;
+  let failed = 0;
   for (const sub of subs) {
     try {
       await webpush.sendNotification(
@@ -72,12 +73,13 @@ export async function sendPush(userId: string, payload: { title: string; body: s
       );
       sent += 1;
     } catch (err) {
+      failed += 1;
       const status = (err as { statusCode?: number }).statusCode;
       console.error("[push] delivery failed", { userId, subscriptionId: sub.id, status, error: err });
       if (status === 404 || status === 410) await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
     }
   }
-  return { sent, configured: true };
+  return { sent, failed, configured: true };
 }
 
 export async function resolveAudience(audience: string, audienceIds: string[]): Promise<string[]> {

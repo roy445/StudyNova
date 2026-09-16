@@ -65,8 +65,14 @@ function ProfileInner() {
       const reg = await navigator.serviceWorker.ready;
       const perm = await Notification.requestPermission();
       if (perm !== "granted") return toast.push("error", "你拒絕了通知權限");
-      const existing = await reg.pushManager.getSubscription();
-      const sub = existing ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyToUint8Array(push.data.publicKey) });
+      const applicationServerKey = vapidKeyToUint8Array(push.data.publicKey);
+      let existing = await reg.pushManager.getSubscription();
+      const existingKey = existing?.options.applicationServerKey;
+      if (existing && existingKey && !sameBytes(new Uint8Array(existingKey), new Uint8Array(applicationServerKey))) {
+        await existing.unsubscribe();
+        existing = null;
+      }
+      const sub = existing ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
       const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
       await apiPost("/push/subscribe", { endpoint: json.endpoint, keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth } });
       toast.push("success", "已開啟推播通知");
@@ -622,6 +628,10 @@ function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
   return Uint8Array.from(raw, (char) => char.charCodeAt(0)).buffer as ArrayBuffer;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export default function ProfilePage() {
