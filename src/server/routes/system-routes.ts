@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { pushSubscriptions, notifications, users, novaTransactions, questions, jobQueue, weeklyExamWeeks, storageObjects, featurePermissions, platformSettings, customizationCategories, customizationVersions } from "@/db/schema";
 import { route, type Ctx, type RouteDef } from "../router";
-import { badRequest, fail, hashPassword, verifyPassword, generateNovaId, toCsv, todayStr } from "../core";
+import { badRequest, fail, hashPassword, verifyPassword, generateNovaId, safeErrorMessage, toCsv, todayStr } from "../core";
 import { listNotifications, markRead, unreadCount, pushConfigured, sendPush } from "../notify";
 import { CRON_TASKS, queue, runCronTask, isWeekOpen, type JobName } from "../queue";
 import { storageHealth, activeDriver, putObject, readObject, deleteObject } from "../storage";
@@ -20,7 +20,7 @@ async function timed(name: string, group: string, fn: () => Promise<string>): Pr
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.startsWith("SKIP:")) return { name, group, status: "SKIP", durationMs: Date.now() - start, detail: msg.slice(5) };
-    return { name, group, status: "FAIL", durationMs: Date.now() - start, detail: msg.slice(0, 300) };
+    return { name, group, status: "FAIL", durationMs: Date.now() - start, detail: safeErrorMessage(err) };
   }
 }
 
@@ -28,7 +28,7 @@ async function handleCron(ctx: Ctx) {
   const secret = process.env.CRON_SECRET;
   const authorization = ctx.req.headers.get("authorization") ?? "";
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  const provided = ctx.req.headers.get("x-cron-secret") ?? ctx.query.get("secret") ?? bearer;
+  const provided = ctx.req.headers.get("x-cron-secret") ?? bearer;
   if (!secret) throw fail("ADMIN_CRON_SECRET_MISSING");
   if (provided !== secret) throw fail("ADMIN_CRON_SECRET_INVALID");
   const task = (ctx.query.get("task") ?? "daily_tasks_refresh") as JobName;

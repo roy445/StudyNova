@@ -486,6 +486,8 @@ class RedisQueue implements QueueAdapter {
   private fallback = new PostgresQueue();
 
   async enqueue(job: { name: JobName; payload?: JobPayload; uniqueKey: string; runAt?: Date }) {
+    // 沒有明確啟用常駐 BullMQ worker 時，不能只把任務放進 Redis；改走可由 Cron drain 的 PostgreSQL queue。
+    if (process.env.STUDYNOVA_BULLMQ_WORKER !== "1") return this.fallback.enqueue(job);
     try {
       const { Queue } = await import("bullmq");
       const queue = new Queue("studynova", { connection: { url: process.env.REDIS_URL! } as never });
