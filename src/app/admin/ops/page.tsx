@@ -78,6 +78,7 @@ export default function AdminOpsPage() {
   const featureCustomizations = useApi<{ features: Array<{ feature: string; label: string; enabled: boolean; allowedRoles: string[]; config: Record<string, unknown> }> }>("/admin/feature-customizations");
 
   const [annOpen, setAnnOpen] = useState(false);
+  const [selectedAnnouncementTemplate, setSelectedAnnouncementTemplate] = useState("");
   const [annForm, setAnnForm] = useState({ title: "", body: "", link: "/dashboard", targetFeature: "all", category: "general", announcementType: "general", importance: "normal", tags: "", audience: "all", pinned: false, marquee: false, notify: true, push: false, email: false, showHome: true, showPwa: false, ctaLabel: "", ctaUrl: "", status: "published", startsAt: "", endsAt: "" });
   const [pushForm, setPushForm] = useState({ title: "🐦 Novi 測試提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard", audience: "all" });
   const [pushResult, setPushResult] = useState<{ targets: number; subscribedUsers: number; pushAttempted: number; pushFailed: number; notified: number; pushSent: number; configured: boolean } | null>(null);
@@ -521,7 +522,7 @@ export default function AdminOpsPage() {
           <Button size="sm" className="mt-2" onClick={async () => { try { const result = await apiPost<{ targets: number; subscribedUsers: number; pushAttempted: number; pushFailed: number; notified: number; pushSent: number; configured: boolean }>("/admin/push/test", pushForm); setPushResult(result); toast.push("success", `目標 ${result.targets} 人，已訂閱 ${result.subscribedUsers} 人，Web Push 實際送達 ${result.pushSent} 台裝置`); } catch (err) { toast.push("error", errorMessage(err)); } }}>立即發送給選定身分組</Button>
           {pushResult && <p className="mt-2 text-xs text-muted">最近一次：目標 {pushResult.targets} 人・已訂閱 {pushResult.subscribedUsers} 人・嘗試 {pushResult.pushAttempted} 人・失敗 {pushResult.pushFailed} 人・站內通知 {pushResult.notified} 人・Web Push 實際送達 {pushResult.pushSent} 台・VAPID {pushResult.configured ? "已設定" : "未設定（僅站內通知）"}{pushResult.subscribedUsers < pushResult.targets ? "・部分使用者尚未在裝置開啟推播" : ""}{pushResult.pushFailed > 0 ? "・請重新開啟推播以更新訂閱" : ""}</p>}
         </Card>
-        <Card title="▤ 公告管理｜實際公告" subtitle="這裡管理已建立、發布、草稿、排程或已過期的實際公告；只有這裡的公告資料會影響學生端。" action={<Button size="sm" onClick={() => { setAnnForm({ ...annForm, status: "draft", title: "", body: "", ctaLabel: "", ctaUrl: "" }); setAnnOpen(true); }}>＋ 建立公告</Button>}>
+        <Card title="▤ 公告管理｜實際公告" subtitle="這裡管理已建立、發布、草稿、排程或已過期的實際公告；只有這裡的公告資料會影響學生端。" action={<Button size="sm" onClick={() => { setSelectedAnnouncementTemplate(""); setAnnForm({ ...annForm, status: "draft", title: "", body: "", ctaLabel: "", ctaUrl: "" }); setAnnOpen(true); }}>＋ 建立公告</Button>}>
           {anns.loading && <Skeleton lines={3} />}
           <div className="space-y-2">
             {anns.data?.announcements.map((a) => (
@@ -766,7 +767,7 @@ export default function AdminOpsPage() {
       <Modal open={annOpen} onClose={() => setAnnOpen(false)} title="發布公告">
         <div className="space-y-3">
           <Field label="從公告模板建立（只會填入草稿編輯器）">
-            <Select value="" onChange={(e) => { const preset = announcementTemplates.data?.templates.find((item) => item.id === e.target.value); if (preset) { const settings = preset.defaultSettings ?? {}; setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.ctaUrl || annForm.link, announcementType: preset.announcementType, ctaLabel: preset.ctaLabel, ctaUrl: preset.ctaUrl, marquee: settings.marquee === true, status: "draft" }); } }}>
+            <Select value={selectedAnnouncementTemplate} onChange={(e) => { const templateId = e.target.value; setSelectedAnnouncementTemplate(templateId); const preset = announcementTemplates.data?.templates.find((item) => item.id === templateId); if (preset) { const settings = preset.defaultSettings ?? {}; setAnnForm({ ...annForm, title: preset.title, body: preset.body, link: preset.ctaUrl || annForm.link, announcementType: preset.announcementType, ctaLabel: preset.ctaLabel, ctaUrl: preset.ctaUrl, marquee: settings.marquee === true, status: "draft" }); } }}>
               <option value="">選擇公告模板…</option>
               {announcementTemplates.data?.templates.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
             </Select>
