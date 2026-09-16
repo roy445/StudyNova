@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Wordmark, StarField, NoviAvatar } from "@/components/brand";
 import { Button, Field, Input, useToast } from "@/components/ui";
 import { apiGet, apiPost, errorMessage, shareContent } from "@/lib/api";
@@ -18,6 +18,21 @@ export default function RegisterPage() {
   const [pending, setPending] = useState(false);
   const [created, setCreated] = useState<{ novaId: string; displayName: string } | null>(null);
   const [qr, setQr] = useState<{ svg: string; link: string } | null>(null);
+  const [terms, setTerms] = useState<{ version: string; title: string; body: string } | null>(null);
+  const [termsReadComplete, setTermsReadComplete] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const termsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void apiGet<{ document: { version: string; title: string; body: string } }>("/support/legal/registration_terms")
+      .then((result) => setTerms(result.document))
+      .catch(() => setError("目前無法載入註冊條款，請稍後再試。"));
+  }, []);
+
+  function onTermsScroll() {
+    const element = termsRef.current;
+    if (element && element.scrollTop + element.clientHeight >= element.scrollHeight - 8) setTermsReadComplete(true);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,9 +41,13 @@ export default function RegisterPage() {
       setError("兩次輸入的密碼不一致");
       return;
     }
+    if (!terms || !termsReadComplete || !termsAccepted) {
+      setError("請先閱讀條款至底部，並勾選同意後再建立帳號。");
+      return;
+    }
     setPending(true);
     try {
-      const res = await apiPost<{ novaId: string; displayName: string }>("/auth/register", { email, password, displayName });
+      const res = await apiPost<{ novaId: string; displayName: string }>("/auth/register", { email, password, displayName, termsVersion: terms.version, termsReadComplete, termsAccepted });
       setCreated(res);
       toast.push("success", "已建立 StudyNova 帳號");
       try {
@@ -109,6 +128,17 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={submit} className="space-y-3">
+          <section className="rounded-2xl border border-[#37d3ff]/25 bg-black/15 p-3 text-left">
+            <h2 className="text-sm font-semibold">{terms?.title ?? "註冊條款與使用規範"}</h2>
+            <p className="mt-1 text-[11px] text-muted">請完整閱讀條款內容（版本 {terms?.version ?? "載入中"}）。</p>
+            <div ref={termsRef} onScroll={onTermsScroll} className="mt-2 max-h-44 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-6 text-muted">
+              {terms?.body ?? "條款載入中…"}
+            </div>
+            <label className="mt-3 flex items-start gap-2 text-xs">
+              <input type="checkbox" disabled={!termsReadComplete} checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} className="mt-0.5 accent-[#7c5cff]" />
+              <span className={!termsReadComplete ? "text-muted" : "text-white"}>{termsReadComplete ? "我已閱讀並同意註冊條款與使用規範" : "請先滑動條款閱讀區至底部"}</span>
+            </label>
+          </section>
           <Field label="顯示名稱" required>
             <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="例如：小星" maxLength={40} required />
           </Field>
@@ -124,7 +154,7 @@ export default function RegisterPage() {
 
           {error && <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{error}</p>}
 
-          <Button type="submit" full size="lg" loading={pending}>
+          <Button type="submit" full size="lg" loading={pending} disabled={!termsReadComplete || !termsAccepted}>
             建立我的 NOVA ID
           </Button>
         </form>

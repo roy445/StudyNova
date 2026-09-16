@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { AuthUser } from "./auth";
 import { clientIp, getSession, rateLimit, requireAdmin, requireUser } from "./auth";
 import { AppError, fail, newRequestId, safeErrorMessage } from "./core";
 import { db } from "@/db";
-import { platformSettings, systemLogs } from "@/db/schema";
+import { legalConsents, legalDocuments, platformSettings, systemLogs } from "@/db/schema";
 import { classifyAuditPath, writeAudit } from "./audit";
 
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -123,6 +123,14 @@ async function loadRoutes(): Promise<Compiled[]> {
   return compiledRoutes;
 }
 
+async function hasCurrentUsageConsent(userId: string) {
+  const document = (await db.select({ version: legalDocuments.version }).from(legalDocuments).where(eq(legalDocuments.slug, "usage_rules")).limit(1))[0];
+  if (!document) return true;
+  const consentRows = await db.select({ id: legalConsents.id }).from(legalConsents).where(and(eq(legalConsents.userId, userId), eq(legalConsents.documentSlug, "usage_rules"), eq(legalConsents.documentVersion, document.version))).limit(1);
+  const consent = consentRows[0];
+  return Boolean(consent);
+}
+
 export async function handleApiRequest(req: Request, pathSegments: string[]): Promise<Response> {
   const routes = await loadRoutes();
   const url = new URL(req.url);
@@ -141,6 +149,10 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     if (def.auth !== "admin" && !def.path.startsWith("/auth") && def.path !== "/health" && def.path !== "/system/cron") {
       const control = await serviceControl();
       if (!control.enabled) throw fail("SERVICE_MAINTENANCE", { message: control.message, details: { estimatedRecoveryAt: control.estimatedRecoveryAt } });
+    }
+
+    if (user && def.auth !== "admin" && !def.path.startsWith("/auth") && !def.path.startsWith("/support/legal") && def.path !== "/health" && !(await hasCurrentUsageConsent(user.userId))) {
+      throw fail("AUTH_USAGE_RULES_REQUIRED");
     }
 
     if (def.rate) {

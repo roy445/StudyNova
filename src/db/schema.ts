@@ -2232,6 +2232,21 @@ export const legalDocuments = pgTable("legal_documents", {
   updatedAt: updated(),
 });
 
+export const legalConsents = pgTable(
+  "legal_consents",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    documentSlug: text("document_slug").notNull(),
+    documentVersion: text("document_version").notNull(),
+    consentType: text("consent_type").notNull().default("accept"),
+    agreedAt: timestamp("agreed_at", { withTimezone: true }).notNull().defaultNow(),
+    ip: text("ip").notNull().default(""),
+    userAgent: text("user_agent").notNull().default(""),
+  },
+  (t) => [index("legal_consent_user_idx").on(t.userId, t.documentSlug, t.agreedAt), index("legal_consent_version_idx").on(t.documentSlug, t.documentVersion)],
+);
+
 
 /* -------------------------------------------------- AUDIT / EDUCATION CONTENT */
 export const auditLogs = pgTable(

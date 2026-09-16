@@ -53,6 +53,8 @@ export const ERROR_CATALOG = {
   AUTH_PASSWORD_WRONG: def("SN-AUTH-1009", 400, "AUTH", "目前密碼不正確", "請重新輸入目前的密碼；若已忘記請登出後使用忘記密碼。"),
   AUTH_OWNER_PROTECTED: def("SN-AUTH-1010", 400, "AUTH", "擁有者帳號不可自行刪除", "請先將擁有者權限轉移給其他管理員。"),
   AUTH_ACCOUNT_DELETED: def("SN-AUTH-1011", 401, "AUTH", "此帳號已遭到刪除", "此帳號不可申訴；如需使用 StudyNova，請重新註冊新的帳號。"),
+  AUTH_USAGE_RULES_REQUIRED: def("SN-AUTH-1012", 403, "AUTH", "請先閱讀並同意最新使用規章", "完成閱讀與同意後即可繼續使用 StudyNova。"),
+  AUTH_TERMS_UPDATE_REQUIRED: def("SN-AUTH-1013", 409, "AUTH", "條款版本已更新", "請重新載入最新條款並完成同意。"),
 
   /* ---------------------------------------------------------- ACCT 12xx */
   ACCT_NOT_FOUND: def("SN-ACCT-1201", 404, "ACCT", "找不到這個 NOVA ID", "請確認 NOVA ID 是否輸入正確（格式：NV-XXXX-XXXX）。"),

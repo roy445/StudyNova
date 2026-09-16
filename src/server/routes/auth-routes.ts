@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import { db } from "@/db";
-import { users, deletedAccounts, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems, accountAppeals } from "@/db/schema";
+import { users, deletedAccounts, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems, accountAppeals, legalDocuments, legalConsents } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import {
   fail,
@@ -46,8 +46,13 @@ export const routes: RouteDef[] = [
           email: emailSchema,
           password: passwordSchema,
           displayName: z.string().min(1, "請輸入顯示名稱").max(40),
+          termsVersion: z.string().min(1).max(40),
+          termsReadComplete: z.literal(true),
+          termsAccepted: z.literal(true),
         }),
       );
+      const terms = (await db.select({ version: legalDocuments.version }).from(legalDocuments).where(eq(legalDocuments.slug, "registration_terms")).limit(1))[0];
+      if (!terms || terms.version !== body.termsVersion) throw fail("AUTH_TERMS_UPDATE_REQUIRED", { message: "註冊條款已更新，請重新閱讀最新版本。" });
       const registrationName = checkDisplayName(body.displayName);
       if (!registrationName.ok) throw badRequest("這個名稱不符合 StudyNova 名稱規範，請改用不含髒話、不雅文字或聯絡方式的名稱。", { reason: registrationName.reason });
       const email = body.email.toLowerCase().trim();
@@ -57,16 +62,12 @@ export const routes: RouteDef[] = [
       if (deletedEmail[0]) throw fail("AUTH_ACCOUNT_DELETED", { message: "此 Email 對應的帳號已遭到刪除，無法重新註冊。" });
 
       const novaId = await createUniqueNovaId();
-      const inserted = await db
-        .insert(users)
-        .values({
-          novaId,
-          email,
-          passwordHash: hashPassword(body.password),
-          displayName: body.displayName.trim(),
-          role: "student",
-        })
-        .returning({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, role: users.role });
+      const inserted = await db.transaction(async (tx) => {
+        const createdUsers = await tx.insert(users).values({ novaId, email, passwordHash: hashPassword(body.password), displayName: body.displayName.trim(), role: "student" }).returning({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, role: users.role });
+        if (!createdUsers[0]) throw fail("SYS_INTERNAL");
+        await tx.insert(legalConsents).values({ userId: createdUsers[0].userId, documentSlug: "registration_terms", documentVersion: terms.version, consentType: "registration", ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
+        return createdUsers;
+      });
 
       const user = inserted[0];
       await db.insert(userSettings).values({ userId: user.userId }).onConflictDoNothing();
@@ -141,6 +142,34 @@ export const routes: RouteDef[] = [
     handler: async () => {
       await destroySession();
       return { loggedOut: true };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/auth/usage-rules",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const document = (await db.select().from(legalDocuments).where(eq(legalDocuments.slug, "usage_rules")).limit(1))[0];
+      if (!document) return { required: false, consented: true, document: null };
+      const consentRows = await db.select({ id: legalConsents.id, agreedAt: legalConsents.agreedAt }).from(legalConsents).where(and(eq(legalConsents.userId, user.userId), eq(legalConsents.documentSlug, "usage_rules"), eq(legalConsents.documentVersion, document.version))).limit(1);
+      const consent = consentRows[0];
+      return { required: !consent, consented: Boolean(consent), document };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/auth/usage-rules/consent",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ version: z.string().min(1).max(40), readComplete: z.literal(true), accepted: z.literal(true) }));
+      const document = (await db.select({ version: legalDocuments.version }).from(legalDocuments).where(eq(legalDocuments.slug, "usage_rules")).limit(1))[0];
+      if (!document || document.version !== body.version) throw fail("AUTH_TERMS_UPDATE_REQUIRED", { message: "使用規章已更新，請重新閱讀最新版本。" });
+      await db.insert(legalConsents).values({ userId: user.userId, documentSlug: "usage_rules", documentVersion: body.version, consentType: "usage", ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
+      return { consented: true, version: body.version };
     },
   }),
 
