@@ -1384,6 +1384,26 @@ export const shares = pgTable(
   (t) => [uniqueIndex("shares_slug_uq").on(t.slug), index("shares_user_idx").on(t.userId)],
 );
 
+export const referrals = pgTable("referrals", {
+  id: id(),
+  inviterId: uuid("inviter_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+  inviteeId: uuid("invitee_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+  shareId: uuid("share_id").references(() => shares.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("clicked"),
+  qualifiedAt: timestamp("qualified_at", { withTimezone: true }),
+  rewardedAt: timestamp("rewarded_at", { withTimezone: true }),
+  rewardNova: integer("reward_nova").notNull().default(0),
+  rewardXp: integer("reward_xp").notNull().default(0),
+  createdAt: created(),
+}, (t) => [uniqueIndex("referral_pair_uq").on(t.inviterId, t.inviteeId), index("referral_inviter_idx").on(t.inviterId, t.createdAt)]);
+export const referralEvents = pgTable("referral_events", {
+  id: id(), referralId: uuid("referral_id").notNull().references(() => referrals.id, { onDelete: "cascade" }), eventType: text("event_type").notNull(), occurredAt: created(), metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+}, (t) => [uniqueIndex("referral_event_uq").on(t.referralId, t.eventType)]);
+export const softwareReleases = pgTable("software_releases", {
+  id: id(), version: text("version").notNull(), previousVersion: text("previous_version").notNull().default(""), releaseType: text("release_type").notNull().default("PATCH"), title: text("title").notNull(), subtitle: text("subtitle").notNull().default(""), description: text("description").notNull().default(""), releaseNotes: text("release_notes").notNull().default(""),
+  newFeatures: jsonb("new_features").$type<string[]>().notNull().default([]), improvements: jsonb("improvements").$type<string[]>().notNull().default([]), bugFixes: jsonb("bug_fixes").$type<string[]>().notNull().default([]), breakingChanges: jsonb("breaking_changes").$type<string[]>().notNull().default([]), migrationRequired: boolean("migration_required").notNull().default(false), minimumSupportedVersion: text("minimum_supported_version").notNull().default("1.0.0"), releasedAt: timestamp("released_at", { withTimezone: true }), createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }), status: text("status").notNull().default("DRAFT"), createdAt: created(), updatedAt: updated(),
+}, (t) => [uniqueIndex("software_release_version_uq").on(t.version), index("software_release_status_idx").on(t.status, t.releasedAt)]);
+
 /* --------------------------------------------------- NOTIFY / ECONOMY */
 
 export const notifications = pgTable(
