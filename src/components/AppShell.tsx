@@ -232,6 +232,18 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     return () => window.clearTimeout(timer);
   }, [featureKey, installGuideOpen]);
 
+  const markUsageRulesRead = useCallback(() => {
+    const el = usageRulesRef.current;
+    if (!el) return;
+    if (el.scrollHeight <= el.clientHeight + 8 || el.scrollTop + el.clientHeight >= el.scrollHeight - 8) setUsageRulesRead(true);
+  }, []);
+
+  useEffect(() => {
+    if (!usageRules?.required || !usageRules.document) return;
+    const timer = window.setTimeout(markUsageRulesRead, 0);
+    return () => window.clearTimeout(timer);
+  }, [usageRules, markUsageRulesRead]);
+
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -405,7 +417,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
 
   return (
     <div className="min-h-dvh lg:flex">
-      {usageRules?.required && usageRules.document && <div className="fixed inset-0 z-[120] grid place-items-center bg-[#060915]/95 p-4 backdrop-blur-md"><div className="w-full max-w-lg rounded-3xl border border-[#37d3ff]/30 bg-[#0b1226] p-5 shadow-[0_0_60px_rgba(55,211,255,.18)]"><p className="text-xs tracking-widest text-[#37d3ff]">StudyNova 使用規章 · v{usageRules.document.version}</p><h2 className="mt-2 text-xl font-bold">{usageRules.document.title}</h2><p className="mt-1 text-xs text-muted">請完整閱讀至底部，完成後才能繼續使用學習功能。</p><div ref={usageRulesRef} onScroll={() => { const el = usageRulesRef.current; if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 8) setUsageRulesRead(true); }} className="mt-4 max-h-[48vh] overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-7 text-muted">{usageRules.document.body}</div><label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" disabled={!usageRulesRead} checked={usageRulesAccepted} onChange={(event) => setUsageRulesAccepted(event.target.checked)} className="mt-1 accent-[#7c5cff]" /><span>{usageRulesRead ? "我已完整閱讀並同意遵守 StudyNova 使用規章" : "請先閱讀到條款底部"}</span></label><Button full className="mt-4" disabled={!usageRulesRead || !usageRulesAccepted} onClick={async () => { await apiPost("/auth/usage-rules/consent", { version: usageRules.document?.version, readComplete: usageRulesRead, accepted: usageRulesAccepted }); setUsageRules({ ...usageRules, required: false }); window.location.reload(); }}>開始使用 StudyNova</Button></div></div>}
+      {usageRules?.required && usageRules.document && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#060915]/95 p-3 backdrop-blur-md sm:p-5"><div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-[#37d3ff]/30 bg-[#0b1226] shadow-[0_0_60px_rgba(55,211,255,.18)] sm:max-h-[calc(100dvh-2.5rem)]"><div className="shrink-0 border-b border-white/10 p-5 pb-4"><p className="text-xs tracking-widest text-[#37d3ff]">StudyNova 使用規章 · v{usageRules.document.version}</p><h2 className="mt-2 text-xl font-bold sm:text-2xl">{usageRules.document.title}</h2><p className="mt-1 text-xs leading-5 text-muted">請在上方內容區滑動閱讀至最底部，閱讀完成後即可勾選同意。</p></div><div ref={usageRulesRef} onScroll={markUsageRulesRead} tabIndex={0} className="min-h-[220px] flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 py-4 text-sm leading-8 text-slate-200 outline-none sm:px-7 sm:text-base">{usageRules.document.body}</div><div className="shrink-0 border-t border-white/10 bg-[#0b1226] p-5 pt-4"><label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><input type="checkbox" disabled={!usageRulesRead} checked={usageRulesAccepted} onChange={(event) => setUsageRulesAccepted(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#7c5cff]" /><span>{usageRulesRead ? "我已完整閱讀並同意遵守 StudyNova 使用規章" : "請先將上方規章滑動閱讀到底部"}</span></label><Button full className="mt-4" disabled={!usageRulesRead || !usageRulesAccepted} onClick={async () => { await apiPost("/auth/usage-rules/consent", { version: usageRules.document?.version, readComplete: usageRulesRead, accepted: usageRulesAccepted }); setUsageRules({ ...usageRules, required: false }); window.location.reload(); }}>開始使用 StudyNova</Button></div></div></div>}
       {maintenance?.enabled && <MaintenanceNotice state={maintenance} />}
       {updateReady && !updateApplying && <div className="fixed inset-x-3 top-3 z-[100] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#37d3ff]/40 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_28px_rgba(55,211,255,0.2)] backdrop-blur-xl"><span><strong className="text-[#b9f2ff]">StudyNova 有新版本了</strong><span className="ml-2 text-xs text-muted">你的資料不會被清除</span></span><Button size="sm" onClick={() => { setUpdateApplying(true); setUpdateReady(null); sessionStorage.setItem("sn-update-complete", "1"); updateReady.waiting?.postMessage({ type: "SKIP_WAITING" }); window.setTimeout(() => window.location.reload(), 3500); }}>立即更新</Button></div>}
       {updateApplying && <div className="fixed inset-0 z-[110] grid place-items-center bg-[#060915]/90 p-6 backdrop-blur-md"><div className="rounded-3xl border border-[#37d3ff]/30 bg-[#0b1226] px-8 py-7 text-center shadow-[0_0_60px_rgba(55,211,255,.2)]"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#37d3ff]/25 border-t-[#37d3ff]" /><p className="mt-4 font-bold text-white">正在套用 StudyNova 更新</p><p className="mt-1 text-xs text-muted">請稍候，登入狀態與學習資料會保留。</p></div></div>}
