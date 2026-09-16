@@ -12,6 +12,7 @@ export function compareVersions(left: string, right: string) { const a = semver(
 const currentVersion = () => process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.APP_VERSION ?? "1.0.0";
 
 export const routes: RouteDef[] = [
+  route({ method: "GET", path: "/admin/releases", auth: "admin", handler: async () => ({ releases: await db.select().from(softwareReleases).orderBy(desc(softwareReleases.createdAt)) }) }),
   route({ method: "GET", path: "/releases/latest", auth: "optional", handler: async (ctx) => {
     const now = new Date();
     const rows = await db.select().from(softwareReleases).where(and(eq(softwareReleases.status, "PUBLISHED"), or(isNull(softwareReleases.releasedAt), gt(softwareReleases.releasedAt, new Date(0))))).orderBy(desc(softwareReleases.releasedAt)).limit(1);
