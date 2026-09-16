@@ -131,7 +131,7 @@ export default function RegisterPage() {
           <section className="rounded-2xl border border-[#37d3ff]/25 bg-black/15 p-3 text-left">
             <h2 className="text-sm font-semibold">{terms?.title ?? "註冊條款與使用規範"}</h2>
             <p className="mt-1 text-[11px] text-muted">請完整閱讀條款內容（版本 {terms?.version ?? "載入中"}）。</p>
-            <div ref={termsRef} onScroll={onTermsScroll} className="mt-2 max-h-44 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-6 text-muted">
+            <div ref={termsRef} onScroll={onTermsScroll} className="mt-2 max-h-64 whitespace-pre-wrap overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-6 text-muted sm:max-h-72">
               {terms?.body ?? "條款載入中…"}
             </div>
             <label className="mt-3 flex items-start gap-2 text-xs">
