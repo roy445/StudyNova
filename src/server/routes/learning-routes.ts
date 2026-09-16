@@ -944,6 +944,40 @@ export const routes: RouteDef[] = [
 
   route({
     method: "GET",
+    path: "/wrong-questions",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const subject = ctx.query.get("subject")?.trim();
+      const page = Math.max(1, Number(ctx.query.get("page") ?? 1) || 1);
+      const limit = Math.min(50, Math.max(1, Number(ctx.query.get("limit") ?? 20) || 20));
+      const filters = [eq(wrongQuestions.userId, user.userId), isNull(wrongQuestions.resolvedAt), ...(subject ? [eq(wrongQuestions.subject, subject)] : [])];
+      const rows = await db.select({ wrong: wrongQuestions, question: questions }).from(wrongQuestions).innerJoin(questions, eq(questions.id, wrongQuestions.questionId)).where(and(...filters)).orderBy(desc(wrongQuestions.lastWrongAt)).limit(limit).offset((page - 1) * limit);
+      const [{ count: total }] = await db.select({ count: sql<number>`count(*)::int` }).from(wrongQuestions).where(and(...filters));
+      return { items: rows.map((row) => ({ ...row.wrong, question: row.question })), page, limit, total, hasNext: page * limit < Number(total) };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/wrong-questions/:id/answer",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ response: z.array(z.string().max(500)).max(10), idempotencyKey: z.string().max(100).optional() }));
+      const row = (await db.select({ wrong: wrongQuestions, question: questions }).from(wrongQuestions).innerJoin(questions, eq(questions.id, wrongQuestions.questionId)).where(and(eq(wrongQuestions.id, ctx.params.id), eq(wrongQuestions.userId, user.userId))).limit(1))[0];
+      if (!row) throw notFound("找不到這題錯題");
+      const expected = row.question.answer.map((value) => String(value).trim().toLocaleLowerCase());
+      const actual = body.response.map((value) => value.trim().toLocaleLowerCase());
+      const correct = expected.length === actual.length && expected.every((value) => actual.includes(value));
+      const nextMastery = Math.min(100, Math.max(0, row.wrong.mastery + (correct ? 25 : -5)));
+      const updated = (await db.update(wrongQuestions).set({ mastery: nextMastery, reviewCount: sql`${wrongQuestions.reviewCount} + 1`, wrongCount: correct ? row.wrong.wrongCount : sql`${wrongQuestions.wrongCount} + 1`, resolvedAt: correct && nextMastery >= 80 ? new Date() : null, nextReviewAt: new Date(Date.now() + (correct ? 3 : 1) * 86_400_000) }).where(eq(wrongQuestions.id, row.wrong.id)).returning())[0];
+      return { correct, expected: row.question.answer, explanation: row.question.explanation, item: updated };
+    },
+  }),
+
+  route({
+    method: "GET",
     path: "/adaptive/next",
     auth: "user",
     handler: async (ctx) => {
