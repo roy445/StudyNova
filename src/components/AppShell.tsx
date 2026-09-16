@@ -181,7 +181,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
     "/dashboard",
   );
-  const pwaAnnouncements = useApi<{ announcements: Array<{ id: string; title: string; body: string; ctaLabel: string; ctaUrl: string; importance: string }> }>("/pwa/announcements");
+  const pwaAnnouncements = useApi<{ announcements: Array<{ id: string; title: string; body: string; ctaLabel: string; ctaUrl: string; importance: string; pinned: boolean }> }>("/pwa/announcements");
   const releaseInfo = useApi<{ currentVersion: string; latestVersion: string; updateAvailable: boolean; release: { title: string; subtitle: string; releaseNotes: string; newFeatures: string[]; improvements: string[]; bugFixes: string[] } | null }>(`/releases/latest?currentVersion=${encodeURIComponent(APP_VERSION)}`);
   const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
@@ -413,7 +413,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const nova = summary.data?.nova ?? 0;
   const level = summary.data?.novi?.level ?? 1;
   const featureNotices = (summary.data?.announcements ?? []).filter((item) => item.pinned && (item.targetFeature === "all" || item.targetFeature === featureKey)).slice(0, 3);
-  const pwaNotice = pwaAnnouncements.data?.announcements[0] ?? null;
+  const pwaNotice = pwaAnnouncements.data?.announcements.find((item) => item.pinned) ?? null;
 
   const kindLabel = useMemo(
     () => ({ material: "教材", note: "筆記", quiz: "測驗", question: "題目", activity: "活動" }) as Record<string, string>,
