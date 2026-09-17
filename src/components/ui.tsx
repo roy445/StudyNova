@@ -167,9 +167,9 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  const { className = "", children, ...rest } = props;
+  const { className = "", children, style, ...rest } = props;
   return (
-    <select {...rest} className={`${inputBase} appearance-none bg-[var(--surface-solid)] ${className}`}>
+    <select {...rest} style={{ colorScheme: "dark", ...style }} className={`${inputBase} appearance-none bg-[var(--surface-solid)] ${className}`}>
       {children}
     </select>
   );
