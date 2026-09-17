@@ -2,15 +2,34 @@ import { z } from "zod";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, educationGrades, educationSchools, educationStages, educationSubjects, textbookContents, textbookEditions, textbookLessons, userSettings } from "@/db/schema";
-import { route, type RouteDef } from "../router";
-import { notFound } from "../core";
+import { route, type Ctx, type RouteDef } from "../router";
+import { fail, notFound, safeErrorMessage } from "../core";
 import { writeAudit } from "../audit";
 import { putObject } from "../storage";
 import { createFileContext } from "../unified-ai-engine";
+import { classifyTextbookDatabaseError } from "../textbook-diagnostics";
 
 const idSchema = z.string().uuid();
 const stageScope = z.object({ stageId: idSchema.optional(), schoolId: idSchema.optional(), gradeId: idSchema.optional(), subjectId: idSchema.optional() });
 const formFlag = (form: FormData, key: string, fallback: boolean) => form.get(key) === null ? fallback : form.get(key) === "true";
+function logTextbookDatabaseFailure(ctx: Ctx, error: unknown, operation: string, validation: string) {
+  const requestId = ctx.req.headers.get("x-request-id") ?? "unavailable";
+  const raw = error instanceof Error ? error : new Error(String(error));
+  console.error("[StudyNova][textbook] database failure", {
+    requestId,
+    route: "/admin/textbooks",
+    method: ctx.req.method,
+    userId: ctx.user?.userId ?? "anonymous",
+    adminRole: ctx.user?.role ?? "unknown",
+    errorCode: classifyTextbookDatabaseError(error),
+    errorName: raw.name,
+    errorMessage: safeErrorMessage(error),
+    stack: raw.stack,
+    databaseOperation: operation,
+    validation,
+    timestamp: new Date().toISOString(),
+  });
+}
 // Avoid selecting additive 0041 columns on production databases before migration.
 const publicEditionColumns = {
   id: textbookEditions.id,
@@ -77,7 +96,18 @@ export const routes: RouteDef[] = [
       return { editions: editions.map((edition) => ({ ...edition, description: "", isbn: "", metadata: {}, ocrStatus: "not_started" })) };
     }
   } }),
-  route({ method: "POST", path: "/admin/textbooks", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ ...stageScope.shape, subjectId: idSchema, publisher: z.string().min(1).max(120), version: z.string().max(120).default(""), volume: z.string().max(80).default(""), coverUrl: z.string().url().or(z.literal("/brand/studynova-logo-square.png")).default("/brand/studynova-logo-square.png"), description: z.string().max(2000).default(""), isbn: z.string().max(80).default(""), sortOrder: z.number().int().default(0) })); const row = (await db.insert(textbookEditions).values(body).returning())[0]; await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "textbooks", action: "edition.create", resourceId: row.id, ip: ctx.ip }); return { edition: row }; } }),
+  route({ method: "POST", path: "/admin/textbooks", auth: "admin", handler: async (ctx) => {
+    const body = await ctx.json(z.object({ ...stageScope.shape, subjectId: idSchema, publisher: z.string().min(1).max(120), version: z.string().max(120).default(""), volume: z.string().max(80).default(""), coverUrl: z.string().url().or(z.literal("/brand/studynova-logo-square.png")).default("/brand/studynova-logo-square.png"), description: z.string().max(2000).default(""), isbn: z.string().max(80).default(""), sortOrder: z.number().int().default(0) }));
+    try {
+      const row = (await db.insert(textbookEditions).values(body).returning())[0];
+      if (!row) throw new Error("textbook_editions insert returned no row");
+      await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "textbooks", action: "edition.create", resourceId: row.id, ip: ctx.ip });
+      return { edition: row };
+    } catch (error) {
+      logTextbookDatabaseFailure(ctx, error, "textbook_editions.insert", "passed");
+      throw fail("ADMIN_TEXTBOOK_DB_ERROR");
+    }
+  } }),
   route({ method: "PATCH", path: "/admin/textbooks/:id", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ subjectId: idSchema.optional(), publisher: z.string().min(1).max(120).optional(), version: z.string().max(120).optional(), volume: z.string().max(80).optional(), coverUrl: z.string().max(500).optional(), description: z.string().max(2000).optional(), isbn: z.string().max(80).optional(), metadata: z.record(z.string(), z.unknown()).optional(), ocrStatus: z.string().max(40).optional(), enabled: z.boolean().optional(), sortOrder: z.number().int().optional() })); const rows = await db.update(textbookEditions).set({ ...body, updatedAt: new Date() }).where(eq(textbookEditions.id, ctx.params.id)).returning(); if (!rows[0]) throw notFound("找不到教材版本"); await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "textbooks", action: "edition.update", resourceId: ctx.params.id, ip: ctx.ip }); return { edition: rows[0] }; } }),
   route({ method: "POST", path: "/admin/textbooks/:id/cover", auth: "admin", handler: async (ctx) => { const admin = ctx.requireUser(); const edition = (await db.select().from(textbookEditions).where(eq(textbookEditions.id, ctx.params.id)).limit(1))[0]; if (!edition) throw notFound("找不到教材版本"); if (!edition.subjectId) throw new Error("教材尚未設定科目"); const subjectRow = (await db.select({ name: educationSubjects.name }).from(educationSubjects).where(eq(educationSubjects.id, edition.subjectId)).limit(1))[0]; const subject = subjectRow?.name || "其他"; const form = await ctx.formData(); const file = form.get("file"); if (!(typeof File !== "undefined" && file instanceof File)) throw new Error("請選擇封面圖片"); const stored = await putObject({ userId: admin.userId, filename: file.name, mimeType: file.type || "image/jpeg", data: Buffer.from(await file.arrayBuffer()), allow: ["image"] }); const coverUrl = `/api/textbook-covers/${stored.id}`; const row = (await db.update(textbookEditions).set({ coverObjectId: stored.id, coverUrl, updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id)).returning())[0]; await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "textbooks", action: "edition.cover_upload", resourceId: edition.id, ip: ctx.ip, metadata: { objectId: stored.id, filename: file.name } }); return { edition: row, coverUrl }; } }),
   route({ method: "POST", path: "/admin/textbooks/:id/ocr", auth: "admin", handler: async (ctx) => { const admin = ctx.requireUser(); const edition = (await db.select().from(textbookEditions).where(eq(textbookEditions.id, ctx.params.id)).limit(1))[0]; if (!edition) throw notFound("找不到教材版本"); if (!edition.subjectId) throw new Error("教材尚未設定科目"); const subjectRow = (await db.select({ name: educationSubjects.name }).from(educationSubjects).where(eq(educationSubjects.id, edition.subjectId)).limit(1))[0]; const subject = subjectRow?.name || "其他"; const form = await ctx.formData(); const files = form.getAll("files").filter((value): value is File => typeof File !== "undefined" && value instanceof File); if (!files.length) throw new Error("請上傳教材圖片或 PDF"); const threshold = Math.max(0, Math.min(1, Number(form.get("confidenceThreshold") ?? 0.35) || 0.35)); const settings = { includeQuestion: formFlag(form, "includeQuestion", true), includeHandwriting: formFlag(form, "includeHandwriting", true), includeNote: formFlag(form, "includeNote", true), highlightPriority: formFlag(form, "highlightPriority", true), confidenceThreshold: threshold }; await db.update(textbookEditions).set({ ocrStatus: "analyzing", metadata: sql`jsonb_set(coalesce(${textbookEditions.metadata}, '{}'::jsonb), '{ocrSettings}', ${JSON.stringify(settings)}::jsonb, true)`, updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id)); const results = []; for (const file of files.slice(0, 8)) { const stored = await putObject({ userId: admin.userId, filename: file.name, mimeType: file.type || "image/jpeg", data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] }); results.push(await createFileContext({ userId: admin.userId, objectId: stored.id, originalName: file.name, batch: Date.now(), scope: settings, subject })); } const lesson = (await db.insert(textbookLessons).values({ editionId: edition.id, title: `OCR 匯入 ${new Date().toLocaleDateString("zh-TW")}`, description: "由 StudyNova OCR 分析匯入，可再由管理員編輯。", sortOrder: 999 }).returning())[0]; let imported = 0; for (const result of results) { const segments = (result.context.detected as Array<{ kind?: string; text?: string; confidence?: number }>).filter((segment) => Number(segment.confidence ?? 0) >= threshold && (settings.includeQuestion || segment.kind !== "QUESTION") && (settings.includeNote || !["NOTE", "HIGHLIGHT"].includes(segment.kind ?? "")) && (settings.includeHandwriting || segment.kind !== "HANDWRITING")); for (const segment of segments) { if (!segment.text?.trim()) continue; await db.insert(textbookContents).values({ lessonId: lesson.id, type: segment.kind?.toLowerCase() || "note", title: `${segment.kind || "OCR"} ${imported + 1}`, body: segment.text, metadata: { confidence: segment.confidence ?? 0, source: result.context.originalName, ocr: true, settings: JSON.stringify(settings) } }); imported += 1; } } await db.update(textbookEditions).set({ ocrStatus: "ready", updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id)); await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "textbooks", action: "edition.ocr_import", resourceId: edition.id, ip: ctx.ip, metadata: { files: files.length, imported, settings: JSON.stringify(settings) } }); return { lesson, imported, settings, files: results.map((result) => result.context) }; } }),
