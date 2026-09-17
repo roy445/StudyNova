@@ -550,7 +550,6 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      await assertGradeInputOpen();
       const body = await ctx.json(
         z.object({ subject: z.string().min(1).max(20), targetScore: z.number().min(1).max(100), baselineScore: z.number().min(0).max(100).optional() }),
       );

@@ -56,7 +56,7 @@ export default function GradesPage() {
         <div className="flex flex-wrap gap-1.5">
           <Button size="sm" onClick={() => guardGradeInput(() => setOpen(true))}>＋ 新增成績</Button>
           <Button size="sm" variant="ghost" onClick={() => guardExamDateInput(() => setExamOpen(true))}>＋ 考試倒數</Button>
-          <Button size="sm" variant="ghost" onClick={() => guardGradeInput(() => setGoalOpen(true))}>◇ 目標分數</Button>
+          <Button size="sm" variant="ghost" onClick={() => setGoalOpen(true)}>◇ 目標分數</Button>
         </div>
       </header>
 
@@ -336,10 +336,6 @@ export default function GradesPage() {
           <Button
             full
             onClick={async () => {
-              if (!gradeInputOpen) {
-                toast.push("info", gradeInputMessage);
-                return;
-              }
               try {
                 await apiPut("/grades/goals", goalForm);
                 toast.push("success", "目標已設定，達成時會自動發放獎勵");
