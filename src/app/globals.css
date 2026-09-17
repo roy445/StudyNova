@@ -180,6 +180,20 @@ select {
   font-size: 16px; /* prevents iOS zoom */
 }
 
+select option {
+  background-color: var(--surface-solid);
+  color: var(--text);
+}
+
+html[data-theme="light"] select {
+  color-scheme: light;
+}
+
+html[data-theme="light"] select option {
+  background-color: var(--surface-solid);
+  color: var(--text);
+}
+
 /* ---------------------------------------------------------- scroll */
 
 .scroll-thin::-webkit-scrollbar {
