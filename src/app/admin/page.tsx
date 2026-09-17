@@ -22,6 +22,7 @@ type AdminUser = {
   level: number | null;
   xp: number | null;
 };
+type GradeGoal = { id: string; subject: string; targetScore: number | null; baselineScore: number | null; achievedAt: string | null };
 type ChristmasTheme = {
   enabled: boolean;
   snow: boolean;
@@ -92,6 +93,7 @@ export default function AdminOverviewPage() {
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [renameReason, setRenameReason] = useState("");
+  const [goalForm, setGoalForm] = useState({ subject: "數學", targetScore: 85, baselineScore: "", reason: "" });
   const [themeForm, setThemeForm] = useState<ChristmasTheme>(DEFAULT_CHRISTMAS_THEME);
   const [compressionForm, setCompressionForm] = useState<CompressionSettings>(DEFAULT_COMPRESSION_SETTINGS);
 
@@ -248,6 +250,7 @@ export default function AdminOverviewPage() {
                           setDetail(res);
                           setNameDraft(String((res.user as { displayName?: string } | undefined)?.displayName ?? ""));
                           setRenameReason("");
+                          setGoalForm({ subject: "數學", targetScore: 85, baselineScore: "", reason: "" });
                         }}
                       >
                         詳細
@@ -407,6 +410,7 @@ export default function AdminOverviewPage() {
 
       <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title="使用者詳細" wide>
         {Boolean(detail?.user) && <div className="mb-3 space-y-2 rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3"><p className="text-xs font-semibold text-[#b9f2ff]">管理員代改名稱</p><div className="flex flex-wrap gap-2"><Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="新的顯示名稱" className="flex-1" /><Input value={renameReason} onChange={(e) => setRenameReason(e.target.value)} placeholder="修改原因（必填）" className="flex-1" /><Button size="sm" onClick={async () => { const user = detail?.user as { userId?: string } | undefined; if (!user?.userId || !renameReason.trim()) { toast.push("error", "請填寫名稱與修改原因"); return; } try { await apiPatch(`/admin/users/${user.userId}/profile`, { displayName: nameDraft, reason: renameReason }); toast.push("success", "名稱已更新並通知使用者"); setDetail(null); await users.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存名稱</Button></div></div>}
+        {Boolean(detail?.user) && <div className="mb-3 space-y-3 rounded-xl border border-[#ffc857]/25 bg-[#ffc857]/5 p-3"><div><p className="text-xs font-semibold text-[#ffe09a]">◇ 成績分析目標分數</p><p className="mt-1 text-xs text-muted">這裡設定的是該使用者在學生端「成績分析」看到的科目目標，不是段考專區的預設分數。</p></div><div className="space-y-1 text-xs">{((detail?.gradeGoals as GradeGoal[] | undefined) ?? []).map((goal) => <p key={goal.id}>{goal.subject}：<strong>{goal.targetScore ?? "—"} 分</strong>{goal.achievedAt ? "・已達成" : ""}</p>)}{!((detail?.gradeGoals as GradeGoal[] | undefined) ?? []).length && <p className="text-muted">尚未設定任何科目目標。</p>}</div><div className="grid gap-2 sm:grid-cols-4"><Field label="科目"><Input value={goalForm.subject} onChange={(e) => setGoalForm({ ...goalForm, subject: e.target.value })} placeholder="例如：數學" /></Field><Field label="目標分數"><Input type="number" min={1} max={100} value={goalForm.targetScore} onChange={(e) => setGoalForm({ ...goalForm, targetScore: Number(e.target.value) })} /></Field><Field label="基準分數（選填）"><Input type="number" min={0} max={100} value={goalForm.baselineScore} onChange={(e) => setGoalForm({ ...goalForm, baselineScore: e.target.value })} /></Field><Field label="設定原因"><Input value={goalForm.reason} onChange={(e) => setGoalForm({ ...goalForm, reason: e.target.value })} placeholder="必填，會寫入 Audit Log" /></Field></div><Button size="sm" onClick={async () => { const user = detail?.user as { userId?: string } | undefined; if (!user?.userId || !goalForm.subject.trim() || !goalForm.reason.trim()) { toast.push("error", "請填寫科目與設定原因"); return; } try { const result = await apiPut<{ goal: GradeGoal }>(`/admin/users/${user.userId}/grade-goals`, { subject: goalForm.subject.trim(), targetScore: goalForm.targetScore, baselineScore: goalForm.baselineScore === "" ? null : Number(goalForm.baselineScore), reason: goalForm.reason.trim() }); setDetail((current) => current ? { ...current, gradeGoals: [...(((current.gradeGoals as GradeGoal[] | undefined) ?? []).filter((goal) => goal.subject !== result.goal.subject)), result.goal] } : current); setGoalForm({ ...goalForm, reason: "" }); toast.push("success", "學生端目標分數已更新"); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存目標分數</Button></div>}
         <pre className="max-h-[60vh] overflow-auto scroll-thin whitespace-pre-wrap rounded-xl bg-black/30 p-3 text-[11px]">{JSON.stringify(detail, null, 2)}</pre>
       </Modal>
     </div>

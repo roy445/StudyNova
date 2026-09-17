@@ -31,6 +31,7 @@ import {
   questionAnalysisJobs,
   questionAnalysisBatches,
   gradeRecords,
+  grades,
   weeklyExamResults,
   weeklyExamWeeks,
   weeklyExamQuestions,
@@ -463,7 +464,8 @@ export const routes: RouteDef[] = [
       const nova = (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, u.userId)).limit(1))[0];
       const ledger = await db.select().from(novaTransactions).where(eq(novaTransactions.userId, u.userId)).orderBy(desc(novaTransactions.createdAt)).limit(30);
       const usage = await db.select().from(featureUsage).where(eq(featureUsage.userId, u.userId)).orderBy(desc(featureUsage.usageDate)).limit(40);
-      return { user: { ...u, passwordHash: undefined }, membership: m, nova, ledger, usage };
+      const gradeGoals = await db.select().from(grades).where(eq(grades.userId, u.userId)).orderBy(asc(grades.subject));
+      return { user: { ...u, passwordHash: undefined }, membership: m, nova, ledger, usage, gradeGoals };
     },
   }),
 
@@ -482,6 +484,22 @@ export const routes: RouteDef[] = [
       await adminLog({ actorId: admin.userId, action: "user.rename", targetType: "user", targetId: before.userId, reason: body.reason, before: { displayName: before.displayName, bio: before.bio }, after: updated, ip: ctx.ip });
       await notify({ userId: before.userId, kind: "admin_notice", title: "你的 StudyNova 名稱已由管理員調整", body: `新名稱：${updated.displayName}。原因：${body.reason}`, link: "/profile", dedupeKey: `rename:${before.userId}:${Date.now()}` });
       return { profile: updated };
+    },
+  }),
+
+  route({
+    method: "PUT",
+    path: "/admin/users/:id/grade-goals",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ subject: z.string().min(1).max(20), targetScore: z.number().min(1).max(100), baselineScore: z.number().min(0).max(100).nullable().optional(), reason: z.string().min(1).max(300) }));
+      const target = (await db.select({ userId: users.userId }).from(users).where(eq(users.userId, ctx.params.id)).limit(1))[0];
+      if (!target) throw notFound("找不到使用者");
+      const before = (await db.select().from(grades).where(and(eq(grades.userId, target.userId), eq(grades.subject, body.subject))).limit(1))[0] ?? null;
+      const rows = await db.insert(grades).values({ userId: target.userId, subject: body.subject, targetScore: body.targetScore, baselineScore: body.baselineScore ?? null }).onConflictDoUpdate({ target: [grades.userId, grades.subject], set: { targetScore: body.targetScore, baselineScore: body.baselineScore ?? null, achievedAt: null, updatedAt: new Date() } }).returning();
+      await adminLog({ actorId: admin.userId, action: "grade_goal.admin_update", targetType: "user", targetId: target.userId, reason: body.reason, before: before ? { subject: before.subject, targetScore: before.targetScore, baselineScore: before.baselineScore } : null, after: { subject: rows[0].subject, targetScore: rows[0].targetScore, baselineScore: rows[0].baselineScore }, ip: ctx.ip });
+      return { goal: rows[0] };
     },
   }),
 
