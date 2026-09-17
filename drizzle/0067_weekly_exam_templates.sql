@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS "weekly_exam_templates" (
   "purpose" text NOT NULL DEFAULT 'UNIT_TEST',
   "active_version_id" uuid,
   "enabled" boolean NOT NULL DEFAULT true,
-  "created_by" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE RESTRICT,
+  "created_by" uuid NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT,
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
   "updated_at" timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS "weekly_exam_template_versions" (
   "changes" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "validation_errors" jsonb NOT NULL DEFAULT '[]'::jsonb,
   "source_preview_url" text NOT NULL DEFAULT '',
-  "created_by" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE RESTRICT,
+  "created_by" uuid NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT,
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
   "updated_at" timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT "weekly_exam_template_version_uq" UNIQUE ("template_id", "version")
