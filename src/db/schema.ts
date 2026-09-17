@@ -2748,7 +2748,7 @@ export const dailyKnowledgeViews = pgTable(
     userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
     subject: text("subject").notNull().default("其他"),
     deliveryDate: text("delivery_date").notNull().default(""),
-    viewedAt: created(),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("daily_knowledge_view_uq").on(t.itemId, t.userId), index("daily_knowledge_view_user_idx").on(t.userId, t.viewedAt)],
 );
