@@ -2595,6 +2595,7 @@ export const examHubs = pgTable(
     schoolName: text("school_name").notNull().default(""),
     grade: integer("grade").notNull(),
     examNumber: text("exam_number").notNull(),
+    targetScore: integer("target_score").notNull().default(60),
     openAt: timestamp("open_at", { withTimezone: true }),
     closeAt: timestamp("close_at", { withTimezone: true }),
     status: text("status").notNull().default("draft"),
