@@ -4,6 +4,7 @@ import { classifyTextbookDatabaseError } from "../src/server/textbook-diagnostic
 describe("admin textbook database diagnostics", () => {
   it("classifies the production missing-column failure", () => {
     expect(classifyTextbookDatabaseError({ code: "42703", message: 'column "description" does not exist' })).toBe("missing_table_or_column");
+    expect(classifyTextbookDatabaseError({ message: "Failed query", cause: { code: "42703", message: 'column "ocr_status" does not exist' } })).toBe("missing_table_or_column");
   });
 
   it.each([
