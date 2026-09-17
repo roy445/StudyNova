@@ -9,6 +9,8 @@ import {
   weeklyExamAnswers,
   weeklyExamWords,
   weeklyExamSentences,
+  weeklyExamTemplates,
+  weeklyExamTemplateVersions,
   weeklyExamAttempts,
   weeklyExamResults,
   groupMembers,
@@ -23,6 +25,7 @@ import { putObject, readObject, deleteObject, signObjectUrl, createPresignedUplo
 import { runAi, runAiJson, aiConfigured } from "../ai";
 import { recordStudy } from "./learning-routes";
 import { notify } from "../notify";
+import { validateTemplateStructure, type TemplateStructure } from "../weekly-template-validation";
 
 type WeekRow = typeof weeklyExamWeeks.$inferSelect;
 
@@ -263,6 +266,147 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/weekly-templates",
+    auth: "admin",
+    handler: async () => {
+      const templates = await db.select().from(weeklyExamTemplates).orderBy(desc(weeklyExamTemplates.updatedAt));
+      const versions = await db.select().from(weeklyExamTemplateVersions).orderBy(desc(weeklyExamTemplateVersions.version));
+      return { templates: templates.map((template) => ({ ...template, versions: versions.filter((version) => version.templateId === template.id) })) };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/weekly-templates",
+    auth: "admin",
+    rate: { limit: 20, windowSec: 3600 },
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const form = await ctx.formData();
+      const file = form.get("file");
+      if (!(file instanceof File)) throw fail("REQ_NO_FILE");
+      const metadata = z.object({ name: z.string().min(1).max(120), description: z.string().max(2000).default(""), educationLevel: z.string().max(40).default("senior"), grade: z.string().max(40).default(""), textbook: z.string().max(120).default(""), scope: z.string().max(500).default(""), notes: z.string().max(2000).default(""), purpose: z.enum(["UNIT_TEST", "WEEKLY_EXAM", "COMPREHENSIVE", "OTHER"]).default("UNIT_TEST") }).parse(JSON.parse(String(form.get("metadata") ?? "{}")));
+      const stored = await putObject({ userId: admin.userId, filename: file.name, mimeType: file.type || "application/octet-stream", data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
+      const result = await db.transaction(async (tx) => {
+        const template = (await tx.insert(weeklyExamTemplates).values({ ...metadata, createdBy: admin.userId }).returning())[0];
+        const version = (await tx.insert(weeklyExamTemplateVersions).values({ templateId: template.id, version: 1, sourceFileName: file.name, sourceObjectId: stored.id, sourcePreviewUrl: signObjectUrl(stored.id, admin.userId), createdBy: admin.userId }).returning())[0];
+        return { template, version };
+      });
+      await adminLog({ actorId: admin.userId, action: "weekly.template.create", targetType: "weekly_exam_template", targetId: result.template.id, after: { versionId: result.version.id, purpose: metadata.purpose, filename: file.name }, ip: ctx.ip });
+      return result;
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/weekly-templates/:id/versions",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const template = (await db.select().from(weeklyExamTemplates).where(eq(weeklyExamTemplates.id, ctx.params.id)).limit(1))[0];
+      if (!template) throw notFound("找不到考試範本");
+      const form = await ctx.formData();
+      const file = form.get("file");
+      if (!(file instanceof File)) throw fail("REQ_NO_FILE");
+      const stored = await putObject({ userId: admin.userId, filename: file.name, mimeType: file.type || "application/octet-stream", data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
+      const latest = (await db.select({ version: weeklyExamTemplateVersions.version }).from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.templateId, template.id)).orderBy(desc(weeklyExamTemplateVersions.version)).limit(1))[0];
+      const version = (await db.insert(weeklyExamTemplateVersions).values({ templateId: template.id, version: (latest?.version ?? 0) + 1, sourceFileName: file.name, sourceObjectId: stored.id, sourcePreviewUrl: signObjectUrl(stored.id, admin.userId), createdBy: admin.userId }).returning())[0];
+      await adminLog({ actorId: admin.userId, action: "weekly.template.version_create", targetType: "weekly_exam_template", targetId: template.id, after: { versionId: version.id, version: version.version, filename: file.name }, ip: ctx.ip });
+      return { version };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/weekly-template-versions/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const version = (await db.select().from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.id, ctx.params.id)).limit(1))[0];
+      if (!version) throw notFound("找不到考試範本版本");
+      const template = (await db.select().from(weeklyExamTemplates).where(eq(weeklyExamTemplates.id, version.templateId)).limit(1))[0];
+      return { template, version };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/weekly-template-versions/:id/analyze",
+    auth: "admin",
+    rate: { limit: 20, windowSec: 3600 },
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const version = (await db.select().from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.id, ctx.params.id)).limit(1))[0];
+      if (!version) throw notFound("找不到考試範本版本");
+      if (!version.sourceObjectId) throw badRequest("範本來源檔案不存在");
+      if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
+      await db.update(weeklyExamTemplateVersions).set({ status: "analyzing", updatedAt: new Date() }).where(eq(weeklyExamTemplateVersions.id, version.id));
+      try {
+        const source = await readObject(version.sourceObjectId);
+        const { data } = await runAiJson<TemplateStructure>({
+          feature: "weekly_exam_template_analysis",
+          userId: admin.userId,
+          system: "你是英文考卷範本結構分析器。只分析版型與出題規則，不要抄錄或輸出原題目。不得假設固定題數。若影像模糊或無法可靠辨識，請讓 sections 為空並在 questionLogicSummary 明確寫出無法可靠分析。回傳 JSON，sections 每一項必須包含 key,name,type,questionCount,percentage,pointsPerQuestion,questionLogic，並說明 vocabulary、sentence cloze、translation 等真正的題型邏輯、答案方式、選項規則與來源規則。",
+          parts: [{ kind: "text", text: "請依序分析：檔案解析/OCR、題號、大題、題型、題數、配分、選項、作答方式、結構、出題邏輯。只能回傳結構，不要提供原題內容。" }, { kind: "image", mimeType: source.mimeType, base64: source.data.toString("base64") }],
+          maxOutputTokens: 5000,
+          temperature: 0.1,
+        }, { totalQuestions: 0, totalScore: 0, sections: [], questionLogicSummary: "無法可靠分析這份範本，請重新上傳較清楚的圖片。" });
+        const validationErrors = validateTemplateStructure(data);
+        const status = validationErrors.length ? "failed" : "validated";
+        const updated = (await db.update(weeklyExamTemplateVersions).set({ status, analysisResult: data as Record<string, unknown>, questionStructure: data as Record<string, unknown>, scoring: { totalScore: data.totalScore, sections: data.sections.map((section) => ({ key: section.key, percentage: section.percentage, pointsPerQuestion: section.pointsPerQuestion })) }, validationErrors, updatedAt: new Date() }).where(eq(weeklyExamTemplateVersions.id, version.id)).returning())[0];
+        await adminLog({ actorId: admin.userId, action: "weekly.template.analyze", targetType: "weekly_exam_template_version", targetId: version.id, after: { status, validationErrors }, ip: ctx.ip });
+        return { version: updated, validationErrors };
+      } catch (error) {
+        await db.update(weeklyExamTemplateVersions).set({ status: "failed", validationErrors: ["無法可靠分析這份範本，請重新上傳較清楚的圖片。"], updatedAt: new Date() }).where(eq(weeklyExamTemplateVersions.id, version.id));
+        throw error;
+      }
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/weekly-template-versions/:id/correct",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ structure: z.object({ totalQuestions: z.number().int().min(1), totalScore: z.number().positive(), sections: z.array(z.object({ key: z.string().min(1), name: z.string().min(1), type: z.string().min(1), questionCount: z.number().int().min(1), percentage: z.number().min(0).max(100), pointsPerQuestion: z.number().positive(), questionLogic: z.string().min(1), sourceRules: z.string().optional(), answerMode: z.string().optional() })).min(1), difficulty: z.string().optional(), questionLogicSummary: z.string().optional() }), changes: z.record(z.string(), z.unknown()).default({}) }));
+      const source = (await db.select().from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.id, ctx.params.id)).limit(1))[0];
+      if (!source) throw notFound("找不到考試範本版本");
+      const validationErrors = validateTemplateStructure(body.structure);
+      const nextVersion = ((await db.select({ version: weeklyExamTemplateVersions.version }).from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.templateId, source.templateId)).orderBy(desc(weeklyExamTemplateVersions.version)).limit(1))[0]?.version ?? source.version) + 1;
+      const createdVersion = (await db.insert(weeklyExamTemplateVersions).values({ templateId: source.templateId, version: nextVersion, status: validationErrors.length ? "failed" : "validated", sourceFileId: source.sourceFileId, sourceFileName: source.sourceFileName, sourceObjectId: source.sourceObjectId, sourcePreviewUrl: source.sourcePreviewUrl, analysisResult: body.structure, questionStructure: body.structure, scoring: { totalScore: body.structure.totalScore, sections: body.structure.sections.map((section) => ({ key: section.key, percentage: section.percentage, pointsPerQuestion: section.pointsPerQuestion })) }, changes: body.changes, validationErrors, createdBy: admin.userId }).returning())[0];
+      await adminLog({ actorId: admin.userId, action: "weekly.template.correct", targetType: "weekly_exam_template_version", targetId: createdVersion.id, before: { version: source.version }, after: { version: nextVersion, validationErrors }, ip: ctx.ip });
+      return { version: createdVersion, validationErrors };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/weekly-template-versions/:id/activate",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const version = (await db.select().from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.id, ctx.params.id)).limit(1))[0];
+      if (!version) throw notFound("找不到考試範本版本");
+      if (version.status !== "validated") throw badRequest("範本驗證失敗", { details: { errors: version.validationErrors } });
+      await db.transaction(async (tx) => {
+        await tx.update(weeklyExamTemplateVersions).set({ status: "archived", updatedAt: new Date() }).where(and(eq(weeklyExamTemplateVersions.templateId, version.templateId), eq(weeklyExamTemplateVersions.status, "active")));
+        await tx.update(weeklyExamTemplateVersions).set({ status: "active", updatedAt: new Date() }).where(eq(weeklyExamTemplateVersions.id, version.id));
+        await tx.update(weeklyExamTemplates).set({ activeVersionId: version.id, updatedAt: new Date() }).where(eq(weeklyExamTemplates.id, version.templateId));
+      });
+      await adminLog({ actorId: admin.userId, action: "weekly.template.activate", targetType: "weekly_exam_template_version", targetId: version.id, after: { status: "active" }, ip: ctx.ip });
+      return { activated: true, versionId: version.id };
+    },
+  }),
+  route({
+    method: "DELETE",
+    path: "/admin/weekly-templates/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const template = (await db.select().from(weeklyExamTemplates).where(eq(weeklyExamTemplates.id, ctx.params.id)).limit(1))[0];
+      if (!template) throw notFound("找不到考試範本");
+      const versions = await db.select({ id: weeklyExamTemplateVersions.id, status: weeklyExamTemplateVersions.status }).from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.templateId, template.id));
+      const used = versions.length ? await db.select({ id: weeklyExamWeeks.id }).from(weeklyExamWeeks).where(inArray(weeklyExamWeeks.templateVersionId, versions.map((version) => version.id))).limit(1) : [];
+      if (used.length || versions.some((version) => version.status === "active")) throw conflict("已被正式考試使用或目前啟用，不能刪除；請先停用並保留版本歷史。");
+      await db.delete(weeklyExamTemplates).where(eq(weeklyExamTemplates.id, template.id));
+      return { deleted: true };
+    },
+  }),
   /* ================================================== ADMIN SIDE */
   route({
     method: "GET",
@@ -343,6 +487,7 @@ export const routes: RouteDef[] = [
           closeTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
           openFrom: z.string().datetime().nullable().optional(),
           openUntil: z.string().datetime().nullable().optional(),
+          templateVersionId: z.string().uuid().nullable().optional(),
           novaCost: z.number().int().min(0).max(5000).optional(),
           proOnly: z.boolean().optional(),
           allowedUserIds: z.array(z.string().uuid()).max(500).optional(),
@@ -352,6 +497,10 @@ export const routes: RouteDef[] = [
       );
       const before = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
       if (!before) throw fail("WEEK_NOT_FOUND");
+      if (body.templateVersionId) {
+        const version = (await db.select({ id: weeklyExamTemplateVersions.id, status: weeklyExamTemplateVersions.status }).from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.id, body.templateVersionId)).limit(1))[0];
+        if (!version || !["validated", "active"].includes(version.status)) throw badRequest("只能指定通過 Validation 的範本版本");
+      }
       const patch: Record<string, unknown> = { ...body, updatedAt: new Date() };
       if (body.openFrom !== undefined) patch.openFrom = body.openFrom ? new Date(body.openFrom) : null;
       if (body.openUntil !== undefined) patch.openUntil = body.openUntil ? new Date(body.openUntil) : null;
@@ -581,6 +730,8 @@ export const routes: RouteDef[] = [
       const answerText = fresh.filter((f) => f.fileKind === "answer").map((f) => `【answer #${f.orderIndex + 1}】\n${f.ocrText}`).join("\n\n");
       const sourceText = body.scope === "vocabulary" ? vocabularyText : body.scope === "sentences" ? sentenceText : paperText;
       if (!sourceText.trim()) throw fail("AI_OCR_EMPTY", { message: body.scope === "vocabulary" ? "請先上傳單字來源或雜誌" : body.scope === "sentences" ? "請先上傳句子來源或雜誌" : "請先上傳考卷" });
+      const templateVersion = week.templateVersionId ? (await db.select().from(weeklyExamTemplateVersions).where(and(eq(weeklyExamTemplateVersions.id, week.templateVersionId), inArray(weeklyExamTemplateVersions.status, ["validated", "active"]))).limit(1))[0] : null;
+      const templateInstruction = templateVersion ? `本次正式考試必須依照範本版本 v${templateVersion.version} 生成，不可使用固定題數。範本結構：${JSON.stringify(templateVersion.questionStructure)}。生成結果必須符合各大題 questionCount、percentage、pointsPerQuestion、answerMode 與 questionLogic；若來源不足，標記 validationErrors，不得自行補造。` : "目前未指定考試範本；依既有資料產生草稿，但不要假設 Unit 2 的固定格式。";
 
       // 2) Structure into a draft (never auto-published)
       const { data } = await runAiJson<{
@@ -594,7 +745,7 @@ export const routes: RouteDef[] = [
           feature: "weekly_structure",
           userId: admin.userId,
           system:
-            `你是補習班教材數位化助理。這次只處理 ${body.scope === "vocabulary" ? "單字與片語" : body.scope === "sentences" ? "英文句子、中文翻譯與句型" : "考卷題目"}，不可把其他類型內容混入。` +
+            `你是補習班教材數位化助理。這次只處理 ${body.scope === "vocabulary" ? "單字與片語" : body.scope === "sentences" ? "英文句子、中文翻譯與句型" : "考卷題目"}，不可把其他類型內容混入。${templateInstruction}` +
             (body.scope === "questions" || body.scope === "all" ? "請自己判斷題目；中文題幹或中文答案請補上自然英文翻譯，並保留原文。" : body.scope === "sentences" ? "只找完整句子、片語與句型，並提供自然中文翻譯、文法重點與英文原句。" : "只找值得學習的單字與片語，提供中文意思、詞性、例句與易混淆字；不要把整句文章當成單字。") +
             '回傳：{"questions":[{"number":1,"stem":"","options":[],"answer":[""],"explanation":"","confidence":0-1}],"answers":[{"number":1,"answer":"","confidence":0-1}],"words":[{"word":"","meaning":"","example":"","color":"pink"}],"sentences":[{"en":"","zh":"","color":"blue"}],"summary":""}' +
             "。答案卷可能已經寫入學生答案：請比較題目與答案的顏色／位置，只有與題目對應且確實寫上的答案才納入；紅色簽名、老師刪除線、批改姓名與非作答文字一律忽略。字跡潦草時，請依上下文找最接近的合理英文翻譯並標低 confidence。不同檔案重複出現的單字、句子或題目只建立一次。不確定的項目 confidence 給低分。不要杜撰不存在的題目。",
@@ -604,6 +755,7 @@ export const routes: RouteDef[] = [
             { kind: "text", text: `單字來源 OCR：\n${vocabularyText.slice(0, 8000)}` },
             { kind: "text", text: `句子來源 OCR：\n${sentenceText.slice(0, 8000)}` },
             { kind: "text", text: `答案卷 OCR：\n${answerText.slice(0, 6000) || "（未提供）"}` },
+            { kind: "text", text: `範本版本規則：\n${templateInstruction}` },
           ],
           maxOutputTokens: 4000,
         },
@@ -616,7 +768,7 @@ export const routes: RouteDef[] = [
           : 0.4;
       const draft = await db
         .insert(weeklyExamDrafts)
-        .values({ weekId: week.id, payload: data as Record<string, unknown>, confidence })
+        .values({ weekId: week.id, templateVersionId: templateVersion?.id ?? null, payload: { ...data, templateVersionId: templateVersion?.id ?? null, templateStructure: templateVersion?.questionStructure ?? null } as Record<string, unknown>, confidence })
         .returning();
       await adminLog({ actorId: admin.userId, action: "weekly.analyze", targetType: "week", targetId: week.id, after: { draftId: draft[0].id }, ip: ctx.ip });
       return { draft: draft[0] };
@@ -645,6 +797,11 @@ export const routes: RouteDef[] = [
       if (draft.status !== "draft") throw fail("WEEK_DRAFT_HANDLED");
       const week = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, draft.weekId)).limit(1))[0];
       if (!week) throw fail("WEEK_NOT_FOUND");
+      if (draft.templateVersionId && body.questions.length) {
+        const template = (await db.select({ questionStructure: weeklyExamTemplateVersions.questionStructure, status: weeklyExamTemplateVersions.status }).from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.id, draft.templateVersionId)).limit(1))[0];
+        const expected = Number((template?.questionStructure as { totalQuestions?: number } | undefined)?.totalQuestions ?? 0);
+        if (!template || !["validated", "active"].includes(template.status) || expected !== body.questions.length) throw badRequest("正式題目未符合範本題數，Validation Failed，禁止發布", { details: { expected, actual: body.questions.length } });
+      }
       const updatingPublished = week.status === "published";
 
       await db.transaction(async (tx) => {

@@ -1729,6 +1729,7 @@ export const weeklyExamWeeks = pgTable(
     closeTime: text("close_time").notNull().default("23:59"),
     openFrom: timestamp("open_from", { withTimezone: true }),
     openUntil: timestamp("open_until", { withTimezone: true }),
+    templateVersionId: uuid("template_version_id"),
     novaCost: integer("nova_cost").notNull().default(0),
     proOnly: boolean("pro_only").notNull().default(false),
     allowedUserIds: jsonb("allowed_user_ids").$type<string[]>().notNull().default([]),
@@ -1767,12 +1768,57 @@ export const weeklyExamDrafts = pgTable(
   {
     id: id(),
     weekId: uuid("week_id").notNull().references(() => weeklyExamWeeks.id, { onDelete: "cascade" }),
+    templateVersionId: uuid("template_version_id"),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
     confidence: real("confidence").notNull().default(0),
     status: text("status").notNull().default("draft"), // draft | confirmed | discarded
     createdAt: created(),
   },
   (t) => [index("week_draft_idx").on(t.weekId, t.status)],
+);
+
+export const weeklyExamTemplates = pgTable(
+  "weekly_exam_templates",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    educationLevel: text("education_level").notNull().default("senior"),
+    grade: text("grade").notNull().default(""),
+    textbook: text("textbook").notNull().default(""),
+    scope: text("scope").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    purpose: text("purpose").notNull().default("UNIT_TEST"),
+    activeVersionId: uuid("active_version_id"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdBy: uuid("created_by").notNull().references(() => users.userId, { onDelete: "restrict" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("weekly_exam_templates_purpose_idx").on(t.purpose, t.enabled), index("weekly_exam_templates_created_idx").on(t.createdAt)],
+);
+
+export const weeklyExamTemplateVersions = pgTable(
+  "weekly_exam_template_versions",
+  {
+    id: id(),
+    templateId: uuid("template_id").notNull().references(() => weeklyExamTemplates.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    status: text("status").notNull().default("draft"), // draft | analyzing | validated | active | failed | archived
+    sourceFileId: uuid("source_file_id").references(() => weeklyExamFiles.id, { onDelete: "set null" }),
+    sourceFileName: text("source_file_name").notNull().default(""),
+    sourceObjectId: uuid("source_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    analysisResult: jsonb("analysis_result").$type<Record<string, unknown>>().notNull().default({}),
+    questionStructure: jsonb("question_structure").$type<Record<string, unknown>>().notNull().default({}),
+    scoring: jsonb("scoring").$type<Record<string, unknown>>().notNull().default({}),
+    changes: jsonb("changes").$type<Record<string, unknown>>().notNull().default({}),
+    validationErrors: jsonb("validation_errors").$type<string[]>().notNull().default([]),
+    sourcePreviewUrl: text("source_preview_url").notNull().default(""),
+    createdBy: uuid("created_by").notNull().references(() => users.userId, { onDelete: "restrict" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("weekly_exam_template_version_uq").on(t.templateId, t.version), index("weekly_exam_template_versions_status_idx").on(t.status)],
 );
 
 export const weeklyExamQuestions = pgTable(

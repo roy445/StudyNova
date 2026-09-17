@@ -18,6 +18,7 @@ type Week = {
   novaCost: number;
   proOnly: boolean;
   highlightMap: Record<string, string>;
+  templateVersionId: string | null;
   open: boolean;
   counts: { questions: number; words: number; sentences: number; files: number; results: number };
 };
@@ -31,6 +32,8 @@ type Detail = {
   sentences: Array<{ id: string; en: string; zh: string; published: boolean }>;
   answers: Array<{ id: string; questionNumber: number; answerText: string; confidence: number }>;
 };
+type TemplateVersion = { id: string; version: number; status: string; sourceFileName: string; analysisResult: Record<string, unknown>; questionStructure: { totalQuestions?: number; totalScore?: number; sections?: Array<{ key: string; name: string; type: string; questionCount: number; percentage: number; pointsPerQuestion: number; questionLogic: string }> }; validationErrors: string[]; sourcePreviewUrl: string; createdAt: string };
+type Template = { id: string; name: string; description: string; educationLevel: string; grade: string; textbook: string; scope: string; notes: string; purpose: string; enabled: boolean; versions: TemplateVersion[] };
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -54,6 +57,12 @@ export default function AdminWeeklyPage() {
     activeId && tab === "stats" ? `/admin/weekly/${activeId}/stats` : null,
     [activeId, tab],
   );
+  const templates = useApi<{ templates: Template[] }>("/admin/weekly-templates");
+  const [templateForm, setTemplateForm] = useState({ name: "", description: "", educationLevel: "senior", grade: "", textbook: "", scope: "", notes: "", purpose: "UNIT_TEST" });
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [editingTemplateVersionId, setEditingTemplateVersionId] = useState<string | null>(null);
+  const [templateEditJson, setTemplateEditJson] = useState("");
 
   async function loadDetail(id: string) {
     setLoading(true);
@@ -108,8 +117,59 @@ export default function AdminWeeklyPage() {
     }
   }
 
+  async function uploadTemplate() {
+    if (!templateFile || !templateForm.name.trim()) return toast.push("error", "請填寫範本名稱並選擇檔案");
+    setTemplateBusy(true);
+    try {
+      const body = new FormData();
+      body.append("file", templateFile);
+      body.append("metadata", JSON.stringify(templateForm));
+      await apiPost("/admin/weekly-templates", body);
+      setTemplateFile(null);
+      setTemplateForm({ name: "", description: "", educationLevel: "senior", grade: "", textbook: "", scope: "", notes: "", purpose: "UNIT_TEST" });
+      toast.push("success", "考試範本已建立，請執行 AI 分析");
+      await templates.reload();
+    } catch (err) { toast.push("error", errorMessage(err)); } finally { setTemplateBusy(false); }
+  }
+
+  async function analyzeTemplate(versionId: string) {
+    setTemplateBusy(true);
+    try { await apiPost(`/admin/weekly-template-versions/${versionId}/analyze`); toast.push("success", "AI 範本分析完成，請檢查結構與驗證結果"); await templates.reload(); } catch (err) { toast.push("error", errorMessage(err)); } finally { setTemplateBusy(false); }
+  }
+
+  async function activateTemplate(versionId: string) {
+    try { await apiPost(`/admin/weekly-template-versions/${versionId}/activate`); toast.push("success", "範本版本已啟用"); await templates.reload(); } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+
+  async function correctTemplate(versionId: string) {
+    try {
+      const structure = JSON.parse(templateEditJson) as Record<string, unknown>;
+      await apiPost(`/admin/weekly-template-versions/${versionId}/correct`, { structure, changes: { editedInAdmin: true } });
+      setEditingTemplateVersionId(null);
+      toast.push("success", "人工校正已建立新的範本版本，請重新檢查 Validation");
+      await templates.reload();
+    } catch (err) { toast.push("error", err instanceof Error && err.name === "SyntaxError" ? "JSON 格式錯誤，請修正後再儲存" : errorMessage(err)); }
+  }
+
   return (
     <div className="space-y-4">
+      <Card title="▧ 考試範本中心" subtitle="範本只描述題型與配分，不會把原題放入學生題庫；正式題目仍由既有英文隨堂考流程依教材生成。">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="範本名稱"><Input value={templateForm.name} onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} placeholder="英文 Unit 隨堂考標準範本" /></Field>
+          <Field label="用途"><Select value={templateForm.purpose} onChange={(e) => setTemplateForm({ ...templateForm, purpose: e.target.value })}><option value="UNIT_TEST">UNIT_TEST・單元考</option><option value="WEEKLY_EXAM">WEEKLY_EXAM・週考（待實際範本）</option><option value="COMPREHENSIVE">COMPREHENSIVE・綜合考</option><option value="OTHER">OTHER・其他</option></Select></Field>
+          <Field label="適用年級"><Input value={templateForm.grade} onChange={(e) => setTemplateForm({ ...templateForm, grade: e.target.value })} placeholder="例如：高一" /></Field>
+          <Field label="教材"><Input value={templateForm.textbook} onChange={(e) => setTemplateForm({ ...templateForm, textbook: e.target.value })} placeholder="例如：龍騰英文" /></Field>
+          <Field label="範圍"><Input value={templateForm.scope} onChange={(e) => setTemplateForm({ ...templateForm, scope: e.target.value })} placeholder="例如：Unit 1–3" /></Field>
+          <Field label="描述"><Input value={templateForm.description} onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })} /></Field>
+          <Field label="備註"><Input value={templateForm.notes} onChange={(e) => setTemplateForm({ ...templateForm, notes: e.target.value })} /></Field>
+          <Field label="範本檔案"><Input type="file" accept="image/*,.pdf" onChange={(e) => setTemplateFile(e.target.files?.[0] ?? null)} /></Field>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2"><Button loading={templateBusy} onClick={() => void uploadTemplate()}>＋上傳考卷範本</Button><span className="text-xs text-muted">支援 PDF、JPG、PNG 與目前系統允許的文件格式；WEEKLY_EXAM 目前只建立分類，不猜測格式。</span></div>
+        <div className="mt-4 space-y-3">
+          {templates.data?.templates.map((template) => <div key={template.id} className="glass-soft rounded-xl p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium">{template.name} <Badge tone="cyan">{template.purpose}</Badge></p><p className="text-xs text-muted">{template.textbook || "未指定教材"}・{template.grade || "未指定年級"}・{template.scope || "未指定範圍"}</p></div><span className="text-xs text-muted">{template.versions.length} 個版本</span></div><div className="mt-2 space-y-2">{template.versions.map((version) => <div key={version.id} className="rounded-lg border border-[var(--line)] p-2 text-xs"><div className="flex flex-wrap items-center justify-between gap-2"><span>Template v{version.version}・{version.sourceFileName}</span><Badge tone={version.status === "validated" || version.status === "active" ? "green" : version.status === "failed" ? "rose" : "muted"}>{version.status}</Badge></div>{version.questionStructure?.sections?.length ? <p className="mt-1 text-muted">總題數 {version.questionStructure.totalQuestions ?? "-"}・總分 {version.questionStructure.totalScore ?? "-"}｜{version.questionStructure.sections.map((section) => `${section.name} ${section.questionCount} 題・${section.percentage}%・每題 ${section.pointsPerQuestion} 分`).join("｜")}</p> : <p className="mt-1 text-muted">尚未分析：先執行 AI 範本分析。</p>}{version.validationErrors.length > 0 && <p className="mt-1 text-rose-300">Validation Failed：{version.validationErrors.join("；")}</p>}<details className="mt-2"><summary className="cursor-pointer text-[#7dd3fc]">查看 JSON／AI 判斷規則</summary><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-black/20 p-2 text-[10px]">{JSON.stringify(version.questionStructure, null, 2)}</pre><div className="mt-2 rounded-lg border border-cyan-300/20 bg-cyan-300/5 p-2"><p className="font-medium">模擬考卷結構預覽</p>{version.questionStructure.sections?.map((section) => <p key={section.key} className="mt-1 text-muted">{section.name}（{section.type}）・{section.questionCount} 題・{section.percentage}%・每題 {section.pointsPerQuestion} 分：{section.questionLogic}</p>)}</div></details><div className="mt-2 flex flex-wrap gap-2">{version.status === "draft" || version.status === "failed" ? <Button size="sm" loading={templateBusy} onClick={() => void analyzeTemplate(version.id)}>AI 範本分析</Button> : null}{version.status === "validated" ? <Button size="sm" onClick={() => void activateTemplate(version.id)}>啟用 v{version.version}</Button> : null}<Button size="sm" variant="ghost" onClick={() => { setEditingTemplateVersionId(version.id); setTemplateEditJson(JSON.stringify(version.questionStructure, null, 2)); }}>人工校正</Button>{version.sourcePreviewUrl && <a className="self-center text-[#7dd3fc] underline" href={version.sourcePreviewUrl} target="_blank" rel="noreferrer">原始範本預覽</a>}</div>{editingTemplateVersionId === version.id && <div className="mt-2 space-y-2"><Textarea value={templateEditJson} onChange={(e) => setTemplateEditJson(e.target.value)} className="min-h-48 font-mono text-[11px]" /><div className="flex gap-2"><Button size="sm" onClick={() => void correctTemplate(version.id)}>建立新版本</Button><Button size="sm" variant="ghost" onClick={() => setEditingTemplateVersionId(null)}>取消</Button></div></div>}</div>)}</div></div>)}
+          {!templates.loading && !templates.data?.templates.length && <EmptyState icon="▧" title="尚未建立考試範本" />}
+        </div>
+      </Card>
       <Card
         title="▦ 每週小考管理"
         subtitle={`英文考試／模擬考專區・目前週次代碼：${list.data?.currentWeekCode ?? "-"}・開放時間可自由設定，不寫死星期六`}
@@ -450,6 +510,12 @@ export default function AdminWeeklyPage() {
 
             {tab === "settings" && (
               <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="正式考試範本版本" hint="只有 validated 或 active 版本可指定；範本原題不會直接提供給學生。">
+                  <Select value={detail.week.templateVersionId ?? ""} onChange={(e) => patchWeek({ templateVersionId: e.target.value || null })}>
+                    <option value="">未指定</option>
+                    {templates.data?.templates.flatMap((template) => template.versions.filter((version) => ["validated", "active"].includes(version.status)).map((version) => <option key={version.id} value={version.id}>{template.name} v{version.version}（{template.purpose}）</option>))}
+                  </Select>
+                </Field>
                 <Field label="狀態">
                   <Select value={detail.week.status} onChange={(e) => patchWeek({ status: e.target.value })}>
                     <option value="draft">草稿</option>
