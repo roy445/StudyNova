@@ -26,7 +26,10 @@ export async function createFileContext(params: { userId: string; objectId: stri
   // forever even though no usable analysis exists.
   if (duplicate && duplicate.status !== "failed") return { context: duplicate, duplicate: true };
   const scope = { ...DEFAULT_SCOPE, ...params.scope };
-  const inserted = await db.insert(fileContexts).values({ userId: params.userId, objectId: params.objectId, originalName: params.originalName.slice(0, 180), uploadBatch: params.batch, sha256, status: "analyzing" }).returning();
+  const rawBatch = Math.trunc(Number(params.batch));
+  const normalizedBatch = rawBatch > 2_147_483_647 ? Math.floor(rawBatch / 1000) : rawBatch;
+  const uploadBatch = Math.max(1, Math.min(2_147_483_647, normalizedBatch || Math.floor(Date.now() / 1000)));
+  const inserted = await db.insert(fileContexts).values({ userId: params.userId, objectId: params.objectId, originalName: params.originalName.slice(0, 180), uploadBatch, sha256, status: "analyzing" }).returning();
   const context = inserted[0];
   await db.insert(analysisScopes).values({ fileContextId: context.id, ...scope }).onConflictDoUpdate({ target: analysisScopes.fileContextId, set: scope });
   try {

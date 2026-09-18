@@ -136,7 +136,7 @@ export const routes: RouteDef[] = [
         for (const file of files.slice(0, 8)) {
           try {
             const stored = await putObject({ userId: admin.userId, filename: file.name, mimeType: file.type || "image/jpeg", data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
-            results.push(await createFileContext({ userId: admin.userId, objectId: stored.id, originalName: file.name, batch: Date.now(), scope: settings, subject }));
+            results.push(await createFileContext({ userId: admin.userId, objectId: stored.id, originalName: file.name, batch: Math.floor(Date.now() / 1000), scope: settings, subject }));
           } catch (error) {
             failedFiles.push(file.name);
             console.error("[StudyNova][textbook] OCR file failed", { requestId, fileName: file.name, error: safeErrorMessage(error), stack: error instanceof Error ? error.stack : undefined });
