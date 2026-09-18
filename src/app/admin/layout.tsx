@@ -27,12 +27,17 @@ const NAV_GROUPS: AdminNavGroup[] = [
   {
     label: "學習與內容",
     items: [
-      { href: "/admin/weekly", label: "每週小考", icon: "weekly" },
       { href: "/admin/reference-materials", label: "AI 參考資料", icon: "admin" },
       { href: "/admin/daily-knowledge", label: "每日知識", icon: "study" },
       { href: "/admin/content", label: "Content Studio", icon: "study" },
       { href: "/admin/customization", label: "客製化風格中心", icon: "spark" },
       { href: "/admin/challenges", label: "挑戰管理", icon: "challenge" },
+    ],
+  },
+  {
+    label: "英文隨堂考",
+    items: [
+      { href: "/admin/weekly", label: "隨堂考・範本與考試", icon: "weekly" },
     ],
   },
   {
@@ -81,7 +86,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </div>
           </div>
 
-          <nav aria-label="管理員功能分類" className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+          <nav aria-label="管理員功能分類" className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
             {NAV_GROUPS.map((group) => (
               <section key={group.label} className="min-w-0 rounded-2xl border border-[var(--line)]/80 bg-white/[0.025] p-2">
                 <h2 className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{group.label}</h2>

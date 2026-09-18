@@ -163,11 +163,11 @@ export const ERROR_CATALOG = {
   ADMIN_CRON_SECRET_INVALID: def("SN-ADMIN-9507", 400, "ADMIN", "CRON secret 不正確", "請確認排程服務帶上正確的 x-cron-secret 標頭。"),
   ADMIN_CRON_TASK_UNKNOWN: def("SN-ADMIN-9508", 400, "ADMIN", "不支援的排程任務", "請從後台 Cron 分頁選擇任務。"),
   ADMIN_PUSH_NOT_CONFIGURED: def("SN-ADMIN-9509", 400, "ADMIN", "尚未設定 VAPID 金鑰", "請執行 npx web-push generate-vapid-keys 並填入環境變數。"),
-  ADMIN_TEXTBOOK_REQUEST_INVALID: def("SN-ADM-TB-001", 400, "ADMIN", "教材資料格式不正確", "請確認教育階段、科目、出版社與教材欄位後再試。"),
-  ADMIN_TEXTBOOK_DB_ERROR: def("SN-ADM-TB-002", 500, "ADMIN", "教材資料儲存失敗", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號。"),
-  ADMIN_TEXTBOOK_STORAGE_ERROR: def("SN-ADM-TB-003", 502, "ADMIN", "教材檔案儲存失敗", "請重新上傳檔案；若持續發生，請提供錯誤代碼與追蹤編號。"),
-  ADMIN_TEXTBOOK_PERMISSION: def("SN-ADM-TB-004", 403, "ADMIN", "沒有管理教材的權限", "請使用管理員帳號重新登入。"),
-  ADMIN_TEXTBOOK_PROCESSING_ERROR: def("SN-ADM-TB-005", 500, "ADMIN", "教材處理失敗", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號。"),
+  ADMIN_TEXTBOOK_REQUEST_INVALID: def("SN-ADM-1001", 400, "ADMIN", "教材資料格式不正確", "請確認教育階段、科目、出版社與教材欄位後再試。"),
+  ADMIN_TEXTBOOK_DB_ERROR: def("SN-ADM-1002", 500, "ADMIN", "教材資料儲存失敗", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號。"),
+  ADMIN_TEXTBOOK_STORAGE_ERROR: def("SN-ADM-1003", 502, "ADMIN", "教材檔案儲存失敗", "請重新上傳檔案；若持續發生，請提供錯誤代碼與追蹤編號。"),
+  ADMIN_TEXTBOOK_PERMISSION: def("SN-ADM-1004", 403, "ADMIN", "沒有管理教材的權限", "請使用管理員帳號重新登入。"),
+  ADMIN_TEXTBOOK_PROCESSING_ERROR: def("SN-ADM-1005", 500, "ADMIN", "教材處理失敗", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號。"),
 
   /* ---------------------------------------------------------- RATE 97xx */
   RATE_LIMITED: def("SN-RATE-9701", 429, "RATE", "操作太頻繁，請稍後再試", "為了保護系統，短時間內的重複請求會被暫時限制。"),

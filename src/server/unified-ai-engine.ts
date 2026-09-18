@@ -35,7 +35,7 @@ export async function createFileContext(params: { userId: string; objectId: stri
         feature: "ai_solution_segment",
         userId: params.userId,
         system: `你是 StudyNova 的全科影像內容分段器。${subjectStrategy(params.subject)}請辨識圖片內每個區塊並只回傳 JSON。kind 只能是 QUESTION、HANDWRITING、NOTE、HIGHLIGHT、UNKNOWN。不要猜測看不清楚的文字；readable=false 時 message 必須是請拍攝的清楚一點。若有兩個以上獨立題目，multipleQuestions=true。`,
-        parts: [{ kind: object.mimeType.startsWith("image/") ? "image" : "text", ...(object.mimeType.startsWith("image/") ? { mimeType: object.mimeType, base64: object.data.toString("base64") } : { text: object.data.toString("utf8").slice(0, 30000) }) } as never],
+        parts: [{ kind: object.mimeType.startsWith("image/") || object.mimeType === "application/pdf" ? "image" : "text", ...(object.mimeType.startsWith("image/") || object.mimeType === "application/pdf" ? { mimeType: object.mimeType, base64: object.data.toString("base64") } : { text: object.data.toString("utf8").slice(0, 30000) }) } as never],
         maxOutputTokens: 3000,
       },
       { segments: [], readable: true, multipleQuestions: false },
