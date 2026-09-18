@@ -9,12 +9,12 @@ import { readObject } from "./storage";
 import { runAiJson } from "./ai";
 import { subjectStrategy } from "./subject-strategies";
 
-export const SEGMENT_KINDS = ["QUESTION", "HANDWRITING", "NOTE", "HIGHLIGHT", "UNKNOWN"] as const;
+export const SEGMENT_KINDS = ["QUESTION", "VOCABULARY", "PHRASE", "SENTENCE", "ARTICLE", "HANDWRITING", "NOTE", "HIGHLIGHT", "UNKNOWN"] as const;
 export type SegmentKind = (typeof SEGMENT_KINDS)[number];
 export type Segment = { kind: SegmentKind; text: string; confidence: number; box?: number[] };
-export type Scope = { includeQuestion: boolean; includeHandwriting: boolean; includeNote: boolean; highlightPriority: boolean; questionColor?: string; sentenceColor?: string; keywordColor?: string };
+export type Scope = { includeQuestion: boolean; includeVocabulary?: boolean; includeSentence?: boolean; includeHandwriting: boolean; includeNote: boolean; highlightPriority: boolean; questionColor?: string; sentenceColor?: string; keywordColor?: string };
 
-const DEFAULT_SCOPE: Scope = { includeQuestion: true, includeHandwriting: true, includeNote: true, highlightPriority: false };
+const DEFAULT_SCOPE: Scope = { includeQuestion: true, includeVocabulary: true, includeSentence: true, includeHandwriting: true, includeNote: true, highlightPriority: false };
 
 export async function createFileContext(params: { userId: string; objectId: string; originalName: string; batch: number; scope?: Partial<Scope>; subject?: string }) {
   const object = await readObject(params.objectId);
@@ -31,19 +31,27 @@ export async function createFileContext(params: { userId: string; objectId: stri
   const uploadBatch = Math.max(1, Math.min(2_147_483_647, normalizedBatch || Math.floor(Date.now() / 1000)));
   const inserted = await db.insert(fileContexts).values({ userId: params.userId, objectId: params.objectId, originalName: params.originalName.slice(0, 180), uploadBatch, sha256, status: "analyzing" }).returning();
   const context = inserted[0];
-  await db.insert(analysisScopes).values({ fileContextId: context.id, ...scope }).onConflictDoUpdate({ target: analysisScopes.fileContextId, set: scope });
+  const persistedScope = { includeQuestion: scope.includeQuestion, includeHandwriting: scope.includeHandwriting, includeNote: scope.includeNote, highlightPriority: scope.highlightPriority, questionColor: scope.questionColor, sentenceColor: scope.sentenceColor, keywordColor: scope.keywordColor };
+  await db.insert(analysisScopes).values({ fileContextId: context.id, ...persistedScope }).onConflictDoUpdate({ target: analysisScopes.fileContextId, set: persistedScope });
   try {
     const { data } = await runAiJson<{ segments?: Segment[]; readable?: boolean; multipleQuestions?: boolean; message?: string }>(
       {
         feature: "ai_solution_segment",
         userId: params.userId,
-        system: `你是 StudyNova 的全科影像內容分段器。${subjectStrategy(params.subject)}請辨識圖片內每個區塊並只回傳 JSON。kind 只能是 QUESTION、HANDWRITING、NOTE、HIGHLIGHT、UNKNOWN。不要猜測看不清楚的文字；readable=false 時 message 必須是請拍攝的清楚一點。若有兩個以上獨立題目，multipleQuestions=true。`,
+        system: `你是 StudyNova 的全科影像內容分段器。${subjectStrategy(params.subject)}請辨識圖片內每個區塊並只回傳 JSON。kind 只能是 QUESTION、VOCABULARY、PHRASE、SENTENCE、ARTICLE、HANDWRITING、NOTE、HIGHLIGHT、UNKNOWN。單字、片語、例句要分開辨識，不可全部歸類成 UNKNOWN；本次只分析勾選的區塊：題目=${scope.includeQuestion ? "是" : "否"}、單字片語=${scope.includeVocabulary ? "是" : "否"}、句子文章=${scope.includeSentence ? "是" : "否"}、手寫=${scope.includeHandwriting ? "是" : "否"}、筆記=${scope.includeNote ? "是" : "否"}；未勾選類型請不要輸出。不要猜測看不清楚的文字；readable=false 時 message 必須是請拍攝的清楚一點。若有兩個以上獨立題目，multipleQuestions=true。`,
         parts: [{ kind: object.mimeType.startsWith("image/") || object.mimeType === "application/pdf" ? "image" : "text", ...(object.mimeType.startsWith("image/") || object.mimeType === "application/pdf" ? { mimeType: object.mimeType, base64: object.data.toString("base64") } : { text: object.data.toString("utf8").slice(0, 30000) }) } as never],
         maxOutputTokens: 3000,
       },
       { segments: [], readable: true, multipleQuestions: false },
     );
-    const segments = (data.segments ?? []).filter((s) => SEGMENT_KINDS.includes(s.kind as SegmentKind)).map((s) => ({ kind: s.kind as SegmentKind, text: String(s.text ?? "").slice(0, 12000), confidence: Math.max(0, Math.min(1, Number(s.confidence ?? 0))), box: s.box }));
+    const segments = (data.segments ?? []).filter((s) => SEGMENT_KINDS.includes(s.kind as SegmentKind)).filter((s) => {
+      if (s.kind === "QUESTION") return scope.includeQuestion;
+      if (s.kind === "VOCABULARY" || s.kind === "PHRASE") return scope.includeVocabulary;
+      if (s.kind === "SENTENCE" || s.kind === "ARTICLE") return scope.includeSentence;
+      if (s.kind === "HANDWRITING") return scope.includeHandwriting;
+      if (s.kind === "NOTE" || s.kind === "HIGHLIGHT") return scope.includeNote;
+      return true;
+    }).map((s) => ({ kind: s.kind as SegmentKind, text: String(s.text ?? "").slice(0, 12000), confidence: Math.max(0, Math.min(1, Number(s.confidence ?? 0))), box: s.box }));
     const rows = await db.update(fileContexts).set({ status: "ready", detected: segments, error: data.readable === false ? String(data.message || "請拍攝的清楚一點") : "", updatedAt: new Date() }).where(eq(fileContexts.id, context.id)).returning();
     return { context: rows[0], duplicate: false, readable: data.readable !== false, multipleQuestions: Boolean(data.multipleQuestions) };
   } catch (error) {

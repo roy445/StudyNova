@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs, educationGrades, educationSchools, educationStages, educationSubjects, textbookContents, textbookEditions, textbookLessons, userSettings } from "@/db/schema";
+import { auditLogs, educationGrades, educationSchools, educationStages, educationSubjects, fileContexts, textbookContents, textbookEditions, textbookLessons, userSettings } from "@/db/schema";
 import { route, type Ctx, type RouteDef } from "../router";
 import { fail, notFound, safeErrorMessage } from "../core";
 import { writeAudit } from "../audit";
@@ -47,6 +47,28 @@ const publicEditionColumns = {
   createdAt: textbookEditions.createdAt,
   updatedAt: textbookEditions.updatedAt,
 };
+
+type OcrImportSettings = { includeQuestion: boolean; includeVocabulary: boolean; includeSentence: boolean; includeHandwriting: boolean; includeNote: boolean; highlightPriority: boolean; confidenceThreshold: number };
+
+async function importConfirmedOcr(params: { editionId: string; contexts: Array<typeof fileContexts.$inferSelect>; settings: OcrImportSettings }) {
+  const lesson = (await db.insert(textbookLessons).values({ editionId: params.editionId, title: `OCR 匯入 ${new Date().toLocaleDateString("zh-TW")}`, description: "由 StudyNova OCR 分析匯入，可再由管理員編輯。", sortOrder: 999 }).returning())[0];
+  let imported = 0;
+  await db.transaction(async (tx) => {
+    for (const context of params.contexts) {
+      const segments = (context.detected as Array<{ kind?: string; text?: string; confidence?: number }>).filter((segment) => {
+        const kind = segment.kind ?? "UNKNOWN";
+        const enabled = kind === "QUESTION" ? params.settings.includeQuestion : ["VOCABULARY", "PHRASE"].includes(kind) ? params.settings.includeVocabulary : ["SENTENCE", "ARTICLE"].includes(kind) ? params.settings.includeSentence : kind === "HANDWRITING" ? params.settings.includeHandwriting : ["NOTE", "HIGHLIGHT"].includes(kind) ? params.settings.includeNote : true;
+        return enabled && Number(segment.confidence ?? 0) >= params.settings.confidenceThreshold;
+      });
+      for (const segment of segments) {
+        if (!segment.text?.trim()) continue;
+        await tx.insert(textbookContents).values({ lessonId: lesson.id, type: segment.kind?.toLowerCase() || "note", title: `${segment.kind || "OCR"} ${imported + 1}`, body: segment.text, metadata: { confidence: segment.confidence ?? 0, source: context.originalName, ocr: true, settings: JSON.stringify(params.settings), contextId: context.id } });
+        imported += 1;
+      }
+    }
+  });
+  return { lesson, imported };
+}
 
 export const routes: RouteDef[] = [
   route({ method: "GET", path: "/admin/audit-logs", auth: "admin", handler: async (ctx) => {
@@ -128,7 +150,7 @@ export const routes: RouteDef[] = [
       const invalidFiles = files.filter((file) => !file.type.startsWith("image/") && file.type !== "application/pdf");
       if (invalidFiles.length) throw fail("ADMIN_TEXTBOOK_REQUEST_INVALID", { message: "OCR 目前只接受圖片或 PDF。", details: { requestId, stage: "validate_file_types", invalidFiles: invalidFiles.map((file) => file.name).slice(0, 8) } });
       const threshold = Math.max(0, Math.min(1, Number(form.get("confidenceThreshold") ?? 0.35) || 0.35));
-      const settings = { includeQuestion: formFlag(form, "includeQuestion", true), includeHandwriting: formFlag(form, "includeHandwriting", true), includeNote: formFlag(form, "includeNote", true), highlightPriority: formFlag(form, "highlightPriority", true), confidenceThreshold: threshold };
+      const settings = { includeQuestion: formFlag(form, "includeQuestion", true), includeVocabulary: formFlag(form, "includeVocabulary", true), includeSentence: formFlag(form, "includeSentence", true), includeHandwriting: formFlag(form, "includeHandwriting", true), includeNote: formFlag(form, "includeNote", true), highlightPriority: formFlag(form, "highlightPriority", true), confidenceThreshold: threshold };
       await db.update(textbookEditions).set({ ocrStatus: "analyzing", metadata: sql`jsonb_set(coalesce(${textbookEditions.metadata}, '{}'::jsonb), '{ocrSettings}', ${JSON.stringify(settings)}::jsonb, true)`, updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id));
       const failedFiles: string[] = [];
       try {
@@ -143,25 +165,39 @@ export const routes: RouteDef[] = [
             throw error;
           }
         }
-        const lesson = (await db.insert(textbookLessons).values({ editionId: edition.id, title: `OCR 匯入 ${new Date().toLocaleDateString("zh-TW")}`, description: "由 StudyNova OCR 分析匯入，可再由管理員編輯。", sortOrder: 999 }).returning())[0];
-        let imported = 0;
-        for (const result of results) {
-          const segments = (result.context.detected as Array<{ kind?: string; text?: string; confidence?: number }>).filter((segment) => Number(segment.confidence ?? 0) >= threshold && (settings.includeQuestion || segment.kind !== "QUESTION") && (settings.includeNote || !["NOTE", "HIGHLIGHT"].includes(segment.kind ?? "")) && (settings.includeHandwriting || segment.kind !== "HANDWRITING"));
-          for (const segment of segments) {
-            if (!segment.text?.trim()) continue;
-            await db.insert(textbookContents).values({ lessonId: lesson.id, type: segment.kind?.toLowerCase() || "note", title: `${segment.kind || "OCR"} ${imported + 1}`, body: segment.text, metadata: { confidence: segment.confidence ?? 0, source: result.context.originalName, ocr: true, settings: JSON.stringify(settings) } });
-            imported += 1;
-          }
-        }
-        await db.update(textbookEditions).set({ ocrStatus: "ready", updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id));
-        await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "textbooks", action: "edition.ocr_import", resourceId: edition.id, ip: ctx.ip, metadata: { requestId, files: files.length, imported, settings: JSON.stringify(settings) } });
-        return { lesson, imported, settings, files: results.map((result) => result.context), diagnostics: { requestId, processedFiles: results.length, failedFiles } };
+        await db.update(textbookEditions).set({ ocrStatus: "preview_ready", updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id));
+        await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "textbooks", action: "edition.ocr_preview", resourceId: edition.id, ip: ctx.ip, metadata: { requestId, files: files.length, settings: JSON.stringify(settings) } });
+        return { imported: 0, previewOnly: true, settings, files: results.map((result) => result.context), diagnostics: { requestId, processedFiles: results.length, failedFiles } };
       } catch (error) {
         await db.update(textbookEditions).set({ ocrStatus: "failed", updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id));
         const cause = safeErrorMessage(error).slice(0, 500);
         console.error("[StudyNova][textbook] OCR processing failed", { requestId, editionId: edition.id, subject, fileCount: files.length, failedFiles, errorCode: error instanceof Error && "code" in error ? String((error as { code?: unknown }).code) : "UNKNOWN", cause, stack: error instanceof Error ? error.stack : undefined });
         await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "textbooks", action: "edition.ocr_failed", resourceId: edition.id, ip: ctx.ip, outcome: "failure", errorCategory: "ocr_processing", metadata: { requestId, fileCount: files.length, failedFiles: JSON.stringify(failedFiles), subject, cause } });
         throw fail("ADMIN_TEXTBOOK_PROCESSING_ERROR", { message: "教材 OCR 處理失敗，教材狀態已標記為失敗。", hint: "請確認檔案清晰、格式正確後重試；若仍失敗，請提供錯誤代碼與追蹤編號。", details: { requestId, stage: failedFiles.length ? "file_analysis" : "content_import", failedFiles, cause } });
+      }
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/textbooks/:id/ocr/confirm",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const requestId = ctx.req.headers.get("x-request-id") ?? "unavailable";
+      const body = await ctx.json(z.object({ contextIds: z.array(idSchema).min(1).max(8), includeQuestion: z.boolean().default(true), includeVocabulary: z.boolean().default(true), includeSentence: z.boolean().default(true), includeHandwriting: z.boolean().default(true), includeNote: z.boolean().default(true), highlightPriority: z.boolean().default(true), confidenceThreshold: z.number().min(0).max(1).default(0.35) }));
+      const edition = (await db.select().from(textbookEditions).where(eq(textbookEditions.id, ctx.params.id)).limit(1))[0];
+      if (!edition) throw notFound("找不到教材版本");
+      const contexts = await db.select().from(fileContexts).where(and(eq(fileContexts.userId, admin.userId), inArray(fileContexts.id, body.contextIds)));
+      if (contexts.length !== body.contextIds.length || contexts.some((context) => context.status !== "ready")) throw fail("ADMIN_TEXTBOOK_REQUEST_INVALID", { message: "部分 OCR 結果不存在或尚未完成，請重新分析。", details: { requestId, stage: "validate_preview", contextCount: contexts.length } });
+      try {
+        const settings = { includeQuestion: body.includeQuestion, includeVocabulary: body.includeVocabulary, includeSentence: body.includeSentence, includeHandwriting: body.includeHandwriting, includeNote: body.includeNote, highlightPriority: body.highlightPriority, confidenceThreshold: body.confidenceThreshold };
+        const result = await importConfirmedOcr({ editionId: edition.id, contexts, settings });
+        await db.update(textbookEditions).set({ ocrStatus: "ready", updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id));
+        await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "textbooks", action: "edition.ocr_import", resourceId: edition.id, ip: ctx.ip, metadata: { requestId, contextCount: contexts.length, imported: result.imported, settings: JSON.stringify(settings) } });
+        return { ...result, confirmed: true, requestId };
+      } catch (error) {
+        await db.update(textbookEditions).set({ ocrStatus: "failed", updatedAt: new Date() }).where(eq(textbookEditions.id, edition.id));
+        throw fail("ADMIN_TEXTBOOK_PROCESSING_ERROR", { message: "OCR 結果匯入失敗，尚未完成匯入。", details: { requestId, stage: "confirmed_import", cause: safeErrorMessage(error) } });
       }
     },
   }),
