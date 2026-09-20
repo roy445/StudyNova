@@ -14,6 +14,7 @@ import {
   weeklyExamAttempts,
   weeklyExamResults,
   groupMembers,
+  identityGroupMembers,
   users,
   storageObjects,
 } from "@/db/schema";
@@ -32,16 +33,14 @@ type WeekRow = typeof weeklyExamWeeks.$inferSelect;
 async function assertAccess(week: WeekRow, userId: string, isPro: boolean) {
   if (!isWeekOpen(week)) throw fail("WEEK_NOT_OPEN");
   if (week.proOnly && !isPro) throw fail("WEEK_PRO_ONLY");
-  if (week.allowedUserIds.length && !week.allowedUserIds.includes(userId)) {
-    if (!week.allowedGroupIds.length) throw fail("WEEK_NOT_ALLOWED");
-  }
-  if (week.allowedGroupIds.length) {
-    const rows = await db
-      .select({ groupId: groupMembers.groupId })
-      .from(groupMembers)
-      .where(and(eq(groupMembers.userId, userId), inArray(groupMembers.groupId, week.allowedGroupIds)));
-    if (!rows.length && !week.allowedUserIds.includes(userId)) throw fail("WEEK_NOT_ALLOWED", { message: "你不在這個週次的開放班級中" });
-  }
+  const hasAudience = week.allowedUserIds.length > 0 || week.allowedGroupIds.length > 0 || week.allowedIdentityGroupIds.length > 0;
+  if (!hasAudience) return;
+  if (week.allowedUserIds.includes(userId)) return;
+  const [classRows, identityRows] = await Promise.all([
+    week.allowedGroupIds.length ? db.select({ groupId: groupMembers.groupId }).from(groupMembers).where(and(eq(groupMembers.userId, userId), inArray(groupMembers.groupId, week.allowedGroupIds))) : Promise.resolve([]),
+    week.allowedIdentityGroupIds.length ? db.select({ identityGroupId: identityGroupMembers.identityGroupId }).from(identityGroupMembers).where(and(eq(identityGroupMembers.userId, userId), inArray(identityGroupMembers.identityGroupId, week.allowedIdentityGroupIds))) : Promise.resolve([]),
+  ]);
+  if (!classRows.length && !identityRows.length) throw fail("WEEK_NOT_ALLOWED", { message: "你不在這個週次的指定受眾中" });
 }
 
 export const routes: RouteDef[] = [
@@ -492,6 +491,7 @@ export const routes: RouteDef[] = [
           proOnly: z.boolean().optional(),
           allowedUserIds: z.array(z.string().uuid()).max(500).optional(),
           allowedGroupIds: z.array(z.string().uuid()).max(50).optional(),
+          allowedIdentityGroupIds: z.array(z.string().uuid()).max(50).optional(),
           highlightMap: z.record(z.string(), z.string()).optional(),
         }),
       );

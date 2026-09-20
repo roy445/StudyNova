@@ -38,6 +38,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
     label: "英文隨堂考",
     items: [
       { href: "/admin/weekly", label: "隨堂考・範本與考試", icon: "weekly" },
+      { href: "/admin/identity-groups", label: "身分組・定向發布", icon: "admin" },
     ],
   },
   {

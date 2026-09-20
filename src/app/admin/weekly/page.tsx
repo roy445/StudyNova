@@ -17,6 +17,7 @@ type Week = {
   closeTime: string;
   novaCost: number;
   proOnly: boolean;
+  allowedIdentityGroupIds: string[];
   highlightMap: Record<string, string>;
   templateVersionId: string | null;
   open: boolean;
@@ -34,6 +35,7 @@ type Detail = {
 };
 type TemplateVersion = { id: string; version: number; status: string; sourceFileName: string; analysisResult: Record<string, unknown>; questionStructure: { totalQuestions?: number; totalScore?: number; sections?: Array<{ key: string; name: string; type: string; questionCount: number; percentage: number; pointsPerQuestion: number; questionLogic: string }> }; validationErrors: string[]; sourcePreviewUrl: string; createdAt: string };
 type Template = { id: string; name: string; description: string; educationLevel: string; grade: string; textbook: string; scope: string; notes: string; purpose: string; enabled: boolean; versions: TemplateVersion[] };
+type IdentityGroup = { id: string; name: string; badge: string; enabled: boolean; memberCount: number };
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -58,6 +60,7 @@ export default function AdminWeeklyPage() {
     [activeId, tab],
   );
   const templates = useApi<{ templates: Template[] }>("/admin/weekly-templates");
+  const identityGroups = useApi<{ groups: IdentityGroup[] }>("/admin/identity-groups");
   const [templateForm, setTemplateForm] = useState({ name: "", description: "", educationLevel: "senior", grade: "", textbook: "", scope: "", notes: "", purpose: "UNIT_TEST" });
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [templateBusy, setTemplateBusy] = useState(false);
@@ -575,6 +578,15 @@ export default function AdminWeeklyPage() {
                     <option value="false">所有學生</option>
                     <option value="true">僅 Nova Pro</option>
                   </Select>
+                </Field>
+                <Field label="指定身分組發布" hint="不選代表不以身分組限制；可與指定使用者或班級條件並存，符合任一受眾即可進入。">
+                  <div className="space-y-2 rounded-xl border border-[var(--line)] p-3">
+                    {identityGroups.data?.groups.filter((group) => group.enabled).map((group) => {
+                      const checked = detail.week.allowedIdentityGroupIds?.includes(group.id) ?? false;
+                      return <label key={group.id} className="flex items-center justify-between gap-2 text-sm"><span><input type="checkbox" checked={checked} onChange={() => { const current = detail.week.allowedIdentityGroupIds ?? []; const next = checked ? current.filter((id) => id !== group.id) : [...current, group.id]; void patchWeek({ allowedIdentityGroupIds: next }); }} className="mr-2 accent-[#37d3ff]" />{group.name}</span><span className="text-xs text-muted">{group.badge}・{group.memberCount} 人</span></label>;
+                    })}
+                    {!identityGroups.data?.groups.filter((group) => group.enabled).length && <p className="text-xs text-muted">尚未建立啟用中的身分組，請先到「身分組・定向發布」建立。</p>}
+                  </div>
                 </Field>
                 <div className="sm:col-span-2">
                   <Button

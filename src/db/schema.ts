@@ -1332,6 +1332,33 @@ export const groupMembers = pgTable(
   (t) => [primaryKey({ columns: [t.groupId, t.userId] })],
 );
 
+export const identityGroups = pgTable(
+  "identity_groups",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    badge: text("badge").notNull().default("身分"),
+    color: text("color").notNull().default("#37d3ff"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdBy: uuid("created_by").notNull().references(() => users.userId, { onDelete: "restrict" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("identity_groups_name_uq").on(t.name), index("identity_groups_enabled_idx").on(t.enabled)],
+);
+
+export const identityGroupMembers = pgTable(
+  "identity_group_members",
+  {
+    identityGroupId: uuid("identity_group_id").notNull().references(() => identityGroups.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    addedBy: uuid("added_by").references(() => users.userId, { onDelete: "set null" }),
+    joinedAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.identityGroupId, t.userId] }), index("identity_group_members_user_idx").on(t.userId)],
+);
+
 export const challenges = pgTable(
   "challenges",
   {
@@ -1734,6 +1761,7 @@ export const weeklyExamWeeks = pgTable(
     proOnly: boolean("pro_only").notNull().default(false),
     allowedUserIds: jsonb("allowed_user_ids").$type<string[]>().notNull().default([]),
     allowedGroupIds: jsonb("allowed_group_ids").$type<string[]>().notNull().default([]),
+    allowedIdentityGroupIds: jsonb("allowed_identity_group_ids").$type<string[]>().notNull().default([]),
     highlightMap: jsonb("highlight_map").$type<Record<string, string>>().notNull().default({
       yellow: "本次考試",
       green: "重要",
