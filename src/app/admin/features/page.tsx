@@ -47,14 +47,14 @@ export default function AdminFeaturesPage() {
   async function saveService(enabled: boolean) {
     setBusy(true);
     try {
-      await apiPatch("/admin/service-control", { enabled, ...maintenanceDraft, estimatedRecoveryAt: maintenanceDraft.estimatedRecoveryAt ? new Date(maintenanceDraft.estimatedRecoveryAt).toISOString() : null });
+      await apiPatch("/admin/service-control", { enabled, ...maintenanceDraft, estimatedRecoveryAt: maintenanceDraft.estimatedRecoveryAt ? new Date(maintenanceDraft.estimatedRecoveryAt).toISOString() : null, announceOnEnable: enabled });
       await service.reload();
       toast.push("success", enabled ? "全站服務已恢復" : "已開始全站施工");
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
   return <div className="space-y-4">
     <header><h1 className="text-xl font-bold sm:text-2xl">功能總控台</h1><p className="text-xs text-muted sm:text-sm">所有功能由你控制。可分類查看、即時關閉、設定會員限制與 Nova 成本。</p></header>
-    <Card title="全站服務總開關" subtitle="施工會在 server-side 擋住公開頁與學生端 App；不刪除 session、不清除 cookie，管理員仍可進入後台恢復。">
+    <Card title="全站服務總開關" subtitle="這是唯一的全站服務狀態來源；施工會在 server-side 擋住公開頁與學生端 App，不刪除 session、不清除 cookie，管理員仍可進入後台恢復。維護快捷中心也會同步這個開關。">
       <div className="flex flex-wrap items-center gap-3"><span className={`rounded-full px-3 py-1 text-xs ${service.data?.enabled !== false ? "bg-emerald-400/15 text-emerald-300" : "bg-orange-400/15 text-orange-200"}`}>{service.data?.enabled !== false ? "🟢 正常服務" : "🟠 施工中"}</span><Button size="sm" variant={service.data?.enabled === false ? "primary" : "ghost"} loading={busy} onClick={() => void saveService(true)}>立即恢復服務</Button><Button size="sm" variant="ghost" loading={busy} onClick={() => void saveService(false)}>開始施工</Button></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="施工標題"><Input value={maintenanceDraft.title} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, title: event.target.value }))} /></Field>
