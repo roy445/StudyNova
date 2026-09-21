@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiPatch, apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
 
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
+type ServiceControl = { enabled: boolean; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
+type MaintenanceAction = "start" | "restore";
 
 export default function AdminSystemPage() {
   const toast = useToast();
@@ -17,10 +19,44 @@ export default function AdminSystemPage() {
   const countdowns = (settings.data?.settings.find((s) => s.key === "exam_countdowns")?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
   const exportConfig = (settings.data?.settings.find((s) => s.key === "learning_exports")?.value ?? {}) as { enabled?: boolean; proOnly?: boolean; novaPerKb?: number; minimumNova?: number; allowedKinds?: string[] };
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
-  const service = useApi<{ enabled: boolean; title: string; message: string }>("/admin/service-control");
+  const service = useApi<ServiceControl>("/admin/service-control");
+  const [maintenanceAction, setMaintenanceAction] = useState<MaintenanceAction | null>(null);
+  const [maintenanceForm, setMaintenanceForm] = useState({ title: "系統施工中", description: "StudyNova 目前正在進行系統維護，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "維護完成後會自動通知。" });
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [summary, setSummary] = useState<{ total: number; pass: number; fail: number; skip: number; durationMs: number } | null>(null);
   const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    if (!service.data) return;
+    setMaintenanceForm({
+      title: service.data.title,
+      description: service.data.description,
+      badgeText: service.data.badgeText,
+      estimatedRecoveryAt: service.data.estimatedRecoveryAt ? service.data.estimatedRecoveryAt.slice(0, 16) : "",
+      message: service.data.message,
+    });
+  }, [service.data]);
+
+  async function saveMaintenance() {
+    if (!maintenanceAction) return;
+    if (maintenanceAction === "start" && maintenanceForm.estimatedRecoveryAt && new Date(maintenanceForm.estimatedRecoveryAt) <= new Date()) {
+      toast.push("error", "預計恢復時間必須晚於現在");
+      return;
+    }
+    try {
+      await apiPatch("/admin/service-control", {
+        enabled: maintenanceAction === "restore",
+        ...maintenanceForm,
+        estimatedRecoveryAt: maintenanceForm.estimatedRecoveryAt ? new Date(maintenanceForm.estimatedRecoveryAt).toISOString() : null,
+        announceOnEnable: maintenanceAction === "restore",
+      });
+      toast.push("success", maintenanceAction === "start" ? "已依照設定開啟維護模式" : "已依照設定恢復網站並發送維護完成通知");
+      setMaintenanceAction(null);
+      await service.reload();
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
 
   const EXPORTS = [
     ["users", "使用者"],
@@ -34,8 +70,12 @@ export default function AdminSystemPage() {
 
   return (
     <div className="space-y-4">
-      <Card title="⚡ 維護快捷控制" subtitle={service.data?.enabled === false ? "目前網站維護中，學生端主要 API 會暫停。" : "目前網站正常運作。可一鍵切換維護狀態。"} action={<Button size="sm" variant="ghost" onClick={service.reload}>重新整理</Button>}>
-        <div className="flex flex-wrap gap-2"><Button variant={service.data?.enabled === false ? "gold" : "outline"} onClick={async () => { try { await apiPatch("/admin/service-control", { enabled: false, title: "系統施工中", description: "StudyNova 目前正在進行維護，請稍後再試。", badgeText: "系統維護中，請稍候", message: "維護完成後會自動通知。" }); toast.push("success", "已開啟網站維護模式"); await service.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>一鍵開始維護</Button><Button variant={service.data?.enabled === false ? "gold" : "outline"} onClick={async () => { try { await apiPatch("/admin/service-control", { enabled: true, announceOnEnable: true, title: "系統施工中", description: "", badgeText: "系統維護中，請稍候", message: "服務已恢復。" }); toast.push("success", "已恢復網站並發送維護完成推播"); await service.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>恢復網站＋推播</Button></div>
+      <Card title="⚡ 維護快捷中心" subtitle={service.data?.enabled === false ? "目前網站維護中；任何變更都必須先完成詳細設定。" : "目前網站正常運作；開始或結束維護前會先顯示完整設定確認。"} action={<Button size="sm" variant="ghost" onClick={service.reload}>重新整理</Button>}>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] p-4"><p className="text-xs font-semibold uppercase tracking-wider text-amber-200">網站維護</p><p className="mt-2 text-sm font-semibold">開始維護模式</p><p className="mt-1 text-xs leading-5 text-muted">設定維護標題、使用者提示、預計恢復時間與維護期間顯示內容。</p><Button className="mt-3" variant="gold" onClick={() => setMaintenanceAction("start")}>設定並開始維護</Button></div>
+          <div className="rounded-2xl border border-emerald-300/25 bg-emerald-300/[0.06] p-4"><p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">服務恢復</p><p className="mt-2 text-sm font-semibold">恢復網站並通知</p><p className="mt-1 text-xs leading-5 text-muted">設定恢復後的公告內容，確認後才會解除維護並發送站內通知與推播。</p><Button className="mt-3" variant="outline" onClick={() => setMaintenanceAction("restore")}>設定並恢復網站</Button></div>
+        </div>
+        {service.data && <div className="mt-3 grid gap-1 rounded-xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs text-muted sm:grid-cols-3"><span>狀態：<b className={service.data.enabled ? "text-emerald-200" : "text-amber-200"}>{service.data.enabled ? "正常運作" : "維護中"}</b></span><span>預計恢復：{service.data.estimatedRecoveryAt ? new Date(service.data.estimatedRecoveryAt).toLocaleString("zh-TW") : "未設定"}</span><span>最後修改：{service.data.updatedByName ?? "—"}</span></div>}
       </Card>
       <Tabs
         tabs={[
@@ -239,6 +279,16 @@ export default function AdminSystemPage() {
           </div>
         </Card>
       )}
+      <Modal open={maintenanceAction !== null} onClose={() => setMaintenanceAction(null)} title={maintenanceAction === "start" ? "設定網站維護" : "設定恢復網站與通知"} wide>
+        <div className="space-y-3">
+          <p className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs leading-5 text-muted">{maintenanceAction === "start" ? "儲存後會立即暫停學生端主要 API。請先確認所有文字、時間與通知內容。" : "儲存後會立即解除維護模式，並依照下方內容建立維護完成公告及通知。"}</p>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="頁面標題" required><Input value={maintenanceForm.title} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, title: e.target.value })} /></Field><Field label="徽章文字" required><Input value={maintenanceForm.badgeText} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, badgeText: e.target.value })} /></Field></div>
+          <Field label={maintenanceAction === "start" ? "維護說明" : "恢復後公告內容"} required><Textarea value={maintenanceForm.description} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, description: e.target.value })} className="!min-h-[100px]" /></Field>
+          <Field label="使用者提示／通知訊息" required><Textarea value={maintenanceForm.message} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, message: e.target.value })} className="!min-h-[80px]" /></Field>
+          <Field label="預計恢復時間" hint="可留空；開始維護時會顯示給使用者"><Input type="datetime-local" value={maintenanceForm.estimatedRecoveryAt} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, estimatedRecoveryAt: e.target.value })} /></Field>
+          <Button full onClick={saveMaintenance}>{maintenanceAction === "start" ? "確認設定並開始維護" : "確認設定並恢復網站、發送通知"}</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

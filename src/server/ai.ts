@@ -414,13 +414,16 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       continue;
     }
     try {
+      const requestConfig = cfg.name.startsWith("gemini_") && isImageTask(normalizedReq)
+        ? { ...cfg, model: imageModel }
+        : cfg;
       const out =
-          cfg.name.startsWith("gemini_")
-          ? await callGemini(cfg, normalizedReq)
+          requestConfig.name.startsWith("gemini_")
+          ? await callGemini(requestConfig, normalizedReq)
           : await callOpenAiCompatible(
-              cfg,
+              requestConfig,
               normalizedReq,
-              cfg.name === "openai"
+              requestConfig.name === "openai"
                 ? "https://api.openai.com/v1/chat/completions"
                 : "https://openrouter.ai/api/v1/chat/completions",
             );
