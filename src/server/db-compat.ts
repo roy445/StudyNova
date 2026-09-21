@@ -18,7 +18,7 @@ export function ensureIdentityGroupSchema() {
         "badge" text NOT NULL DEFAULT '身分',
         "color" text NOT NULL DEFAULT '#37d3ff',
         "enabled" boolean NOT NULL DEFAULT true,
-        "created_by" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE RESTRICT,
+        "created_by" uuid NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT,
         "created_at" timestamptz NOT NULL DEFAULT now(),
         "updated_at" timestamptz NOT NULL DEFAULT now()
       );
@@ -26,8 +26,8 @@ export function ensureIdentityGroupSchema() {
       CREATE INDEX IF NOT EXISTS "identity_groups_enabled_idx" ON "identity_groups" ("enabled");
       CREATE TABLE IF NOT EXISTS "identity_group_members" (
         "identity_group_id" uuid NOT NULL REFERENCES "identity_groups"("id") ON DELETE CASCADE,
-        "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
-        "added_by" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+        "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "added_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
         "joined_at" timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY ("identity_group_id", "user_id")
       );
