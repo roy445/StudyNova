@@ -6,6 +6,7 @@ import { AppError, fail, newRequestId, safeErrorMessage } from "./core";
 import { db } from "@/db";
 import { legalConsents, legalDocuments, platformSettings, systemLogs } from "@/db/schema";
 import { classifyAuditPath, writeAudit } from "./audit";
+import { ensureIdentityGroupSchema } from "./db-compat";
 
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export type AuthMode = "none" | "optional" | "user" | "admin";
@@ -120,6 +121,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/pro-renewal-routes"),
     import("./routes/release-routes"),
     import("./routes/identity-group-routes"),
+    import("./routes/error-log-routes"),
   ]);
   compiledRoutes = compile(mods.flatMap((m) => m.routes));
   return compiledRoutes;
@@ -134,6 +136,11 @@ async function hasCurrentUsageConsent(userId: string) {
 }
 
 export async function handleApiRequest(req: Request, pathSegments: string[]): Promise<Response> {
+  try {
+    await ensureIdentityGroupSchema();
+  } catch (error) {
+    console.error("[StudyNova][db-preflight] identity group schema unavailable", error);
+  }
   const routes = await loadRoutes();
   const url = new URL(req.url);
   const found = match(routes, req.method, pathSegments);

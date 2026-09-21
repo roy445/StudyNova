@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
-import { apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
+import { apiPatch, apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
 
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
 
@@ -17,6 +17,7 @@ export default function AdminSystemPage() {
   const countdowns = (settings.data?.settings.find((s) => s.key === "exam_countdowns")?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
   const exportConfig = (settings.data?.settings.find((s) => s.key === "learning_exports")?.value ?? {}) as { enabled?: boolean; proOnly?: boolean; novaPerKb?: number; minimumNova?: number; allowedKinds?: string[] };
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
+  const service = useApi<{ enabled: boolean; title: string; message: string }>("/admin/service-control");
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [summary, setSummary] = useState<{ total: number; pass: number; fail: number; skip: number; durationMs: number } | null>(null);
   const [running, setRunning] = useState(false);
@@ -33,6 +34,9 @@ export default function AdminSystemPage() {
 
   return (
     <div className="space-y-4">
+      <Card title="⚡ 維護快捷控制" subtitle={service.data?.enabled === false ? "目前網站維護中，學生端主要 API 會暫停。" : "目前網站正常運作。可一鍵切換維護狀態。"} action={<Button size="sm" variant="ghost" onClick={service.reload}>重新整理</Button>}>
+        <div className="flex flex-wrap gap-2"><Button variant={service.data?.enabled === false ? "gold" : "outline"} onClick={async () => { try { await apiPatch("/admin/service-control", { enabled: false, title: "系統施工中", description: "StudyNova 目前正在進行維護，請稍後再試。", badgeText: "系統維護中，請稍候", message: "維護完成後會自動通知。" }); toast.push("success", "已開啟網站維護模式"); await service.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>一鍵開始維護</Button><Button variant={service.data?.enabled === false ? "gold" : "outline"} onClick={async () => { try { await apiPatch("/admin/service-control", { enabled: true, announceOnEnable: true, title: "系統施工中", description: "", badgeText: "系統維護中，請稍候", message: "服務已恢復。" }); toast.push("success", "已恢復網站並發送維護完成推播"); await service.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>恢復網站＋推播</Button></div>
+      </Card>
       <Tabs
         tabs={[
           { key: "tests", label: "System Test Center", icon: "🧪" },

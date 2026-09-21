@@ -61,6 +61,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/system", label: "系統・測試・匯出", icon: "admin" },
       { href: "/admin/performance", label: "系統效能", icon: "grades" },
       { href: "/admin/audit", label: "Audit Log", icon: "admin" },
+      { href: "/admin/error-logs", label: "錯誤日誌・PDF", icon: "admin" },
     ],
   },
 ];

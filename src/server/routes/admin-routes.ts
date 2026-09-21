@@ -49,6 +49,7 @@ import {
   customizationCategories,
   customizationVersions,
   pushSubscriptions,
+  auditLogs,
 } from "@/db/schema";
 import { normalizeQuestionRows } from "../question-import";
 import { route, type RouteDef } from "../router";
@@ -406,6 +407,10 @@ export const routes: RouteDef[] = [
             }
             case "delete_account": {
               if (before.userId === admin.userId) throw fail("ADMIN_TARGET_PROTECTED", { message: "不能刪除目前登入中的管理員帳號" });
+              const administrators = await db.select({ userId: users.userId }).from(users).where(or(eq(users.role, "admin"), eq(users.role, "owner")));
+              for (const administrator of administrators) {
+                await notify({ userId: administrator.userId, kind: "security", title: "管理員刪除帳號通知", body: `管理員 ${admin.displayName} 已刪除帳號 ${before.displayName}（${before.email}）。原因：${body.reason}`, link: "/admin", dedupeKey: `account-delete:${userId}:${administrator.userId}:${Date.now()}` });
+              }
               await db.insert(deletedAccounts).values([{ identifierType: "email", identifier: before.email.toLowerCase(), reason: body.reason }, { identifierType: "nova_id", identifier: before.novaId.toUpperCase(), reason: body.reason }]).onConflictDoUpdate({ target: [deletedAccounts.identifierType, deletedAccounts.identifier], set: { reason: body.reason, deletedAt: new Date() } });
               await db.delete(users).where(eq(users.userId, userId));
               await adminLog({ actorId: admin.userId, action: "user.delete_account", targetType: "user", targetId: userId, reason: body.reason, before, ip: ctx.ip });
@@ -465,7 +470,9 @@ export const routes: RouteDef[] = [
       const ledger = await db.select().from(novaTransactions).where(eq(novaTransactions.userId, u.userId)).orderBy(desc(novaTransactions.createdAt)).limit(30);
       const usage = await db.select().from(featureUsage).where(eq(featureUsage.userId, u.userId)).orderBy(desc(featureUsage.usageDate)).limit(40);
       const gradeGoals = await db.select().from(grades).where(eq(grades.userId, u.userId)).orderBy(asc(grades.subject));
-      return { user: { ...u, passwordHash: undefined }, membership: m, nova, ledger, usage, gradeGoals };
+      const activityLogs = await db.select().from(auditLogs).where(eq(auditLogs.userId, u.userId)).orderBy(desc(auditLogs.occurredAt)).limit(200);
+      const loginSessions = await db.select({ id: sessions.id, ip: sessions.ip, userAgent: sessions.userAgent, createdAt: sessions.createdAt, rotatedAt: sessions.rotatedAt, expiresAt: sessions.expiresAt }).from(sessions).where(eq(sessions.userId, u.userId)).orderBy(desc(sessions.createdAt)).limit(20);
+      return { user: { ...u, passwordHash: undefined }, membership: m, nova, ledger, usage, gradeGoals, activityLogs, loginSessions };
     },
   }),
 
@@ -539,6 +546,7 @@ export const routes: RouteDef[] = [
         badgeText: z.string().trim().max(120).default("系統維護中，請稍候"),
         estimatedRecoveryAt: z.string().datetime().nullable().default(null),
         message: z.string().trim().max(500).default("請稍後再回來看看！"),
+        announceOnEnable: z.boolean().default(false),
       }));
       const now = new Date().toISOString();
       const value = {
@@ -549,6 +557,10 @@ export const routes: RouteDef[] = [
         updatedAt: now,
       };
       await db.insert(platformSettings).values({ key: "service_control", value, updatedAt: new Date() }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } });
+      if (body.enabled && current.enabled === false && body.announceOnEnable) {
+        const announcement = (await db.insert(announcements).values({ title: "StudyNova 維護完成", body: "網站維護已完成，所有主要功能現在可以正常使用。感謝你的耐心等候。", link: "/dashboard", targetFeature: "all", category: "system", announcementType: "maintenance", importance: "high", audience: "all", audienceIds: [], notify: true, push: true, showHome: true, showPwa: true, pinned: true, marquee: true, status: "published", startsAt: new Date(), createdBy: admin.userId }).returning())[0];
+        if (announcement) for (const userId of await resolveAudience("all", [])) await notify({ userId, kind: "announcement", title: `📢 ${announcement.title}`, body: announcement.body, link: announcement.link, push: true, dedupeKey: `maintenance-complete:${announcement.id}:${userId}` });
+      }
       await adminLog({ actorId: admin.userId, action: body.enabled ? "service.enable" : "service.disable", targetType: "platform", targetId: "service_control", after: value, ip: ctx.ip });
       return { ...value, updatedAt: now };
     },
@@ -659,7 +671,10 @@ export const routes: RouteDef[] = [
     method: "GET",
     path: "/admin/announcements",
     auth: "admin",
-    handler: async () => ({ announcements: await db.select().from(announcements).orderBy(desc(announcements.createdAt)).limit(100) }),
+    handler: async () => {
+      try { return { announcements: await db.select().from(announcements).orderBy(desc(announcements.createdAt)).limit(100) }; }
+      catch (error) { console.error("[StudyNova][admin-announcements] fallback query", error); return { announcements: await db.select({ id: announcements.id, title: announcements.title, body: announcements.body, link: announcements.link, status: announcements.status, startsAt: announcements.startsAt, endsAt: announcements.endsAt, pinned: announcements.pinned, sortOrder: announcements.sortOrder, createdAt: announcements.createdAt }).from(announcements).orderBy(desc(announcements.createdAt)).limit(100) }; }
+    },
   }),
 
   route({
