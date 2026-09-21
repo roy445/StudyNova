@@ -690,7 +690,9 @@ export const routes: RouteDef[] = [
           link: z.string().max(300).default("/dashboard"),
           targetFeature: z.string().min(1).max(60).default("all"),
           category: z.string().min(1).max(40).default("general"),
-          announcementType: z.enum(["maintenance", "update", "feature", "exam", "activity", "ai", "pwa", "security", "general"]).default("general"),
+          // The database column is text and templates may introduce new types.
+          // Do not reject a valid custom announcement type with SN-REQ-2002.
+          announcementType: z.string().trim().min(1).max(30).default("general"),
           importance: z.enum(["low", "normal", "high", "critical"]).default("normal"),
           tags: z.union([z.array(z.string().max(30)), z.string()]).transform((value) => (Array.isArray(value) ? value : value.split(",")).map((tag) => tag.trim()).filter(Boolean).slice(0, 12)),
           image: z.string().max(400).default(""),
