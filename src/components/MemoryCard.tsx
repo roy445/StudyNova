@@ -10,6 +10,9 @@ export type MemoryCardWord = {
   example?: string | null;
   example_zh?: string | null;
   part_of_speech?: string | null;
+  phonetic?: string | null;
+  usPhonetic?: string | null;
+  ukPhonetic?: string | null;
   familiarity?: number | null;
 };
 
@@ -18,6 +21,7 @@ type MemoryCardProps = {
   sourceKey: string;
   title?: string;
   subtitle?: string;
+  onRate?: (rating: "again" | "hard" | "good" | "easy", word: MemoryCardWord) => void | Promise<void>;
 };
 
 function readFavorites(storageKey: string) {
@@ -41,11 +45,12 @@ function speak(text: string) {
   return true;
 }
 
-export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "先想想看，再點擊中文查看答案。" }: MemoryCardProps) {
+export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "先想想看，再點擊中文查看答案。", onRate }: MemoryCardProps) {
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [loop, setLoop] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
+  const [rating, setRating] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(() => readFavorites(`studynova:memory-card:favorites:${sourceKey}`));
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -94,6 +99,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
   function goTo(nextIndex: number) {
     if (autoTimer.current) clearTimeout(autoTimer.current);
     setRevealed(false);
+    setRating(null);
     setIndex(nextIndex);
   }
 
@@ -122,6 +128,17 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
       window.localStorage.setItem(favoriteStorageKey, JSON.stringify([...next]));
     } catch {
       // Keep the in-memory state when persistence is blocked.
+    }
+  }
+
+  async function rate(nextRating: "again" | "hard" | "good" | "easy") {
+    if (!onRate || rating) return;
+    setRating(nextRating);
+    try {
+      await onRate(nextRating, current);
+      goNext();
+    } catch {
+      setRating(null);
     }
   }
 
@@ -156,6 +173,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
           <span className="absolute right-5 top-5 text-xs text-muted">{revealed ? "中英對照" : "英文提示"}</span>
           <span className="flex min-h-[250px] flex-col items-center justify-center gap-3">
             <span className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl">{current.word}</span>
+            {(current.phonetic || current.usPhonetic || current.ukPhonetic) && <span className="text-xs tracking-wide text-white/55">{current.phonetic || current.usPhonetic || current.ukPhonetic}</span>}
             {current.part_of_speech && <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted">{current.part_of_speech}</span>}
             <span className={`max-w-[34rem] text-lg leading-relaxed transition sm:text-xl ${revealed ? "text-[#37d3ff]" : "text-white/30"}`}>
               {revealed ? current.meaning : "點擊卡片查看中文"}
@@ -184,6 +202,15 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
             下一個
           </Button>
         </div>
+
+        {onRate && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="單字熟悉度">
+          {(["again", "hard", "good", "easy"] as const).map((value) => {
+            const labels = { again: "😵 不會", hard: "😐 有點忘", good: "🙂 會了", easy: "🔥 非常熟" };
+            return <button key={value} type="button" disabled={Boolean(rating)} onClick={() => void rate(value)} className={`memory-card-action focus-ring rounded-xl border px-3 py-2.5 text-xs font-medium transition ${rating === value ? "ring-2 ring-[#37d3ff]/70" : ""}`}>
+              {rating === value ? "已記錄" : labels[value]}
+            </button>;
+          })}
+        </div>}
 
         <div className="grid gap-2 sm:grid-cols-2">
           <button

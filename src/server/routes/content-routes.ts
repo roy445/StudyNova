@@ -30,6 +30,7 @@ import { AppError } from "../errors";
 import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
 import { subjectStrategy } from "../subject-strategies";
+import { naturalExamplePrompt } from "../vocabulary-quality";
 
 export async function extractText(mime: string, data: Buffer, userId: string, subject = "其他"): Promise<string> {
   if (mime.startsWith("text/") || mime === "application/json") return sanitizeText(data.toString("utf8"));
@@ -702,7 +703,7 @@ export const contentRoutes: RouteDef[] = [
         solve: '逐題解題並說明步驟。JSON：{"title":"","body":"markdown"}',
         keypoints: '抓出重點條列。JSON：{"title":"重點整理","body":"markdown"}',
         flashcards: '製作記憶卡。JSON：{"cards":[{"front":"","back":""}]}',
-        vocabulary: '找出文字中的重要英文單字與片語。JSON：{"vocabulary":[{"word":"","meaning":"","partOfSpeech":"","phonetic":"","example":"","exampleZh":""}]}',
+        vocabulary: `找出文字中的重要英文單字與片語，並為每個單字寫自然、完整、可直接學習的英文情境例句。${naturalExamplePrompt()} JSON：{"vocabulary":[{"word":"","meaning":"","partOfSpeech":"","phonetic":"","example":"","exampleZh":""}]}`,
         translate: '翻譯成中英對照。JSON：{"title":"翻譯","body":"markdown"}',
         wrong: '找出可能的易錯點與陷阱。JSON：{"title":"易錯提醒","body":"markdown"}',
         plan: '建立 3 天複習計畫。JSON：{"title":"複習計畫","body":"markdown","tasks":["任務"]}',

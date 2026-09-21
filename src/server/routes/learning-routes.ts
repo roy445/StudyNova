@@ -1137,6 +1137,7 @@ export const routes: RouteDef[] = [
           meanings: dailyWords.meanings,
           phrases: dailyWords.phrases,
           part_of_speech: dailyWords.partOfSpeech,
+          phonetic: dailyWords.usPhonetic,
           example: dailyWords.example,
           example_zh: dailyWords.exampleZh,
           level: dailyWords.level,

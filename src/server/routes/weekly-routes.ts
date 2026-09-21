@@ -27,6 +27,7 @@ import { runAi, runAiJson, aiConfigured } from "../ai";
 import { recordStudy } from "./learning-routes";
 import { notify } from "../notify";
 import { validateTemplateStructure, type TemplateStructure } from "../weekly-template-validation";
+import { checkNaturalExample, naturalExamplePrompt } from "../vocabulary-quality";
 
 type WeekRow = typeof weeklyExamWeeks.$inferSelect;
 
@@ -746,7 +747,7 @@ export const routes: RouteDef[] = [
           userId: admin.userId,
           system:
             `你是補習班教材數位化助理。這次只處理 ${body.scope === "vocabulary" ? "單字與片語" : body.scope === "sentences" ? "英文句子、中文翻譯與句型" : "考卷題目"}，不可把其他類型內容混入。${templateInstruction}` +
-            (body.scope === "questions" || body.scope === "all" ? "請自己判斷題目；中文題幹或中文答案請補上自然英文翻譯，並保留原文。" : body.scope === "sentences" ? "只找完整句子、片語與句型，並提供自然中文翻譯、文法重點與英文原句。" : "只找值得學習的單字與片語，提供中文意思、詞性、例句與易混淆字；不要把整句文章當成單字。") +
+            (body.scope === "questions" || body.scope === "all" ? "請自己判斷題目；中文題幹或中文答案請補上自然英文翻譯，並保留原文。" : body.scope === "sentences" ? "只找完整句子、片語與句型，並提供自然中文翻譯、文法重點與英文原句。" : `只找值得學習的單字與片語，提供中文意思、詞性、例句與易混淆字；不要把整句文章當成單字。${naturalExamplePrompt()}`) +
             '回傳：{"questions":[{"number":1,"stem":"","options":[],"answer":[""],"explanation":"","confidence":0-1}],"answers":[{"number":1,"answer":"","confidence":0-1}],"words":[{"word":"","meaning":"","example":"","color":"pink"}],"sentences":[{"en":"","zh":"","color":"blue"}],"summary":""}' +
             "。答案卷可能已經寫入學生答案：請比較題目與答案的顏色／位置，只有與題目對應且確實寫上的答案才納入；紅色簽名、老師刪除線、批改姓名與非作答文字一律忽略。字跡潦草時，請依上下文找最接近的合理英文翻譯並標低 confidence。不同檔案重複出現的單字、句子或題目只建立一次。不確定的項目 confidence 給低分。不要杜撰不存在的題目。",
           parts: [
@@ -797,6 +798,11 @@ export const routes: RouteDef[] = [
       if (draft.status !== "draft") throw fail("WEEK_DRAFT_HANDLED");
       const week = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, draft.weekId)).limit(1))[0];
       if (!week) throw fail("WEEK_NOT_FOUND");
+      const invalidExamples = body.words.flatMap((word) => {
+        const quality = word.example ? checkNaturalExample(word.example, word.word) : { valid: true, reasons: [] };
+        return quality.valid ? [] : [{ word: word.word, reasons: quality.reasons }];
+      });
+      if (invalidExamples.length) throw badRequest("部分單字例句不是自然英文情境，請修改後再確認匯入", { details: { invalidExamples } });
       if (draft.templateVersionId && body.questions.length) {
         const template = (await db.select({ questionStructure: weeklyExamTemplateVersions.questionStructure, status: weeklyExamTemplateVersions.status }).from(weeklyExamTemplateVersions).where(eq(weeklyExamTemplateVersions.id, draft.templateVersionId)).limit(1))[0];
         const expected = Number((template?.questionStructure as { totalQuestions?: number } | undefined)?.totalQuestions ?? 0);
