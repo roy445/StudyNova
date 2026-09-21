@@ -59,6 +59,7 @@ const DEFAULT_CHRISTMAS_THEME: ChristmasTheme = {
 };
 type CompressionSettings = { enabled: boolean; maxOriginalBytes: number; maxBatchFiles: number; maxProcessingSeconds: number; maxPdfPages: number; maxImagePixels: number; minImageQuality: number; maxIterations: number; allowPdf: boolean; allowImages: boolean; allowBatch: boolean; proOnly: boolean; dailyFree: number; dailyPro: number };
 const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = { enabled: true, maxOriginalBytes: 100 * 1024 * 1024, maxBatchFiles: 20, maxProcessingSeconds: 120, maxPdfPages: 100, maxImagePixels: 144000000, minImageQuality: 35, maxIterations: 8, allowPdf: true, allowImages: true, allowBatch: true, proOnly: false, dailyFree: 10, dailyPro: 100 };
+type ServiceControl = { enabled: boolean; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 
 const ACTIONS = [
   { key: "gift_nova", label: "調整 Nova（可負數）", needAmount: true },
@@ -86,6 +87,7 @@ export default function AdminOverviewPage() {
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string }> }>("/admin/features");
   const challengeAdmin = useApi<{ challenges: Array<{ id: string; title: string; kind: string; status: string; expiresAt: string; createdAt: string; creatorName: string; participants: number }> }>("/admin/challenges");
   const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
+  const serviceControl = useApi<ServiceControl>("/admin/service-control");
 
   const [selected, setSelected] = useState<string[]>([]);
   const [actionOpen, setActionOpen] = useState(false);
@@ -140,6 +142,15 @@ export default function AdminOverviewPage() {
     }
   }
 
+  async function restoreService() {
+    if (!window.confirm("確定要立即恢復網站嗎？所有一般使用者將可重新進入網站。")) return;
+    try {
+      await apiPatch("/admin/service-control", { enabled: true, title: serviceControl.data?.title ?? "系統施工中", description: serviceControl.data?.description ?? "", badgeText: serviceControl.data?.badgeText ?? "", estimatedRecoveryAt: null, message: serviceControl.data?.message ?? "" });
+      await serviceControl.reload();
+      toast.push("success", "🚀 網站已立即恢復");
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+
   return (
     <div className="space-y-4">
       <Tabs
@@ -168,6 +179,10 @@ export default function AdminOverviewPage() {
                 <Stat label="總學習分鐘" value={overview.data.totalMinutes} />
                 <Stat label="週次數" value={overview.data.weeks} />
               </div>
+              <Card title="⚙️ 網站維護" subtitle="維護模式不會清除任何 session 或 cookie；管理員可從 /admin-access 返回此處恢復網站。" action={<Badge tone={serviceControl.data?.enabled === false ? "gold" : "green"}>{serviceControl.data?.enabled === false ? "🟠 維護模式" : "🟢 正常運作"}</Badge>}>
+                <div className="flex flex-wrap items-center gap-2"><Button size="sm" onClick={() => void restoreService()} disabled={serviceControl.data?.enabled !== false}>🚀 立即恢復網站</Button><a href="/admin/features" className="rounded-xl border border-[var(--line)] px-3 py-2 text-xs text-white/85 hover:bg-white/10">開啟完整維護設定</a></div>
+                {serviceControl.data?.enabled === false && <p className="mt-3 text-xs text-amber-100/80">目前顯示：{serviceControl.data.message || serviceControl.data.description}</p>}
+              </Card>
               <Card title="近 14 天新註冊">
                 {overview.data.newUsers.length ? (
                   <BarChart series={overview.data.newUsers.map((d) => ({ label: d.day.slice(5), value: d.c }))} suffix=" 人" />

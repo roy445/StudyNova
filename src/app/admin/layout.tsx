@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/auth";
+import { isAdminRole } from "@/server/auth";
 import { SymbolIcon, type SymbolName } from "@/components/Symbol";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +70,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.user.role !== "admin" && session.user.role !== "owner") redirect("/dashboard");
+  if (!isAdminRole(session.user.role)) redirect("/dashboard");
 
   return (
     <div className="min-h-dvh">

@@ -8,6 +8,7 @@ import {
   fail,
   badRequest,
   conflict,
+  forbidden,
   generateNovaId,
   hashPassword,
   notFound,
@@ -16,7 +17,7 @@ import {
   unauthorized,
   verifyPassword,
 } from "../core";
-import { createSession, destroySession, getSession } from "../auth";
+import { createSession, destroySession, getSession, isAdminRole } from "../auth";
 import { ensureDailyTasks, ensureUserEconomy, allFeatureStates, novaBalance } from "../economy";
 import { notify } from "../notify";
 import { sendPasswordResetEmail } from "../email";
@@ -142,6 +143,26 @@ export const routes: RouteDef[] = [
     handler: async () => {
       await destroySession();
       return { loggedOut: true };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/auth/admin-login",
+    auth: "none",
+    rate: { limit: 10, windowSec: 300, key: "admin-login" },
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({ identifier: z.string().min(3).max(180), password: z.string().min(1).max(128) }));
+      const identifier = body.identifier.trim();
+      const isEmail = identifier.includes("@");
+      const user = (await db.select().from(users).where(isEmail ? eq(users.email, identifier.toLowerCase()) : eq(users.novaId, identifier.toUpperCase())).limit(1))[0];
+      const generic = fail("AUTH_INVALID_CREDENTIALS");
+      if (!user || !verifyPassword(body.password, user.passwordHash)) throw generic;
+      if (!isAdminRole(user.role)) throw forbidden("此入口只允許管理員使用");
+      if (user.status !== "active") throw fail("AUTH_ACCOUNT_BLOCKED", { message: "此管理員帳號目前無法登入。" });
+      await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.userId, user.userId));
+      await createSession(user.userId, { ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
+      return { displayName: user.displayName, role: user.role, redirectTo: "/admin" };
     },
   }),
 

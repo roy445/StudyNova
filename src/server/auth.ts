@@ -22,6 +22,10 @@ export type AuthUser = {
 
 export type SessionInfo = { user: AuthUser; sessionId: string };
 
+export function isAdminRole(role: string | null | undefined): boolean {
+  return role === "admin" || role === "owner" || role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
 function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
@@ -130,7 +134,7 @@ export async function requireUser(): Promise<AuthUser> {
 
 export async function requireAdmin(): Promise<AuthUser> {
   const user = await requireUser();
-  if (user.role !== "admin" && user.role !== "owner") throw forbidden("需要管理員權限");
+  if (!isAdminRole(user.role)) throw forbidden("需要管理員權限");
   return user;
 }
 
