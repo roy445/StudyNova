@@ -25,6 +25,7 @@ import {
   userAchievements,
   dailyWords,
   dailyWordAppearances,
+  wordExamples,
   platformSettings,
   wordProgress,
   questions,
@@ -1158,9 +1159,32 @@ export const routes: RouteDef[] = [
       if (rows.length) {
         await db.insert(dailyWordAppearances).values(rows.map((row) => ({ userId: user.userId, wordId: row.id, appearanceDate: dateKey }))).onConflictDoNothing();
       }
+      const exampleRows = await db
+        .select({ wordId: wordExamples.wordId, english: wordExamples.english, chinese: wordExamples.chinese, level: wordExamples.level, sourceKind: wordExamples.sourceKind, createdAt: wordExamples.createdAt })
+        .from(wordExamples)
+        .where(inArray(wordExamples.wordId, rows.map((row) => row.id)))
+        .orderBy(asc(wordExamples.createdAt));
+      const examplesByWord = new Map<string, Array<{ english: string; chinese: string; level: string; sourceKind: string }>>();
+      for (const example of exampleRows) {
+        const list = examplesByWord.get(example.wordId) ?? [];
+        const normalized = example.english.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        if (normalized && !list.some((item) => item.english.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === normalized)) {
+          list.push({ english: example.english, chinese: example.chinese, level: example.level, sourceKind: example.sourceKind });
+        }
+        examplesByWord.set(example.wordId, list);
+      }
+      const enrichedRows = rows.map((row) => {
+        const relatedExamples = examplesByWord.get(row.id) ?? [];
+        const examples = relatedExamples.length
+          ? relatedExamples
+          : row.example.trim()
+            ? [{ english: row.example, chinese: row.example_zh, level: "一般", sourceKind: "source" }]
+            : [];
+        return { ...row, examples, exampleSentences: examples };
+      });
       const appearanceRows = await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWords.level, track)));
       const appearedCount = new Set(appearanceRows.map((row) => row.wordId)).size;
-      return { words: rows, level: track, track, count: rows.length, dailyTarget, appearedCount, totalWords, resetAt, appearanceDate: dateKey };
+      return { words: enrichedRows, level: track, track, count: enrichedRows.length, dailyTarget, appearedCount, totalWords, resetAt, appearanceDate: dateKey };
     },
   }),
 
