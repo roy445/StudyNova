@@ -2111,6 +2111,7 @@ export const systemLogs = pgTable(
     level: text("level").notNull().default("info"),
     scope: text("scope").notNull().default("app"),
     message: text("message").notNull(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
     meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: created(),
   },
