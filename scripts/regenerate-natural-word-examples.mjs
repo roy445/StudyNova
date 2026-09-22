@@ -26,7 +26,15 @@ function validExamples(items, word) {
 }
 
 async function generate(word, meaning, partOfSpeech, meanings, phrases) {
-  const instruction = `為英文單字「${word}」產生 5 句真正自然、可朗讀、可直接學習用法的英文例句，並提供每句完整繁體中文翻譯。\n詞性：${partOfSpeech || "未知"}\n主要中文義項：${meaning || "未知"}\n其他義項：${JSON.stringify(meanings || [])}\n常見片語：${JSON.stringify(phrases || [])}\n\n要求：把單字放在真實語境中使用，不要解釋單字本身。情境自然分散在日常生活、朋友對話、家庭、旅行、科技、新聞、運動、工作、學校等；句型可以是敘述、否定、問句、對話、條件句或轉折句。每句必須符合詞性、常見搭配與其中一個義項。禁止 In the passage...、The word X...、The writer...、The author...、This sentence shows...、The meaning of X...、helps explain the writer's main idea，以及任何「正在介紹這個單字」的句子。不要五句只替換單字，也不要使用空泛的教材解釋句。只回傳 JSON：{"examples":[{"english":"自然英文句子","chinese":"完整繁體中文翻譯","level":"基礎|會考|進階"}]}`;
+  const instruction = `為英文單字「${word}」產生 5 句真正自然、可朗讀、可直接學習用法的英文例句，並提供每句完整繁體中文翻譯。
+詞性：${partOfSpeech || "未知"}
+主要中文義項：${meaning || "未知"}
+其他義項：${JSON.stringify(meanings || [])}
+常見片語：${JSON.stringify(phrases || [])}
+
+嚴格品質規則：例句的最高目的，是讓學生理解這個字在現實生活何時使用、如何使用及常見搭配。優先使用日常對話、學校、手機網路、社群、作業考試、社團、旅行交通、購物餐廳、人際關係、問題解決、建議提醒、表達意見感受或實際狀況。每句約 8–18 字（必要時可略超過），必須有資訊價值、符合詞性與常見義項，並盡可能呈現固定搭配或句型。句型和主詞要自然變化，不要五句都用 I 開頭。
+禁止流水帳（起床、吃早餐、上學、放學、回家等與目標字無關的行程）、禁止為塞入單字而硬寫、禁止小說式虛假故事、禁止不自然或過度學術的英文、禁止解釋單字本身。禁止 In the passage...、The word X...、The writer...、The author...、This sentence shows...、The meaning of X...、helps explain the writer's main idea，以及任何正在介紹這個單字的句子。多義字只挑國高中最常見且有學習價值的意思，除非其他意思也很重要才分配句子。生成後自行檢查：英文自然嗎、用法正確嗎、學生真的會遇到嗎、是否有常見搭配、是否比空泛句更實用；不合格就重寫。
+只回傳 JSON：{"examples":[{"english":"自然英文句子","chinese":"完整繁體中文翻譯","level":"基礎|會考|進階"}]}`;
   let last = [];
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const response = await fetch(`${apiBase}/chat/completions`, {
@@ -47,7 +55,14 @@ async function generate(word, meaning, partOfSpeech, meanings, phrases) {
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const client = await pool.connect();
 try {
-  const query = `SELECT id, word, meaning, meanings, part_of_speech, phrases FROM daily_words ${targetWord ? `WHERE lower(word) = '${targetWord.replaceAll("'", "''")}'` : ""} ORDER BY word ${limit ? `LIMIT ${Math.floor(limit)}` : ""}`;
+  const query = `SELECT dw.id, dw.word, dw.meaning, dw.meanings, dw.part_of_speech, dw.phrases,
+    count(we.id)::int AS existing_examples
+    FROM daily_words dw
+    LEFT JOIN word_examples we ON we.word_id = dw.id
+    ${targetWord ? `WHERE lower(dw.word) = '${targetWord.replaceAll("'", "''")}'` : ""}
+    GROUP BY dw.id
+    HAVING count(we.id) < 5
+    ORDER BY dw.word ${limit ? `LIMIT ${Math.floor(limit)}` : ""}`;
   const { rows } = await client.query(query);
   let cursor = 0; let done = 0; let failed = 0;
   async function worker() {
@@ -57,14 +72,22 @@ try {
       const row = rows[index];
       try {
         const examples = await generate(row.word, row.meaning, row.part_of_speech, row.meanings, row.phrases);
-        await client.query("BEGIN");
-        await client.query("DELETE FROM word_examples WHERE word_id = $1", [row.id]);
-        for (const example of examples) await client.query("INSERT INTO word_examples (word_id, english, chinese, level, source_kind) VALUES ($1, $2, $3, $4, $5)", [row.id, example.english, example.chinese, example.level, "ai_natural_regenerated"]);
-        await client.query("COMMIT");
+        // Never delete or replace existing rows: official/source examples are immutable.
+        // Only fill the missing quota, and skip generated sentences that already exist.
+        const existing = await client.query("SELECT english FROM word_examples WHERE word_id = $1", [row.id]);
+        const existingCount = existing.rows.length;
+        const seen = new Set(existing.rows.map((item) => String(item.english).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()));
+        const targetCount = Math.max(5, existingCount);
+        for (const example of examples) {
+          if (seen.size >= targetCount) break;
+          const key = example.english.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+          if (!key || seen.has(key)) continue;
+          await client.query("INSERT INTO word_examples (word_id, english, chinese, level, source_kind) VALUES ($1, $2, $3, $4, $5)", [row.id, example.english, example.chinese, example.level, "ai_natural_regenerated"]);
+          seen.add(key);
+        }
         done += 1;
         if (done % 10 === 0 || done === rows.length) console.log(`進度 ${done}/${rows.length}：${row.word}`);
       } catch (error) {
-        await client.query("ROLLBACK").catch(() => undefined);
         failed += 1;
         console.error(`失敗 ${row.word}: ${error instanceof Error ? error.message : String(error)}`);
       }

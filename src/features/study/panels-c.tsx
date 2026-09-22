@@ -23,10 +23,22 @@ function SpeechRateControl({ rate, onChange }: { rate: number; onChange: (rate: 
   return <label className="flex items-center gap-1.5 text-[11px] text-muted"><span>語速</span><select value={rate} onChange={(event) => { const next = Number(event.target.value); window.localStorage.setItem("studynova-speech-rate", String(next)); onChange(next); }} className="rounded-lg border border-[var(--line)] bg-black/20 px-2 py-1 text-[11px] text-[var(--text)]"><option value={0.7}>0.7× 慢</option><option value={0.85}>0.85×</option><option value={1}>1× 正常</option><option value={1.15}>1.15×</option><option value={1.3}>1.3× 快</option></select></label>;
 }
 
-type Word = { id: string; word: string; meaning: string; meanings?: string[]; phrases?: Array<{ en: string; zh: string }>; part_of_speech: string; phonetic?: string; example: string; example_zh: string; familiarity: number; memory_tip: string | null };
+type WordExample = { english: string; chinese: string; level?: string; sourceKind?: string };
+type Word = { id: string; word: string; meaning: string; meanings?: string[]; phrases?: Array<{ en: string; zh: string }>; part_of_speech: string; phonetic?: string; example: string; example_zh: string; examples?: WordExample[]; exampleSentences?: WordExample[]; familiarity: number; memory_tip: string | null };
 
 function exampleLabel(example: string) {
   return example.trim() || "尚未提供自然例句";
+}
+
+function examplesFor(word: Word) {
+  const items = word.examples?.length ? word.examples : word.exampleSentences?.length ? word.exampleSentences : word.example ? [{ english: word.example, chinese: word.example_zh }] : [];
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.english.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5);
 }
 
 export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
@@ -144,7 +156,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         </div>
         {current.meanings && current.meanings.length > 1 && <div className="mt-3"><p className="text-[11px] font-semibold text-muted">一字多意</p><div className="mt-1 flex flex-wrap gap-1.5">{current.meanings.slice(0, 6).map((meaning) => <span key={meaning} className="rounded-lg bg-white/10 px-2 py-1 text-xs">{meaning}</span>)}</div></div>}
         {current.phrases?.length ? <div className="mt-3"><p className="text-[11px] font-semibold text-muted">常用片語</p><div className="mt-1 grid gap-1.5 sm:grid-cols-2">{current.phrases.slice(0, 4).map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="rounded-lg bg-black/15 px-2.5 py-1.5 text-xs"><span className="font-medium">{phrase.en}</span><span className="ml-1 text-muted">{phrase.zh}</span></div>)}</div></div> : null}
-        <div className="mt-3 rounded-xl bg-black/15 px-3 py-2 text-xs leading-5"><p className="text-muted">例句</p>{current.example ? <p className="text-[#dcecff]">{current.example}</p> : <p className="text-muted">該單字目前尚未有例句</p>}{current.example_zh && <p className="text-[#ffc857]">{current.example_zh}</p>}</div>
+        <div className="mt-3 rounded-xl bg-black/15 px-3 py-2 text-xs leading-5"><div className="flex items-center justify-between gap-2"><p className="text-muted">實用例句（{examplesFor(current).length}）</p><Button size="sm" variant="ghost" onClick={() => examplesFor(current).forEach((item, itemIndex) => window.setTimeout(() => speak(item.english, "en-US", speechRate), itemIndex * 1900))}>朗讀全部</Button></div>{examplesFor(current).length ? <div className="mt-1 space-y-2">{examplesFor(current).map((item, itemIndex) => <div key={`${item.english}-${itemIndex}`}><p className="text-[#dcecff]">{item.english}</p>{item.chinese && <p className="text-[#ffc857]">{item.chinese}</p>}</div>)}</div> : <p className="text-muted">該單字目前尚未有自然例句</p>}</div>
         <div className="mt-3 flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => setDetailWord(current)}>查看完整解析</Button><span className="text-[11px] text-muted">熟悉度 {current.familiarity}%・點擊下方單字可切換</span></div>
       </section>
 
@@ -164,8 +176,8 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
                     <span className="text-xs text-muted">{word.part_of_speech}</span>
                     <span className="text-sm text-[#7dd3fc]">{word.meaning}</span>
                   </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-[#dcecff]">{word.example || "該單字目前尚未有例句"}</span>
-                  {word.example_zh && <span className="block text-xs leading-relaxed text-[#ffc857]">{word.example_zh}</span>}
+                  <span className="mt-1 block text-xs leading-relaxed text-[#dcecff]">{examplesFor(word)[0]?.english || "該單字目前尚未有自然例句"}</span>
+                  {examplesFor(word)[0]?.chinese && <span className="block text-xs leading-relaxed text-[#ffc857]">{examplesFor(word)[0].chinese}</span>}
                 </span>
               </div>
             </button>
@@ -197,10 +209,9 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
             {(flipped || mode === "card") && mode !== "spell" && <p className="text-lg text-[#37d3ff]">{flipped ? current.meaning : "　"}</p>}
           </>
         )}
-        {flipped && (current.example || current.word) && (
+        {flipped && (examplesFor(current).length || current.word) && (
           <div className="mt-1 text-xs text-muted">
-            <p>{exampleLabel(current.example)}</p>
-            <p>{current.example_zh || "我今天在課堂上學會了這個單字。"}</p>
+            {examplesFor(current).slice(0, 2).map((item, itemIndex) => <div key={`${item.english}-${itemIndex}`} className="mb-1"><p>{item.english}</p><p>{item.chinese}</p></div>)}
           </div>
         )}
         {tip && <p className="mt-2 whitespace-pre-wrap rounded-xl bg-black/30 p-2 text-left text-xs text-muted">{tip}</p>}
