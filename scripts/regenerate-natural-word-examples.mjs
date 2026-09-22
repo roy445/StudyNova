@@ -10,9 +10,13 @@ const apiKey = process.env.OPENAI_API_KEY;
 if (!process.env.DATABASE_URL || !apiBase || !apiKey) throw new Error("DATABASE_URL, OPENAI_API_BASE and OPENAI_API_KEY are required");
 
 const forbidden = [/in the passage/i, /the word\s+["“']/i, /the writer/i, /the author/i, /this sentence shows/i, /the meaning of/i, /helps explain the writer/i, /is used to describe/i];
+function wordPattern(word) {
+  const alternatives = word.toLowerCase().replace(/[()]/g, "/").split("/").map((part) => part.trim()).filter(Boolean);
+  const escaped = alternatives.map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return new RegExp(`\\b(?:${escaped})\\b`, "i");
+}
 function validExamples(items, word) {
-  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const target = new RegExp(`\\b${escaped}\\b`, "i");
+  const target = wordPattern(word);
   const seen = new Set();
   return (Array.isArray(items) ? items : []).filter((item) => {
     const english = String(item?.english || "").trim();
@@ -35,7 +39,7 @@ async function generate(word, meaning, partOfSpeech, meanings, phrases) {
 嚴格品質規則：例句的最高目的，是讓學生理解這個字在現實生活何時使用、如何使用及常見搭配。優先使用日常對話、學校、手機網路、社群、作業考試、社團、旅行交通、購物餐廳、人際關係、問題解決、建議提醒、表達意見感受或實際狀況。每句約 8–18 字（必要時可略超過），必須有資訊價值、符合詞性與常見義項，並盡可能呈現固定搭配或句型。句型和主詞要自然變化，不要五句都用 I 開頭。
 禁止流水帳（起床、吃早餐、上學、放學、回家等與目標字無關的行程）、禁止為塞入單字而硬寫、禁止小說式虛假故事、禁止不自然或過度學術的英文、禁止解釋單字本身。禁止 In the passage...、The word X...、The writer...、The author...、This sentence shows...、The meaning of X...、helps explain the writer's main idea，以及任何正在介紹這個單字的句子。多義字只挑國高中最常見且有學習價值的意思，除非其他意思也很重要才分配句子。生成後自行檢查：英文自然嗎、用法正確嗎、學生真的會遇到嗎、是否有常見搭配、是否比空泛句更實用；不合格就重寫。
 只回傳 JSON：{"examples":[{"english":"自然英文句子","chinese":"完整繁體中文翻譯","level":"基礎|會考|進階"}]}`;
-  let last = [];
+  let collected = [];
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const response = await fetch(`${apiBase}/chat/completions`, {
       method: "POST",
@@ -46,10 +50,16 @@ async function generate(word, meaning, partOfSpeech, meanings, phrases) {
     const payload = await response.json();
     let content = payload.choices?.[0]?.message?.content || "{}";
     if (Array.isArray(content)) content = content.map((part) => part.text || "").join("");
-    try { last = validExamples(JSON.parse(content).examples, word); } catch { last = []; }
-    if (last.length === 5) return last;
+    let batch = [];
+    try { batch = validExamples(JSON.parse(content).examples, word); } catch { batch = []; }
+    const seen = new Set(collected.map((item) => item.english.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()));
+    for (const item of batch) {
+      const key = item.english.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (!seen.has(key)) { collected.push(item); seen.add(key); }
+    }
+    if (collected.length >= 5) return collected.slice(0, 5);
   }
-  throw new Error(`品質檢查未通過：${word}，只得到 ${last.length} 句`);
+  throw new Error(`品質檢查未通過：${word}，只得到 ${collected.length} 句`);
 }
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
