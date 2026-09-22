@@ -27,14 +27,26 @@ const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
 
+const configuredMax = Number(process.env.PG_POOL_MAX ?? (process.env.VERCEL ? 1 : 5));
+const poolMax = Number.isFinite(configuredMax) ? Math.min(10, Math.max(1, Math.floor(configuredMax))) : 1;
+
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
     connectionString: secureDatabaseUrl(databaseUrl),
+    max: poolMax,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 10_000,
+    query_timeout: 30_000,
+    statement_timeout: 30_000,
+    allowExitOnIdle: true,
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
-}
+globalForDb.__arenaNextJsPostgresqlPool = pool;
+pool.on("error", (error) => {
+  // A Neon connection can be closed while a serverless isolate is being
+  // suspended. Handle it here so pg does not surface an uncaught exception.
+  console.error("[db] pooled connection error", error instanceof Error ? error.message : error);
+});
 
 export const db = drizzle(pool);
