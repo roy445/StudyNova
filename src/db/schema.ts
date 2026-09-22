@@ -2107,13 +2107,14 @@ export const systemLogs = pgTable(
   "system_logs",
   {
     id: id(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
     level: text("level").notNull().default("info"),
     scope: text("scope").notNull().default("app"),
     message: text("message").notNull(),
     meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: created(),
   },
-  (t) => [index("system_logs_idx").on(t.createdAt)],
+  (t) => [index("system_logs_idx").on(t.createdAt), index("system_logs_user_idx").on(t.userId, t.createdAt)],
 );
 
 export const jobQueue = pgTable(

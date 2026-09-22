@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs, educationGrades, educationSchools, educationStages, educationSubjects, fileContexts, textbookContents, textbookEditions, textbookLessons, userSettings } from "@/db/schema";
+import { auditLogs, educationGrades, educationSchools, educationStages, educationSubjects, fileContexts, textbookContents, textbookEditions, textbookLessons, userSettings, users } from "@/db/schema";
 import { route, type Ctx, type RouteDef } from "../router";
 import { fail, notFound, safeErrorMessage } from "../core";
 import { writeAudit } from "../audit";
@@ -75,13 +75,20 @@ export const routes: RouteDef[] = [
     const page = Math.max(1, Number(ctx.query.get("page") ?? 1) || 1); const pageSize = Math.min(100, Math.max(10, Number(ctx.query.get("pageSize") ?? 30) || 30));
     const userId = ctx.query.get("userId"); const eventType = ctx.query.get("eventType"); const moduleFilter = ctx.query.get("module"); const outcome = ctx.query.get("outcome"); const resourceId = ctx.query.get("resourceId"); const keyword = ctx.query.get("q")?.trim(); const from = ctx.query.get("from"); const to = ctx.query.get("to");
     const filters = [userId ? eq(auditLogs.userId, userId) : undefined, eventType ? eq(auditLogs.eventType, eventType) : undefined, moduleFilter ? eq(auditLogs.module, moduleFilter) : undefined, outcome ? eq(auditLogs.outcome, outcome) : undefined, resourceId ? eq(auditLogs.resourceId, resourceId) : undefined, from ? gte(auditLogs.occurredAt, new Date(from)) : undefined, to ? lte(auditLogs.occurredAt, new Date(to)) : undefined, keyword ? or(ilike(auditLogs.action, `%${keyword}%`), ilike(auditLogs.resourceId, `%${keyword}%`), ilike(auditLogs.errorCategory, `%${keyword}%`)) : undefined].filter(Boolean);
-    const rows = await db.select().from(auditLogs).where(filters.length ? and(...filters) : undefined).orderBy(desc(auditLogs.occurredAt)).limit(pageSize).offset((page - 1) * pageSize);
+    const rows = await db.select({ id: auditLogs.id, userId: auditLogs.userId, userName: users.displayName, userNovaId: users.novaId, occurredAt: auditLogs.occurredAt, eventType: auditLogs.eventType, module: auditLogs.module, action: auditLogs.action, resourceId: auditLogs.resourceId, outcome: auditLogs.outcome, errorCategory: auditLogs.errorCategory, correlationId: auditLogs.correlationId, ip: auditLogs.ip, metadata: auditLogs.metadata }).from(auditLogs).leftJoin(users, eq(users.userId, auditLogs.userId)).where(filters.length ? and(...filters) : undefined).orderBy(desc(auditLogs.occurredAt)).limit(pageSize).offset((page - 1) * pageSize);
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(auditLogs).where(filters.length ? and(...filters) : undefined);
     await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "audit", action: "audit_logs.view", resourceId: userId ?? "all", ip: ctx.ip, metadata: { status: 200, route: "/admin/audit-logs", method: "GET", targetCount: rows.length } });
     return { logs: rows, page, pageSize, total: count ?? 0, totalPages: Math.ceil((count ?? 0) / pageSize) };
   }}),
+  route({ method: "GET", path: "/admin/audit-summary", auth: "admin", handler: async (ctx) => {
+    const since = new Date(); since.setHours(0, 0, 0, 0);
+    const [totals] = await db.select({ total: sql<number>`count(*)::int`, success: sql<number>`coalesce(sum(case when ${auditLogs.outcome} = 'success' then 1 else 0 end), 0)::int`, failure: sql<number>`coalesce(sum(case when ${auditLogs.outcome} = 'failure' then 1 else 0 end), 0)::int` }).from(auditLogs).where(gte(auditLogs.occurredAt, since));
+    const byAction = await db.select({ action: auditLogs.action, count: sql<number>`count(*)::int` }).from(auditLogs).where(gte(auditLogs.occurredAt, since)).groupBy(auditLogs.action).orderBy(desc(sql`count(*)`)).limit(50);
+    const byUser = await db.select({ userId: auditLogs.userId, userName: users.displayName, userNovaId: users.novaId, count: sql<number>`count(*)::int`, lastActiveAt: sql<Date>`max(${auditLogs.occurredAt})` }).from(auditLogs).leftJoin(users, eq(users.userId, auditLogs.userId)).where(gte(auditLogs.occurredAt, since)).groupBy(auditLogs.userId, users.displayName, users.novaId).orderBy(desc(sql`count(*)`)).limit(50);
+    return { date: since.toISOString().slice(0, 10), totals: totals ?? { total: 0, success: 0, failure: 0 }, byAction, byUser };
+  }}),
   route({ method: "GET", path: "/admin/audit-logs/:userId/timeline", auth: "admin", handler: async (ctx) => {
-    const rows = await db.select().from(auditLogs).where(eq(auditLogs.userId, ctx.params.userId)).orderBy(desc(auditLogs.occurredAt)).limit(200);
+    const rows = await db.select({ id: auditLogs.id, userId: auditLogs.userId, userName: users.displayName, userNovaId: users.novaId, occurredAt: auditLogs.occurredAt, eventType: auditLogs.eventType, module: auditLogs.module, action: auditLogs.action, resourceId: auditLogs.resourceId, outcome: auditLogs.outcome, errorCategory: auditLogs.errorCategory, correlationId: auditLogs.correlationId, ip: auditLogs.ip, metadata: auditLogs.metadata }).from(auditLogs).leftJoin(users, eq(users.userId, auditLogs.userId)).where(eq(auditLogs.userId, ctx.params.userId)).orderBy(desc(auditLogs.occurredAt)).limit(200);
     await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "audit", action: "audit_timeline.view", resourceId: ctx.params.userId, ip: ctx.ip, metadata: { status: 200, route: "/admin/audit-logs/:userId/timeline", method: "GET", targetCount: rows.length } });
     return { logs: rows };
   }}),

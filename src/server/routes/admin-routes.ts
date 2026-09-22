@@ -1676,7 +1676,8 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const kind = ctx.query.get("kind") ?? "admin";
       if (kind === "system") {
-        return { logs: await db.select().from(systemLogs).orderBy(desc(systemLogs.createdAt)).limit(100) };
+        const logs = await db.select({ id: systemLogs.id, userId: systemLogs.userId, userName: users.displayName, userNovaId: users.novaId, level: systemLogs.level, scope: systemLogs.scope, message: systemLogs.message, meta: systemLogs.meta, createdAt: systemLogs.createdAt }).from(systemLogs).leftJoin(users, eq(users.userId, systemLogs.userId)).orderBy(desc(systemLogs.createdAt)).limit(100);
+        return { logs };
       }
       const rows = await db
         .select({
@@ -1730,8 +1731,9 @@ export const routes: RouteDef[] = [
       }
       if (kind === "ai") {
         const rows = await db
-          .select({ provider: aiUsageLogs.provider, model: aiUsageLogs.model, feature: aiUsageLogs.feature, success: aiUsageLogs.success, inputTokens: aiUsageLogs.inputTokens, outputTokens: aiUsageLogs.outputTokens, latencyMs: aiUsageLogs.latencyMs, createdAt: aiUsageLogs.createdAt })
+          .select({ userId: aiUsageLogs.userId, displayName: users.displayName, novaId: users.novaId, provider: aiUsageLogs.provider, model: aiUsageLogs.model, feature: aiUsageLogs.feature, success: aiUsageLogs.success, inputTokens: aiUsageLogs.inputTokens, outputTokens: aiUsageLogs.outputTokens, latencyMs: aiUsageLogs.latencyMs, createdAt: aiUsageLogs.createdAt })
           .from(aiUsageLogs)
+          .leftJoin(users, eq(users.userId, aiUsageLogs.userId))
           .orderBy(desc(aiUsageLogs.createdAt))
           .limit(5000);
         return csvResponse("studynova-ai-usage.csv", rows as never);

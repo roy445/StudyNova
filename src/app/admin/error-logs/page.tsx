@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Select, Skeleton } from "@/components/ui";
 import { useApi } from "@/lib/api";
 
-type Log = { id: string; level: string; scope: string; message: string; meta: Record<string, unknown>; createdAt: string };
+type Log = { id: string; userId: string | null; userName: string | null; userNovaId: string | null; level: string; scope: string; message: string; meta: Record<string, unknown>; createdAt: string };
 export default function ErrorLogsPage() {
   const [level, setLevel] = useState("error");
   const [scope, setScope] = useState("");
@@ -19,7 +19,7 @@ export default function ErrorLogsPage() {
     {logs.loading && <Card><Skeleton lines={7} /></Card>}
     {logs.error && <ErrorState message={logs.error} onRetry={logs.reload} />}
     <Card title={`錯誤紀錄（${logs.data?.logs.length ?? 0} 筆）`} action={<Button size="sm" variant="ghost" onClick={logs.reload}>重新整理</Button>}>
-      <div className="space-y-2">{logs.data?.logs.map((log) => <details key={log.id} className="glass-soft rounded-xl p-3 text-xs"><summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2"><Badge tone={log.level === "error" ? "rose" : "gold"}>{log.level}</Badge><b>{log.scope}</b><span className="max-w-[520px] truncate">{log.message}</span></span><time className="text-muted">{new Date(log.createdAt).toLocaleString("zh-TW")}</time></summary><pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-[11px]">{JSON.stringify(log.meta, null, 2)}</pre></details>)}{!logs.loading && !logs.data?.logs.length && <EmptyState icon="!" title="沒有符合條件的錯誤" hint="可以放寬日期、範圍或 Level 篩選。" />}</div>
+      <div className="space-y-2">{logs.data?.logs.map((log) => <details key={log.id} className="glass-soft rounded-xl p-3 text-xs"><summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2"><Badge tone={log.level === "error" ? "rose" : "gold"}>{log.level}</Badge><b>{log.scope}</b><span className="max-w-[520px] truncate">{log.message}</span></span><time className="text-muted">{new Date(log.createdAt).toLocaleString("zh-TW")}</time></summary><div className="mt-3 grid gap-1 text-muted sm:grid-cols-2"><span>使用者：<b>{log.userName ?? "系統／排程"}</b></span><span>Nova ID：<code>{log.userNovaId ?? "—"}</code></span><span>User ID：<code>{log.userId ?? "—"}</code></span></div><pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-[11px]">{JSON.stringify(log.meta, null, 2)}</pre></details>)}{!logs.loading && !logs.data?.logs.length && <EmptyState icon="!" title="沒有符合條件的錯誤" hint="可以放寬日期、範圍或 Level 篩選。" />}</div>
     </Card>
   </div>;
 }

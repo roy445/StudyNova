@@ -205,7 +205,7 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
       const audit = classifyAuditPath(def.path);
       await writeAudit({ userId: user.userId, eventType: audit.eventType, module: audit.module, action: audit.action, resourceId: params.id, ip, userAgent: req.headers.get("user-agent") ?? "", metadata: { status: response.status, httpStatus: response.status, durationMs: Date.now() - startedAt, route: def.path, method: def.method, queryKeys: Array.from(url.searchParams.keys()).join(",") } });
     }
-    void logApiPerformance({ route: def.path, method: def.method, status: response.status, durationMs: Date.now() - startedAt, requestId: response.headers.get("x-request-id") ?? newRequestId() });
+    void logApiPerformance({ userId: user?.userId ?? null, route: def.path, method: def.method, status: response.status, durationMs: Date.now() - startedAt, requestId: response.headers.get("x-request-id") ?? newRequestId() });
     return response;
   } catch (err) {
     if (err instanceof AppError) {
@@ -214,28 +214,28 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
         await writeAudit({ userId: user.userId, eventType: audit.eventType, module: audit.module, action: audit.action, resourceId: params.id, outcome: "failure", errorCategory: err.code, ip, userAgent: req.headers.get("user-agent") ?? "", metadata: { status: err.status, httpStatus: err.status, route: def.path, method: def.method, errorCode: err.code } });
       }
       if (err.status >= 500) {
-        await logSystemError(`api:${def.method} ${def.path}`, err.message, { ip, code: err.code, requestId: err.requestId });
+        await logSystemError(`api:${def.method} ${def.path}`, err.message, { ip, code: err.code, requestId: err.requestId }, user?.userId ?? null);
       }
       return errorResponse(err);
     }
     const requestId = newRequestId();
     const internal = fail("SYS_INTERNAL", { details: { requestId } });
-    await logSystemError(`api:${def.method} ${def.path}`, safeErrorMessage(err), { ip, code: internal.code, requestId: internal.requestId });
+    await logSystemError(`api:${def.method} ${def.path}`, safeErrorMessage(err), { ip, code: internal.code, requestId: internal.requestId }, user?.userId ?? null);
     return errorResponse(internal);
   }
 }
 
-async function logApiPerformance(meta: { route: string; method: string; status: number; durationMs: number; requestId: string }) {
+async function logApiPerformance(meta: { userId: string | null; route: string; method: string; status: number; durationMs: number; requestId: string }) {
   try {
-    await db.insert(systemLogs).values({ level: "perf", scope: "api", message: `${meta.method} ${meta.route}`, meta: { ...meta, timestamp: new Date().toISOString() } });
+    await db.insert(systemLogs).values({ userId: meta.userId, level: "perf", scope: "api", message: `${meta.method} ${meta.route}`, meta: { ...meta, timestamp: new Date().toISOString() } });
   } catch {
     /* performance logging must never affect the request */
   }
 }
 
-async function logSystemError(scope: string, message: string, meta: Record<string, unknown>) {
+async function logSystemError(scope: string, message: string, meta: Record<string, unknown>, userId: string | null = null) {
   try {
-    await db.insert(systemLogs).values({ level: "error", scope, message: message.slice(0, 500), meta });
+    await db.insert(systemLogs).values({ userId, level: "error", scope, message: message.slice(0, 500), meta });
   } catch {
     /* logging must never break the response */
   }
