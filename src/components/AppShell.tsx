@@ -192,6 +192,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
 
   useEffect(() => {
     trackAnalytics("page_view", { route: pathname, metadata: { feature: featureKey } });
+    if (featureKey !== "all") trackAnalytics("feature_use", { route: pathname, metadata: { feature: featureKey } });
   }, [pathname, featureKey]);
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
