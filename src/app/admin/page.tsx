@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { BarChart } from "@/components/charts";
@@ -16,6 +17,7 @@ type AdminUser = {
   blockedAt: string | null;
   createdAt: string;
   lastLoginAt: string | null;
+  lastSeenAt: string | null;
   tier: string | null;
   expiresAt: string | null;
   nova: number | null;
@@ -81,8 +83,9 @@ export default function AdminOverviewPage() {
   const toast = useToast();
   const [tab, setTab] = useState("overview");
   const [q, setQ] = useState("");
+  const [userPage, setUserPage] = useState(1);
   const overview = useApi<{ users: number; pro: number; novaCirculating: number; aiCallsThisMonth: number; totalMinutes: number; weeks: number; newUsers: Array<{ day: string; c: number }> }>("/admin/overview");
-  const users = useApi<{ users: AdminUser[] }>(`/admin/users?q=${encodeURIComponent(q)}`, [q]);
+  const users = useApi<{ users: AdminUser[]; total: number; page: number; pageSize: number }>(`/admin/users?q=${encodeURIComponent(q)}&page=${userPage}&pageSize=25`, [q, userPage]);
   const logs = useApi<{ logs: Array<{ id: string; action: string; targetType: string; targetId: string; reason: string; createdAt: string; actor: string | null }> }>("/admin/logs?kind=admin");
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string }> }>("/admin/features");
   const challengeAdmin = useApi<{ challenges: Array<{ id: string; title: string; kind: string; status: string; expiresAt: string; createdAt: string; creatorName: string; participants: number }> }>("/admin/challenges");
@@ -100,6 +103,7 @@ export default function AdminOverviewPage() {
   const [compressionForm, setCompressionForm] = useState<CompressionSettings>(DEFAULT_COMPRESSION_SETTINGS);
 
   const currentAction = ACTIONS.find((a) => a.key === form.action);
+  useEffect(() => { setUserPage(1); setSelected([]); }, [q]);
   useEffect(() => {
     const saved = settings.data?.settings.find((setting) => setting.key === "christmas_theme")?.value;
     if (!saved) return;
@@ -228,6 +232,7 @@ export default function AdminOverviewPage() {
                   <th className="pb-2">Email</th>
                   <th className="pb-2">角色</th>
                   <th className="pb-2">狀態</th>
+                  <th className="pb-2">最後上線</th>
                   <th className="pb-2 text-right">Nova</th>
                   <th className="pb-2 text-right">Lv/XP</th>
                   <th className="pb-2">會員</th>
@@ -252,6 +257,7 @@ export default function AdminOverviewPage() {
                     <td className="py-2">
                       <span title={u.status === "blocked" ? `原因：${u.blockedReason || "未填寫"}｜日期：${u.blockedAt ? new Date(u.blockedAt).toLocaleString("zh-TW") : "—"}` : "帳號正常"}><Badge tone={u.status === "active" ? "green" : "rose"}>{u.status}</Badge></span>
                     </td>
+                    <td className="py-2 text-muted">{u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleString("zh-TW") : "—"}</td>
                     <td className="py-2 text-right tabular-nums">{u.nova ?? 0}</td>
                     <td className="py-2 text-right tabular-nums">
                       {u.level ?? 1}/{u.xp ?? 0}
@@ -270,12 +276,14 @@ export default function AdminOverviewPage() {
                       >
                         詳細
                       </button>
+                      <Link href={`/admin/users/${u.userId}`} className="ml-2 underline text-[#7dd3fc]">分析</Link>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {users.data && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] pt-3 text-xs text-muted"><span>共 {users.data.total} 位會員 · 第 {users.data.page} / {Math.max(1, Math.ceil(users.data.total / users.data.pageSize))} 頁</span><div className="flex gap-2"><Button size="sm" variant="ghost" disabled={userPage <= 1} onClick={() => setUserPage((page) => Math.max(1, page - 1))}>上一頁</Button><Button size="sm" variant="ghost" disabled={userPage >= Math.max(1, Math.ceil(users.data.total / users.data.pageSize))} onClick={() => setUserPage((page) => page + 1)}>下一頁</Button></div></div>}
         </Card>
       )}
 

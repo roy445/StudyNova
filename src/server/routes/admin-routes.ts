@@ -62,6 +62,7 @@ import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured
 import { analysisPrompt, qualityGate } from "../question-analysis";
 import { getAiPolicy, policyInstructions } from "../ai-policy";
 import { checkDisplayName } from "../name-moderation";
+import { getRegistrationControl } from "../registration";
 
 function validateCustomizationTokens(tokens: Record<string, string>) {
   const allowed = new Set(["primary", "secondary", "accent", "surface", "line", "radius", "shadow", "glow", "buttonRadius", "motion", "pageBackground", "fontSize", "fontWeight", "spacing"]);
@@ -285,8 +286,10 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const q = (ctx.query.get("q") ?? "").trim();
+      const page = Math.max(1, Number(ctx.query.get("page") ?? 1) || 1);
+      const pageSize = Math.min(50, Math.max(10, Number(ctx.query.get("pageSize") ?? 25) || 25));
       const like = `%${q}%`;
-      const rows = await db
+      const [rows, total] = await Promise.all([db
         .select({
           userId: users.userId,
           novaId: users.novaId,
@@ -298,6 +301,7 @@ export const routes: RouteDef[] = [
           blockedAt: users.blockedAt,
           createdAt: users.createdAt,
           lastLoginAt: users.lastLoginAt,
+          lastSeenAt: users.lastSeenAt,
           tier: memberships.tier,
           expiresAt: memberships.expiresAt,
           nova: novaAccounts.balance,
@@ -310,8 +314,9 @@ export const routes: RouteDef[] = [
         .leftJoin(assistantProfiles, eq(assistantProfiles.userId, users.userId))
         .where(q ? or(ilike(users.novaId, like), ilike(users.email, like), ilike(users.displayName, like)) : sql`true`)
         .orderBy(desc(users.createdAt))
-        .limit(100);
-      return { users: rows };
+        .limit(pageSize)
+        .offset((page - 1) * pageSize), db.select({ count: sql<number>`count(*)::int` }).from(users).where(q ? or(ilike(users.novaId, like), ilike(users.email, like), ilike(users.displayName, like)) : sql`true`)]);
+      return { users: rows, total: total[0]?.count ?? 0, page, pageSize };
     },
   }),
 
@@ -1763,6 +1768,28 @@ export const routes: RouteDef[] = [
         return csvResponse("studynova-student-stats.csv", rows as never);
       }
       throw fail("ADMIN_EXPORT_UNSUPPORTED");
+    },
+  }),
+
+  /* ----------------------------------------------- registration control */
+  route({
+    method: "GET",
+    path: "/admin/registration-control",
+    auth: "admin",
+    handler: async () => ({ registration: await getRegistrationControl() }),
+  }),
+  route({
+    method: "PUT",
+    path: "/admin/registration-control",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ enabled: z.boolean(), reason: z.string().max(500).default(""), reopeningAt: z.string().datetime().nullable().default(null), notice: z.string().max(1000).default("") }));
+      const before = await getRegistrationControl();
+      const value = { ...body, updatedAt: new Date().toISOString() };
+      const rows = await db.insert(platformSettings).values({ key: "registration_control", value }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } }).returning();
+      await adminLog({ actorId: admin.userId, action: "settings.registration_control.update", targetType: "setting", targetId: "registration_control", reason: body.reason || (body.enabled ? "重新開放註冊" : "暫停註冊"), before, after: value, ip: ctx.ip });
+      return { registration: { ...body, updatedAt: rows[0]?.updatedAt?.toISOString?.() ?? value.updatedAt } };
     },
   }),
 

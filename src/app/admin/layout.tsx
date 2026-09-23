@@ -14,6 +14,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
     label: "核心與使用者",
     items: [
       { href: "/admin", label: "總覽・使用者", icon: "home" },
+      { href: "/admin/analytics", label: "網站 Analytics", icon: "grades" },
     ],
   },
   {

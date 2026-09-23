@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Wordmark, StarField } from "@/components/brand";
 import { Button, Field, Input, useToast } from "@/components/ui";
-import { ApiRequestError, apiPost, errorMessage } from "@/lib/api";
+import { ApiRequestError, apiPost, errorMessage, trackAnalytics } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,7 +26,8 @@ export default function LoginPage() {
     setDeleted(null);
     setPending(true);
     try {
-      const res = await apiPost<{ onboarded: boolean; displayName: string }>("/auth/login", { identifier, password });
+      const res = await apiPost<{ onboarded: boolean; displayName: string; firstLogin?: boolean }>("/auth/login", { identifier, password });
+      trackAnalytics(res.firstLogin ? "first_login" : "login_success", { route: "/login" });
       toast.push("success", `歡迎回來，${res.displayName}！`);
       router.replace(res.onboarded ? "/dashboard" : "/onboarding");
       router.refresh();

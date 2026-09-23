@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
 import { SymbolIcon, type SymbolName } from "./Symbol";
 import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
-import { apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, errorMessage, trackAnalytics, useApi } from "@/lib/api";
 import { MaintenanceNotice } from "@/components/MaintenanceNotice";
 import type { MaintenanceState } from "@/server/maintenance";
 
@@ -175,6 +175,17 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       .then(setUsageRules)
       .catch(() => setUsageRules(null));
   }, [user.userId]);
+
+  useEffect(() => {
+    const startedAt = Number(sessionStorage.getItem("studynova:analytics-start") ?? Date.now());
+    sessionStorage.setItem("studynova:analytics-start", String(startedAt));
+    trackAnalytics("session_start", { metadata: { role: user.role } });
+    return () => trackAnalytics("session_end", { durationMs: Math.max(0, Date.now() - startedAt) });
+  }, [user.role]);
+
+  useEffect(() => {
+    trackAnalytics("page_view", { route: pathname, metadata: { feature: featureKey } });
+  }, [pathname, featureKey]);
 
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",

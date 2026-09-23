@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { AuthUser } from "./auth";
 import { clientIp, getSession, rateLimit, requireAdmin, requireUser } from "./auth";
 import { AppError, fail, newRequestId, safeErrorMessage } from "./core";
 import { db } from "@/db";
-import { legalConsents, legalDocuments, platformSettings, systemLogs } from "@/db/schema";
+import { legalConsents, legalDocuments, platformSettings, systemLogs, users } from "@/db/schema";
 import { classifyAuditPath, writeAudit } from "./audit";
 import { ensureIdentityGroupSchema } from "./db-compat";
 
@@ -122,6 +122,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/release-routes"),
     import("./routes/identity-group-routes"),
     import("./routes/error-log-routes"),
+    import("./routes/analytics-routes"),
   ]);
   compiledRoutes = compile(mods.flatMap((m) => m.routes));
   return compiledRoutes;
@@ -133,6 +134,18 @@ async function hasCurrentUsageConsent(userId: string) {
   const consentRows = await db.select({ id: legalConsents.id }).from(legalConsents).where(and(eq(legalConsents.userId, userId), eq(legalConsents.documentSlug, "usage_rules"), eq(legalConsents.documentVersion, document.version))).limit(1);
   const consent = consentRows[0];
   return Boolean(consent);
+}
+
+const lastSeenMemory = new Map<string, number>();
+async function touchLastSeen(userId: string) {
+  const now = Date.now();
+  if ((lastSeenMemory.get(userId) ?? 0) > now - 10 * 60_000) return;
+  lastSeenMemory.set(userId, now);
+  try {
+    await db.update(users).set({ lastSeenAt: new Date(now) }).where(and(eq(users.userId, userId), sql`${users.lastSeenAt} is null or ${users.lastSeenAt} < now() - interval '10 minutes'`));
+  } catch {
+    lastSeenMemory.delete(userId);
+  }
 }
 
 export async function handleApiRequest(req: Request, pathSegments: string[]): Promise<Response> {
@@ -154,13 +167,14 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     if (def.auth === "admin") user = await requireAdmin();
     else if (def.auth === "user") user = await requireUser();
     else if (def.auth === "optional") user = (await getSession())?.user ?? null;
+    if (user) void touchLastSeen(user.userId);
 
     if (def.auth !== "admin" && !def.path.startsWith("/auth") && def.path !== "/health" && def.path !== "/system/cron") {
       const control = await serviceControl();
       if (!control.enabled) throw fail("SERVICE_MAINTENANCE", { message: control.message, details: { estimatedRecoveryAt: control.estimatedRecoveryAt } });
     }
 
-    if (user && def.auth !== "admin" && !def.path.startsWith("/auth") && !def.path.startsWith("/support/legal") && def.path !== "/health" && !(await hasCurrentUsageConsent(user.userId))) {
+    if (user && def.auth !== "admin" && !def.path.startsWith("/auth") && !def.path.startsWith("/support/legal") && def.path !== "/analytics/events" && def.path !== "/health" && !(await hasCurrentUsageConsent(user.userId))) {
       throw fail("AUTH_USAGE_RULES_REQUIRED");
     }
 

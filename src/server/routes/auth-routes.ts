@@ -22,6 +22,7 @@ import { ensureDailyTasks, ensureUserEconomy, allFeatureStates, novaBalance } fr
 import { notify } from "../notify";
 import { sendPasswordResetEmail } from "../email";
 import { checkDisplayName } from "../name-moderation";
+import { getRegistrationControl } from "../registration";
 
 const emailSchema = z.string().email("Email 格式不正確").max(180);
 const passwordSchema = z.string().min(8, "密碼至少 8 個字元").max(128);
@@ -36,6 +37,13 @@ async function createUniqueNovaId(): Promise<string> {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/auth/registration-status",
+    auth: "none",
+    handler: async () => ({ registration: await getRegistrationControl() }),
+  }),
+
   route({
     method: "POST",
     path: "/auth/register",
@@ -52,6 +60,13 @@ export const routes: RouteDef[] = [
           termsAccepted: z.literal(true),
         }),
       );
+      const registration = await getRegistrationControl();
+      if (!registration.enabled) {
+        throw fail("AUTH_REGISTRATION_CLOSED", {
+          message: registration.reason || undefined,
+          details: { reopeningAt: registration.reopeningAt, notice: registration.notice },
+        });
+      }
       const terms = (await db.select({ version: legalDocuments.version }).from(legalDocuments).where(eq(legalDocuments.slug, "registration_terms")).limit(1))[0];
       if (!terms || terms.version !== body.termsVersion) throw fail("AUTH_TERMS_UPDATE_REQUIRED", { message: "註冊條款已更新，請重新閱讀最新版本。" });
       const registrationName = checkDisplayName(body.displayName);
@@ -130,9 +145,10 @@ export const routes: RouteDef[] = [
       }
 
       await ensureUserEconomy(user.userId);
+      const firstLogin = !user.lastLoginAt;
       await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.userId, user.userId));
       await createSession(user.userId, { ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
-      return { userId: user.userId, novaId: user.novaId, displayName: user.displayName, role: user.role, onboarded: user.onboarded };
+      return { userId: user.userId, novaId: user.novaId, displayName: user.displayName, role: user.role, onboarded: user.onboarded, firstLogin };
     },
   }),
 

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Wordmark, StarField, NoviAvatar } from "@/components/brand";
 import { Button, Field, Input, useToast } from "@/components/ui";
-import { apiGet, apiPost, errorMessage, shareContent } from "@/lib/api";
+import { apiGet, apiPost, errorMessage, shareContent, trackAnalytics } from "@/lib/api";
+
+type RegistrationControl = { enabled: boolean; reason: string; reopeningAt: string | null; notice: string; updatedAt: string | null };
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,9 +23,15 @@ export default function RegisterPage() {
   const [terms, setTerms] = useState<{ version: string; title: string; body: string } | null>(null);
   const [termsReadComplete, setTermsReadComplete] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [registration, setRegistration] = useState<RegistrationControl | null>(null);
   const termsRef = useRef<HTMLDivElement>(null);
+  const registerStartedRef = useRef(false);
 
   useEffect(() => {
+    trackAnalytics("register_view", { route: "/register" });
+    void apiGet<{ registration: RegistrationControl }>("/auth/registration-status")
+      .then((result) => setRegistration(result.registration))
+      .catch(() => setRegistration({ enabled: true, reason: "", reopeningAt: null, notice: "", updatedAt: null }));
     void apiGet<{ document: { version: string; title: string; body: string } }>("/support/legal/registration_terms")
       .then((result) => setTerms(result.document))
       .catch(() => setError("目前無法載入註冊條款，請稍後再試。"));
@@ -36,6 +44,7 @@ export default function RegisterPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    trackAnalytics("register_submit", { route: "/register" });
     setError(null);
     if (password !== confirm) {
       setError("兩次輸入的密碼不一致");
@@ -49,6 +58,7 @@ export default function RegisterPage() {
     try {
       const res = await apiPost<{ novaId: string; displayName: string }>("/auth/register", { email, password, displayName, termsVersion: terms.version, termsReadComplete, termsAccepted });
       setCreated(res);
+      trackAnalytics("register_success", { route: "/register" });
       toast.push("success", "已建立 StudyNova 帳號");
       try {
         setQr(await apiGet<{ svg: string; link: string }>("/account/nova-id-qr"));
@@ -60,6 +70,10 @@ export default function RegisterPage() {
     } finally {
       setPending(false);
     }
+  }
+
+  if (registration && !registration.enabled) {
+    return <div className="relative grid min-h-dvh place-items-center overflow-hidden px-4 py-8"><StarField count={22} /><div className="glass anim-pop relative z-10 w-full max-w-md p-7 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-amber-300/40 bg-amber-300/10 text-3xl">🔒</div><h1 className="mt-4 text-2xl font-black">目前暫停新會員註冊</h1><p className="mt-3 text-sm leading-7 text-muted">StudyNova 目前暫時沒有開放新的會員註冊。</p>{registration.reason && <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/5 p-3 text-sm text-amber-100">{registration.reason}</p>}{registration.notice && <p className="mt-3 text-sm leading-6 text-muted">{registration.notice}</p>}{registration.reopeningAt && <p className="mt-4 text-xs text-muted">預計重新開放：{new Date(registration.reopeningAt).toLocaleString("zh-TW")}</p>}<Link href="/login" className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-4 py-3 text-sm font-bold text-white">返回登入</Link></div></div>;
   }
 
   if (created) {
@@ -127,7 +141,7 @@ export default function RegisterPage() {
           <p className="text-xs text-muted">建立帳號後系統會自動產生你的 NOVA ID（不需要 Email 驗證）</p>
         </div>
 
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} onFocus={() => { if (!registerStartedRef.current) { registerStartedRef.current = true; trackAnalytics("register_started", { route: "/register" }); } }} className="space-y-3">
           <section className="rounded-2xl border border-[#37d3ff]/25 bg-black/15 p-3 text-left">
             <h2 className="text-sm font-semibold">{terms?.title ?? "註冊條款與使用規範"}</h2>
             <p className="mt-1 text-[11px] text-muted">請完整閱讀條款內容（版本 {terms?.version ?? "載入中"}）。</p>

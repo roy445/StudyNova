@@ -55,6 +55,7 @@ export const ERROR_CATALOG = {
   AUTH_ACCOUNT_DELETED: def("SN-AUTH-1011", 401, "AUTH", "此帳號已遭到刪除", "此帳號不可申訴；如需使用 StudyNova，請重新註冊新的帳號。"),
   AUTH_USAGE_RULES_REQUIRED: def("SN-AUTH-1012", 403, "AUTH", "請先閱讀並同意最新使用規章", "完成閱讀與同意後即可繼續使用 StudyNova。"),
   AUTH_TERMS_UPDATE_REQUIRED: def("SN-AUTH-1013", 409, "AUTH", "條款版本已更新", "請重新載入最新條款並完成同意。"),
+  AUTH_REGISTRATION_CLOSED: def("SN-AUTH-1014", 403, "AUTH", "目前暫停新會員註冊", "StudyNova 暫時沒有開放新的會員註冊，請稍後再回來看看。"),
 
   /* ---------------------------------------------------------- ACCT 12xx */
   ACCT_NOT_FOUND: def("SN-ACCT-1201", 404, "ACCT", "找不到這個 NOVA ID", "請確認 NOVA ID 是否輸入正確（格式：NV-XXXX-XXXX）。"),

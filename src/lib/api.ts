@@ -90,6 +90,18 @@ export const apiPatch = <T,>(path: string, body?: unknown) => apiSend<T>(path, "
 export const apiPut = <T,>(path: string, body?: unknown) => apiSend<T>(path, "PUT", body);
 export const apiDelete = <T,>(path: string, body?: unknown) => apiSend<T>(path, "DELETE", body);
 
+export function trackAnalytics(eventName: string, data: { route?: string; durationMs?: number | null; metadata?: Record<string, string | number | boolean | null> } = {}) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = "studynova:analytics-session";
+    const sessionKey = sessionStorage.getItem(key) ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem(key, sessionKey);
+    void apiPost("/analytics/events", { events: [{ eventName, sessionKey, route: data.route ?? window.location.pathname, durationMs: data.durationMs ?? null, metadata: data.metadata ?? {} }] }).catch(() => undefined);
+  } catch {
+    /* analytics must never affect the learning experience */
+  }
+}
+
 export type QueryState<T> = {
   data: T | null;
   loading: boolean;

@@ -49,6 +49,7 @@ export const users = pgTable(
     bio: text("bio").notNull().default(""),
     onboarded: boolean("onboarded").notNull().default(false),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     inactiveReminderCount: integer("inactive_reminder_count").notNull().default(0),
     inactiveFirstNotifiedAt: timestamp("inactive_first_notified_at", { withTimezone: true }),
     inactiveSecondNotifiedAt: timestamp("inactive_second_notified_at", { withTimezone: true }),
@@ -88,6 +89,21 @@ export const sessions = pgTable(
     createdAt: created(),
   },
   (t) => [uniqueIndex("sessions_token_uq").on(t.tokenHash), index("sessions_user_idx").on(t.userId)],
+);
+
+export const analyticsEvents = pgTable(
+  "analytics_events",
+  {
+    id: id(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    sessionKey: text("session_key").notNull().default(""),
+    eventName: text("event_name").notNull(),
+    route: text("route").notNull().default(""),
+    durationMs: integer("duration_ms"),
+    metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("analytics_event_time_idx").on(t.occurredAt), index("analytics_event_name_idx").on(t.eventName, t.occurredAt), index("analytics_event_user_idx").on(t.userId, t.occurredAt), index("analytics_event_session_idx").on(t.sessionKey, t.occurredAt)],
 );
 
 export const passwordResetTokens = pgTable(
