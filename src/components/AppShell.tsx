@@ -179,8 +179,15 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   useEffect(() => {
     const startedAt = Number(sessionStorage.getItem("studynova:analytics-start") ?? Date.now());
     sessionStorage.setItem("studynova:analytics-start", String(startedAt));
+    let ended = false;
+    const endSession = () => {
+      if (ended) return;
+      ended = true;
+      trackAnalytics("session_end", { durationMs: Math.max(0, Date.now() - startedAt) });
+    };
     trackAnalytics("session_start", { metadata: { role: user.role } });
-    return () => trackAnalytics("session_end", { durationMs: Math.max(0, Date.now() - startedAt) });
+    window.addEventListener("pagehide", endSession);
+    return () => { window.removeEventListener("pagehide", endSession); endSession(); };
   }, [user.role]);
 
   useEffect(() => {
