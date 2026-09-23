@@ -553,10 +553,8 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                     >
                       <span>我的單字</span><span aria-hidden="true">→</span>
                     </Link>
-                    {user.isPro && <>
-                      <div className="px-3 py-2 text-xs text-[#ffd98a]">PRO 剩餘 {proDays === null ? "∞" : `${proDays} 天`}</div>
-                      <button type="button" className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-muted transition hover:bg-white/5 hover:text-[var(--text)]" onClick={async () => { try { const estimate = await apiGet<{ kind: string; bytes: number; novaCost: number }>("/exports/my-learning/estimate?kind=vocabulary"); const ok = window.confirm(`匯出我的單字將產生約 ${(estimate.bytes / 1024).toFixed(1)} KB 檔案，需消耗 ${estimate.novaCost} Nova。確認後才會扣點並下載。`); if (ok) window.location.href = "/api/v1/exports/my-learning?kind=vocabulary"; } catch (err) { toast.push("error", errorMessage(err)); } }}>我的單字匯出<span aria-hidden="true">↓</span></button>
-                    </>}
+                    {user.isPro && <div className="px-3 py-2 text-xs text-[#ffd98a]">PRO 剩餘 {proDays === null ? "∞" : `${proDays} 天`}</div>}
+                    <Link href="/export?dataset=vocabulary" role="menuitem" onClick={() => setAccountMenuOpen(false)} className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-muted transition hover:bg-white/5 hover:text-[var(--text)]"><span>我的單字匯出（選格式）</span><span aria-hidden="true">↓</span></Link>
                     <button
                       type="button"
                       role="menuitem"

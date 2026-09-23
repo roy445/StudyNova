@@ -7,6 +7,8 @@ import { apiPatch, apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
 type ServiceControl = { enabled: boolean; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 type MaintenanceAction = "start" | "restore";
+const EXPORT_DATASETS = [["vocabulary", "我的單字"], ["notes", "我的筆記"], ["wrong", "錯題本"], ["studyMaterials", "學習資料"], ["plans", "學習計畫"], ["studyRecords", "學習紀錄"], ["focus", "專注紀錄"], ["tasks", "任務紀錄"], ["dailyTasks", "每日任務"], ["achievements", "成就徽章"], ["nova", "Nova 交易"], ["xp", "XP 紀錄"]] as const;
+const EXPORT_FORMATS = [["pdf", "PDF 單字書"], ["docx", "Word 單字書"], ["xlsx", "Excel 單字表"], ["csv", "CSV 表格"], ["json", "JSON"], ["txt", "純文字"], ["md", "Markdown"], ["zip", "ZIP 完整資料"]] as const;
 
 export default function AdminSystemPage() {
   const toast = useToast();
@@ -17,7 +19,7 @@ export default function AdminSystemPage() {
   const gradeWindow = (settings.data?.settings.find((s) => s.key === "grade_input_window")?.value ?? {}) as { enabled?: boolean; startsAt?: string; endsAt?: string };
   const examDateWindow = (settings.data?.settings.find((s) => s.key === "exam_date_input_window")?.value ?? {}) as { enabled?: boolean; startsAt?: string; endsAt?: string };
   const countdowns = (settings.data?.settings.find((s) => s.key === "exam_countdowns")?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
-  const exportConfig = (settings.data?.settings.find((s) => s.key === "learning_exports")?.value ?? {}) as { enabled?: boolean; proOnly?: boolean; novaPerKb?: number; minimumNova?: number; allowedKinds?: string[] };
+  const exportConfig = (settings.data?.settings.find((s) => s.key === "learning_exports")?.value ?? {}) as { enabled?: boolean; proOnly?: boolean; minimumNova?: number; freeUntil?: string; allowedKinds?: string[]; allowedFormats?: string[]; freeFormats?: string[]; costs?: Record<string, number> };
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
   const service = useApi<ServiceControl>("/admin/service-control");
   const [maintenanceAction, setMaintenanceAction] = useState<MaintenanceAction | null>(null);
@@ -28,13 +30,14 @@ export default function AdminSystemPage() {
 
   useEffect(() => {
     if (!service.data) return;
-    setMaintenanceForm({
-      title: service.data.title,
-      description: service.data.description,
-      badgeText: service.data.badgeText,
-      estimatedRecoveryAt: service.data.estimatedRecoveryAt ? service.data.estimatedRecoveryAt.slice(0, 16) : "",
-      message: service.data.message,
-    });
+    const timer = window.setTimeout(() => setMaintenanceForm({
+      title: service.data?.title ?? "",
+      description: service.data?.description ?? "",
+      badgeText: service.data?.badgeText ?? "",
+      estimatedRecoveryAt: service.data?.estimatedRecoveryAt ? service.data.estimatedRecoveryAt.slice(0, 16) : "",
+      message: service.data?.message ?? "",
+    }), 0);
+    return () => window.clearTimeout(timer);
   }, [service.data]);
 
   async function saveMaintenance() {
@@ -184,15 +187,11 @@ export default function AdminSystemPage() {
             <Button className="mt-3" onClick={async () => { try { await apiPut("/admin/settings/exam_countdowns", { value: { exam: { name: (document.getElementById("countdown-exam-name") as HTMLInputElement).value, date: (document.getElementById("countdown-exam-date") as HTMLInputElement).value, enabled: (document.getElementById("countdown-exam-enabled") as HTMLInputElement).checked }, gsat: { name: (document.getElementById("countdown-gsat-name") as HTMLInputElement).value, date: (document.getElementById("countdown-gsat-date") as HTMLInputElement).value, enabled: (document.getElementById("countdown-gsat-enabled") as HTMLInputElement).checked } } }); toast.push("success", "倒數設定已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存倒數設定</Button>
           </div>
           <div className="mt-6 border-t border-[var(--line)] pt-4">
-            <p className="mb-3 text-sm font-semibold">↥ PRO 匯出與 Nova 收費</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="匯出功能"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-enabled" type="checkbox" defaultChecked={exportConfig.enabled !== false} className="accent-[#7c5cff]" /> 開放匯出</label></Field>
-              <Field label="會員限制"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-pro-only" type="checkbox" defaultChecked={exportConfig.proOnly !== false} className="accent-[#7c5cff]" /> 僅限 PRO</label></Field>
-              <Field label="每 KB Nova"><Input id="export-nova-kb" type="number" min={0} step={0.1} defaultValue={String(exportConfig.novaPerKb ?? 1)} /></Field>
-              <Field label="最低 Nova"><Input id="export-min-nova" type="number" min={0} defaultValue={String(exportConfig.minimumNova ?? 5)} /></Field>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-4 text-sm"><label className="flex items-center gap-2"><input id="export-vocab" type="checkbox" defaultChecked={exportConfig.allowedKinds?.includes("vocabulary") ?? true} className="accent-[#7c5cff]" /> 我的單字</label><label className="flex items-center gap-2"><input id="export-wrong" type="checkbox" defaultChecked={exportConfig.allowedKinds?.includes("wrong") ?? true} className="accent-[#7c5cff]" /> 錯題本</label></div>
-            <Button className="mt-3" onClick={async () => { const allowedKinds = [((document.getElementById("export-vocab") as HTMLInputElement).checked ? "vocabulary" : ""), ((document.getElementById("export-wrong") as HTMLInputElement).checked ? "wrong" : "")].filter(Boolean); try { await apiPut("/admin/settings/learning_exports", { value: { enabled: (document.getElementById("export-enabled") as HTMLInputElement).checked, proOnly: (document.getElementById("export-pro-only") as HTMLInputElement).checked, novaPerKb: Number((document.getElementById("export-nova-kb") as HTMLInputElement).value), minimumNova: Number((document.getElementById("export-min-nova") as HTMLInputElement).value), allowedKinds } }); toast.push("success", "匯出收費設定已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存匯出設定</Button>
+            <p className="mb-3 text-sm font-semibold">↥ 匯出資料、格式與 Nova 政策</p>
+            <div className="grid gap-3 sm:grid-cols-2"><Field label="匯出功能"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-enabled" type="checkbox" defaultChecked={exportConfig.enabled !== false} className="accent-[#7c5cff]" /> 開放匯出</label></Field><Field label="會員限制"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-pro-only" type="checkbox" defaultChecked={exportConfig.proOnly === true} className="accent-[#7c5cff]" /> 僅限 PRO</label></Field><Field label="最低 Nova（保留設定）"><Input id="export-min-nova" type="number" min={0} defaultValue={String(exportConfig.minimumNova ?? 0)} /></Field><Field label="限時免費截止（留空代表不限期）"><Input id="export-free-until" type="datetime-local" defaultValue={exportConfig.freeUntil ? exportConfig.freeUntil.slice(0, 16) : ""} /></Field></div>
+            <p className="mt-4 text-xs font-semibold text-muted">允許匯出的資料類型</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{EXPORT_DATASETS.map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm"><input id={`export-kind-${key}`} type="checkbox" defaultChecked={exportConfig.allowedKinds?.includes(key) ?? true} className="accent-[#7c5cff]" />{label}</label>)}</div>
+            <p className="mt-4 text-xs font-semibold text-muted">允許格式、每次扣點與限時免費</p><div className="mt-2 space-y-2">{EXPORT_FORMATS.map(([key, label]) => <div key={key} className="grid items-center gap-2 rounded-xl border border-[var(--line)] p-2 sm:grid-cols-[1fr_110px_auto]"><label className="flex items-center gap-2 text-sm"><input id={`export-format-${key}`} type="checkbox" defaultChecked={exportConfig.allowedFormats?.includes(key) ?? true} className="accent-[#7c5cff]" />{label}</label><Input id={`export-cost-${key}`} type="number" min={0} step={1} defaultValue={String(exportConfig.costs?.[key] ?? ({ pdf: 800, docx: 600, xlsx: 500, csv: 200, json: 100, txt: 100, md: 100, zip: 1000 }[key] ?? 0))} /><label className="flex items-center gap-2 text-xs text-[#ffd98a]"><input id={`export-free-${key}`} type="checkbox" defaultChecked={exportConfig.freeFormats?.includes(key) ?? false} className="accent-[#ffc857]" />限時免費</label></div>)}</div>
+            <Button className="mt-3" onClick={async () => { const allowedKinds = EXPORT_DATASETS.filter(([key]) => (document.getElementById(`export-kind-${key}`) as HTMLInputElement).checked).map(([key]) => key); const allowedFormats = EXPORT_FORMATS.filter(([key]) => (document.getElementById(`export-format-${key}`) as HTMLInputElement).checked).map(([key]) => key); const freeFormats = EXPORT_FORMATS.filter(([key]) => (document.getElementById(`export-free-${key}`) as HTMLInputElement).checked).map(([key]) => key); const costs = Object.fromEntries(EXPORT_FORMATS.map(([key]) => [key, Number((document.getElementById(`export-cost-${key}`) as HTMLInputElement).value)])); const freeUntil = (document.getElementById("export-free-until") as HTMLInputElement).value; try { await apiPut("/admin/settings/learning_exports", { value: { enabled: (document.getElementById("export-enabled") as HTMLInputElement).checked, proOnly: (document.getElementById("export-pro-only") as HTMLInputElement).checked, minimumNova: Number((document.getElementById("export-min-nova") as HTMLInputElement).value), freeUntil: freeUntil ? new Date(freeUntil).toISOString() : null, allowedKinds, allowedFormats, freeFormats, costs } }); toast.push("success", "匯出資料、格式與收費政策已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存匯出政策</Button>
           </div>
         </Card>
       )}
