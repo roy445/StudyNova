@@ -25,6 +25,7 @@ import {
   aiPolicies,
   aiPolicyVersions,
   questions,
+  dailyWords,
   questionBanks,
   questionVersions,
   questionImportJobs,
@@ -1183,14 +1184,24 @@ export const routes: RouteDef[] = [
       const admin = ctx.requireUser();
       const body = await ctx.json(z.object({ prompt: z.string().max(4000).default(""), subject: z.string().min(1).max(40), educationLevel: z.string().max(40).default(""), grade: z.string().max(40).default(""), chapter: z.string().max(120).default(""), topic: z.string().max(120).default(""), types: z.array(z.string().max(40)).min(1).max(8).default(["single"]), count: z.number().int().min(1).max(100).default(10), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).default("normal"), referenceText: z.string().max(30000).default(""), requireExplanation: z.boolean().default(true), expertSettings: EXPERT_SETTINGS_SCHEMA.optional() }));
       const expert = await loadExpertSettings(body.expertSettings);
-      const instruction = `請產生 ${body.count} 題${body.subject}題目。教育階段：${body.educationLevel}；年級：${body.grade}；章節：${body.chapter}；主題：${body.topic}；題型可使用：${body.types.join(",")}；難度：${body.difficulty}。${expertSettingsInstructions(expert)}\n${body.prompt}\n${body.referenceText ? `只能根據以下參考資料，不要捏造：\n${body.referenceText}` : ""}`;
       const policy = await getAiPolicy("question_generation");
-      const result = await runAiJson<unknown[]>({ feature: "admin_question_generation", userId: admin.userId, system: `你是 StudyNova 題庫出題器。${policyInstructions(policy)}\n只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。答案必須可由題目與資料支持；不要輸出 Markdown。`, parts: [{ kind: "text", text: instruction }], maxOutputTokens: Math.min(12000, 900 * body.count), temperature: expert.temperature }, []);
       const level = body.educationLevel.toLowerCase().includes("senior") || body.educationLevel.includes("高中") ? "senior" : "junior";
-      const normalized = normalizeQuestionRows(result.data, { subject: body.subject, difficulty: body.difficulty, level, sourceLabel: "AI 生成草稿", bankCategory: "AI 生成待審核" });
-      const previews = normalized.previews.map((item) => ({ ...item, status: item.status === "READY" && body.requireExplanation && !item.explanation ? "WARNING" : item.status, sourceType: "ai", reviewStatus: "draft" }));
-      await adminLog({ actorId: admin.userId, action: "questions.generate", targetType: "question_draft", targetId: "preview", after: { subject: body.subject, count: body.count, generated: previews.length, errors: previews.filter((item) => item.status === "ERROR").length }, ip: ctx.ip });
-      return { drafts: previews, summary: { requested: body.count, generated: previews.length, ready: previews.filter((item) => item.status === "READY").length, warnings: previews.filter((item) => item.status === "WARNING").length, errors: previews.filter((item) => item.status === "ERROR").length } };
+      const previews: Array<Record<string, unknown>> = [];
+      for (let batch = 0; batch < 8 && previews.filter((item) => item.status !== "ERROR").length < body.count; batch += 1) {
+        const remaining = body.count - previews.filter((item) => item.status !== "ERROR").length;
+        const batchCount = Math.min(20, remaining);
+        const instruction = `請產生 ${batchCount} 題${body.subject}題目。教育階段：${body.educationLevel}；年級：${body.grade}；章節：${body.chapter}；主題：${body.topic}；題型可使用：${body.types.join(",")}；難度：${body.difficulty}。${expertSettingsInstructions(expert)}\n${body.prompt}\n${body.referenceText ? `只能根據以下參考資料，不要捏造：\n${body.referenceText}` : ""}\n已產生題目不可重複：${previews.slice(-60).map((item) => String(item.stem ?? "")).join("\n")}`;
+        const result = await runAiJson<unknown[]>({ feature: "admin_question_generation", userId: admin.userId, system: `你是 StudyNova 題庫出題器。${policyInstructions(policy)}\n只回傳 JSON 陣列，陣列必須盡量包含要求的 ${batchCount} 題；每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。答案必須可由題目與資料支持；不要輸出 Markdown。`, parts: [{ kind: "text", text: instruction }], maxOutputTokens: 12000, temperature: expert.temperature }, []);
+        const normalized = normalizeQuestionRows(result.data, { subject: body.subject, difficulty: body.difficulty, level, sourceLabel: "AI 生成草稿", bankCategory: "AI 生成待審核" });
+        for (const item of normalized.previews) {
+          if (item.status === "ERROR" || !item.stem || previews.some((existing) => existing.stem === item.stem)) continue;
+          previews.push({ ...item, status: item.status === "READY" && body.requireExplanation && !item.explanation ? "WARNING" : item.status, sourceType: "ai", reviewStatus: "draft" });
+        }
+        if (!normalized.previews.length) break;
+      }
+      const ready = previews.filter((item) => item.status === "READY" || item.status === "WARNING");
+      await adminLog({ actorId: admin.userId, action: "questions.generate", targetType: "question_draft", targetId: "preview", after: { subject: body.subject, count: body.count, generated: previews.length, errors: body.count - ready.length }, ip: ctx.ip });
+      return { drafts: previews, summary: { requested: body.count, generated: previews.length, ready: ready.length, warnings: previews.filter((item) => item.status === "WARNING").length, errors: Math.max(0, body.count - ready.length) } };
     },
   }),
   route({
@@ -1232,6 +1243,37 @@ export const routes: RouteDef[] = [
       const drafts = normalized.previews.map((item) => ({ ...item, sourceType: "file", sourceFile: file.name, reviewStatus: "draft" }));
       await adminLog({ actorId: admin.userId, action: "questions.generate.file", targetType: "question_draft", targetId: file.name.slice(0, 120), after: { subject, count, generated: drafts.length }, ip: ctx.ip });
       return { drafts, summary: { requested: count, generated: drafts.length, ready: drafts.filter((item) => item.status === "READY").length, warnings: drafts.filter((item) => item.status === "WARNING").length, errors: drafts.filter((item) => item.status === "ERROR").length } };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/questions/generate-vocabulary",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ level: z.enum(["junior", "senior", "all"]).default("senior"), count: z.number().int().min(1).max(8000).default(7000), offset: z.number().int().min(0).default(0), direction: z.enum(["zh2en", "en2zh"]).default("zh2en"), sourceLabel: z.string().max(120).default("高中7000單字中翻英題庫") }));
+      const conditions = body.level === "all" ? undefined : eq(dailyWords.level, body.level);
+      const words = await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, level: dailyWords.level }).from(dailyWords).where(conditions).orderBy(asc(dailyWords.word)).limit(body.count).offset(body.offset);
+      if (!words.length) throw badRequest("找不到可轉換的單字；請先執行7000單字 seed");
+      const optionPool = words.filter((word) => word.word.trim());
+      const rows = words.map((word, index) => {
+        const meaning = word.meaning.trim() || "請選出與此單字相符的中文意思";
+        const answer = body.direction === "zh2en" ? word.word.trim() : meaning;
+        const stem = body.direction === "zh2en" ? `中文意思：${meaning}${word.partOfSpeech ? `（${word.partOfSpeech}）` : ""}\n請選出正確的英文單字。` : `英文單字：${word.word.trim()}\n請選出正確的中文意思。`;
+        const options = [answer];
+        for (let step = 1; options.length < 4 && step <= optionPool.length; step += 1) {
+          const candidate = body.direction === "zh2en" ? optionPool[(index + step) % optionPool.length].word.trim() : (optionPool[(index + step) % optionPool.length].meaning.trim() || "其他意思");
+          if (candidate && !options.includes(candidate)) options.push(candidate);
+        }
+        return { ownerId: null, origin: "bank", targetBank: "general", bankCategory: body.direction === "zh2en" ? "7000單字・中翻英" : "7000單字・英翻中", sourceLabel: body.sourceLabel, subject: "英文", topic: "國高中7000單字", chapter: word.level === "senior" ? "高中" : "國中", sourceType: "vocabulary", status: "published", level: word.level, difficulty: "normal", type: "single", stem, options, answer: [answer], explanation: `${word.word.trim()}：${meaning}`, metadata: { dailyWordId: word.id, direction: body.direction, generatedBy: "vocabulary-bank" }, fingerprint: fingerprint("vocabulary-bank", word.id, body.direction) };
+      });
+      let imported = 0;
+      for (let start = 0; start < rows.length; start += 250) {
+        const inserted = await db.insert(questions).values(rows.slice(start, start + 250)).onConflictDoNothing().returning({ id: questions.id });
+        imported += inserted.length;
+      }
+      await adminLog({ actorId: admin.userId, action: "questions.generate.vocabulary", targetType: "questions", targetId: body.sourceLabel, after: { requested: body.count, selected: rows.length, imported, level: body.level, direction: body.direction }, ip: ctx.ip });
+      return { requested: body.count, selected: rows.length, imported, skipped: rows.length - imported, level: body.level, direction: body.direction, sourceLabel: body.sourceLabel };
     },
   }),
   route({

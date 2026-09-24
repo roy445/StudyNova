@@ -4,6 +4,7 @@ import { db } from "@/db";
 import {
   questions,
   quizzes,
+  quizQuestionHistory,
   quizAttempts,
   answers,
   wrongQuestions,
@@ -113,6 +114,9 @@ export function filterDuplicateQuestions<T extends { stem: string; options: stri
 }
 
 type CleanQuestion = { type: string; stem: string; options: string[]; answer: string[]; explanation: string; topic: string; metadata: Record<string, unknown> };
+function quizQuestionFingerprint(question: { subject: string; stem: string; answer: string[] }) {
+  return fingerprint("quiz-question", question.subject, question.stem, question.answer.join("|"));
+}
 function cleanGeneratedQuestions(raw: GeneratedQuestion[], topic: string): CleanQuestion[] {
   return raw.map((q) => { const type = qType.safeParse(q.type ?? "single").success && q.type !== "mixed" ? (q.type as string) : "single"; const answerArr = Array.isArray(q.answer) ? q.answer.map(String).filter(Boolean) : q.answer ? [String(q.answer)] : []; const options = Array.isArray(q.options) ? q.options.map(String).filter(Boolean) : []; if (!q.stem || !answerArr.length) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && options.length < 2) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && !answerArr.every((a) => options.includes(a))) return null; return { type, stem: String(q.stem).slice(0, 2000), options: options.slice(0, 8), answer: answerArr.slice(0, 8), explanation: String(q.explanation ?? "").slice(0, 2000), metadata: q.metadata ?? {}, topic: String(q.topic ?? topic).slice(0, 60) }; }).filter(Boolean) as CleanQuestion[];
 }
@@ -275,16 +279,21 @@ export const routes: RouteDef[] = [
       if (!policy) throw fail("REQ_VALIDATION", { message: "找不到可用的考試模式" });
       sourceText = `【正式考試模式：${policy.label}】\n${policy.description}\n模式規則：${JSON.stringify(policy.rules)}\n請依此規則設計題型、閱讀理解與能力取向，不可只更改標籤。\n${sourceText}`;
 
-      const ids = await generateQuestions({
-        userId: user.userId,
-        subject: body.subject,
-        topic: body.topic ?? "",
-        sourceText,
-        count: body.count,
-        difficulty: body.difficulty,
-        type: body.type,
-        level: body.educationLevel,
-      });
+      const appearedDate = todayStr();
+      const oldHistory = await db.select({ questionFingerprint: quizQuestionHistory.questionFingerprint }).from(quizQuestionHistory).where(and(eq(quizQuestionHistory.userId, user.userId), eq(quizQuestionHistory.appearedDate, appearedDate)));
+      const usedFingerprints = new Set(oldHistory.map((row) => row.questionFingerprint));
+      const ids: string[] = [];
+      for (let round = 0; round < 4 && ids.length < body.count; round += 1) {
+        const remaining = body.count - ids.length;
+        const avoid = usedFingerprints.size ? `\n不可使用以下今日已出現題目指紋（必須重新設計不同題幹與答案）：${JSON.stringify([...usedFingerprints].slice(-300))}` : "";
+        const generated = await generateQuestions({ userId: user.userId, subject: body.subject, topic: body.topic ?? "", sourceText: `${sourceText}${avoid}`, count: remaining, difficulty: body.difficulty, type: body.type, level: body.educationLevel });
+        const generatedRows = generated.length ? await db.select({ id: questions.id, subject: questions.subject, stem: questions.stem, answer: questions.answer }).from(questions).where(inArray(questions.id, generated)) : [];
+        for (const row of generatedRows) {
+          const key = quizQuestionFingerprint(row);
+          if (!usedFingerprints.has(key) && !ids.includes(row.id)) { usedFingerprints.add(key); ids.push(row.id); }
+        }
+      }
+      if (ids.length < body.count) throw fail("REQ_VALIDATION", { message: `今日可用的新題目不足：要求 ${body.count} 題，實際只產生 ${ids.length} 題。請換教材或明天再試。` });
       const rows = await db
         .insert(quizzes)
         .values({
@@ -298,6 +307,8 @@ export const routes: RouteDef[] = [
           questionIds: ids,
         })
         .returning();
+      const selectedRows = await db.select({ subject: questions.subject, stem: questions.stem, answer: questions.answer }).from(questions).where(inArray(questions.id, ids));
+      await db.insert(quizQuestionHistory).values(selectedRows.map((question) => ({ userId: user.userId, quizId: rows[0].id, questionFingerprint: quizQuestionFingerprint(question), appearedDate }))).onConflictDoNothing();
       return { quiz: rows[0], generated: ids.length };
     },
   }),

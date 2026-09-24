@@ -627,6 +627,19 @@ export const quizzes = pgTable(
   (t) => [index("quizzes_user_idx").on(t.userId), uniqueIndex("quizzes_slug_uq").on(t.shareSlug)],
 );
 
+export const quizQuestionHistory = pgTable(
+  "quiz_question_history",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    quizId: uuid("quiz_id").notNull().references(() => quizzes.id, { onDelete: "cascade" }),
+    questionFingerprint: text("question_fingerprint").notNull(),
+    appearedDate: text("appeared_date").notNull(),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("quiz_question_history_daily_uq").on(t.userId, t.appearedDate, t.questionFingerprint), index("quiz_question_history_user_date_idx").on(t.userId, t.appearedDate)],
+);
+
 export const quizAttempts = pgTable(
   "quiz_attempts",
   {
@@ -2531,10 +2544,11 @@ export const challengeQuestionHistory = pgTable(
     userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
     challengeId: uuid("challenge_id").notNull().references(() => challenges.id, { onDelete: "cascade" }),
     questionFingerprint: text("question_fingerprint").notNull(),
+    appearedDate: text("appeared_date").notNull().default("1970-01-01"),
     options: jsonb("options").$type<string[]>().notNull().default([]),
     createdAt: created(),
   },
-  (t) => [uniqueIndex("challenge_history_question_uq").on(t.userId, t.questionFingerprint), index("challenge_history_user_idx").on(t.userId, t.createdAt)],
+  (t) => [uniqueIndex("challenge_history_question_daily_uq").on(t.userId, t.appearedDate, t.questionFingerprint), index("challenge_history_user_idx").on(t.userId, t.appearedDate, t.createdAt)],
 );
 
 

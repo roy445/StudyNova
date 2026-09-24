@@ -377,7 +377,8 @@ export const routes: RouteDef[] = [
       const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string; timeMode?: "standard" | "sprint"; items?: Array<Record<string, unknown>>; readyUserIds?: string[] };
       const track = payload.track === "senior" ? "senior" : "junior";
       const count = Math.max(5, Math.min(200, Number(payload.questionCount ?? 10)));
-      const history = await db.select({ questionFingerprint: challengeQuestionHistory.questionFingerprint, options: challengeQuestionHistory.options }).from(challengeQuestionHistory).where(eq(challengeQuestionHistory.userId, user.userId));
+      const appearedDate = todayStr();
+      const history = await db.select({ questionFingerprint: challengeQuestionHistory.questionFingerprint, options: challengeQuestionHistory.options }).from(challengeQuestionHistory).where(and(eq(challengeQuestionHistory.userId, user.userId), eq(challengeQuestionHistory.appearedDate, appearedDate)));
       const usedQuestions = new Set(history.map((item) => item.questionFingerprint));
       const usedOptions = new Set(history.flatMap((item) => item.options.map(normalizeChallengeOption)));
       const sourceRows = payload.items?.length ? payload.items : await db.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, exampleZh: dailyWords.exampleZh, level: dailyWords.level }).from(dailyWords).where(eq(dailyWords.level, track)).orderBy(sql`random()`).limit(Math.min(800, count * 8));
@@ -389,6 +390,7 @@ export const routes: RouteDef[] = [
       });
       const rows = freshRows.slice(0, count);
       if (!rows.length) throw badRequest("這位使用者已完成目前題庫的題目與選項，請等待新的題庫內容");
+      await db.insert(challengeQuestionHistory).values(rows.map((record) => ({ userId: user.userId, challengeId: challenge.id, questionFingerprint: challengeQuestionFingerprint(record as Record<string, unknown>), appearedDate, options: Array.isArray((record as Record<string, unknown>).options) ? ((record as Record<string, unknown>).options as unknown[]).map(String) : [] }))).onConflictDoNothing();
       return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal", timeMode: payload.timeMode ?? "standard" }, words: rows };
     },
   }),
@@ -474,7 +476,7 @@ export const routes: RouteDef[] = [
       for (const record of verifiedRecords) {
         const item = record.item;
         const options = Array.isArray(item?.options) ? item.options.map(String) : [];
-        await db.insert(challengeQuestionHistory).values({ userId: user.userId, challengeId: c.id, questionFingerprint: challengeQuestionFingerprint(item ?? { word: record.word, meaning: record.prompt, options }), options }).onConflictDoNothing();
+        await db.insert(challengeQuestionHistory).values({ userId: user.userId, challengeId: c.id, questionFingerprint: challengeQuestionFingerprint(item ?? { word: record.word, meaning: record.prompt, options }), appearedDate: todayStr(), options }).onConflictDoNothing();
       }
       const settlement = await settleChallengeStake(c);
       const claimed = await db
