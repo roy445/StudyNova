@@ -83,12 +83,33 @@ export function validateEnglishQuizOptions(items: StrictEnglishQuestion[]) {
     for (const option of normalized) optionUsageCount.set(option, (optionUsageCount.get(option) ?? 0) + 1);
   }
 
+  const repeatedOptionKeys = [...optionUsageCount.entries()].filter(([, count]) => count > 1).map(([option]) => option);
   return {
-    valid: invalidQuestionIndexes.length === 0 && duplicateOptionSetIndexes.length === 0,
+    valid: invalidQuestionIndexes.length === 0 && duplicateOptionSetIndexes.length === 0 && repeatedOptionKeys.length === 0,
     invalidQuestionIndexes: [...new Set(invalidQuestionIndexes)],
     duplicateOptionSetIndexes: [...new Set(duplicateOptionSetIndexes)].sort((a, b) => a - b),
+    repeatedOptionKeys,
     optionUsageCount: Object.fromEntries(optionUsageCount),
   };
+}
+
+export function normalizeQuestionStem(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ");
+}
+
+export function filterDuplicateQuestions<T extends { stem: string; options: string[] }>(items: T[], reservedStems: Set<string> = new Set()) {
+  const stems = new Set(reservedStems);
+  const options = new Set<string>();
+  const unique: T[] = [];
+  for (const item of items) {
+    const stem = normalizeQuestionStem(item.stem);
+    const normalizedOptions = item.options.map(normalizeQuizOption).filter(Boolean);
+    if (!stem || stems.has(stem) || normalizedOptions.some((option) => options.has(option))) continue;
+    stems.add(stem);
+    for (const option of normalizedOptions) options.add(option);
+    unique.push(item);
+  }
+  return unique;
 }
 
 type CleanQuestion = { type: string; stem: string; options: string[]; answer: string[]; explanation: string; topic: string; metadata: Record<string, unknown> };
@@ -116,33 +137,38 @@ export async function generateQuestions(params: {
   level: string;
 }) {
   const strictEnglishOptions = isEnglishSubject(params.subject) && ["single", "multiple", "part_of_speech", "meaning", "mixed"].includes(params.type);
+  const existingRows = await db.select({ stem: questions.stem }).from(questions).where(and(eq(questions.ownerId, params.userId), eq(questions.subject, params.subject))).limit(2000);
+  const reservedQuestionStems = new Set(existingRows.map((row) => normalizeQuestionStem(row.stem)));
   let cleaned: CleanQuestion[] = [];
   let usedOptionPool: string[] = [];
   let bestScore = Number.POSITIVE_INFINITY;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const usage = usedOptionPool.reduce<Record<string, number>>((counts, option) => { counts[option] = (counts[option] ?? 0) + 1; return counts; }, {});
-    const avoid = usedOptionPool.length ? `本次測驗選項使用次數（出現 1 次就優先避免，2 次以上除非沒有合理替代不要再用）：${JSON.stringify(usage)}` : "目前尚無已使用選項。";
+    const usedQuestionStems = cleaned.map((item) => item.stem).concat([...reservedQuestionStems]).slice(-120);
+    const avoid = `${usedOptionPool.length ? `本次測驗選項使用次數（每個選項只能出現 1 次）：${JSON.stringify(usage)}` : "目前尚無已使用選項。"}\n已經用過的題目（不可改寫後重複）：${JSON.stringify(usedQuestionStems)}`;
     const { data } = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: `你是台灣國高中題目設計引擎。請依教材出題，不得杜撰。回傳 JSON questions。${strictEnglishOptions ? "這是英文單字或文法測驗：每一題必須恰好提供 4 個選項 A、B、C、D，四個選項不可重複；single、part_of_speech、meaning、multiple 必須只有一個正確答案（answer 只放一個選項原文）。每題都要依題幹量身設計選項，禁止複製其他題的整組選項。單字干擾項須與題幹相關、同詞性、語意接近、字形易混淆或是常見誤用；文法干擾項須屬同一文法主題下的不同時態、動詞變化或常見學習者錯誤，且必須有明確唯一正解。" : "single/part_of_speech/meaning 優先提供 4 個合理 options。"}選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。不可為了去重使用不自然或無關選項。整份測驗不得重複相同選項組合；使用繁體中文（英文科目可用英文）。`, parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText.slice(0, 12000)}` }], maxOutputTokens: 3000 }, { questions: [] });
-    let candidate = cleanGeneratedQuestions(data.questions ?? [], params.topic); let validation = validateQuizOptionPool(candidate);
+    let candidate = filterDuplicateQuestions(cleanGeneratedQuestions(data.questions ?? [], params.topic), reservedQuestionStems); let validation = validateQuizOptionPool(candidate);
     if (candidate.length && validation.excessiveCrossQuestionDuplicates && attempt < 2) {
       const repairIndexes = diversityRepairIndexes(candidate, validation.optionUsageCount);
       const repairPrompt = repairIndexes.map((index) => `第 ${index + 1} 題：${candidate[index].stem}\n目前答案：${JSON.stringify(candidate[index].answer)}\n目前選項：${JSON.stringify(candidate[index].options)}`).join("\n");
       const repaired = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate_repair", userId: params.userId, system: `只重新生成指定題目的選項與答案。保留原題幹、正確性與難度；${strictEnglishOptions ? "必須恰好輸出 4 個全新且互不重複的英文選項，answer 只能有一個，干擾項要符合單字同詞性近義／易混淆或文法常見錯誤規則，且不得與其他題形成相同選項組合。" : "避免使用已出現 2 次以上的選項，優先選擇相同詞性、易混淆或相同語境的合理干擾選項。"}範圍外單字只能作干擾選項，不得變成正式考點。回傳 JSON questions。`, parts: [{ kind: "text", text: `已使用選項次數：${JSON.stringify(validation.optionUsageCount)}\n請修復以下題目：\n${repairPrompt}` }], maxOutputTokens: 1800 }, { questions: [] });
-      const replacements = cleanGeneratedQuestions(repaired.data.questions ?? [], params.topic);
+      const replacements = filterDuplicateQuestions(cleanGeneratedQuestions(repaired.data.questions ?? [], params.topic), reservedQuestionStems);
       for (const [position, index] of repairIndexes.entries()) if (replacements[position]) candidate[index] = replacements[position];
+      candidate = filterDuplicateQuestions(candidate, reservedQuestionStems);
       validation = validateQuizOptionPool(candidate);
     }
-    const strictValidation = strictEnglishOptions ? validateEnglishQuizOptions(candidate) : { valid: true, invalidQuestionIndexes: [], duplicateOptionSetIndexes: [] };
-    const score = (validation.sameQuestionDuplicate ? 1000 : 0) + validation.repeatedOccurrences + Math.round(validation.repeatedRate * 100) + (strictValidation.valid ? 0 : 5000 + strictValidation.invalidQuestionIndexes.length * 100 + strictValidation.duplicateOptionSetIndexes.length * 100);
+    const strictValidation = strictEnglishOptions ? validateEnglishQuizOptions(candidate) : { valid: true, invalidQuestionIndexes: [], duplicateOptionSetIndexes: [], repeatedOptionKeys: [] };
+    const enoughQuestions = candidate.length >= params.count;
+    const score = (enoughQuestions ? 0 : 10000) + validation.repeatedOccurrences + Math.round(validation.repeatedRate * 100) + (strictValidation.valid ? 0 : 5000 + strictValidation.invalidQuestionIndexes.length * 100 + strictValidation.duplicateOptionSetIndexes.length * 100 + strictValidation.repeatedOptionKeys.length * 100);
     if (candidate.length && score < bestScore) { cleaned = candidate; bestScore = score; }
     usedOptionPool = validation.usedOptions;
     if (candidate.length >= params.count && !validation.sameQuestionDuplicate && !validation.excessiveCrossQuestionDuplicates && strictValidation.valid) break;
   }
-  if (!cleaned.length || (strictEnglishOptions && !validateEnglishQuizOptions(cleaned).valid)) throw fail("AI_NO_VALID_QUESTIONS");
+  if (!cleaned.length || cleaned.length < params.count || (strictEnglishOptions && !validateEnglishQuizOptions(cleaned).valid)) throw fail("AI_NO_VALID_QUESTIONS");
 
   const ids: string[] = [];
   for (const q of cleaned) {
-    const fp = fingerprint(params.subject, q.stem, q.answer.join("|"));
+    const fp = fingerprint(params.userId, params.subject, q.type, normalizeQuestionStem(q.stem));
     const inserted = await db
       .insert(questions)
       .values({
@@ -163,10 +189,8 @@ export async function generateQuestions(params: {
       .onConflictDoNothing()
       .returning({ id: questions.id });
     if (inserted[0]) ids.push(inserted[0].id);
-    else {
-      const existing = await db.select({ id: questions.id }).from(questions).where(eq(questions.fingerprint, fp)).limit(1);
-      if (existing[0]) ids.push(existing[0].id);
-    }
+    // Never reuse a conflicting question ID: doing so was the source of
+    // identical questions appearing in every newly generated quiz.
   }
   return ids;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeQuizOption, validateEnglishQuizOptions, validateQuizOptionPool } from "../src/server/routes/quiz-routes";
+import { filterDuplicateQuestions, normalizeQuestionStem, normalizeQuizOption, validateEnglishQuizOptions, validateQuizOptionPool } from "../src/server/routes/quiz-routes";
 
 describe("quiz option diversity", () => {
   it("normalizes case, whitespace, punctuation, and full-width text", () => {
@@ -48,5 +48,24 @@ describe("quiz option diversity", () => {
     ]);
     expect(result.valid).toBe(false);
     expect(result.duplicateOptionSetIndexes).toEqual([0, 1]);
+  });
+
+  it("rejects every option that has already appeared, not just identical option sets", () => {
+    const result = validateEnglishQuizOptions([
+      { stem: "1", options: ["expand", "extend", "expose", "expect"], answer: ["expand"] },
+      { stem: "2", options: ["protect", "prevent", "preserve", "expect"], answer: ["protect"] },
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.repeatedOptionKeys).toEqual(["expect"]);
+  });
+
+  it("removes repeated stems and options before persistence", () => {
+    const result = filterDuplicateQuestions([
+      { stem: "The company plans to expand.", options: ["expand", "extend", "expose", "expect"] },
+      { stem: "  THE COMPANY PLANS TO EXPAND! ", options: ["grow", "increase", "enlarge", "develop"] },
+      { stem: "Choose the correct verb.", options: ["protect", "prevent", "expect", "preserve"] },
+    ], new Set([normalizeQuestionStem("A previous question") ]));
+    expect(result).toHaveLength(1);
+    expect(result[0]?.stem).toBe("The company plans to expand.");
   });
 });
