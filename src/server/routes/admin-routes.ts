@@ -1224,8 +1224,9 @@ export const routes: RouteDef[] = [
         userId: admin.userId,
         system: `你是 StudyNova 題庫出題器。${policyInstructions(policy)}\n只回傳 JSON 陣列，每題欄位 question, type, options, answer, explanation, subject, topic, difficulty。必須根據附件內容，不得捏造；答案不確定時在 explanation 標記待審核。`,
         parts: isText ? [{ kind: "text", text: instruction }] : [{ kind: "text", text: instruction }, { kind: file.type.startsWith("audio/") ? "audio" : "image", mimeType: file.type || "application/octet-stream", base64: bytes.toString("base64") }],
-        maxOutputTokens: Math.min(12000, 900 * count),
+        maxOutputTokens: Math.min(6000, Math.max(1800, 700 * count)),
         temperature: expert.temperature,
+        timeoutMs: 90_000,
       }, []);
       const normalized = normalizeQuestionRows(result.data, { subject, difficulty, level, sourceLabel: file.name, bankCategory: "AI 檔案出題待審核" });
       const drafts = normalized.previews.map((item) => ({ ...item, sourceType: "file", sourceFile: file.name, reviewStatus: "draft" }));

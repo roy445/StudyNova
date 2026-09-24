@@ -391,15 +391,28 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   let fallbackFrom = "";
   let lastCategory: FailureCategory = "unknown";
   let lastReason = "";
-  // 每日知識是背景補充內容，不應讓多個失效 provider 連續佔用整個 request；
-  // 其他互動式 AI 功能維持較寬鬆的既有 deadline。
-  const deadline = Date.now() + (req.feature === "daily_knowledge_generation" ? 18_000 : 45_000);
+  // Large admin file generation needs more time than an interactive answer,
+  // but must not spend that time retrying the same Gemini model with several
+  // keys. The old 45s deadline caused gemini_2/3/4 to time out in sequence
+  // before OpenAI/OpenRouter could be attempted.
+  const deadline = Date.now() + (
+    req.feature === "daily_knowledge_generation"
+      ? 18_000
+      : req.feature === "admin_question_generation_file"
+        ? 120_000
+        : 45_000
+  );
+  const timedOutGeminiModels = new Set<string>();
 
   for (const cfg of configs) {
     if (Date.now() >= deadline) {
       lastCategory = "timeout";
       lastReason = "AI provider aggregate deadline exceeded";
       break;
+    }
+    if (cfg.name.startsWith("gemini_") && timedOutGeminiModels.has(cfg.model)) {
+      fallbackFrom = fallbackFrom || cfg.name;
+      continue;
     }
     // 健康狀態／使用量是觀測資料；即使 production migration 尚未同步，也不能阻斷圖片分析本身。
     let health: Awaited<ReturnType<typeof healthRow>> | undefined;
@@ -442,6 +455,10 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       lastReason = err instanceof ProviderError ? err.reason || err.message : err instanceof Error ? err.message : "unknown";
       lastCategory = category;
       console.error("[ai] provider attempt failed", { provider: cfg.name, model: cfg.model, feature: req.feature, category, reason: lastReason });
+      // All Gemini keys for a feature point at the same model endpoint. A
+      // timeout is therefore an endpoint/model latency problem, not a key
+      // problem; trying gemini_3/4/5 would only burn the remaining deadline.
+      if (category === "timeout" && cfg.name.startsWith("gemini_")) timedOutGeminiModels.add(cfg.model);
       try {
         await db
           .update(aiProviderHealth)

@@ -2,6 +2,8 @@ import { handleApiRequest } from "@/server/router";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// File-based admin question generation may need provider fallback time.
+export const maxDuration = 300;
 
 type Params = { params: Promise<{ path: string[] }> };
 
