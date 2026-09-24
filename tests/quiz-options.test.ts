@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeQuizOption, validateQuizOptionPool } from "../src/server/routes/quiz-routes";
+import { normalizeQuizOption, validateEnglishQuizOptions, validateQuizOptionPool } from "../src/server/routes/quiz-routes";
 
 describe("quiz option diversity", () => {
   it("normalizes case, whitespace, punctuation, and full-width text", () => {
@@ -26,5 +26,27 @@ describe("quiz option diversity", () => {
     const result = validateQuizOptionPool([{ stem: "1", answer: ["clean"], options: ["clean", "dirty", "CLEAN", "large"] }]);
     expect(result.sameQuestionDuplicate).toBe(true);
     expect(result.duplicateQuestionIndexes).toEqual([0]);
+  });
+
+  it("requires four unique options and exactly one answer for English questions", () => {
+    expect(validateEnglishQuizOptions([
+      { type: "single", stem: "The company plans to ___ its business.", options: ["expand", "extend", "expose", "expect"], answer: ["expand"] },
+      { type: "single", stem: "If I ___ about it, I would have told you.", options: ["know", "knew", "had known", "have known"], answer: ["had known"] },
+    ]).valid).toBe(true);
+
+    const invalid = validateEnglishQuizOptions([
+      { type: "single", stem: "Choose a word.", options: ["go", "went", "go", "gone"], answer: ["go", "went"] },
+    ]);
+    expect(invalid.valid).toBe(false);
+    expect(invalid.invalidQuestionIndexes).toEqual([0]);
+  });
+
+  it("rejects reusing the same complete option combination across questions", () => {
+    const result = validateEnglishQuizOptions([
+      { stem: "1", options: ["expand", "extend", "expose", "expect"], answer: ["expand"] },
+      { stem: "2", options: ["expect", "expand", "extend", "expose"], answer: ["expect"] },
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.duplicateOptionSetIndexes).toEqual([0, 1]);
   });
 });

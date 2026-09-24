@@ -46,9 +46,58 @@ export function validateQuizOptionPool(items: NormalizedQuestion[]) {
   return { usedOptions, optionUsageCount: Object.fromEntries(counts), totalOptions, uniqueOptions, repeatedOccurrences, repeatedRate, sameQuestionDuplicate, duplicateQuestionIndexes, excessiveCrossQuestionDuplicates: repeatedOccurrences > Math.max(2, Math.floor(totalOptions * 0.2)) };
 }
 
+type StrictEnglishQuestion = NormalizedQuestion & { type?: string };
+
+/**
+ * English vocabulary/grammar questions use a strict exam format:
+ * four different options, exactly one correct answer, and no repeated
+ * option set in the same quiz.  This is intentionally server-side because
+ * model output must never be trusted merely because it is valid JSON.
+ */
+export function validateEnglishQuizOptions(items: StrictEnglishQuestion[]) {
+  const invalidQuestionIndexes: number[] = [];
+  const duplicateOptionSetIndexes: number[] = [];
+  const optionSetOwners = new Map<string, number>();
+  const optionUsageCount = new Map<string, number>();
+
+  for (const [index, item] of items.entries()) {
+    const normalized = item.options.map(normalizeQuizOption).filter(Boolean);
+    const localUnique = new Set(normalized);
+    const answerKeys = item.answer.map(normalizeQuizOption).filter(Boolean);
+    const invalid =
+      normalized.length !== 4 ||
+      localUnique.size !== 4 ||
+      answerKeys.length !== 1 ||
+      !answerKeys.every((answer) => localUnique.has(answer));
+    if (invalid) invalidQuestionIndexes.push(index);
+
+    const signature = [...localUnique].sort().join("|");
+    if (signature && localUnique.size === 4) {
+      const previous = optionSetOwners.get(signature);
+      if (previous !== undefined) {
+        duplicateOptionSetIndexes.push(index, previous);
+      } else {
+        optionSetOwners.set(signature, index);
+      }
+    }
+    for (const option of normalized) optionUsageCount.set(option, (optionUsageCount.get(option) ?? 0) + 1);
+  }
+
+  return {
+    valid: invalidQuestionIndexes.length === 0 && duplicateOptionSetIndexes.length === 0,
+    invalidQuestionIndexes: [...new Set(invalidQuestionIndexes)],
+    duplicateOptionSetIndexes: [...new Set(duplicateOptionSetIndexes)].sort((a, b) => a - b),
+    optionUsageCount: Object.fromEntries(optionUsageCount),
+  };
+}
+
 type CleanQuestion = { type: string; stem: string; options: string[]; answer: string[]; explanation: string; topic: string; metadata: Record<string, unknown> };
 function cleanGeneratedQuestions(raw: GeneratedQuestion[], topic: string): CleanQuestion[] {
-  return raw.map((q) => { const type = qType.safeParse(q.type ?? "single").success && q.type !== "mixed" ? (q.type as string) : "single"; const answerArr = Array.isArray(q.answer) ? q.answer.map(String) : q.answer ? [String(q.answer)] : []; const options = Array.isArray(q.options) ? q.options.map(String).filter(Boolean) : []; if (!q.stem || !answerArr.length) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && options.length < 2) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && !answerArr.every((a) => options.includes(a))) return null; return { type, stem: String(q.stem).slice(0, 2000), options: options.slice(0, 8), answer: answerArr.slice(0, 8), explanation: String(q.explanation ?? "").slice(0, 2000), metadata: q.metadata ?? {}, topic: String(q.topic ?? topic).slice(0, 60) }; }).filter(Boolean) as CleanQuestion[];
+  return raw.map((q) => { const type = qType.safeParse(q.type ?? "single").success && q.type !== "mixed" ? (q.type as string) : "single"; const answerArr = Array.isArray(q.answer) ? q.answer.map(String).filter(Boolean) : q.answer ? [String(q.answer)] : []; const options = Array.isArray(q.options) ? q.options.map(String).filter(Boolean) : []; if (!q.stem || !answerArr.length) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && options.length < 2) return null; if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && !answerArr.every((a) => options.includes(a))) return null; return { type, stem: String(q.stem).slice(0, 2000), options: options.slice(0, 8), answer: answerArr.slice(0, 8), explanation: String(q.explanation ?? "").slice(0, 2000), metadata: q.metadata ?? {}, topic: String(q.topic ?? topic).slice(0, 60) }; }).filter(Boolean) as CleanQuestion[];
+}
+
+function isEnglishSubject(subject: string) {
+  return /^(english|英文|英文科|英語|英語科)$/i.test(subject.trim());
 }
 
 function diversityRepairIndexes(items: CleanQuestion[], optionUsageCount: Record<string, number>): number[] {
@@ -66,28 +115,30 @@ export async function generateQuestions(params: {
   type: string;
   level: string;
 }) {
+  const strictEnglishOptions = isEnglishSubject(params.subject) && ["single", "multiple", "part_of_speech", "meaning", "mixed"].includes(params.type);
   let cleaned: CleanQuestion[] = [];
   let usedOptionPool: string[] = [];
   let bestScore = Number.POSITIVE_INFINITY;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const usage = usedOptionPool.reduce<Record<string, number>>((counts, option) => { counts[option] = (counts[option] ?? 0) + 1; return counts; }, {});
     const avoid = usedOptionPool.length ? `本次測驗選項使用次數（出現 1 次就優先避免，2 次以上除非沒有合理替代不要再用）：${JSON.stringify(usage)}` : "目前尚無已使用選項。";
-    const { data } = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: "你是台灣國高中題目設計引擎。請依教材出題，不得杜撰。回傳 JSON questions。single/part_of_speech/meaning 必須提供 4 個 options。選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。干擾選項優先使用意思相近、易混淆、相同詞性、常見錯誤答案、相同語境可成立但意思不同的字詞；不可為了去重使用不自然或無關選項。整份測驗優先避免重複選項，但若沒有合理替代可少量重複。multiple 的 answer 必須完全等於 options 字串。使用繁體中文（英文科目可用英文）。", parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText.slice(0, 12000)}` }], maxOutputTokens: 3000 }, { questions: [] });
+    const { data } = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: `你是台灣國高中題目設計引擎。請依教材出題，不得杜撰。回傳 JSON questions。${strictEnglishOptions ? "這是英文單字或文法測驗：每一題必須恰好提供 4 個選項 A、B、C、D，四個選項不可重複；single、part_of_speech、meaning、multiple 必須只有一個正確答案（answer 只放一個選項原文）。每題都要依題幹量身設計選項，禁止複製其他題的整組選項。單字干擾項須與題幹相關、同詞性、語意接近、字形易混淆或是常見誤用；文法干擾項須屬同一文法主題下的不同時態、動詞變化或常見學習者錯誤，且必須有明確唯一正解。" : "single/part_of_speech/meaning 優先提供 4 個合理 options。"}選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。不可為了去重使用不自然或無關選項。整份測驗不得重複相同選項組合；使用繁體中文（英文科目可用英文）。`, parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText.slice(0, 12000)}` }], maxOutputTokens: 3000 }, { questions: [] });
     let candidate = cleanGeneratedQuestions(data.questions ?? [], params.topic); let validation = validateQuizOptionPool(candidate);
     if (candidate.length && validation.excessiveCrossQuestionDuplicates && attempt < 2) {
       const repairIndexes = diversityRepairIndexes(candidate, validation.optionUsageCount);
-      const repairPrompt = repairIndexes.map((index) => `第 ${index + 1} 題：${candidate[index].stem}`).join("\n");
-      const repaired = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate_repair", userId: params.userId, system: "只重新生成指定題目的選項與答案。保留原題意與正確性；避免使用已出現 2 次以上的選項，優先選擇相同詞性、易混淆或相同語境的合理干擾選項。範圍外單字只能作干擾選項，不得變成正式考點。回傳 JSON questions。", parts: [{ kind: "text", text: `已使用選項次數：${JSON.stringify(validation.optionUsageCount)}\n請修復以下題目：\n${repairPrompt}` }], maxOutputTokens: 1800 }, { questions: [] });
+      const repairPrompt = repairIndexes.map((index) => `第 ${index + 1} 題：${candidate[index].stem}\n目前答案：${JSON.stringify(candidate[index].answer)}\n目前選項：${JSON.stringify(candidate[index].options)}`).join("\n");
+      const repaired = await runAiJson<{ questions?: GeneratedQuestion[] }>({ feature: "quiz_generate_repair", userId: params.userId, system: `只重新生成指定題目的選項與答案。保留原題幹、正確性與難度；${strictEnglishOptions ? "必須恰好輸出 4 個全新且互不重複的英文選項，answer 只能有一個，干擾項要符合單字同詞性近義／易混淆或文法常見錯誤規則，且不得與其他題形成相同選項組合。" : "避免使用已出現 2 次以上的選項，優先選擇相同詞性、易混淆或相同語境的合理干擾選項。"}範圍外單字只能作干擾選項，不得變成正式考點。回傳 JSON questions。`, parts: [{ kind: "text", text: `已使用選項次數：${JSON.stringify(validation.optionUsageCount)}\n請修復以下題目：\n${repairPrompt}` }], maxOutputTokens: 1800 }, { questions: [] });
       const replacements = cleanGeneratedQuestions(repaired.data.questions ?? [], params.topic);
       for (const [position, index] of repairIndexes.entries()) if (replacements[position]) candidate[index] = replacements[position];
       validation = validateQuizOptionPool(candidate);
     }
-    const score = (validation.sameQuestionDuplicate ? 1000 : 0) + validation.repeatedOccurrences + Math.round(validation.repeatedRate * 100);
+    const strictValidation = strictEnglishOptions ? validateEnglishQuizOptions(candidate) : { valid: true, invalidQuestionIndexes: [], duplicateOptionSetIndexes: [] };
+    const score = (validation.sameQuestionDuplicate ? 1000 : 0) + validation.repeatedOccurrences + Math.round(validation.repeatedRate * 100) + (strictValidation.valid ? 0 : 5000 + strictValidation.invalidQuestionIndexes.length * 100 + strictValidation.duplicateOptionSetIndexes.length * 100);
     if (candidate.length && score < bestScore) { cleaned = candidate; bestScore = score; }
     usedOptionPool = validation.usedOptions;
-    if (candidate.length >= params.count && !validation.sameQuestionDuplicate && !validation.excessiveCrossQuestionDuplicates) break;
+    if (candidate.length >= params.count && !validation.sameQuestionDuplicate && !validation.excessiveCrossQuestionDuplicates && strictValidation.valid) break;
   }
-  if (!cleaned.length) throw fail("AI_NO_VALID_QUESTIONS");
+  if (!cleaned.length || (strictEnglishOptions && !validateEnglishQuizOptions(cleaned).valid)) throw fail("AI_NO_VALID_QUESTIONS");
 
   const ids: string[] = [];
   for (const q of cleaned) {
