@@ -30,10 +30,9 @@ const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
-  { href: "/textbooks", label: "教材", icon: "study" },
   { href: "/ai", label: "AI", icon: "nova" },
-  { href: "/online-pk", label: "線上 PK", icon: "challenge", special: true },
   { href: "/solve", label: "解題專區", icon: "nova" },
+  { href: "/online-pk", label: "線上 PK", icon: "challenge", special: true },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
@@ -78,7 +77,6 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "Dashboard", icon: "home" },
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
-  { href: "/textbooks", label: "教材專區", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/solve", label: "解題專區", icon: "nova" },
   { href: "/essay", label: "英文作文批改", icon: "pen" },
@@ -90,7 +88,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/report", label: "學習報告", icon: "report" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
-const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/textbooks": "textbooks", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
+  const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
 const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   dashboard: { title: "首頁使用提醒", text: "今日建議僅供參考，可依時間與狀態自由選擇，不需要全部完成。" },
   ai: { title: "Novi AI 使用提醒", text: "切換模式後請查看用途說明；涉及成績、錯題、計畫或寫入資料時，請先確認授權與動作預覽。" },
@@ -104,7 +102,6 @@ const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   "online-pk": { title: "線上 PK 使用提醒", text: "每題答案、計時與分數都由伺服器驗證；斷線可在短時間內重連，請不要分享私人房間密碼。" },
   grades: { title: "成績分析使用提醒", text: "分析結果是學習參考，不代表正式校務成績；請確認輸入資料正確。" },
   profile: { title: "帳號與 Nova 使用提醒", text: "請妥善保管帳號與兌換碼；Nova 交易與會員變更以系統紀錄為準。" },
-  textbooks: { title: "教材專區使用提醒", text: "學生教材主流程以英文為主；其他科目若需要解答，請使用解題專區或詢問 Novi。", },
   report: { title: "學習報告使用提醒", text: "報告是根據你的學習紀錄產生的趨勢參考，不等同正式校務成績。" },
   admin: { title: "管理後台使用提醒", text: "後台操作會留下 Audit Log；涉及服務開關、資料與獎勵設定時請先確認影響範圍。" },
 };
@@ -121,7 +118,6 @@ const FEATURE_STEPS: Record<string, string[]> = {
   "online-pk": ["先選快速配對、邀請好友或建立自訂房間。", "開始後依照每題倒數作答；答案與計分由伺服器驗證。", "結算後可把錯題加入複習或單字資料夾。"],
   grades: ["確認科目、日期範圍與成績資料。", "查看趨勢、弱點與建議學習方向。", "將建議轉成可執行的複習任務。"],
   profile: ["查看帳號、會員、Nova 與學習偏好。", "修改設定後確認儲存結果。", "遇到問題保留錯誤代碼、Request ID 與發生時間。"],
-  textbooks: ["教材主流程以英文學習內容為主，先確認學段、學校、年級與版本。", "建立版本後設定封面、課次、內容與 OCR 規則。", "其他科目若需要解答，請使用解題專區或直接詢問 Novi。"],
   report: ["查看英文學習期間、正確率、錯題與弱點趨勢。", "確認單字、句型、閱讀與測驗表現。", "其他科目若需要解答，請使用解題專區或直接詢問 Novi。"],
   admin: ["先查看系統狀態與近期錯誤。", "修改服務開關或功能權限前確認影響範圍。", "完成後到 Audit Log 檢查操作結果與錯誤代碼。"],
 };
