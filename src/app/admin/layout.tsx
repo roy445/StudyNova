@@ -34,6 +34,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/content", label: "Content Studio", icon: "study" },
       { href: "/admin/customization", label: "客製化風格中心", icon: "spark" },
       { href: "/admin/challenges", label: "挑戰管理", icon: "challenge" },
+      { href: "/admin/online-pk", label: "線上 PK 監控", icon: "challenge" },
     ],
   },
   {

@@ -2582,6 +2582,283 @@ export const challengeSettlements = pgTable(
   (t) => [uniqueIndex("challenge_settlement_once_uq").on(t.challengeId)],
 );
 
+/* ----------------------------------------------------------- ONLINE PK */
+
+/** Online PK domain: volatile match state is kept separate from async challenges. */
+export const pkRooms = pgTable(
+  "pk_rooms",
+  {
+    id: id(),
+    // The reverse FK is added by the migration after both tables exist.
+    matchId: uuid("match_id"),
+    roomCode: text("room_code").notNull(),
+    shareToken: text("share_token").notNull(),
+    name: text("name").notNull(),
+    visibility: text("visibility").notNull().default("public"),
+    passwordHash: text("password_hash").notNull().default(""),
+    maxPlayers: integer("max_players").notNull().default(2),
+    mode: text("mode").notNull().default("1v1"),
+    teamMode: text("team_mode").notNull().default("solo"),
+    allowLateJoin: boolean("allow_late_join").notNull().default(false),
+    allowSpectators: boolean("allow_spectators").notNull().default(false),
+    showRanking: boolean("show_ranking").notNull().default(true),
+    hostId: uuid("host_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    status: text("status").notNull().default("waiting"),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("pk_rooms_code_uq").on(t.roomCode), uniqueIndex("pk_rooms_share_uq").on(t.shareToken), index("pk_rooms_status_idx").on(t.status, t.createdAt), index("pk_rooms_host_idx").on(t.hostId)],
+);
+
+export const pkMatches = pgTable(
+  "pk_matches",
+  {
+    id: id(),
+    roomId: uuid("room_id").references(() => pkRooms.id, { onDelete: "set null" }),
+    ownerId: uuid("owner_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    status: text("status").notNull().default("waiting"),
+    mode: text("mode").notNull().default("1v1"),
+    teamMode: text("team_mode").notNull().default("solo"),
+    subject: text("subject").notNull().default("英文"),
+    grade: text("grade").notNull().default(""),
+    unit: text("unit").notNull().default(""),
+    difficulty: text("difficulty").notNull().default("normal"),
+    questionCount: integer("question_count").notNull().default(10),
+    questionTimeSec: integer("question_time_sec").notNull().default(30),
+    currentQuestion: integer("current_question").notNull().default(0),
+    allowLateJoin: boolean("allow_late_join").notNull().default(false),
+    allowSpectators: boolean("allow_spectators").notNull().default(false),
+    showRanking: boolean("show_ranking").notNull().default(true),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    eventSeq: integer("event_seq").notNull().default(0),
+    rewardNova: integer("reward_nova").notNull().default(20),
+    rewardXp: integer("reward_xp").notNull().default(40),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("pk_matches_status_idx").on(t.status, t.createdAt), index("pk_matches_owner_idx").on(t.ownerId, t.createdAt), index("pk_matches_live_idx").on(t.status, t.startsAt)],
+);
+
+export const pkTeams = pgTable(
+  "pk_teams",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    color: text("color").notNull().default("#37d3ff"),
+    score: integer("score").notNull().default(0),
+    rank: integer("rank"),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("pk_teams_match_name_uq").on(t.matchId, t.name), index("pk_teams_match_idx").on(t.matchId)],
+);
+
+export const pkMatchPlayers = pgTable(
+  "pk_match_players",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    teamId: uuid("team_id").references(() => pkTeams.id, { onDelete: "set null" }),
+    role: text("role").notNull().default("player"),
+    connectionState: text("connection_state").notNull().default("connected"),
+    optionOrders: jsonb("option_orders").$type<Record<string, string[]>>().notNull().default({}),
+    score: integer("score").notNull().default(0),
+    combo: integer("combo").notNull().default(0),
+    maxCombo: integer("max_combo").notNull().default(0),
+    correctCount: integer("correct_count").notNull().default(0),
+    answeredCount: integer("answered_count").notNull().default(0),
+    totalResponseMs: integer("total_response_ms").notNull().default(0),
+    fastestResponseMs: integer("fastest_response_ms"),
+    rank: integer("rank"),
+    joinedAt: created(),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
+    currentQuestionStartedAt: timestamp("current_question_started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("pk_match_players_uq").on(t.matchId, t.userId), index("pk_match_players_match_idx").on(t.matchId, t.score), index("pk_match_players_presence_idx").on(t.userId, t.connectionState)],
+);
+
+export const pkMatchQuestions = pgTable(
+  "pk_match_questions",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    orderIndex: integer("order_index").notNull(),
+    type: text("type").notNull().default("single"),
+    stem: text("stem").notNull(),
+    canonicalOptions: jsonb("canonical_options").$type<string[]>().notNull().default([]),
+    canonicalAnswer: text("canonical_answer").notNull(),
+    explanation: text("explanation").notNull().default(""),
+    sourceLabel: text("source_label").notNull().default(""),
+    unit: text("unit").notNull().default(""),
+    fingerprint: text("fingerprint").notNull(),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("pk_match_questions_order_uq").on(t.matchId, t.orderIndex), uniqueIndex("pk_match_questions_fingerprint_uq").on(t.matchId, t.fingerprint), index("pk_match_questions_match_idx").on(t.matchId, t.orderIndex)],
+);
+
+export const pkPlayerAnswers = pgTable(
+  "pk_player_answers",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull().references(() => pkMatchQuestions.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    selectedOption: text("selected_option").notNull(),
+    responseMs: integer("response_ms").notNull().default(0),
+    isCorrect: boolean("is_correct").notNull().default(false),
+    scoreAwarded: integer("score_awarded").notNull().default(0),
+    comboAfter: integer("combo_after").notNull().default(0),
+    idempotencyKey: text("idempotency_key").notNull(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pk_player_answers_once_uq").on(t.matchId, t.questionId, t.userId), uniqueIndex("pk_player_answers_idem_uq").on(t.idempotencyKey), index("pk_player_answers_match_idx").on(t.matchId, t.answeredAt)],
+);
+
+export const pkMatchScores = pgTable(
+  "pk_match_scores",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    score: integer("score").notNull().default(0),
+    rank: integer("rank").notNull().default(0),
+    combo: integer("combo").notNull().default(0),
+    correctCount: integer("correct_count").notNull().default(0),
+    answeredCount: integer("answered_count").notNull().default(0),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("pk_match_scores_uq").on(t.matchId, t.userId), index("pk_match_scores_rank_idx").on(t.matchId, t.rank)],
+);
+
+export const pkMatchEvents = pgTable(
+  "pk_match_events",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    sequence: integer("sequence").notNull(),
+    eventType: text("event_type").notNull(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("pk_match_events_seq_uq").on(t.matchId, t.sequence), index("pk_match_events_match_idx").on(t.matchId, t.createdAt)],
+);
+
+export const pkMatchmakingQueue = pgTable(
+  "pk_matchmaking_queue",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    matchType: text("match_type").notNull().default("1v1"),
+    subject: text("subject").notNull().default("英文"),
+    grade: text("grade").notNull().default(""),
+    unit: text("unit").notNull().default(""),
+    difficulty: text("difficulty").notNull().default("normal"),
+    questionCount: integer("question_count").notNull().default(10),
+    questionTimeSec: integer("question_time_sec").notNull().default(30),
+    status: text("status").notNull().default("waiting"),
+    options: jsonb("options").$type<Record<string, unknown>>().notNull().default({}),
+    joinedAt: created(),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [uniqueIndex("pk_matchmaking_user_active_uq").on(t.userId, t.status), index("pk_matchmaking_waiting_idx").on(t.status, t.matchType, t.subject, t.difficulty, t.joinedAt)],
+);
+
+export const pkPresence = pgTable(
+  "pk_presence",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    sessionKey: text("session_key").notNull(),
+    state: text("state").notNull().default("online"),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    currentMatchId: uuid("current_match_id").references(() => pkMatches.id, { onDelete: "set null" }),
+    currentRoomId: uuid("current_room_id").references(() => pkRooms.id, { onDelete: "set null" }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("pk_presence_user_session_uq").on(t.userId, t.sessionKey), index("pk_presence_expiry_idx").on(t.expiresAt), index("pk_presence_match_idx").on(t.currentMatchId, t.state)],
+);
+
+export const pkActivities = pgTable(
+  "pk_activities",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    cover: text("cover").notNull().default("⚔️"),
+    subject: text("subject").notNull().default("英文"),
+    scope: text("scope").notNull().default(""),
+    description: text("description").notNull().default(""),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    questionCount: integer("question_count").notNull().default(10),
+    difficulty: text("difficulty").notNull().default("normal"),
+    eligibility: jsonb("eligibility").$type<Record<string, unknown>>().notNull().default({}),
+    rewardNova: integer("reward_nova").notNull().default(50),
+    rewardXp: integer("reward_xp").notNull().default(100),
+    status: text("status").notNull().default("draft"),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("pk_activities_status_idx").on(t.status, t.startsAt, t.endsAt)],
+);
+
+export const pkActivityParticipants = pgTable(
+  "pk_activity_participants",
+  {
+    id: id(),
+    activityId: uuid("activity_id").notNull().references(() => pkActivities.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    progress: integer("progress").notNull().default(0),
+    score: integer("score").notNull().default(0),
+    rank: integer("rank"),
+    joinedAt: created(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("pk_activity_participants_uq").on(t.activityId, t.userId), index("pk_activity_participants_rank_idx").on(t.activityId, t.rank)],
+);
+
+export const pkRewards = pgTable(
+  "pk_rewards",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    nova: integer("nova").notNull().default(0),
+    xp: integer("xp").notNull().default(0),
+    wrongQuestionCount: integer("wrong_question_count").notNull().default(0),
+    vocabularyAdded: integer("vocabulary_added").notNull().default(0),
+    idempotencyKey: text("idempotency_key").notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pk_rewards_match_user_uq").on(t.matchId, t.userId), uniqueIndex("pk_rewards_idem_uq").on(t.idempotencyKey)],
+);
+
+export const pkAuditLogs = pgTable(
+  "pk_audit_logs",
+  {
+    id: id(),
+    adminUserId: uuid("admin_user_id").notNull().references(() => users.userId, { onDelete: "restrict" }),
+    matchId: uuid("match_id").references(() => pkMatches.id, { onDelete: "set null" }),
+    targetUserId: uuid("target_user_id").references(() => users.userId, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    reason: text("reason").notNull().default(""),
+    before: jsonb("before").$type<Record<string, unknown> | null>(),
+    after: jsonb("after").$type<Record<string, unknown> | null>(),
+    createdAt: created(),
+  },
+  (t) => [index("pk_audit_logs_match_idx").on(t.matchId, t.createdAt), index("pk_audit_logs_admin_idx").on(t.adminUserId, t.createdAt)],
+);
+
 /* -------------------------------------------------------- PRODUCT EXTENSIONS */
 
 export const examModePolicies = pgTable(

@@ -61,7 +61,12 @@ const DEFAULT_CHRISTMAS_THEME: ChristmasTheme = {
 };
 type CompressionSettings = { enabled: boolean; maxOriginalBytes: number; maxBatchFiles: number; maxProcessingSeconds: number; maxPdfPages: number; maxImagePixels: number; minImageQuality: number; maxIterations: number; allowPdf: boolean; allowImages: boolean; allowBatch: boolean; proOnly: boolean; dailyFree: number; dailyPro: number };
 const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = { enabled: true, maxOriginalBytes: 100 * 1024 * 1024, maxBatchFiles: 20, maxProcessingSeconds: 120, maxPdfPages: 100, maxImagePixels: 144000000, minImageQuality: 35, maxIterations: 8, allowPdf: true, allowImages: true, allowBatch: true, proOnly: false, dailyFree: 10, dailyPro: 100 };
+const DEFAULT_PK_ACTIVITY_START = "2026-09-26T09:00";
+const DEFAULT_PK_ACTIVITY_END = "2026-10-03T23:59";
 type ServiceControl = { enabled: boolean; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
+type PkAdminConfig = { enabled: boolean; quickMatchEnabled: boolean; friendMatchEnabled: boolean; customRoomEnabled: boolean; publicArenaEnabled: boolean; allowedModes: string[]; maxPlayers: number; minQuestions: number; maxQuestions: number; minTimeSec: number; maxTimeSec: number; defaultRewardNova: number; defaultRewardXp: number; activityId: string | null };
+type PkAdminOverview = { config: PkAdminConfig; stats: { online: number; pkOnline: number; waitingRooms: number; liveMatches: number; matching: number }; matches: Array<{ id: string; status: string; subject: string; mode: string; difficulty: string; questionCount: number; createdAt: string; roomName: string | null; playerCount: number }>; anomalies: Array<{ id: string; matchId: string; eventType: string; payload: Record<string, unknown>; createdAt: string }> };
+type PkActivity = { id: string; name: string; cover: string; subject: string; scope: string; description: string; startsAt: string; endsAt: string; questionCount: number; difficulty: string; rewardNova: number; rewardXp: number; status: string };
 
 const ACTIONS = [
   { key: "gift_nova", label: "調整 Nova（可負數）", needAmount: true },
@@ -81,7 +86,7 @@ const ACTIONS = [
 
 export default function AdminOverviewPage() {
   const toast = useToast();
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "online-pk" ? "online-pk" : "overview");
   const [q, setQ] = useState("");
   const [userPage, setUserPage] = useState(1);
   const overview = useApi<{ users: number; pro: number; novaCirculating: number; aiCallsThisMonth: number; totalMinutes: number; weeks: number; newUsers: Array<{ day: string; c: number }> }>("/admin/overview");
@@ -91,6 +96,8 @@ export default function AdminOverviewPage() {
   const challengeAdmin = useApi<{ challenges: Array<{ id: string; title: string; kind: string; status: string; expiresAt: string; createdAt: string; creatorName: string; participants: number }> }>("/admin/challenges");
   const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
   const serviceControl = useApi<ServiceControl>("/admin/service-control");
+  const pkOverview = useApi<PkAdminOverview>("/admin/pk/overview");
+  const pkActivities = useApi<{ activities: PkActivity[] }>("/admin/pk/activities");
 
   const [selected, setSelected] = useState<string[]>([]);
   const [actionOpen, setActionOpen] = useState(false);
@@ -101,9 +108,14 @@ export default function AdminOverviewPage() {
   const [goalForm, setGoalForm] = useState({ subject: "數學", targetScore: 85, baselineScore: "", reason: "" });
   const [themeForm, setThemeForm] = useState<ChristmasTheme>(DEFAULT_CHRISTMAS_THEME);
   const [compressionForm, setCompressionForm] = useState<CompressionSettings>(DEFAULT_COMPRESSION_SETTINGS);
+  const [pkConfigForm, setPkConfigForm] = useState<PkAdminConfig | null>(null);
+  const [pkActivityForm, setPkActivityForm] = useState({ name: "", cover: "⚔️", subject: "英文", scope: "", description: "", startsAt: DEFAULT_PK_ACTIVITY_START, endsAt: DEFAULT_PK_ACTIVITY_END, questionCount: 10, difficulty: "normal", rewardNova: 50, rewardXp: 100, status: "draft" });
 
   const currentAction = ACTIONS.find((a) => a.key === form.action);
-  useEffect(() => { setUserPage(1); setSelected([]); }, [q]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setUserPage(1); setSelected([]); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [q]);
   useEffect(() => {
     const saved = settings.data?.settings.find((setting) => setting.key === "christmas_theme")?.value;
     if (!saved) return;
@@ -118,6 +130,11 @@ export default function AdminOverviewPage() {
     }
     return undefined;
   }, [settings.data]);
+  useEffect(() => {
+    if (!pkOverview.data?.config) return undefined;
+    const timer = window.setTimeout(() => setPkConfigForm(pkOverview.data?.config ?? null), 0);
+    return () => window.clearTimeout(timer);
+  }, [pkOverview.data?.config]);
 
   async function runBulk() {
     if (!selected.length) return toast.push("error", "請先選擇使用者");
@@ -155,6 +172,35 @@ export default function AdminOverviewPage() {
     } catch (err) { toast.push("error", errorMessage(err)); }
   }
 
+  async function savePkConfig() {
+    if (!pkConfigForm) return;
+    try {
+      await apiPut("/admin/pk/config", { value: pkConfigForm });
+      await pkOverview.reload();
+      toast.push("success", "線上 PK 設定已更新");
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+
+  async function controlPkMatch(matchId: string, action: "pause" | "resume" | "end" | "cancel" | "close_join" | "remove_player" | "lock_room") {
+    const reason = window.prompt("請輸入操作原因（會寫入 PK Audit Log）", action === "end" ? "管理員手動結算" : "管理員調整賽場狀態");
+    if (!reason?.trim()) return;
+    try {
+      await apiPost(`/admin/pk/matches/${matchId}/control`, { action, reason });
+      await pkOverview.reload();
+      toast.push("success", `PK 已執行：${action}`);
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+
+  async function createPkActivity() {
+    if (!pkActivityForm.name.trim()) return toast.push("error", "請輸入活動名稱");
+    try {
+      await apiPost("/admin/pk/activities", { ...pkActivityForm, startsAt: new Date(pkActivityForm.startsAt).toISOString(), endsAt: new Date(pkActivityForm.endsAt).toISOString(), eligibility: {} });
+      await pkActivities.reload();
+      setPkActivityForm((current) => ({ ...current, name: "", description: "" }));
+      toast.push("success", "PK 活動已建立");
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
+
   return (
     <div className="space-y-4">
       <Tabs
@@ -163,6 +209,7 @@ export default function AdminOverviewPage() {
           { key: "users", label: "使用者管理", icon: "◎" },
           { key: "logs", label: "Audit Log", icon: "▤" },
           { key: "challenges", label: "挑戰管理", icon: "⚔️" },
+          { key: "online-pk", label: "線上 PK", icon: "⚡" },
           { key: "appearance", label: "外觀・NOVA", icon: "✦" },
         ]}
         active={tab}
@@ -322,6 +369,41 @@ export default function AdminOverviewPage() {
             {!challengeAdmin.loading && !challengeAdmin.data?.challenges.length && <EmptyState icon="⚔️" title="目前沒有挑戰" />}
           </div>
         </Card>
+      )}
+
+      {tab === "online-pk" && (
+        <div className="space-y-4">
+          {pkOverview.loading && !pkOverview.data && <Card><Skeleton lines={5} /></Card>}
+          {pkOverview.error && <ErrorState message={pkOverview.error} onRetry={pkOverview.reload} />}
+          {pkOverview.data && <>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <Stat label="全站在線" value={pkOverview.data.stats.online} tone="cyan" />
+              <Stat label="PK 中" value={pkOverview.data.stats.pkOnline} tone="gold" />
+              <Stat label="配對中" value={pkOverview.data.stats.matching} tone="violet" />
+              <Stat label="等候房" value={pkOverview.data.stats.waitingRooms} />
+              <Stat label="進行中" value={pkOverview.data.stats.liveMatches} tone="cyan" />
+            </div>
+            <Card title="⚡ PK 總開關與規則" subtitle="設定由伺服器作為唯一來源；所有變更會寫入一般 Admin Log 與 PK Audit Log。" action={<Badge tone={pkOverview.data.config.enabled ? "green" : "rose"}>{pkOverview.data.config.enabled ? "啟用" : "已暫停"}</Badge>}>
+              {pkConfigForm && <div className="space-y-4">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">{([["enabled", "啟用線上 PK"], ["quickMatchEnabled", "快速配對"], ["friendMatchEnabled", "好友 PK"], ["customRoomEnabled", "自訂房間"], ["publicArenaEnabled", "公開競技場"]] as Array<[keyof PkAdminConfig, string]>).map(([key, label]) => <label key={key} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><span>{label}</span><input type="checkbox" checked={Boolean(pkConfigForm[key])} onChange={(event) => setPkConfigForm({ ...pkConfigForm, [key]: event.target.checked })} className="accent-[#37d3ff]" /></label>)}</div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><Field label="最大人數"><Input type="number" min={2} max={12} value={pkConfigForm.maxPlayers} onChange={(event) => setPkConfigForm({ ...pkConfigForm, maxPlayers: Number(event.target.value) })} /></Field><Field label="最少題數"><Input type="number" min={5} max={50} value={pkConfigForm.minQuestions} onChange={(event) => setPkConfigForm({ ...pkConfigForm, minQuestions: Number(event.target.value) })} /></Field><Field label="最多題數"><Input type="number" min={5} max={50} value={pkConfigForm.maxQuestions} onChange={(event) => setPkConfigForm({ ...pkConfigForm, maxQuestions: Number(event.target.value) })} /></Field><Field label="最短秒數"><Input type="number" min={5} max={120} value={pkConfigForm.minTimeSec} onChange={(event) => setPkConfigForm({ ...pkConfigForm, minTimeSec: Number(event.target.value) })} /></Field><Field label="最長秒數"><Input type="number" min={5} max={120} value={pkConfigForm.maxTimeSec} onChange={(event) => setPkConfigForm({ ...pkConfigForm, maxTimeSec: Number(event.target.value) })} /></Field><Field label="冠軍加成 Nova"><Input type="number" min={0} max={1000} value={pkConfigForm.defaultRewardNova} onChange={(event) => setPkConfigForm({ ...pkConfigForm, defaultRewardNova: Number(event.target.value) })} /></Field></div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs text-muted"><span>允許模式：{pkConfigForm.allowedModes.join("、")} · 基本 XP {pkConfigForm.defaultRewardXp}</span><Button onClick={() => void savePkConfig()}>儲存 PK 設定</Button></div>
+              </div>}
+            </Card>
+            <Card title="▣ 進行中的賽場" subtitle="可暫停、恢復、結算、關閉加入或鎖定房間；每項操作都需要原因。">
+              <div className="space-y-2">{pkOverview.data.matches.map((item) => <div key={item.id} className="glass-soft flex flex-wrap items-center justify-between gap-3 p-3 text-xs"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge tone={item.status === "in_progress" ? "green" : item.status === "completed" ? "gold" : "muted"}>{item.status}</Badge><span className="font-mono text-muted">{item.id.slice(0, 8)}</span><span className="font-semibold">{item.subject}・{item.mode}</span></div><p className="mt-1 text-muted">{item.roomName || "快速配對"}・{item.playerCount} 位玩家・{item.questionCount} 題・{new Date(item.createdAt).toLocaleString("zh-TW")}</p></div><div className="flex flex-wrap gap-1.5">{item.status === "in_progress" && <Button size="sm" variant="ghost" onClick={() => void controlPkMatch(item.id, "pause")}>暫停</Button>}{item.status === "paused" && <Button size="sm" variant="ghost" onClick={() => void controlPkMatch(item.id, "resume")}>恢復</Button>}{["in_progress", "paused", "countdown"].includes(item.status) && <Button size="sm" onClick={() => void controlPkMatch(item.id, "end")}>結算</Button>}{["waiting", "matching"].includes(item.status) && <Button size="sm" variant="ghost" onClick={() => void controlPkMatch(item.id, "close_join")}>關閉加入</Button>}{!["completed", "cancelled"].includes(item.status) && <Button size="sm" variant="ghost" onClick={() => void controlPkMatch(item.id, "cancel")}>取消</Button>}</div></div>)}{!pkOverview.data.matches.length && <EmptyState icon="⚡" title="目前沒有 PK 賽場" hint="真實玩家建立房間或進入配對後會顯示在這裡。" />}</div>
+            </Card>
+            <Card title="🚨 異常事件" subtitle="顯示伺服器觀察到的極短作答等異常訊號，不自動判定作弊。">
+              <div className="max-h-56 space-y-2 overflow-y-auto scroll-thin">{pkOverview.data.anomalies.map((event) => <div key={event.id} className="glass-soft px-3 py-2 text-xs"><div className="flex justify-between gap-2"><span className="font-semibold">{event.eventType}</span><span className="text-muted">{new Date(event.createdAt).toLocaleString("zh-TW")}</span></div><p className="mt-1 text-muted">Match {event.matchId.slice(0, 8)} · {JSON.stringify(event.payload)}</p></div>)}{!pkOverview.data.anomalies.length && <EmptyState icon="✓" title="目前沒有異常事件" />}</div>
+            </Card>
+          </>}
+          <Card title="✦ PK 活動管理" subtitle="建立活動時只儲存規則與時段；題目仍由每場 PK 的伺服器題庫選擇。">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="活動名稱"><Input value={pkActivityForm.name} onChange={(event) => setPkActivityForm({ ...pkActivityForm, name: event.target.value })} placeholder="例：週末英文閃電戰" /></Field><Field label="科目"><Input value={pkActivityForm.subject} onChange={(event) => setPkActivityForm({ ...pkActivityForm, subject: event.target.value })} /></Field><Field label="開始"><Input type="datetime-local" value={pkActivityForm.startsAt} onChange={(event) => setPkActivityForm({ ...pkActivityForm, startsAt: event.target.value })} /></Field><Field label="結束"><Input type="datetime-local" value={pkActivityForm.endsAt} onChange={(event) => setPkActivityForm({ ...pkActivityForm, endsAt: event.target.value })} /></Field></div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Field label="範圍"><Input value={pkActivityForm.scope} onChange={(event) => setPkActivityForm({ ...pkActivityForm, scope: event.target.value })} /></Field><Field label="題數"><Input type="number" min={5} max={50} value={pkActivityForm.questionCount} onChange={(event) => setPkActivityForm({ ...pkActivityForm, questionCount: Number(event.target.value) })} /></Field><Field label="難度"><Select value={pkActivityForm.difficulty} onChange={(event) => setPkActivityForm({ ...pkActivityForm, difficulty: event.target.value })}><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field><Field label="Nova 獎勵"><Input type="number" min={0} max={1000} value={pkActivityForm.rewardNova} onChange={(event) => setPkActivityForm({ ...pkActivityForm, rewardNova: Number(event.target.value) })} /></Field><Field label="狀態"><Select value={pkActivityForm.status} onChange={(event) => setPkActivityForm({ ...pkActivityForm, status: event.target.value })}><option value="draft">草稿</option><option value="published">發布</option><option value="closed">關閉</option></Select></Field></div>
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-3"><Field label="活動說明"><Input value={pkActivityForm.description} onChange={(event) => setPkActivityForm({ ...pkActivityForm, description: event.target.value })} placeholder="活動規則與參加說明" /></Field><Button onClick={() => void createPkActivity()}>建立活動</Button></div>
+            <div className="mt-4 space-y-2 border-t border-[var(--line)] pt-4">{pkActivities.loading && <Skeleton lines={3} />}{pkActivities.data?.activities.map((activity) => <div key={activity.id} className="glass-soft flex flex-wrap items-center justify-between gap-3 p-3 text-xs"><div><p className="font-semibold">{activity.cover} {activity.name} <Badge tone={activity.status === "published" ? "green" : activity.status === "closed" ? "rose" : "muted"}>{activity.status}</Badge></p><p className="mt-1 text-muted">{activity.subject}・{activity.questionCount} 題・{new Date(activity.startsAt).toLocaleString("zh-TW")} ～ {new Date(activity.endsAt).toLocaleString("zh-TW")}・{activity.rewardNova} Nova</p></div><Button size="sm" variant="ghost" onClick={async () => { try { await apiPatch(`/admin/pk/activities/${activity.id}`, { status: activity.status === "published" ? "closed" : "published" }); await pkActivities.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>{activity.status === "published" ? "關閉" : "發布"}</Button></div>)}{pkActivities.data && !pkActivities.data.activities.length && <EmptyState icon="✦" title="尚未建立 PK 活動" />}</div>
+          </Card>
+        </div>
       )}
 
       {tab === "appearance" && (

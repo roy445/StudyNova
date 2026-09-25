@@ -51,6 +51,14 @@ import {
   customizationVersions,
   pushSubscriptions,
   auditLogs,
+  pkActivities,
+  pkAuditLogs,
+  pkMatchEvents,
+  pkMatchQuestions,
+  pkMatchPlayers,
+  pkMatches,
+  pkPresence,
+  pkRooms,
 } from "@/db/schema";
 import { normalizeQuestionRows } from "../question-import";
 import { route, type RouteDef } from "../router";
@@ -64,6 +72,9 @@ import { analysisPrompt, qualityGate } from "../question-analysis";
 import { getAiPolicy, policyInstructions } from "../ai-policy";
 import { checkDisplayName } from "../name-moderation";
 import { getRegistrationControl } from "../registration";
+import { getPkConfig, normalizePkConfig } from "../pk-config";
+import { finishPkMatch } from "./pk-routes";
+import { publishPkEvent } from "../pk-realtime";
 
 function validateCustomizationTokens(tokens: Record<string, string>) {
   const allowed = new Set(["primary", "secondary", "accent", "surface", "line", "radius", "shadow", "glow", "buttonRadius", "motion", "pageBackground", "fontSize", "fontWeight", "spacing"]);
@@ -1833,6 +1844,147 @@ export const routes: RouteDef[] = [
       const rows = await db.insert(platformSettings).values({ key: "registration_control", value }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } }).returning();
       await adminLog({ actorId: admin.userId, action: "settings.registration_control.update", targetType: "setting", targetId: "registration_control", reason: body.reason || (body.enabled ? "重新開放註冊" : "暫停註冊"), before, after: value, ip: ctx.ip });
       return { registration: { ...body, updatedAt: rows[0]?.updatedAt?.toISOString?.() ?? value.updatedAt } };
+    },
+  }),
+
+  /* -------------------------------------------------------- online PK */
+  route({
+    method: "GET",
+    path: "/admin/pk/config",
+    auth: "admin",
+    handler: async () => ({ config: await getPkConfig() }),
+  }),
+  route({
+    method: "PUT",
+    path: "/admin/pk/config",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ value: z.record(z.string(), z.unknown()) }));
+      const config = normalizePkConfig(body.value);
+      const rows = await db.insert(platformSettings).values({ key: "online_pk_config", value: config }).onConflictDoUpdate({ target: platformSettings.key, set: { value: config, updatedAt: new Date() } }).returning();
+      await adminLog({ actorId: admin.userId, action: "pk.config.update", targetType: "platform", targetId: "online_pk_config", after: config, ip: ctx.ip });
+      await db.insert(pkAuditLogs).values({ adminUserId: admin.userId, action: "config_update", reason: "更新線上 PK 平台設定", after: config as Record<string, unknown> });
+      return { config, setting: rows[0] };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/pk/overview",
+    auth: "admin",
+    handler: async () => {
+      const now = new Date();
+      const [online, pkOnline, waitingRooms, liveMatches, matching, anomalies] = await Promise.all([
+        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(gte(pkPresence.expiresAt, now)),
+        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), sql`${pkPresence.currentMatchId} is not null`)),
+        db.select({ count: sql<number>`count(*)::int` }).from(pkRooms).where(eq(pkRooms.status, "waiting")),
+        db.select({ count: sql<number>`count(*)::int` }).from(pkMatches).where(sql`${pkMatches.status} in ('countdown', 'in_progress', 'paused')`),
+        db.select({ count: sql<number>`count(*)::int` }).from(pkMatches).where(eq(pkMatches.status, "matching")),
+        db.select().from(pkMatchEvents).where(eq(pkMatchEvents.eventType, "anomaly_detected")).orderBy(desc(pkMatchEvents.createdAt)).limit(30),
+      ]);
+      const matches = await db.select({ match: pkMatches, roomName: pkRooms.name }).from(pkMatches).leftJoin(pkRooms, eq(pkRooms.id, pkMatches.roomId)).orderBy(desc(pkMatches.createdAt)).limit(30);
+      const withCounts = [];
+      for (const row of matches) {
+        const count = await db.select({ count: sql<number>`count(*)::int` }).from(pkMatchPlayers).where(and(eq(pkMatchPlayers.matchId, row.match.id), eq(pkMatchPlayers.role, "player")));
+        withCounts.push({ ...row.match, roomName: row.roomName ?? null, playerCount: Number(count[0]?.count ?? 0) });
+      }
+      return { config: await getPkConfig(), stats: { online: Number(online[0]?.count ?? 0), pkOnline: Number(pkOnline[0]?.count ?? 0), waitingRooms: Number(waitingRooms[0]?.count ?? 0), liveMatches: Number(liveMatches[0]?.count ?? 0), matching: Number(matching[0]?.count ?? 0) }, matches: withCounts, anomalies };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/pk/matches/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const match = (await db.select().from(pkMatches).where(eq(pkMatches.id, ctx.params.id)).limit(1))[0];
+      if (!match) throw notFound("找不到 PK 賽場");
+      const [players, questions, events] = await Promise.all([
+        db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId }).from(pkMatchPlayers).innerJoin(users, eq(users.userId, pkMatchPlayers.userId)).where(eq(pkMatchPlayers.matchId, match.id)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score)),
+        db.select().from(pkMatchQuestions).where(eq(pkMatchQuestions.matchId, match.id)).orderBy(asc(pkMatchQuestions.orderIndex)),
+        db.select().from(pkMatchEvents).where(eq(pkMatchEvents.matchId, match.id)).orderBy(desc(pkMatchEvents.sequence)).limit(100),
+      ]);
+      return { match, players, questions, events };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/pk/matches/:id/control",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ action: z.enum(["pause", "resume", "end", "cancel", "close_join", "remove_player", "lock_room"]), reason: z.string().trim().min(1).max(500), targetUserId: z.string().uuid().optional() }));
+      const match = (await db.select().from(pkMatches).where(eq(pkMatches.id, ctx.params.id)).limit(1))[0];
+      if (!match) throw notFound("找不到 PK 賽場");
+      const before = { status: match.status, allowLateJoin: match.allowLateJoin, roomId: match.roomId };
+      if (body.action === "pause") {
+        if (match.status !== "in_progress") throw conflict("只有進行中的 PK 可以暫停");
+        await db.update(pkMatches).set({ status: "paused", updatedAt: new Date() }).where(and(eq(pkMatches.id, match.id), eq(pkMatches.status, "in_progress")));
+      } else if (body.action === "resume") {
+        if (match.status !== "paused") throw conflict("只有暫停中的 PK 可以恢復");
+        await db.update(pkMatches).set({ status: "in_progress", updatedAt: new Date() }).where(and(eq(pkMatches.id, match.id), eq(pkMatches.status, "paused")));
+      } else if (body.action === "end") {
+        await finishPkMatch(match.id);
+      } else if (body.action === "cancel") {
+        await db.update(pkMatches).set({ status: "cancelled", finishedAt: new Date(), updatedAt: new Date() }).where(eq(pkMatches.id, match.id));
+        await db.update(pkRooms).set({ status: "closed", updatedAt: new Date() }).where(eq(pkRooms.matchId, match.id));
+      } else if (body.action === "close_join" || body.action === "lock_room") {
+        await db.update(pkMatches).set({ allowLateJoin: false, updatedAt: new Date() }).where(eq(pkMatches.id, match.id));
+        await db.update(pkRooms).set({ status: "locked", updatedAt: new Date() }).where(eq(pkRooms.matchId, match.id));
+      } else {
+        if (!body.targetUserId) throw badRequest("移除玩家需要 targetUserId");
+        await db.update(pkMatchPlayers).set({ connectionState: "disconnected", role: "spectator", finishedAt: new Date() }).where(and(eq(pkMatchPlayers.matchId, match.id), eq(pkMatchPlayers.userId, body.targetUserId)));
+      }
+      const afterMatch = (await db.select().from(pkMatches).where(eq(pkMatches.id, match.id)).limit(1))[0];
+      const after = afterMatch ? { status: afterMatch.status, allowLateJoin: afterMatch.allowLateJoin, roomId: afterMatch.roomId } : null;
+      await db.insert(pkAuditLogs).values({ adminUserId: admin.userId, matchId: match.id, targetUserId: body.targetUserId ?? null, action: body.action, reason: body.reason, before, after });
+      await adminLog({ actorId: admin.userId, action: `pk.match.${body.action}`, targetType: "pk_match", targetId: match.id, reason: body.reason, before, after, ip: ctx.ip });
+      publishPkEvent(match.id, { type: "admin_control", payload: { action: body.action, reason: body.reason } });
+      return { match: afterMatch, action: body.action };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/pk/audit",
+    auth: "admin",
+    handler: async (ctx) => {
+      const limit = Math.min(200, Math.max(1, Number(ctx.query.get("limit") ?? 100)));
+      return { logs: await db.select({ log: pkAuditLogs, adminName: users.displayName }).from(pkAuditLogs).innerJoin(users, eq(users.userId, pkAuditLogs.adminUserId)).orderBy(desc(pkAuditLogs.createdAt)).limit(limit) };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/pk/activities",
+    auth: "admin",
+    handler: async () => ({ activities: await db.select().from(pkActivities).orderBy(desc(pkActivities.startsAt)) }),
+  }),
+  route({
+    method: "POST",
+    path: "/admin/pk/activities",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ name: z.string().trim().min(1).max(120), cover: z.string().max(8).default("⚔️"), subject: z.string().min(1).max(40), scope: z.string().max(120).default(""), description: z.string().max(1000).default(""), startsAt: z.string().datetime(), endsAt: z.string().datetime(), questionCount: z.number().int().min(5).max(50).default(10), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), eligibility: z.record(z.string(), z.unknown()).default({}), rewardNova: z.number().int().min(0).max(1000).default(50), rewardXp: z.number().int().min(0).max(2000).default(100), status: z.enum(["draft", "published", "closed"]).default("draft") }));
+      if (new Date(body.endsAt) <= new Date(body.startsAt)) throw badRequest("活動結束時間必須晚於開始時間");
+      const rows = await db.insert(pkActivities).values({ ...body, startsAt: new Date(body.startsAt), endsAt: new Date(body.endsAt), createdBy: admin.userId }).returning();
+      await adminLog({ actorId: admin.userId, action: "pk.activity.create", targetType: "pk_activity", targetId: rows[0].id, after: rows[0] as unknown as Record<string, unknown>, ip: ctx.ip });
+      return { activity: rows[0] };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/pk/activities/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ name: z.string().trim().min(1).max(120).optional(), cover: z.string().max(8).optional(), subject: z.string().min(1).max(40).optional(), scope: z.string().max(120).optional(), description: z.string().max(1000).optional(), startsAt: z.string().datetime().optional(), endsAt: z.string().datetime().optional(), questionCount: z.number().int().min(5).max(50).optional(), difficulty: z.enum(["easy", "normal", "hard"]).optional(), eligibility: z.record(z.string(), z.unknown()).optional(), rewardNova: z.number().int().min(0).max(1000).optional(), rewardXp: z.number().int().min(0).max(2000).optional(), status: z.enum(["draft", "published", "closed"]).optional() }));
+      const current = (await db.select().from(pkActivities).where(eq(pkActivities.id, ctx.params.id)).limit(1))[0];
+      if (!current) throw notFound("找不到 PK 活動");
+      const startsAt = body.startsAt ? new Date(body.startsAt) : current.startsAt;
+      const endsAt = body.endsAt ? new Date(body.endsAt) : current.endsAt;
+      if (endsAt <= startsAt) throw badRequest("活動結束時間必須晚於開始時間");
+      const rows = await db.update(pkActivities).set({ ...body, startsAt, endsAt, updatedAt: new Date() }).where(eq(pkActivities.id, ctx.params.id)).returning();
+      await adminLog({ actorId: admin.userId, action: "pk.activity.update", targetType: "pk_activity", targetId: ctx.params.id, before: current as unknown as Record<string, unknown>, after: rows[0] as unknown as Record<string, unknown>, ip: ctx.ip });
+      return { activity: rows[0] };
     },
   }),
 

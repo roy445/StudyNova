@@ -32,12 +32,12 @@ const NAV: NavItem[] = [
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/textbooks", label: "教材", icon: "study" },
   { href: "/ai", label: "AI", icon: "nova" },
+  { href: "/online-pk", label: "線上 PK", icon: "challenge", special: true },
   { href: "/solve", label: "解題專區", icon: "nova" },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
   { href: "/weekly", label: "小考", icon: "weekly" },
-  { href: "/challenge", label: "挑戰", icon: "challenge" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
 
@@ -46,6 +46,7 @@ const NAV: NavItem[] = [
   "/study": "需要我陪你複習錯題、練單字，或安排一段專注時間嗎？",
   "/weekly": "這裡可以查看每週小考、單字與解析；要不要先看看本週重點？",
   "/challenge": "想和好友比一場嗎？可以選每日單字或已開放的每週小考。",
+  "/online-pk": "準備好和真實對手比速度與正確率了嗎？答案由伺服器驗證，放心專注在下一題。",
   "/grades": "我可以幫你看成績趨勢，找出下一個最值得補強的科目。",
   "/ai": "把題目或不懂的地方交給我，我可以用更有趣的方式拆解。",
   "/solve": "其他科目的題目也可以帶到解題專區，我會陪你一步一步看。",
@@ -85,11 +86,11 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/export", label: "資料匯出", icon: "archive" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
-  { href: "/challenge", label: "好友・活動", icon: "challenge" },
+  { href: "/online-pk", label: "線上 PK", icon: "challenge" },
   { href: "/report", label: "學習報告", icon: "report" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
-const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/textbooks": "textbooks", "/weekly": "weekly", "/challenge": "challenge", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
+const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/textbooks": "textbooks", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
 const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   dashboard: { title: "首頁使用提醒", text: "今日建議僅供參考，可依時間與狀態自由選擇，不需要全部完成。" },
   ai: { title: "Novi AI 使用提醒", text: "切換模式後請查看用途說明；涉及成績、錯題、計畫或寫入資料時，請先確認授權與動作預覽。" },
@@ -100,6 +101,7 @@ const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   study: { title: "學習中心使用提醒", text: "複習與專注紀錄可依你的節奏調整；儲存前請確認日期、範圍與內容。" },
   weekly: { title: "每週小考使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
   challenge: { title: "挑戰功能使用提醒", text: "請確認挑戰對象、題目與截止時間；不要分享帳號、密碼或個人敏感資料。" },
+  "online-pk": { title: "線上 PK 使用提醒", text: "每題答案、計時與分數都由伺服器驗證；斷線可在短時間內重連，請不要分享私人房間密碼。" },
   grades: { title: "成績分析使用提醒", text: "分析結果是學習參考，不代表正式校務成績；請確認輸入資料正確。" },
   profile: { title: "帳號與 Nova 使用提醒", text: "請妥善保管帳號與兌換碼；Nova 交易與會員變更以系統紀錄為準。" },
   textbooks: { title: "教材專區使用提醒", text: "學生教材主流程以英文為主；其他科目若需要解答，請使用解題專區或詢問 Novi。", },
@@ -116,6 +118,7 @@ const FEATURE_STEPS: Record<string, string[]> = {
   study: ["StudyNova 主要提供英文教材、OCR、測驗、錯題與單字學習。", "圖片 OCR 每次使用前都會提醒：目前只支援英文科目；其他科目請到解題專區或直接詢問 Novi。", "AI 轉成筆記、題目或單字前，先查看辨識內容。"],
   weekly: ["開始前查看範圍、時間與答題規則。", "每題作答後確認選項，提交前再檢查一次。", "完成後查看分數、錯題與獎勵紀錄。"],
   challenge: ["選擇娛樂模式或 Nova Stake 模式，確認籌碼與負債規則。", "開始後依速度與正確率作答；已出現的題目與選項不會重複。", "完成後查看比分、錯題數與獎勵結算。"],
+  "online-pk": ["先選快速配對、邀請好友或建立自訂房間。", "開始後依照每題倒數作答；答案與計分由伺服器驗證。", "結算後可把錯題加入複習或單字資料夾。"],
   grades: ["確認科目、日期範圍與成績資料。", "查看趨勢、弱點與建議學習方向。", "將建議轉成可執行的複習任務。"],
   profile: ["查看帳號、會員、Nova 與學習偏好。", "修改設定後確認儲存結果。", "遇到問題保留錯誤代碼、Request ID 與發生時間。"],
   textbooks: ["教材主流程以英文學習內容為主，先確認學段、學校、年級與版本。", "建立版本後設定封面、課次、內容與 OCR 規則。", "其他科目若需要解答，請使用解題專區或直接詢問 Novi。"],
@@ -338,6 +341,22 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     timer = setTimeout(sync, 10_000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storageKey = "studynova:pk-presence-session";
+    const sessionKey = sessionStorage.getItem(storageKey) ?? (window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    sessionStorage.setItem(storageKey, sessionKey);
+    let timer: ReturnType<typeof setTimeout>;
+    const heartbeat = () => {
+      void apiPost("/pk/presence/heartbeat", { sessionKey, state: pathname.startsWith("/online-pk") ? "online" : "recently_active", metadata: { route: pathname } }).catch(() => {});
+      timer = setTimeout(heartbeat, 45_000);
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") heartbeat(); };
+    heartbeat();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", onVisibility); };
+  }, [pathname, user.userId]);
 
   const runSearch = useCallback(async () => {
     if (query.trim().length < 1) return;
@@ -598,16 +617,17 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
           {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isPk = item.href === "/online-pk";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
             return (
               <li key={item.href} className="flex-1">
                 <Link
                   href={item.href}
                   aria-label={item.label}
-                  className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${item.special ? "exam-nav-item" : ""} ${active && item.special ? "exam-nav-item-active" : ""}`}
+                  className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
                 >
-                  {item.special && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
-                  <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>
+                  {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
+                  <span className={isPk ? "pk-nav-icon" : item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>
                   <span className="max-w-full truncate">{item.label}</span>
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
                 </Link>
