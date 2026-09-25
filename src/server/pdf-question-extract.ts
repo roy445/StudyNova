@@ -1,9 +1,15 @@
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { WorkerMessageHandler } from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 
 export type PdfTextChunk = { pageStart: number; pageEnd: number; text: string };
 
 export async function extractPdfQuestionChunks(buffer: Buffer, maxCharsPerChunk = 28_000): Promise<PdfTextChunk[]> {
-  const pdf = await getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false, isEvalSupported: false }).promise;
+  // Vercel bundles the legacy parser into a server chunk. Register the worker
+  // handler statically so PDF.js never tries to dynamically import a missing
+  // /var/task/pdf.worker.mjs file at runtime.
+  const workerGlobal = globalThis as typeof globalThis & { pdfjsWorker?: { WorkerMessageHandler: typeof WorkerMessageHandler } };
+  workerGlobal.pdfjsWorker ??= { WorkerMessageHandler };
+  const pdf = await getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false, isEvalSupported: false, disableFontFace: true }).promise;
   const pages: string[] = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber);
