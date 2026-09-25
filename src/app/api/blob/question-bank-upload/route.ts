@@ -176,7 +176,7 @@ export async function POST(request: Request) {
                       temperature: 0.05,
                       maxOutputTokens: 12000,
                       timeoutMs: 55_000,
-                      system: `你是 StudyNova 題庫數位化分析器。這是 PDF 的第 ${chunk.pageStart}-${chunk.pageEnd} 頁文字區段。必須逐題完整擷取，不能摘要、不能挑題、不能因答案缺漏而省略。保留所有題目、選項、答案、解析、題號與頁碼。不要把 answer key 建成題目。只回傳 JSON：{questions:[{questionNumber,subject,topic,level,difficulty,type,stem,options,answer,explanation,confidence,answerSource,sourcePage,reviewReasons}],answerKeys:[{questionNumber,answer,sourcePage}],answerRegions:[{text,sourcePage}]}.答案找不到時仍保留題目並回傳 answer:[]。完成前請檢查區段中的題號是否連續，若有題號也必須建立該題。`,
+                      system: `你是 StudyNova 題庫數位化分析器。這是 PDF 的第 ${chunk.pageStart}-${chunk.pageEnd} 頁文字區段。必須逐題完整擷取，不能摘要、不能挑題、不能因答案缺漏而省略。保留所有題目、選項、答案、解析、題號與頁碼；題幹可能跨頁，請把下一頁的延續文字接回上一題，不要另造空題。不要把 answer key 建成題目。只回傳 JSON：{questions:[{questionNumber,subject,topic,level,difficulty,type,stem,options,answer,explanation,confidence,answerSource,sourcePage,reviewReasons}],answerKeys:[{questionNumber,answer,sourcePage}],answerRegions:[{text,sourcePage}]}.答案找不到時仍保留題目並回傳 answer:[]。完成前請逐一核對本段所有題號、選項標記與題幹開頭；題號不連續時不得自行跳過，沒有清楚題號也要建立 temporaryQuestionId 題目。`,
                       parts: [{ kind: "text", text: `來源：${payload.sourceLabel}
 題庫分類：${payload.bankCategory}
 ${chunk.text}` }],
