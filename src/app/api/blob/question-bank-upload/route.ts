@@ -27,6 +27,46 @@ function safeText(value: unknown, max: number) {
   return String(value ?? "").trim().slice(0, max);
 }
 
+function classifySubject(value: unknown, stem = "") {
+  const text = `${String(value ?? "")} ${stem}`.toLowerCase();
+  if (/英文|英語|english|vocabulary|grammar|reading/.test(text)) return "英文";
+  if (/數學|数学|math|algebra|geometry|calculus|equation/.test(text)) return "數學";
+  if (/物理|physics/.test(text)) return "物理";
+  if (/化學|化学|chemistry/.test(text)) return "化學";
+  if (/生物|biology/.test(text)) return "生物";
+  if (/自然|science|experiment|biology|physics|chemistry/.test(text)) return "自然";
+  if (/國文|国文|中文|語文|語文|chinese|literature/.test(text)) return "國文";
+  if (/歷史|历史|history/.test(text)) return "歷史";
+  if (/地理|geography/.test(text)) return "地理";
+  if (/公民|政治|公民與社會|civics|social studies/.test(text)) return "公民";
+  return safeText(value || "其他", 30) || "其他";
+}
+
+function classifyLevel(value: unknown) {
+  const text = String(value ?? "").toLowerCase();
+  if (/senior|高中|高職|高一|高二|高三|高中職|大學|大專|university|college/.test(text)) return "senior";
+  return "junior";
+}
+
+function classifyDifficulty(value: unknown, stem = "") {
+  const text = `${String(value ?? "")} ${stem}`.toLowerCase();
+  if (/exam|advanced|hard|困難|進階|極難|挑戰/.test(text)) return "hard";
+  if (/easy|簡單|基礎|容易/.test(text)) return "easy";
+  return "normal";
+}
+
+function classifyType(value: unknown, options: string[]) {
+  const text = String(value ?? "").toLowerCase();
+  if (/multiple|複選|多選/.test(text)) return "multiple";
+  if (/true.?false|判斷|是非/.test(text)) return "truefalse";
+  if (/fill|填空|cloze|克漏字/.test(text)) return "fill";
+  if (/matching|配合|連連看/.test(text)) return "matching";
+  if (/essay|作文|申論/.test(text)) return "essay";
+  if (/calculation|計算/.test(text)) return "calculation";
+  if (/single|choice|選擇|單選/.test(text) || options.length >= 2) return "single";
+  return safeText(value || "short", 40).toLowerCase() || "short";
+}
+
 function parseCsv(text: string): Record<string, unknown>[] {
   const rows = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (rows.length < 2) return [];
@@ -48,7 +88,7 @@ function normalizeItem(item: Record<string, unknown>, sourceObjectId: string, so
   if (!stem) return null;
   const answer = Array.isArray(item.answer) ? item.answer.map((value) => safeText(value, 1000)).filter(Boolean).slice(0, 12) : [];
   const options = Array.isArray(item.options) ? item.options.map((value) => safeText(value, 2000)).filter(Boolean).slice(0, 12) : [];
-  const type = safeText(item.type || "short", 40).toLowerCase();
+  const type = classifyType(item.type, options);
   const confidence = Number(item.confidence ?? 0);
   const reasons = Array.isArray(item.reviewReasons) ? item.reviewReasons.map((value) => safeText(value, 200)).filter(Boolean) : [];
   if (!answer.length) reasons.push("答案無法確認");
@@ -69,10 +109,10 @@ function normalizeItem(item: Record<string, unknown>, sourceObjectId: string, so
     sourceObjectId,
   };
   return {
-    subject: safeText(item.subject || "其他", 30),
-    topic: safeText(item.topic || item.knowledgePoint || "", 160),
-    level: item.level === "senior" ? "senior" : "junior",
-    difficulty: safeText(item.difficulty || "normal", 30),
+    subject: classifySubject(item.subject, stem),
+    topic: safeText(item.topic || item.knowledgePoint || item.chapter || item.unit || "未分類", 160),
+    level: classifyLevel(item.level || item.grade || item.educationLevel),
+    difficulty: classifyDifficulty(item.difficulty, stem),
     type,
     stem,
     options,
@@ -122,6 +162,8 @@ export async function POST(request: Request) {
             const chunks = await extractPdfQuestionChunks(rawBuffer);
             const textChunks = chunks.filter((chunk) => chunk.text.replace(/\[第 \d+ 頁\]/g, "").trim().length > 40);
             if (textChunks.length > 0) {
+              const analysisStartedAt = new Date();
+              await db.update(questionImportJobs).set({ analysisTotalChunks: textChunks.length, analysisProcessedChunks: 0, analysisStartedAt, analysisLastChunkAt: null, status: "analyzing", updatedAt: analysisStartedAt }).where(eq(questionImportJobs.id, payload.jobId));
               const merged: { questions: Array<Record<string, unknown>>; answerKeys: Array<Record<string, unknown>>; answerRegions: Array<Record<string, unknown>> } = { questions: [], answerKeys: [], answerRegions: [] };
               const analyzeChunk = async (chunk: typeof textChunks[number]) => {
                 let lastError: unknown = null;
@@ -157,6 +199,8 @@ ${chunk.text}` }],
                   merged.answerKeys.push(...(result.answerKeys ?? []));
                   merged.answerRegions.push(...(result.answerRegions ?? []));
                 }
+                const analysisLastChunkAt = new Date();
+                await db.update(questionImportJobs).set({ analysisProcessedChunks: Math.min(offset + batch.length, textChunks.length), analysisLastChunkAt, totalQuestions: merged.questions.length, updatedAt: analysisLastChunkAt }).where(eq(questionImportJobs.id, payload.jobId));
               }
               parsed = merged;
             } else {

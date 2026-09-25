@@ -1412,7 +1412,13 @@ export const routes: RouteDef[] = [
       const admin = ctx.requireUser();
       const job = (await db.select().from(questionImportJobs).where(and(eq(questionImportJobs.id, ctx.params.id), eq(questionImportJobs.adminId, admin.userId))).limit(1))[0];
       if (!job) throw notFound("找不到匯入工作");
-      return { ...job, progress: job.totalFiles ? Math.min(100, Math.round((job.processedFiles / job.totalFiles) * 100)) : 0 };
+      const fileProgress = job.totalFiles ? Math.round((job.processedFiles / job.totalFiles) * 100) : 0;
+      const chunkProgress = job.analysisTotalChunks ? Math.round((job.analysisProcessedChunks / job.analysisTotalChunks) * 100) : 0;
+      const progress = job.status === "ready" || job.status === "confirmed" ? 100 : job.analysisTotalChunks ? Math.min(99, chunkProgress) : fileProgress;
+      const elapsedSeconds = job.analysisStartedAt ? Math.max(0, (Date.now() - job.analysisStartedAt.getTime()) / 1000) : 0;
+      const averageSeconds = job.analysisProcessedChunks > 0 ? elapsedSeconds / job.analysisProcessedChunks : 0;
+      const estimatedSecondsRemaining = job.analysisTotalChunks > job.analysisProcessedChunks && averageSeconds > 0 ? Math.ceil((job.analysisTotalChunks - job.analysisProcessedChunks) * averageSeconds) : 0;
+      return { ...job, progress, estimatedSecondsRemaining, analysisElapsedSeconds: Math.round(elapsedSeconds) };
     },
   }),
   route({
