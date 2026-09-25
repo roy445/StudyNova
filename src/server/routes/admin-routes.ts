@@ -1373,7 +1373,7 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ name: z.string().min(1).max(120), description: z.string().max(3000).default(""), subject: z.string().min(1).max(40), grade: z.string().max(40).default(""), educationLevel: z.string().max(40).default(""), semester: z.string().max(40).default(""), publisher: z.string().max(120).default(""), source: z.string().max(300).default(""), tags: z.array(z.string().max(60)).max(30).default([]), visibility: z.enum(["private", "school", "public"]).default("private") }));
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(120), description: z.string().max(3000).default(""), subject: z.string().min(1).max(40), grade: z.string().max(40).default(""), educationLevel: z.string().max(40).default(""), semester: z.string().max(40).default(""), publisher: z.string().max(120).default(""), source: z.string().max(300).default(""), tags: z.array(z.string().max(60)).max(30).default([]), visibility: z.enum(["private", "school", "public"]).default("private"), bankKind: z.enum(["global", "exam", "activity", "challenge", "exclusive"]).default("exclusive") }));
       const rows = await db.insert(questionBanks).values({ ...body, createdBy: admin.userId }).returning();
       await adminLog({ actorId: admin.userId, action: "question-bank.create", targetType: "question_bank", targetId: rows[0].id, after: body, ip: ctx.ip });
       return { bank: rows[0] };
@@ -1385,7 +1385,7 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ name: z.string().min(1).max(120).optional(), description: z.string().max(3000).optional(), subject: z.string().min(1).max(40).optional(), grade: z.string().max(40).optional(), educationLevel: z.string().max(40).optional(), semester: z.string().max(40).optional(), publisher: z.string().max(120).optional(), source: z.string().max(300).optional(), tags: z.array(z.string().max(60)).max(30).optional(), visibility: z.enum(["private", "school", "public"]).optional(), status: z.enum(["draft", "review", "published", "archived"]).optional() }));
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(120).optional(), description: z.string().max(3000).optional(), subject: z.string().min(1).max(40).optional(), grade: z.string().max(40).optional(), educationLevel: z.string().max(40).optional(), semester: z.string().max(40).optional(), publisher: z.string().max(120).optional(), source: z.string().max(300).optional(), tags: z.array(z.string().max(60)).max(30).optional(), visibility: z.enum(["private", "school", "public"]).optional(), bankKind: z.enum(["global", "exam", "activity", "challenge", "exclusive"]).optional(), status: z.enum(["draft", "review", "published", "archived"]).optional() }));
       const rows = await db.update(questionBanks).set({ ...body, updatedAt: new Date() }).where(eq(questionBanks.id, ctx.params.id)).returning();
       if (!rows[0]) throw notFound("找不到題庫");
       await adminLog({ actorId: admin.userId, action: "question-bank.update", targetType: "question_bank", targetId: rows[0].id, after: body, ip: ctx.ip });
@@ -1398,8 +1398,9 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ totalFiles: z.number().int().min(1).max(50), bankCategory: z.string().min(1).max(40), sourceLabel: z.string().min(1).max(120), targetBank: z.enum(["general", "activity", "exclusive", "weekly"]) }));
-      const job = (await db.insert(questionImportJobs).values({ adminId: admin.userId, totalFiles: body.totalFiles, bankCategory: body.bankCategory, sourceLabel: body.sourceLabel, targetBank: body.targetBank, status: "uploading" }).returning())[0];
+      const body = await ctx.json(z.object({ totalFiles: z.number().int().min(1).max(50), bankCategory: z.string().min(1).max(40), sourceLabel: z.string().min(1).max(120), targetBank: z.enum(["general", "activity", "exclusive", "weekly"]), questionBankId: z.string().uuid().nullable().optional() }));
+      if (body.questionBankId && !(await db.select({ id: questionBanks.id }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0]) throw notFound("找不到指定的專屬題庫");
+      const job = (await db.insert(questionImportJobs).values({ adminId: admin.userId, totalFiles: body.totalFiles, bankCategory: body.bankCategory, sourceLabel: body.sourceLabel, targetBank: body.targetBank, questionBankId: body.questionBankId ?? null, status: "uploading" }).returning())[0];
       return { jobId: job.id, status: job.status };
     },
   }),
@@ -1489,7 +1490,7 @@ export const routes: RouteDef[] = [
         const stem = String(item.stem || "");
         if (!stem) continue;
         const answer = Array.isArray(item.answer) ? item.answer.map(String) : [];
-        const rows = await db.insert(questions).values({ ownerId: null, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), metadata: item.metadata && typeof item.metadata === "object" ? item.metadata as Record<string, unknown> : {}, fingerprint: fingerprint(subject, stem, answer.join("|")) }).onConflictDoNothing().returning({ id: questions.id });
+        const rows = await db.insert(questions).values({ ownerId: null, bankId: job.questionBankId, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), metadata: item.metadata && typeof item.metadata === "object" ? item.metadata as Record<string, unknown> : {}, fingerprint: fingerprint(subject, stem, answer.join("|")) }).onConflictDoNothing().returning({ id: questions.id });
         if (rows[0]) imported += 1;
       }
       await db.update(questionImportJobs).set({ status: "confirmed", acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
@@ -1514,7 +1515,7 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ items: z.unknown(), subject: z.string().max(20).optional(), bankCategory: z.string().max(40).optional(), sourceLabel: z.string().max(120).optional(), level: z.enum(["junior", "senior"]).optional(), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).optional() }));
+      const body = await ctx.json(z.object({ items: z.unknown(), subject: z.string().max(20).optional(), bankCategory: z.string().max(40).optional(), sourceLabel: z.string().max(120).optional(), level: z.enum(["junior", "senior"]).optional(), difficulty: z.enum(["easy", "normal", "hard", "exam", "advanced"]).optional(), questionBankId: z.string().uuid().nullable().optional() }));
       const preview = normalizeQuestionRows(body.items, body).previews;
       let accepted = 0;
       let imported = 0;
@@ -1523,7 +1524,7 @@ export const routes: RouteDef[] = [
       for (const q of preview) {
         if (q.status === "ERROR" || q.status === "DUPLICATE") { skipped += 1; continue; }
         accepted += 1;
-        const rows = await db.insert(questions).values({ ownerId: null, origin: "bank", targetBank: "general", bankCategory: q.bankCategory, sourceLabel: q.sourceLabel, subject: q.subject, topic: q.topic, level: q.level, difficulty: q.difficulty, type: q.type, stem: q.stem, options: q.options, answer: q.answer, explanation: q.explanation, metadata: q.metadata, fingerprint: q.fingerprint }).onConflictDoNothing().returning({ id: questions.id });
+        const rows = await db.insert(questions).values({ ownerId: null, bankId: body.questionBankId ?? null, origin: "bank", targetBank: "general", bankCategory: q.bankCategory, sourceLabel: q.sourceLabel, subject: q.subject, topic: q.topic, level: q.level, difficulty: q.difficulty, type: q.type, stem: q.stem, options: q.options, answer: q.answer, explanation: q.explanation, metadata: q.metadata, fingerprint: q.fingerprint }).onConflictDoNothing().returning({ id: questions.id });
         if (rows[0]) imported += 1; else skipped += 1;
       }
       await adminLog({ actorId: admin.userId, action: "questions.import", targetType: "questions", targetId: "bank", after: { submitted: preview.length, accepted, imported, skipped, invalid: invalid.length }, ip: ctx.ip });

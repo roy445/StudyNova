@@ -92,9 +92,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
 
           <nav aria-label="管理員功能分類" className="mt-2.5 grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
-            {NAV_GROUPS.map((group) => (
-              <section key={group.label} className="min-w-0 rounded-2xl border border-[var(--line)]/80 bg-white/[0.025] p-2">
-                <h2 className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{group.label}</h2>
+            {NAV_GROUPS.map((group, index) => (
+              <details key={group.label} className="min-w-0 rounded-2xl border border-[var(--line)]/80 bg-white/[0.025] p-2" open={index === 0}>
+                <summary className="cursor-pointer list-none px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted marker:hidden">{group.label}<span className="float-right text-[var(--color-nova-cyan)]">⌄</span></summary>
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-1 2xl:grid-cols-2">
                   {group.items.map((item) => (
                     <Link
@@ -107,7 +107,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                     </Link>
                   ))}
                 </div>
-              </section>
+              </details>
             ))}
           </nav>
         </div>

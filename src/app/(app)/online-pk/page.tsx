@@ -44,8 +44,8 @@ type MatchData = {
 };
 type AnswerResult = { accepted: boolean; replay: boolean; isCorrect: boolean; scoreAwarded: number; combo: number; score: number; serverResponseMs?: number; finished?: boolean };
 
-type CreateForm = { mode: "1v1" | "2v2" | "3v3" | "多人"; subject: string; grade: string; unit: string; difficulty: "easy" | "normal" | "hard"; questionCount: number; questionTimeSec: number; teamMode: "solo" | "team" };
-const DEFAULT_FORM: CreateForm = { mode: "1v1", subject: "英文", grade: "國中", unit: "", difficulty: "normal", questionCount: 10, questionTimeSec: 30, teamMode: "solo" };
+type CreateForm = { mode: "1v1" | "2v2" | "3v3" | "多人"; questionBankId: string; subject: string; grade: string; unit: string; difficulty: "easy" | "normal" | "hard"; questionCount: number; questionTimeSec: number; teamMode: "solo" | "team" };
+const DEFAULT_FORM: CreateForm = { mode: "1v1", questionBankId: "", subject: "", grade: "國中", unit: "", difficulty: "normal", questionCount: 10, questionTimeSec: 30, teamMode: "solo" };
 
 function randomKey() {
   return window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -76,6 +76,7 @@ function playTone(enabled: boolean, correct: boolean) {
 export default function OnlinePkPage() {
   const toast = useToast();
   const overview = useApi<Overview>("/pk/overview");
+  const questionBanks = useApi<{ banks: Array<{ bank: { id: string; name: string; subject: string; status: string }; questionCount: number }> }>("/pk/question-banks");
   const friends = useApi<FriendsResponse>("/friends");
   const [section, setSection] = useState("quick");
   const [form, setForm] = useState<CreateForm>(DEFAULT_FORM);
@@ -183,6 +184,7 @@ export default function OnlinePkPage() {
   const isHost = Boolean(match && match.room && match.room.hostId === match.me.userId);
 
   async function quickMatch() {
+    if (!form.questionBankId) { toast.push("error", "請先選擇 PK 題庫"); return; }
     setBusy(true);
     try {
       const result = await apiPost<{ matched: boolean; matchId?: string; message: string }>("/pk/matchmaking/join", form);
@@ -198,6 +200,7 @@ export default function OnlinePkPage() {
   }
 
   async function createRoom() {
+    if (!form.questionBankId) { toast.push("error", "請先選擇 PK 題庫"); return; }
     setBusy(true);
     try {
       const result = await apiPost<{ match: { id: string }; room: { roomCode: string; shareToken: string } }>("/pk/rooms", { ...form, name: roomName, visibility: roomPrivate ? "private" : "public", password: roomPassword, maxPlayers: roomMaxPlayers, allowLateJoin, allowSpectators, showRanking, inviteIds: friendIds });
@@ -288,7 +291,7 @@ export default function OnlinePkPage() {
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <Field label="模式"><Select value={form.mode} onChange={(event) => setForm({ ...form, mode: event.target.value as CreateForm["mode"] })}>{(config?.allowedModes ?? ["1v1", "2v2", "3v3", "多人"]).map((mode) => <option key={mode} value={mode}>{mode}</option>)}</Select></Field>
-                  <Field label="科目"><Select value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}><option>英文</option><option>數學</option><option>自然</option><option>國文</option></Select></Field>
+                  <Field label="PK 題庫"><Select value={form.questionBankId} onChange={(event) => { const selected = questionBanks.data?.banks.find((item) => item.bank.id === event.target.value); setForm({ ...form, questionBankId: event.target.value, subject: selected?.bank.subject ?? "" }); }}><option value="">請選擇題庫</option>{questionBanks.data?.banks.map(({ bank, questionCount }) => <option key={bank.id} value={bank.id}>{bank.name}（{questionCount} 題）</option>)}</Select><p className="mt-1 text-[11px] text-muted">只能使用既有題庫，括號為目前可用題數。</p></Field>
                   <Field label="難度"><Select value={form.difficulty} onChange={(event) => setForm({ ...form, difficulty: event.target.value as CreateForm["difficulty"] })}><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field>
                   <Field label="年級"><Input value={form.grade} onChange={(event) => setForm({ ...form, grade: event.target.value })} placeholder="例：國中" /></Field>
                 </div>

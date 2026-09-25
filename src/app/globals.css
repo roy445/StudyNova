@@ -557,9 +557,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
 .bottom-nav { box-shadow: var(--custom-shadow, var(--shadow)); }
 
 /* ------------------------------------------------------ ONLINE PK */
-.pk-nav-item { position: relative; z-index: 2; color: #e8edff; transform: translateY(-12px); background: radial-gradient(circle at 50% 20%, rgba(55,211,255,.22), rgba(124,92,255,.18) 48%, rgba(10,14,38,.96) 78%); border: 1px solid rgba(55,211,255,.52); box-shadow: 0 0 0 4px rgba(6,9,21,.96), 0 0 28px rgba(55,211,255,.28), inset 0 1px 0 rgba(255,255,255,.18); }
+.pk-nav-item { position: relative; z-index: 2; display: inline-flex; width: 78px; height: 78px; align-items: center; justify-content: center; border-radius: 9999px; color: #e8edff; transform: translateY(-15px); background: radial-gradient(circle at 50% 20%, rgba(55,211,255,.3), rgba(124,92,255,.22) 48%, rgba(10,14,38,.98) 78%); border: 2px solid rgba(55,211,255,.68); box-shadow: 0 0 0 5px rgba(6,9,21,.96), 0 0 34px rgba(55,211,255,.42), inset 0 1px 0 rgba(255,255,255,.22); animation: pk-nav-float 2.8s ease-in-out infinite; }
+.pk-nav-item::before { content: ""; position: absolute; inset: -9px; z-index: -1; border: 1px solid rgba(55,211,255,.42); border-radius: inherit; animation: pk-nav-ring 2.8s ease-out infinite; }
 .pk-nav-item-active { color: #fff; border-color: rgba(255,200,87,.8); box-shadow: 0 0 0 4px rgba(6,9,21,.96), 0 0 32px rgba(255,200,87,.38), inset 0 1px 0 rgba(255,255,255,.2); }
-.pk-nav-icon { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; padding: 5px; background: linear-gradient(135deg, #37d3ff, #7c5cff 55%, #ffc857); box-shadow: 0 0 18px rgba(55,211,255,.35); }
+.pk-nav-icon { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; padding: 8px; background: linear-gradient(135deg, #37d3ff, #7c5cff 55%, #ffc857); box-shadow: 0 0 24px rgba(55,211,255,.55); }
 .pk-hero { position: relative; isolation: isolate; overflow: hidden; background: radial-gradient(600px 240px at 72% 0%, rgba(55,211,255,.18), transparent 72%), radial-gradient(420px 220px at 12% 100%, rgba(124,92,255,.18), transparent 72%), linear-gradient(135deg, rgba(16,26,51,.86), rgba(11,18,38,.66)); }
 .pk-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; opacity: .18; background-image: linear-gradient(rgba(55,211,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(124,92,255,.25) 1px, transparent 1px); background-size: 28px 28px; mask-image: radial-gradient(ellipse at center, #000, transparent 78%); }
 .pk-glow-card { box-shadow: 0 0 0 1px rgba(55,211,255,.2), 0 0 30px -12px rgba(55,211,255,.55), var(--shadow); }
@@ -577,5 +578,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
 @keyframes pk-score-pop { from { opacity: 0; transform: translateY(7px) scale(.86); } 60% { opacity: 1; transform: translateY(-4px) scale(1.08); } to { transform: translateY(0) scale(1); } }
 @keyframes pk-combo-fire { 0%,100% { filter: drop-shadow(0 0 2px rgba(255,200,87,.35)); } 50% { filter: drop-shadow(0 0 12px rgba(255,120,70,.75)); } }
 @keyframes pk-rank-rise { from { opacity: .2; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
-@media (max-width: 640px) { .pk-nav-item { transform: translateY(-9px); } .pk-nav-icon { padding: 4px; } }
-@media (prefers-reduced-motion: reduce) { .pk-live-dot, .pk-answer-correct, .pk-answer-wrong, .pk-countdown, .pk-score-pop, .pk-combo-fire, .pk-rank-rise { animation: none; } }
+@keyframes pk-nav-float { 0%,100% { transform: translateY(-15px) scale(1); } 50% { transform: translateY(-19px) scale(1.035); } }
+@keyframes pk-nav-ring { 0% { opacity: .75; transform: scale(.84); } 70%,100% { opacity: 0; transform: scale(1.18); } }
+@media (max-width: 640px) { .pk-nav-item { width: 72px; height: 72px; transform: translateY(-11px); } .pk-nav-icon { padding: 7px; } }
+@media (prefers-reduced-motion: reduce) { .pk-live-dot, .pk-answer-correct, .pk-answer-wrong, .pk-countdown, .pk-score-pop, .pk-combo-fire, .pk-rank-rise, .pk-nav-item, .pk-nav-item::before { animation: none; } }

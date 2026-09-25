@@ -18,6 +18,7 @@ import {
   pkRewards,
   pkRooms,
   pkTeams,
+  questionBanks,
   questions,
   userVocabularies,
   users,
@@ -43,6 +44,7 @@ const playerState = z.enum(["online", "recently_active"]);
 type MatchInput = {
   mode: z.infer<typeof matchMode>;
   teamMode: z.infer<typeof teamMode>;
+  questionBankId: string;
   subject: string;
   grade: string;
   unit: string;
@@ -108,46 +110,17 @@ async function generateMatchQuestions(tx: any, matchId: string, input: MatchInpu
   const fingerprints = await recentQuestionFingerprints(tx, input.subject);
   const usedOptions = new Set<string>();
   const blueprints: PkQuestionBlueprint[] = [];
-  const isEnglish = /^(英文|英語|english)/i.test(input.subject.trim());
-
-  if (isEnglish) {
-    const sourceRows: Array<{ id: string; word: string; meaning: string; partOfSpeech: string; example: string; level: string }> = await tx.select({ id: dailyWords.id, word: dailyWords.word, meaning: dailyWords.meaning, partOfSpeech: dailyWords.partOfSpeech, example: dailyWords.example, level: dailyWords.level }).from(dailyWords).orderBy(sql`random()`).limit(Math.min(800, input.questionCount * 10));
-    const distinct = sourceRows.filter((row: { word: string }, index: number, all: Array<{ word: string }>) => all.findIndex((item: { word: string }) => normalizePkText(item.word) === normalizePkText(row.word)) === index);
-    for (let i = 0; i < distinct.length && blueprints.length < input.questionCount; i += 1) {
-      const current = distinct[i];
-      const answer = current.word.trim();
-      const candidates = distinct.filter((item: { id: string; word: string }) => item.id !== current.id && normalizePkText(item.word) !== normalizePkText(answer)).map((item: { word: string }) => item.word.trim());
-      const fresh = candidates.filter((option: string) => !usedOptions.has(normalizePkText(option)));
-      const options = normalizedOptions([answer, ...(fresh.length >= 3 ? fresh : candidates)]).slice(0, 4);
-      const question: PkQuestionBlueprint = {
-        type: "single",
-        stem: `請選出「${current.meaning}」最適合的英文單字。`,
-        options,
-        answer,
-        explanation: current.example ? `${answer}：${current.meaning}\n例句：${current.example}` : `${answer}：${current.meaning}`,
-        sourceLabel: `daily_words:${current.level}`,
-        unit: input.unit,
-        subject: input.subject,
-      };
-      if (options.length < 4) continue;
-      const fp = pkQuestionFingerprint(question);
-      if (fingerprints.has(fp)) continue;
-      blueprints.push(question);
-      options.forEach((option) => usedOptions.add(normalizePkText(option)));
-    }
-  } else {
-    const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(eq(questions.subject, input.subject), eq(questions.difficulty, input.difficulty), ne(questions.status, "draft"))).orderBy(sql`random()`).limit(Math.min(500, input.questionCount * 8));
-    for (const current of sourceRows) {
-      if (blueprints.length >= input.questionCount) break;
-      const answer = String(current.answer[0] ?? "").trim();
-      const options = normalizedOptions(current.options.map(String));
-      if (!current.stem.trim() || !answer || options.length < 2 || !options.some((option) => normalizePkText(option) === normalizePkText(answer))) continue;
-      const question: PkQuestionBlueprint = { type: current.type, stem: current.stem, options, answer, explanation: current.explanation, sourceLabel: current.sourceLabel, unit: current.unit || input.unit, subject: current.subject };
-      const fp = pkQuestionFingerprint(question);
-      if (fingerprints.has(fp)) continue;
-      blueprints.push(question);
-      options.forEach((option) => usedOptions.add(normalizePkText(option)));
-    }
+  const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(eq(questions.bankId, input.questionBankId), ne(questions.status, "draft"))).orderBy(sql`random()`).limit(Math.min(500, input.questionCount * 8));
+  for (const current of sourceRows) {
+    if (blueprints.length >= input.questionCount) break;
+    const answer = String(current.answer[0] ?? "").trim();
+    const options = normalizedOptions(current.options.map(String));
+    if (!current.stem.trim() || !answer || options.length < 2 || !options.some((option) => normalizePkText(option) === normalizePkText(answer))) continue;
+    const question: PkQuestionBlueprint = { type: current.type, stem: current.stem, options, answer, explanation: current.explanation, sourceLabel: current.sourceLabel, unit: current.unit || input.unit, subject: current.subject };
+    const fp = pkQuestionFingerprint(question);
+    if (fingerprints.has(fp)) continue;
+    blueprints.push(question);
+    options.forEach((option) => usedOptions.add(normalizePkText(option)));
   }
 
   if (blueprints.length < input.questionCount) throw badRequest(`目前「${input.subject}」可用且不重複的 PK 題目不足（${blueprints.length}/${input.questionCount}）`);
@@ -172,6 +145,8 @@ async function activeFriends(userId: string, ids: string[]) {
 
 async function createMatch(ownerId: string, input: MatchInput, roomInput?: { name: string; visibility: z.infer<typeof visibility>; password: string; maxPlayers: number; inviteIds: string[]; roomMode: z.infer<typeof teamMode> }) {
   const config = await getPkConfig();
+  const bank = (await db.select({ id: questionBanks.id, name: questionBanks.name, subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, input.questionBankId)).limit(1))[0];
+  if (!bank) throw badRequest("請選擇有效的 PK 題庫");
   if (!config.allowedModes.includes(input.mode)) throw badRequest("這個 PK 模式目前未被管理員允許");
   if (input.questionCount < config.minQuestions || input.questionCount > config.maxQuestions) throw badRequest(`題數必須介於 ${config.minQuestions}～${config.maxQuestions} 題`);
   if (input.questionTimeSec < config.minTimeSec || input.questionTimeSec > config.maxTimeSec) throw badRequest(`每題時間必須介於 ${config.minTimeSec}～${config.maxTimeSec} 秒`);
@@ -180,7 +155,7 @@ async function createMatch(ownerId: string, input: MatchInput, roomInput?: { nam
   if (roomInput && invited.length !== roomInput.inviteIds.length) throw forbidden("只能邀請已經成為好友的使用者");
 
   const result = await db.transaction(async (tx) => {
-    const matchRows = await tx.insert(pkMatches).values({ ownerId, status: roomInput ? "waiting" : "matching", mode: input.mode, teamMode: input.teamMode, subject: input.subject, grade: input.grade, unit: input.unit, difficulty: input.difficulty, questionCount: input.questionCount, questionTimeSec: input.questionTimeSec, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, rewardNova: input.rewardNova, rewardXp: input.rewardXp }).returning();
+    const matchRows = await tx.insert(pkMatches).values({ ownerId, status: roomInput ? "waiting" : "matching", mode: input.mode, teamMode: input.teamMode, questionBankId: input.questionBankId, subject: bank.subject, grade: input.grade, unit: input.unit, difficulty: input.difficulty, questionCount: input.questionCount, questionTimeSec: input.questionTimeSec, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, rewardNova: input.rewardNova, rewardXp: input.rewardXp }).returning();
     const match = matchRows[0];
     await generateMatchQuestions(tx, match.id, input);
     let room = null;
@@ -306,6 +281,15 @@ async function matchPayload(matchId: string, userId: string) {
 export const routes: RouteDef[] = [
   route({
     method: "GET",
+    path: "/pk/question-banks",
+    auth: "user",
+    handler: async () => {
+      const banks = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id} and ${questions.status} <> 'draft')::int` }).from(questionBanks).where(ne(questionBanks.status, "archived")).orderBy(asc(questionBanks.name));
+      return { banks: banks.filter((row) => Number(row.questionCount) >= 5) };
+    },
+  }),
+  route({
+    method: "GET",
     path: "/pk/overview",
     auth: "user",
     handler: async (ctx) => {
@@ -349,18 +333,20 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const config = await getPkConfig();
       settingsError(config, "quickMatchEnabled");
-      const body = await ctx.json(z.object({ mode: matchMode, subject: z.string().min(1).max(40), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), teamMode: teamMode.default("solo") }));
+      const body = await ctx.json(z.object({ mode: matchMode, questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), teamMode: teamMode.default("solo") }));
+      const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
+      if (!bank) throw badRequest("請選擇有效的 PK 題庫");
       if (!config.allowedModes.includes(body.mode)) throw badRequest("這個 PK 模式目前未開放");
       const existing = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"))).limit(1))[0];
       if (existing) return { queue: existing, matched: false, message: "正在尋找對手……" };
       const now = new Date();
-      const rows = await db.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, subject: body.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
-      const candidate = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.subject, body.subject), eq(pkMatchmakingQueue.difficulty, body.difficulty), lte(pkMatchmakingQueue.questionCount, body.questionCount + 5), gte(pkMatchmakingQueue.questionCount, body.questionCount - 5), sql`${pkMatchmakingQueue.userId} <> ${user.userId}`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
+      const rows = await db.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: body.questionBankId, subject: bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
+      const candidate = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.questionBankId, body.questionBankId), eq(pkMatchmakingQueue.difficulty, body.difficulty), lte(pkMatchmakingQueue.questionCount, body.questionCount + 5), gte(pkMatchmakingQueue.questionCount, body.questionCount - 5), sql`${pkMatchmakingQueue.userId} <> ${user.userId}`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
       if (!candidate) return { queue: rows[0], matched: false, message: "正在尋找對手……" };
       const updated = await db.update(pkMatchmakingQueue).set({ status: "matched" }).where(and(eq(pkMatchmakingQueue.id, candidate.id), eq(pkMatchmakingQueue.status, "waiting"))).returning();
       if (!updated[0]) return { queue: rows[0], matched: false, message: "正在尋找對手……" };
       await db.update(pkMatchmakingQueue).set({ status: "matched" }).where(and(eq(pkMatchmakingQueue.id, rows[0].id), eq(pkMatchmakingQueue.status, "waiting")));
-      const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, subject: body.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: Math.max(body.questionCount, candidate.questionCount), questionTimeSec: body.questionTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
+      const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, questionBankId: body.questionBankId, subject: bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: Math.max(body.questionCount, candidate.questionCount), questionTimeSec: body.questionTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
       await db.insert(pkMatchPlayers).values({ matchId: match.match.id, userId: candidate.userId, optionOrders: await questionOrders(db, match.match.id, candidate.userId) }).onConflictDoNothing();
       await emitMatchEvent(match.match.id, "match_found", null, { matchId: match.match.id, playerCount: 2 });
       return { queue: updated[0], matched: true, matchId: match.match.id, message: "已找到對手！" };
@@ -385,9 +371,11 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const config = await getPkConfig();
       settingsError(config, "customRoomEnabled");
-      const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), subject: z.string().min(1).max(40), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]) }));
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]) }));
+      const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
+      if (!bank) throw badRequest("請選擇有效的 PK 題庫");
       if (body.visibility === "private" && !body.password) throw badRequest("私人房間請設定房間密碼，或使用分享連結邀請");
-      const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, subject: body.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
+      const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, questionBankId: body.questionBankId, subject: bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
       return { match: result.match, room: result.room, shareUrl: `/online-pk?room=${result.room?.shareToken ?? ""}` };
     },
   }),
