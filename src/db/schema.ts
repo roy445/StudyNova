@@ -497,6 +497,8 @@ export const questions = pgTable(
   (t) => [
     uniqueIndex("questions_fingerprint_uq").on(t.fingerprint),
     index("questions_subject_idx").on(t.subject, t.difficulty),
+    index("questions_bank_category_idx").on(t.bankCategory, t.type, t.level),
+    index("questions_bank_id_idx").on(t.bankId, t.createdAt),
   ],
 );
 

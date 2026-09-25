@@ -1543,14 +1543,35 @@ export const routes: RouteDef[] = [
     path: "/admin/questions",
     auth: "admin",
     handler: async (ctx) => {
+      const q = ctx.query.get("q")?.trim();
       const subject = ctx.query.get("subject");
+      const bankCategory = ctx.query.get("bankCategory");
+      const type = ctx.query.get("type");
+      const difficulty = ctx.query.get("difficulty");
+      const level = ctx.query.get("level");
       const origin = ctx.query.get("origin");
+      const bankId = ctx.query.get("bankId");
+      const limit = Math.min(200, Math.max(1, Number(ctx.query.get("limit") || 100)));
+      const offset = Math.max(0, Number(ctx.query.get("offset") || 0));
+      const filters = [
+        q ? or(ilike(questions.stem, `%${q}%`), ilike(questions.topic, `%${q}%`), ilike(questions.sourceLabel, `%${q}%`), ilike(questions.bankCategory, `%${q}%`), ilike(questions.subject, `%${q}%`)) : sql`true`,
+        subject ? eq(questions.subject, subject) : sql`true`,
+        bankCategory ? ilike(questions.bankCategory, `%${bankCategory}%`) : sql`true`,
+        type ? eq(questions.type, type) : sql`true`,
+        difficulty ? eq(questions.difficulty, difficulty) : sql`true`,
+        level ? eq(questions.level, level) : sql`true`,
+        origin ? eq(questions.origin, origin) : sql`true`,
+        bankId ? eq(questions.bankId, bankId) : sql`true`,
+      ];
       const rows = await db
         .select({
           id: questions.id,
           origin: questions.origin,
           subject: questions.subject,
           topic: questions.topic,
+          bankCategory: questions.bankCategory,
+          sourceLabel: questions.sourceLabel,
+          bankId: questions.bankId,
           level: questions.level,
           difficulty: questions.difficulty,
           type: questions.type,
@@ -1562,11 +1583,12 @@ export const routes: RouteDef[] = [
           appearedCount: sql<number>`(select count(*) from ${answers} where ${answers.questionId} = ${questions.id})::int`,
         })
         .from(questions)
-        .where(and(origin ? eq(questions.origin, origin) : sql`true`, subject ? eq(questions.subject, subject) : sql`true`))
+        .where(and(...filters))
         .orderBy(desc(questions.createdAt))
-        .limit(100);
-      const [count] = await db.select({ c: sql<number>`count(*)::int` }).from(questions).where(origin ? eq(questions.origin, origin) : sql`true`);
-      return { questions: rows, total: count?.c ?? 0 };
+        .limit(limit)
+        .offset(offset);
+      const [count] = await db.select({ c: sql<number>`count(*)::int` }).from(questions).where(and(...filters));
+      return { questions: rows, total: count?.c ?? 0, limit, offset };
     },
   }),
 
