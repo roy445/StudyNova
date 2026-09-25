@@ -10,6 +10,7 @@ import { normalizeQuestionRows } from "@/server/question-import";
 import { extractPdfQuestionChunks } from "@/server/pdf-question-extract";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 const ALLOWED = ["application/pdf", "text/plain", "text/csv", "application/json", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/png", "image/jpeg", "image/webp", "image/heic", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/mp4", "audio/ogg", "audio/webm"];
 const MAX_AI_BYTES = 18 * 1024 * 1024;
 
@@ -122,21 +123,40 @@ export async function POST(request: Request) {
             const textChunks = chunks.filter((chunk) => chunk.text.replace(/\[第 \d+ 頁\]/g, "").trim().length > 40);
             if (textChunks.length > 0) {
               const merged: { questions: Array<Record<string, unknown>>; answerKeys: Array<Record<string, unknown>>; answerRegions: Array<Record<string, unknown>> } = { questions: [], answerKeys: [], answerRegions: [] };
-              for (const chunk of textChunks.slice(0, 80)) {
-                const ai = await runAi({
-                  userId: payload.userId,
-                  feature: "admin_question_pdf_chunk_import",
-                  json: true,
-                  temperature: 0.05,
-                  maxOutputTokens: 12000,
-                  timeoutMs: 25_000,
-                  system: `你是 StudyNova 題庫數位化分析器。這是 PDF 的第 ${chunk.pageStart}-${chunk.pageEnd} 頁文字區段。只分析這個區段，不要摘要；逐題保留所有題目、選項、答案、解析、題號與頁碼。不要把 answer key 建成題目。只回傳 JSON：{questions:[{questionNumber,subject,topic,level,difficulty,type,stem,options,answer,explanation,confidence,answerSource,sourcePage,reviewReasons}],answerKeys:[{questionNumber,answer,sourcePage}],answerRegions:[{text,sourcePage}]}.答案找不到時保留題目並回傳 answer:[]。`,
-                  parts: [{ kind: "text", text: `來源：${payload.sourceLabel}\n題庫分類：${payload.bankCategory}\n${chunk.text}` }],
-                });
-                const result = extractJson<{ questions?: Array<Record<string, unknown>>; answerKeys?: Array<Record<string, unknown>>; answerRegions?: Array<Record<string, unknown>> }>(ai.text ?? "", {});
-                merged.questions.push(...(result.questions ?? []));
-                merged.answerKeys.push(...(result.answerKeys ?? []));
-                merged.answerRegions.push(...(result.answerRegions ?? []));
+              const analyzeChunk = async (chunk: typeof textChunks[number]) => {
+                let lastError: unknown = null;
+                for (let attempt = 0; attempt < 3; attempt += 1) {
+                  try {
+                    const ai = await runAi({
+                      userId: payload.userId,
+                      feature: "admin_question_pdf_chunk_import",
+                      json: true,
+                      temperature: 0.05,
+                      maxOutputTokens: 12000,
+                      timeoutMs: 55_000,
+                      system: `你是 StudyNova 題庫數位化分析器。這是 PDF 的第 ${chunk.pageStart}-${chunk.pageEnd} 頁文字區段。必須逐題完整擷取，不能摘要、不能挑題、不能因答案缺漏而省略。保留所有題目、選項、答案、解析、題號與頁碼。不要把 answer key 建成題目。只回傳 JSON：{questions:[{questionNumber,subject,topic,level,difficulty,type,stem,options,answer,explanation,confidence,answerSource,sourcePage,reviewReasons}],answerKeys:[{questionNumber,answer,sourcePage}],answerRegions:[{text,sourcePage}]}.答案找不到時仍保留題目並回傳 answer:[]。完成前請檢查區段中的題號是否連續，若有題號也必須建立該題。`,
+                      parts: [{ kind: "text", text: `來源：${payload.sourceLabel}
+題庫分類：${payload.bankCategory}
+${chunk.text}` }],
+                    });
+                    return extractJson<{ questions?: Array<Record<string, unknown>>; answerKeys?: Array<Record<string, unknown>>; answerRegions?: Array<Record<string, unknown>> }>(ai.text ?? "", {});
+                  } catch (error) {
+                    lastError = error;
+                    await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+                  }
+                }
+                console.error("[question-bank-upload] pdf chunk failed", { pageStart: chunk.pageStart, pageEnd: chunk.pageEnd, error: lastError });
+                return {};
+              };
+              // Process every extracted chunk. Small batches reduce wall-clock time while
+              // keeping provider/database pressure bounded for large 5,000-question PDFs.
+              for (let offset = 0; offset < textChunks.length; offset += 3) {
+                const batch = await Promise.all(textChunks.slice(offset, offset + 3).map(analyzeChunk));
+                for (const result of batch) {
+                  merged.questions.push(...(result.questions ?? []));
+                  merged.answerKeys.push(...(result.answerKeys ?? []));
+                  merged.answerRegions.push(...(result.answerRegions ?? []));
+                }
               }
               parsed = merged;
             } else {
@@ -158,9 +178,9 @@ export async function POST(request: Request) {
           parsed = extractJson<{ questions?: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>>; answerKeys?: Array<Record<string, unknown>> }>(ai.text ?? "", {});
           }
           const rawItems = Array.isArray(parsed) ? parsed : Array.isArray((parsed as Record<string, unknown>).questions) ? (parsed as { questions: Array<Record<string, unknown>> }).questions : Array.isArray((parsed as Record<string, unknown>).items) ? (parsed as { items: Array<Record<string, unknown>> }).items : [];
-          const normalized = directRows === null ? rawItems.map((item) => normalizeItem(item, object.id, Number(item.sourcePage ?? 0) || undefined)).filter((item): item is DraftItem => Boolean(item)).slice(0, 1000) : normalizeQuestionRows(rawItems, { sourceLabel: payload.sourceLabel, bankCategory: payload.bankCategory }).previews.map((item) => ({ ...item, metadata: { ...item.metadata, sourceObjectId: object.id }, status: item.status === "ERROR" ? "NEEDS_REVIEW" : item.status === "WARNING" ? "NEEDS_REVIEW" : "READY" }));
+              const normalized = directRows === null ? rawItems.map((item) => normalizeItem(item, object.id, Number(item.sourcePage ?? 0) || undefined)).filter((item): item is DraftItem => Boolean(item)) : normalizeQuestionRows(rawItems, { sourceLabel: payload.sourceLabel, bankCategory: payload.bankCategory }).previews.map((item) => ({ ...item, metadata: { ...item.metadata, sourceObjectId: object.id }, status: item.status === "ERROR" ? "NEEDS_REVIEW" : item.status === "WARNING" ? "NEEDS_REVIEW" : "READY" }));
           const preview = normalized as DraftItem[];
-          const answerKeys = Array.isArray((parsed as Record<string, unknown>).answerKeys) ? ((parsed as { answerKeys: Array<Record<string, unknown>> }).answerKeys).slice(0, 1000) : [];
+          const answerKeys = Array.isArray((parsed as Record<string, unknown>).answerKeys) ? ((parsed as { answerKeys: Array<Record<string, unknown>> }).answerKeys) : [];
           const job = (await db.select().from(questionImportJobs).where(eq(questionImportJobs.id, payload.jobId)).limit(1))[0];
           if (job) {
             const existingKeys = new Set(job.preview.map((item) => `${item.subject}|${item.stem}|${Array.isArray(item.answer) ? item.answer.join("|") : ""}`));

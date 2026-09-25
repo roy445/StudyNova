@@ -133,7 +133,7 @@ export default function AdminOpsPage() {
   }
 
   async function watchImport(jobId: string, auto = false) {
-    for (let attempt = 0; attempt < 90; attempt += 1) {
+    for (let attempt = 0; attempt < 900; attempt += 1) {
       const next = await apiGet<{ id: string; status: string; progress: number; processedFiles: number; totalFiles: number; totalQuestions: number; preview: Array<Record<string, unknown>>; errorMessage: string }>(`/admin/question-imports/${jobId}`);
       setImportJob({ ...next, id: jobId });
       if (["ready", "failed", "confirmed"].includes(next.status)) {
