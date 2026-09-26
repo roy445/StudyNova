@@ -7,7 +7,7 @@ import { questionImportJobs, storageObjects } from "@/db/schema";
 import { requireAdmin } from "@/server/auth";
 import { extractJson, runAi } from "@/server/ai";
 import { normalizeQuestionRows } from "@/server/question-import";
-import { extractPdfQuestionChunks, renderPdfImagePages } from "@/server/pdf-question-extract";
+import { extractPdfQuestionChunks, parseNumberedChoiceQuestionText, renderPdfImagePages } from "@/server/pdf-question-extract";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -162,6 +162,11 @@ export async function POST(request: Request) {
             const chunks = await extractPdfQuestionChunks(rawBuffer);
             const textChunks = chunks.filter((chunk) => chunk.text.replace(/\[第 \d+ 頁\]/g, "").trim().length > 40);
             if (textChunks.length > 0) {
+              const deterministicQuestions = parseNumberedChoiceQuestionText(textChunks.map((chunk) => chunk.text).join("\n"));
+              if (deterministicQuestions.length >= 5) {
+                parsed = { questions: deterministicQuestions, answerKeys: [], answerRegions: [] };
+                await db.update(questionImportJobs).set({ analysisTotalChunks: 1, analysisProcessedChunks: 1, totalQuestions: deterministicQuestions.length, status: "analyzing", updatedAt: new Date() }).where(eq(questionImportJobs.id, payload.jobId));
+              } else {
               const analysisStartedAt = new Date();
               await db.update(questionImportJobs).set({ analysisTotalChunks: textChunks.length, analysisProcessedChunks: 0, analysisStartedAt, analysisLastChunkAt: null, status: "analyzing", updatedAt: analysisStartedAt }).where(eq(questionImportJobs.id, payload.jobId));
               const merged: { questions: Array<Record<string, unknown>>; answerKeys: Array<Record<string, unknown>>; answerRegions: Array<Record<string, unknown>> } = { questions: [], answerKeys: [], answerRegions: [] };
@@ -203,6 +208,7 @@ ${chunk.text}` }],
                 await db.update(questionImportJobs).set({ analysisProcessedChunks: Math.min(offset + batch.length, textChunks.length), analysisLastChunkAt, totalQuestions: merged.questions.length, updatedAt: analysisLastChunkAt }).where(eq(questionImportJobs.id, payload.jobId));
               }
               parsed = merged;
+              }
             } else {
               const imagePages = await renderPdfImagePages(rawBuffer);
               if (imagePages.length > 0) {

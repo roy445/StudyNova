@@ -3,6 +3,33 @@ import { WorkerMessageHandler } from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { createCanvas } from "@napi-rs/canvas";
 export type PdfTextChunk = { pageStart: number; pageEnd: number; text: string };
 export type PdfImagePage = { page: number; base64: string };
+export type DeterministicQuestion = { questionNumber: number; subject: string; topic: string; level: string; difficulty: string; type: string; stem: string; options: string[]; answer: string[]; explanation: string; confidence: number; answerSource: string; sourcePage?: number };
+
+/** Parse the common `1. stem A. ... B. ...` format without spending an AI call. */
+export function parseNumberedChoiceQuestionText(text: string): DeterministicQuestion[] {
+  const answerStart = text.search(/(?:^|\n)\s*答案\s*(?:\n|$)/m);
+  const questionText = answerStart >= 0 ? text.slice(0, answerStart) : text;
+  const answerText = answerStart >= 0 ? text.slice(answerStart) : "";
+  const answers = new Map<number, string>();
+  for (const match of answerText.matchAll(/(?<!\S)(\d{1,3})\s*[.、]?\s*([A-D])(?=\s|$)/g)) answers.set(Number(match[1]), match[2]);
+  // PDF.js often returns one flattened line per page, so question numbers
+  // cannot depend on newline boundaries.
+  const starts = [...questionText.matchAll(/(?<!\S)(\d{1,3})[.)]\s+/g)];
+  const result: DeterministicQuestion[] = [];
+  for (let index = 0; index < starts.length; index += 1) {
+    const number = Number(starts[index][1]);
+    const start = (starts[index].index ?? 0) + starts[index][0].length;
+    const end = starts[index + 1]?.index ?? questionText.length;
+    const block = questionText.slice(start, end).replace(/\[第\s*\d+\s*頁\]/g, " ").replace(/\s+/g, " ").trim();
+    const optionStarts = [...block.matchAll(/(?:^|\s)([A-D])\.\s*/g)];
+    if (optionStarts.length < 2) continue;
+    const stem = block.slice(0, optionStarts[0].index ?? 0).trim();
+    const options = optionStarts.map((option, optionIndex) => block.slice((option.index ?? 0) + option[0].length, optionStarts[optionIndex + 1]?.index ?? block.length).trim());
+    if (!stem || options.some((option) => !option)) continue;
+    result.push({ questionNumber: number, subject: "英文", topic: "英文片語", level: "senior", difficulty: "normal", type: "single", stem, options, answer: answers.has(number) ? [answers.get(number)!] : [], explanation: "", confidence: answers.has(number) ? 1 : 0.7, answerSource: answers.has(number) ? "PDF 答案區" : "待人工確認" });
+  }
+  return result;
+}
 
 export async function extractPdfQuestionChunks(buffer: Buffer, maxCharsPerChunk = 6_000): Promise<PdfTextChunk[]> {
   // Vercel bundles the legacy parser into a server chunk. Register the worker
