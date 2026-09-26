@@ -1414,7 +1414,7 @@ export const routes: RouteDef[] = [
       if (!job) throw notFound("找不到匯入工作");
       const fileProgress = job.totalFiles ? Math.round((job.processedFiles / job.totalFiles) * 100) : 0;
       const chunkProgress = job.analysisTotalChunks ? Math.round((job.analysisProcessedChunks / job.analysisTotalChunks) * 100) : 0;
-      const progress = job.status === "ready" || job.status === "confirmed" ? 100 : job.analysisTotalChunks ? Math.min(99, chunkProgress) : fileProgress;
+      const progress = job.status === "ready" || job.status === "confirmed" ? 100 : job.status === "importing" ? (job.totalQuestions ? Math.min(99, Math.round((job.acceptedQuestions / job.totalQuestions) * 100)) : 0) : job.analysisTotalChunks ? Math.min(99, chunkProgress) : fileProgress;
       const elapsedSeconds = job.analysisStartedAt ? Math.max(0, (Date.now() - job.analysisStartedAt.getTime()) / 1000) : 0;
       const averageSeconds = job.analysisProcessedChunks > 0 ? elapsedSeconds / job.analysisProcessedChunks : 0;
       const estimatedSecondsRemaining = job.analysisTotalChunks > job.analysisProcessedChunks && averageSeconds > 0 ? Math.ceil((job.analysisTotalChunks - job.analysisProcessedChunks) * averageSeconds) : 0;
@@ -1489,6 +1489,7 @@ export const routes: RouteDef[] = [
       const job = (await db.select().from(questionImportJobs).where(and(eq(questionImportJobs.id, ctx.params.id), eq(questionImportJobs.adminId, admin.userId))).limit(1))[0];
       if (!job) throw notFound("找不到匯入工作");
       if (job.status !== "ready") throw badRequest("題目尚未分析完成，不能確認匯入");
+      await db.update(questionImportJobs).set({ status: "importing", acceptedQuestions: 0, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
       let imported = 0;
       for (const item of job.preview) {
         if (item.importAction === "exclude" || item.status === "DUPLICATE") continue;
@@ -1497,7 +1498,10 @@ export const routes: RouteDef[] = [
         if (!stem) continue;
         const answer = Array.isArray(item.answer) ? item.answer.map(String) : [];
         const rows = await db.insert(questions).values({ ownerId: null, bankId: job.questionBankId, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), metadata: item.metadata && typeof item.metadata === "object" ? item.metadata as Record<string, unknown> : {}, fingerprint: fingerprint(subject, stem, answer.join("|")) }).onConflictDoNothing().returning({ id: questions.id });
-        if (rows[0]) imported += 1;
+        if (rows[0]) {
+          imported += 1;
+          if (imported % 10 === 0) await db.update(questionImportJobs).set({ acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
+        }
       }
       await db.update(questionImportJobs).set({ status: "confirmed", acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
       return { jobId: job.id, imported };
