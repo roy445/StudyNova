@@ -1,7 +1,7 @@
 import { get, head } from "@vercel/blob";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { questionImportJobs, storageObjects } from "@/db/schema";
 import { requireAdmin } from "@/server/auth";
@@ -256,7 +256,21 @@ ${chunk.text}` }],
           if (job) {
             const existingKeys = new Set(job.preview.map((item) => `${item.subject}|${item.stem}|${Array.isArray(item.answer) ? item.answer.join("|") : ""}`));
             const merged = [...job.preview, ...preview.filter((item) => { const key = `${item.subject}|${item.stem}|${item.answer.join("|")}`; if (existingKeys.has(key)) return false; existingKeys.add(key); return true; })];
-            await db.update(questionImportJobs).set({ processedFiles: job.processedFiles + 1, totalQuestions: merged.length, acceptedQuestions: merged.filter((item) => item.status !== "DUPLICATE").length, preview: merged.map((item) => ({ ...item, answerKeys })), status: job.processedFiles + 1 >= job.totalFiles ? "ready" : "analyzing", updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
+            const mergedPreview = merged.map((item) => ({ ...item, answerKeys }));
+            // Large PDFs can produce thousands of questions. Sending the whole
+            // preview as one JSONB parameter can exceed serverless/Neon limits.
+            // Write bounded chunks while keeping every preview item.
+            for (let start = 0; start < mergedPreview.length; start += 100) {
+              const chunk = mergedPreview.slice(start, start + 100);
+              await db.update(questionImportJobs).set({
+                preview: start === 0 ? chunk : sql`${questionImportJobs.preview} || ${JSON.stringify(chunk)}::jsonb`,
+                processedFiles: job.processedFiles + 1,
+                totalQuestions: merged.length,
+                acceptedQuestions: merged.filter((item) => item.status !== "DUPLICATE").length,
+                status: job.processedFiles + 1 >= job.totalFiles ? "ready" : "analyzing",
+                updatedAt: new Date(),
+              }).where(eq(questionImportJobs.id, job.id));
+            }
           }
         } catch (error) {
           console.error("[question-bank-upload] parse failed", { objectId: object.id, error });
