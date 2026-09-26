@@ -9,6 +9,8 @@ export type PkConfig = {
   customRoomEnabled: boolean;
   publicArenaEnabled: boolean;
   allowedModes: string[];
+  /** Empty means all non-archived banks for backwards compatibility. */
+  allowedBankIds: string[];
   maxPlayers: number;
   minQuestions: number;
   maxQuestions: number;
@@ -26,6 +28,7 @@ export const DEFAULT_PK_CONFIG: PkConfig = {
   customRoomEnabled: true,
   publicArenaEnabled: true,
   allowedModes: ["1v1", "2v2", "3v3", "多人"],
+  allowedBankIds: [],
   maxPlayers: 12,
   minQuestions: 5,
   maxQuestions: 30,
@@ -38,6 +41,7 @@ export const DEFAULT_PK_CONFIG: PkConfig = {
 
 function clampConfig(value: Record<string, unknown>): PkConfig {
   const allowed = Array.isArray(value.allowedModes) ? value.allowedModes.filter((mode): mode is string => typeof mode === "string" && DEFAULT_PK_CONFIG.allowedModes.includes(mode)) : DEFAULT_PK_CONFIG.allowedModes;
+  const allowedBankIds = Array.isArray(value.allowedBankIds) ? value.allowedBankIds.filter((id): id is string => typeof id === "string") : DEFAULT_PK_CONFIG.allowedBankIds;
   const minQuestions = Math.max(5, Math.min(50, Number(value.minQuestions ?? DEFAULT_PK_CONFIG.minQuestions)) || DEFAULT_PK_CONFIG.minQuestions);
   const maxQuestions = Math.max(minQuestions, Math.min(50, Number(value.maxQuestions ?? DEFAULT_PK_CONFIG.maxQuestions)) || DEFAULT_PK_CONFIG.maxQuestions);
   const minTimeSec = Math.max(5, Math.min(120, Number(value.minTimeSec ?? DEFAULT_PK_CONFIG.minTimeSec)) || DEFAULT_PK_CONFIG.minTimeSec);
@@ -51,6 +55,7 @@ function clampConfig(value: Record<string, unknown>): PkConfig {
     customRoomEnabled: value.customRoomEnabled !== false,
     publicArenaEnabled: value.publicArenaEnabled !== false,
     allowedModes: allowed.length ? allowed : DEFAULT_PK_CONFIG.allowedModes,
+    allowedBankIds,
     maxPlayers: Math.max(2, Math.min(12, Number(value.maxPlayers ?? DEFAULT_PK_CONFIG.maxPlayers)) || DEFAULT_PK_CONFIG.maxPlayers),
     minQuestions,
     maxQuestions,

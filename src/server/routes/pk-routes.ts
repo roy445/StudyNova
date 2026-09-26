@@ -96,6 +96,10 @@ function settingsError(config: PkConfig, area: keyof PkConfig) {
   if (area === "customRoomEnabled" && !config.customRoomEnabled) throw badRequest("自訂房間目前未開放");
 }
 
+function assertPkBankAllowed(config: PkConfig, bankId: string) {
+  if (config.allowedBankIds.length && !config.allowedBankIds.includes(bankId)) throw forbidden("這個題庫目前未開放線上 PK");
+}
+
 function normalizedOptions(options: string[]) {
   return [...new Set(options.map((option) => option.trim()).filter(Boolean))];
 }
@@ -284,7 +288,8 @@ export const routes: RouteDef[] = [
     path: "/pk/question-banks",
     auth: "user",
     handler: async () => {
-      const banks = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id} and ${questions.status} <> 'draft')::int` }).from(questionBanks).where(ne(questionBanks.status, "archived")).orderBy(asc(questionBanks.name));
+      const config = await getPkConfig();
+      const banks = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id} and ${questions.status} <> 'draft')::int` }).from(questionBanks).where(and(ne(questionBanks.status, "archived"), config.allowedBankIds.length ? inArray(questionBanks.id, config.allowedBankIds) : sql`true`)).orderBy(asc(questionBanks.name));
       return { banks: banks.filter((row) => Number(row.questionCount) >= 5) };
     },
   }),
@@ -334,6 +339,7 @@ export const routes: RouteDef[] = [
       const config = await getPkConfig();
       settingsError(config, "quickMatchEnabled");
       const body = await ctx.json(z.object({ mode: matchMode, questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), teamMode: teamMode.default("solo") }));
+      assertPkBankAllowed(config, body.questionBankId);
       const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
       if (!bank) throw badRequest("請選擇有效的 PK 題庫");
       if (!config.allowedModes.includes(body.mode)) throw badRequest("這個 PK 模式目前未開放");
@@ -372,6 +378,7 @@ export const routes: RouteDef[] = [
       const config = await getPkConfig();
       settingsError(config, "customRoomEnabled");
       const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]) }));
+      assertPkBankAllowed(config, body.questionBankId);
       const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
       if (!bank) throw badRequest("請選擇有效的 PK 題庫");
       if (body.visibility === "private" && !body.password) throw badRequest("私人房間請設定房間密碼，或使用分享連結邀請");
