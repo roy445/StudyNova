@@ -1005,17 +1005,24 @@ export function VisualNotesPanel() {
     if (!svgRef.current) return null;
     return new XMLSerializer().serializeToString(svgRef.current);
   }
-  function downloadSvg() {
+  async function embeddedSvg() {
     const text = svgText();
-    if (!text) return;
-    const blob = new Blob([text], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${title || "StudyNova-心智圖"}.svg`; link.click(); URL.revokeObjectURL(url);
+    if (!text) return null;
+    // Standalone SVG/Canvas output cannot assume the viewer has a CJK font installed.
+    const response = await fetch("/api/fonts/cjk");
+    if (!response.ok) throw new Error("CJK 字型載入失敗，無法匯出心智圖");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = "";
+    const chunk = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunk) binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
+    const font = btoa(binary);
+    return text.replace(/<svg([^>]*)>/, `<svg$1><style>@font-face{font-family:'StudyNova CJK';src:url(data:font/ttf;base64,${font}) format('truetype')}text{font-family:'StudyNova CJK','Noto Sans TC',sans-serif}</style>`);
+  }
+  async function downloadSvg() {
+    try { const text = await embeddedSvg(); if (!text) return; const blob = new Blob([text], { type: "image/svg+xml;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${title || "StudyNova-心智圖"}.svg`; link.click(); URL.revokeObjectURL(url); } catch (error) { toast.push("error", errorMessage(error)); }
   }
   async function downloadPng() {
-    const text = svgText(); if (!text) return;
-    const image = new Image(); const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml;charset=utf-8" }));
-    image.onload = () => { const canvas = document.createElement("canvas"); canvas.width = 1400; canvas.height = 900; const context = canvas.getContext("2d"); if (!context) return; context.fillStyle = "#fffaf0"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); const link = document.createElement("a"); link.href = canvas.toDataURL("image/png"); link.download = `${title || "StudyNova-心智圖"}.png`; link.click(); };
-    image.src = url;
+    try { const text = await embeddedSvg(); if (!text) return; const image = new Image(); const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml;charset=utf-8" })); image.onload = () => { const canvas = document.createElement("canvas"); canvas.width = 1400; canvas.height = 900; const context = canvas.getContext("2d"); if (!context) return; context.fillStyle = "#fffaf0"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); const link = document.createElement("a"); link.href = canvas.toDataURL("image/png"); link.download = `${title || "StudyNova-心智圖"}.png`; link.click(); }; image.src = url; } catch (error) { toast.push("error", errorMessage(error)); }
   }
   const colors = ["#b8e8ff", "#ffd6e7", "#d9f7be", "#ffe7a8", "#d9d0ff", "#c8f1e8", "#ffd9b8", "#cfe3ff"];
   return <Card title="✦ 重點視覺化" subtitle="把教材變成清楚的心智圖，加入可愛色彩與手寫感，並可下載保存。">

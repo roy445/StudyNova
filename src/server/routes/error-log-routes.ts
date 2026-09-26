@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { db } from "@/db";
 import { systemLogs } from "@/db/schema";
 import { route, type RouteDef } from "../router";
+import { embedCjkFont } from "../cjk-font";
 
 function buildConditions(ctx: Parameters<NonNullable<RouteDef["handler"]>>[0]) {
   const level = ctx.query.get("level") ?? "error";
@@ -45,12 +46,12 @@ export const routes: RouteDef[] = [
       const { conditions, level, from, to } = buildConditions(ctx);
       const rows = await db.select().from(systemLogs).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(systemLogs.createdAt)).limit(5000);
       const pdf = await PDFDocument.create();
-      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const font = await embedCjkFont(pdf);
       let page = pdf.addPage([595, 842]);
       let y = 808;
       const add = (text: string, size = 9, color = rgb(0.12, 0.12, 0.16)) => {
         if (y < 45) { page = pdf.addPage([595, 842]); y = 808; }
-        page.drawText(text.replace(/[^\x20-\x7E]/g, " ").slice(0, 125), { x: 34, y, size, font, color });
+        page.drawText(text.slice(0, 125), { x: 34, y, size, font, color });
         y -= size >= 14 ? 24 : 14;
       };
       add("StudyNova Error Log Report", 16, rgb(0.1, 0.35, 0.5));

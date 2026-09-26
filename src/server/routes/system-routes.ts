@@ -9,6 +9,7 @@ import { CRON_TASKS, queue, runCronTask, isWeekOpen, type JobName } from "../que
 import { storageHealth, activeDriver, putObject, readObject, deleteObject } from "../storage";
 import { aiConfigured, providerConfigs, providerMetrics, runAi } from "../ai";
 import { grantNova, allFeatureStates, ensureDailyTasks } from "../economy";
+import { runCjkHealth } from "../cjk-health";
 
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
 
@@ -225,12 +226,20 @@ export const routes: RouteDef[] = [
         detail: aiConfigured() ? `可用：${providers.filter((p) => p.configured).map((p) => p.provider).join(", ")}` : "未設定任何 AI API Key",
       });
       out.push({ name: "OCR / TTS", status: aiConfigured() ? "healthy" : "warning", detail: aiConfigured() ? "使用 AI Provider 視覺與語音能力" : "需要 AI Provider" });
+      try { const cjk = await runCjkHealth(); out.push({ name: "CJK Font", status: cjk.healthy ? "healthy" : "error", detail: cjk.healthy ? `Noto Sans CJK TC 已嵌入（${cjk.bytes} bytes）` : `字型健康檢查失敗：${cjk.missingGlyphs.join(",") || cjk.pdf.error || cjk.image.error || "renderer"}` }); } catch (error) { out.push({ name: "CJK Font", status: "error", detail: error instanceof Error ? error.message : String(error) }); }
       out.push({ name: "Push", status: pushConfigured() ? "healthy" : "warning", detail: pushConfigured() ? "VAPID 已設定" : "未設定 VAPID 金鑰" });
       out.push({ name: "Cron", status: process.env.CRON_SECRET ? "healthy" : "warning", detail: process.env.CRON_SECRET ? "CRON_SECRET 已設定" : "未設定 CRON_SECRET" });
       const [obj] = await db.select({ c: sql<number>`count(*)::int`, bytes: sql<number>`coalesce(sum(${storageObjects.sizeBytes}),0)::int` }).from(storageObjects);
       out.push({ name: "Object Usage", status: "healthy", detail: `${obj?.c ?? 0} 個檔案／${Math.round((obj?.bytes ?? 0) / 1024)} KB（driver: ${activeDriver()}）` });
       return { services: out, checkedAt: new Date().toISOString() };
     },
+  }),
+
+  route({
+    method: "GET",
+    path: "/admin/system/cjk-font-health",
+    auth: "admin",
+    handler: async () => runCjkHealth(),
   }),
 
   /* --------------------------------------------------- test center */

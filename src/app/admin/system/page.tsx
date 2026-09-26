@@ -14,6 +14,7 @@ export default function AdminSystemPage() {
   const toast = useToast();
   const [tab, setTab] = useState("tests");
   const health = useApi<{ services: Array<{ name: string; status: string; detail: string }>; checkedAt: string }>("/admin/system/health");
+  const cjk = useApi<{ healthy: boolean; valid: boolean; family: string; bytes: number; glyphs: number; missingGlyphs: string[]; pdf: { embedded: boolean; bytes: number; error?: string }; image: { rendered: boolean; bytes: number; error?: string }; svg: { embedded: boolean; bytes: number; error?: string } }>("/admin/system/cjk-font-health");
   const cron = useApi<{ tasks: Array<{ task: string; label: string; schedule: string }>; jobs: Array<{ id: string; name: string; status: string; lastError: string; createdAt: string }>; adapter: string; health: { status: string; detail: string; pending: number }; secretConfigured: boolean }>("/admin/cron");
   const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
   const gradeWindow = (settings.data?.settings.find((s) => s.key === "grade_input_window")?.value ?? {}) as { enabled?: boolean; startsAt?: string; endsAt?: string };
@@ -85,6 +86,7 @@ export default function AdminSystemPage() {
         tabs={[
           { key: "tests", label: "System Test Center", icon: "🧪" },
           { key: "health", label: "系統健康", icon: "❤️" },
+          { key: "cjk", label: "CJK 字型測試", icon: "文" },
           { key: "cron", label: "Cron / Queue", icon: "⏰" },
           { key: "settings", label: "開放設定", icon: "⚙" },
           { key: "export", label: "CSV 匯出", icon: "📤" },
@@ -162,6 +164,28 @@ export default function AdminSystemPage() {
               </div>
             ))}
           </div>
+        </Card>
+      )}
+
+      {tab === "cjk" && (
+        <Card title="文 CJK Font Health" subtitle="固定使用專案內的 Noto Sans CJK TC，並實際測試 PDF、PNG 與 SVG renderer。" action={<Button size="sm" variant="ghost" onClick={cjk.reload}>重新測試</Button>}>
+          {cjk.loading && <Skeleton lines={4} />}
+          {cjk.error && <ErrorState message={cjk.error} onRetry={cjk.reload} />}
+          {cjk.data && <div className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Stat label="字型檔" value={cjk.data.valid ? "PASS" : "FAIL"} tone={cjk.data.valid ? "cyan" : "gold"} />
+              <Stat label="PDF 嵌入" value={cjk.data.pdf.embedded ? "PASS" : "FAIL"} tone={cjk.data.pdf.embedded ? "cyan" : "gold"} />
+              <Stat label="Image / SVG" value={cjk.data.image.rendered && cjk.data.svg.embedded ? "PASS" : "FAIL"} tone={cjk.data.image.rendered && cjk.data.svg.embedded ? "cyan" : "gold"} />
+            </div>
+            <div className="rounded-xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs leading-6">
+              <p><b>Family：</b>{cjk.data.family}・<b>Glyphs：</b>{cjk.data.glyphs}・<b>大小：</b>{Math.round(cjk.data.bytes / 1024 / 1024)} MB</p>
+              <p><b>測試文字：</b>這是一段繁體中文測試文字。國文、英文、數學、自然、社會、AI 學習助手、錯題本、智慧複習、線上 PK、回報專員 StudyNova</p>
+              {cjk.data.missingGlyphs.length > 0 && <p className="text-rose-200"><b>Missing glyph：</b>{cjk.data.missingGlyphs.join("、")}</p>}
+              {cjk.data.pdf.error && <p className="text-rose-200"><b>PDF：</b>{cjk.data.pdf.error}</p>}
+              {cjk.data.image.error && <p className="text-rose-200"><b>Image：</b>{cjk.data.image.error}</p>}
+              {cjk.data.svg.error && <p className="text-rose-200"><b>SVG：</b>{cjk.data.svg.error}</p>}
+            </div>
+          </div>}
         </Card>
       )}
 

@@ -1,3 +1,10 @@
+@font-face {
+  font-family: "StudyNova CJK";
+  src: url("/api/fonts/cjk") format("truetype");
+  font-display: swap;
+  font-weight: 100 900;
+}
+
 @import "tailwindcss";
 
 @theme {
@@ -10,7 +17,7 @@
   --color-nova-gold: #ffc857;
   --color-nova-text: #e8edff;
   --color-nova-muted: #9aa8cc;
-  --font-sans: "Inter", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "StudyNova CJK", "Inter", "Noto Sans TC", "Noto Sans CJK TC", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 :root {
