@@ -7,7 +7,7 @@ import { questionImportJobs, storageObjects } from "@/db/schema";
 import { requireAdmin } from "@/server/auth";
 import { extractJson, runAi } from "@/server/ai";
 import { normalizeQuestionRows } from "@/server/question-import";
-import { extractPdfQuestionChunks } from "@/server/pdf-question-extract";
+import { extractPdfQuestionChunks, renderPdfImagePages } from "@/server/pdf-question-extract";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -204,7 +204,28 @@ ${chunk.text}` }],
               }
               parsed = merged;
             } else {
-              parsed = undefined;
+              const imagePages = await renderPdfImagePages(rawBuffer);
+              if (imagePages.length > 0) {
+                await db.update(questionImportJobs).set({ analysisTotalChunks: imagePages.length, analysisProcessedChunks: 0, analysisStartedAt: new Date(), status: "analyzing", updatedAt: new Date() }).where(eq(questionImportJobs.id, payload.jobId));
+                const merged: { questions: Array<Record<string, unknown>>; answerKeys: Array<Record<string, unknown>>; answerRegions: Array<Record<string, unknown>> } = { questions: [], answerKeys: [], answerRegions: [] };
+                for (let offset = 0; offset < imagePages.length; offset += 2) {
+                  const batch = await Promise.all(imagePages.slice(offset, offset + 2).map(async (imagePage) => {
+                    for (let attempt = 0; attempt < 3; attempt += 1) {
+                      try {
+                        const ai = await runAi({ userId: payload.userId, feature: "admin_question_pdf_scan_import", json: true, temperature: 0.05, maxOutputTokens: 12000, timeoutMs: 55_000, system: `你是 StudyNova 掃描 PDF 題庫 OCR 分析器。這是第 ${imagePage.page} 頁。請辨識並完整建立本頁每一道題目，不可摘要、不可漏掉題號、選項、表格、公式或圖片題。若題幹在本頁不完整，仍保留已辨識文字並標記 NEEDS_REVIEW。不要把答案 key 建成題目。只回傳 JSON：{questions:[{questionNumber,temporaryQuestionId,subject,topic,level,difficulty,type,stem,options,answer,explanation,confidence,answerSource,sourcePage,reviewReasons}],answerKeys:[{questionNumber,answer,sourcePage}],answerRegions:[{text,sourcePage}]}`, parts: [{ kind: "text", text: `來源：${payload.sourceLabel}；題庫分類：${payload.bankCategory}` }, { kind: "image", mimeType: "image/png", base64: imagePage.base64 }] });
+                        return extractJson<{ questions?: Array<Record<string, unknown>>; answerKeys?: Array<Record<string, unknown>>; answerRegions?: Array<Record<string, unknown>> }>(ai.text ?? "", {});
+                      } catch (error) {
+                        if (attempt === 2) console.error("[question-bank-upload] scanned pdf page failed", { page: imagePage.page, error });
+                        await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+                      }
+                    }
+                    return {};
+                  }));
+                  for (const result of batch) { merged.questions.push(...(result.questions ?? [])); merged.answerKeys.push(...(result.answerKeys ?? [])); merged.answerRegions.push(...(result.answerRegions ?? [])); }
+                  await db.update(questionImportJobs).set({ analysisProcessedChunks: Math.min(offset + batch.length, imagePages.length), totalQuestions: merged.questions.length, updatedAt: new Date() }).where(eq(questionImportJobs.id, payload.jobId));
+                }
+                parsed = merged;
+              } else parsed = undefined;
             }
           }
           if (parsed === undefined) {
