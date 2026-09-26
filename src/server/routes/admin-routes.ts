@@ -1497,7 +1497,7 @@ export const routes: RouteDef[] = [
         const stem = String(item.stem || "");
         if (!stem) continue;
         const answer = Array.isArray(item.answer) ? item.answer.map(String) : [];
-        const rows = await db.insert(questions).values({ ownerId: null, bankId: job.questionBankId, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), metadata: item.metadata && typeof item.metadata === "object" ? item.metadata as Record<string, unknown> : {}, fingerprint: fingerprint(subject, stem, answer.join("|")) }).onConflictDoNothing().returning({ id: questions.id });
+        const rows = await db.insert(questions).values({ ownerId: null, bankId: job.questionBankId, origin: "bank", targetBank: job.targetBank, bankCategory: job.bankCategory, sourceLabel: job.sourceLabel, subject, topic: String(item.topic || ""), level: item.level === "senior" ? "senior" : "junior", difficulty: String(item.difficulty || "normal"), type: String(item.type || "short"), stem, options: Array.isArray(item.options) ? item.options.map(String) : [], answer, explanation: String(item.explanation || ""), metadata: item.metadata && typeof item.metadata === "object" ? item.metadata as Record<string, unknown> : {}, fingerprint: fingerprint(subject, stem, answer.join("|")), status: "published" }).onConflictDoNothing().returning({ id: questions.id });
         if (rows[0]) {
           imported += 1;
           if (imported % 10 === 0) await db.update(questionImportJobs).set({ acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
@@ -1534,7 +1534,7 @@ export const routes: RouteDef[] = [
       for (const q of preview) {
         if (q.status === "ERROR" || q.status === "DUPLICATE") { skipped += 1; continue; }
         accepted += 1;
-        const rows = await db.insert(questions).values({ ownerId: null, bankId: body.questionBankId ?? null, origin: "bank", targetBank: "general", bankCategory: q.bankCategory, sourceLabel: q.sourceLabel, subject: q.subject, topic: q.topic, level: q.level, difficulty: q.difficulty, type: q.type, stem: q.stem, options: q.options, answer: q.answer, explanation: q.explanation, metadata: q.metadata, fingerprint: q.fingerprint }).onConflictDoNothing().returning({ id: questions.id });
+        const rows = await db.insert(questions).values({ ownerId: null, bankId: body.questionBankId ?? null, origin: "bank", targetBank: "general", bankCategory: q.bankCategory, sourceLabel: q.sourceLabel, subject: q.subject, topic: q.topic, level: q.level, difficulty: q.difficulty, type: q.type, stem: q.stem, options: q.options, answer: q.answer, explanation: q.explanation, metadata: q.metadata, fingerprint: q.fingerprint, status: "published" }).onConflictDoNothing().returning({ id: questions.id });
         if (rows[0]) imported += 1; else skipped += 1;
       }
       await adminLog({ actorId: admin.userId, action: "questions.import", targetType: "questions", targetId: "bank", after: { submitted: preview.length, accepted, imported, skipped, invalid: invalid.length }, ip: ctx.ip });
