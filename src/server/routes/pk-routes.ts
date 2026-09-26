@@ -20,6 +20,7 @@ import {
   pkTeams,
   questionBanks,
   questions,
+  studyMaterials,
   userVocabularies,
   users,
   vocabularyFolderItems,
@@ -45,6 +46,8 @@ type MatchInput = {
   mode: z.infer<typeof matchMode>;
   teamMode: z.infer<typeof teamMode>;
   questionBankId: string;
+  sourceType?: "bank" | "vocabulary" | "folder" | "material";
+  sourceId?: string | null;
   subject: string;
   grade: string;
   unit: string;
@@ -159,7 +162,7 @@ async function createMatch(ownerId: string, input: MatchInput, roomInput?: { nam
   if (roomInput && invited.length !== roomInput.inviteIds.length) throw forbidden("只能邀請已經成為好友的使用者");
 
   const result = await db.transaction(async (tx) => {
-    const matchRows = await tx.insert(pkMatches).values({ ownerId, status: roomInput ? "waiting" : "matching", mode: input.mode, teamMode: input.teamMode, questionBankId: input.questionBankId, subject: bank.subject, grade: input.grade, unit: input.unit, difficulty: input.difficulty, questionCount: input.questionCount, questionTimeSec: input.questionTimeSec, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, rewardNova: input.rewardNova, rewardXp: input.rewardXp }).returning();
+    const matchRows = await tx.insert(pkMatches).values({ ownerId, status: roomInput ? "waiting" : "matching", mode: input.mode, teamMode: input.teamMode, questionBankId: input.questionBankId, sourceType: input.sourceType ?? "bank", sourceId: input.sourceId ?? null, subject: bank.subject, grade: input.grade, unit: input.unit, difficulty: input.difficulty, questionCount: input.questionCount, questionTimeSec: input.questionTimeSec, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, rewardNova: input.rewardNova, rewardXp: input.rewardXp }).returning();
     const match = matchRows[0];
     await generateMatchQuestions(tx, match.id, input);
     let room = null;
@@ -291,6 +294,37 @@ export const routes: RouteDef[] = [
       const config = await getPkConfig();
       const banks = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id} and ${questions.status} <> 'draft')::int` }).from(questionBanks).where(and(ne(questionBanks.status, "archived"), config.allowedBankIds.length ? inArray(questionBanks.id, config.allowedBankIds) : sql`true`)).orderBy(asc(questionBanks.name));
       return { banks: banks.filter((row) => Number(row.questionCount) >= 5) };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/pk/sources",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const banks = await db.select({ id: questionBanks.id, name: questionBanks.name, subject: questionBanks.subject, count: sql<number>`(select count(*) from ${questions} q where q.bank_id = ${questionBanks.id} and q.status <> 'draft')::int` }).from(questionBanks).where(ne(questionBanks.status, "archived")).orderBy(asc(questionBanks.name));
+      const folders = await db.select({ id: vocabularyFolders.id, name: vocabularyFolders.name, count: sql<number>`count(${vocabularyFolderItems.vocabularyId})::int` }).from(vocabularyFolders).leftJoin(vocabularyFolderItems, eq(vocabularyFolderItems.folderId, vocabularyFolders.id)).where(eq(vocabularyFolders.userId, user.userId)).groupBy(vocabularyFolders.id).orderBy(asc(vocabularyFolders.name));
+      const materials = await db.select({ id: studyMaterials.id, title: studyMaterials.title, subject: studyMaterials.subject }).from(studyMaterials).where(eq(studyMaterials.userId, user.userId)).orderBy(desc(studyMaterials.createdAt)).limit(100);
+      return { banks, folders, materials, vocabulary: { id: null, name: "我的單字", sourceType: "vocabulary" } };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/pk/self-test",
+    auth: "user",
+    rate: { limit: 20, windowSec: 3600, key: "pk-self-test" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const config = await getPkConfig();
+      settingsError(config, "customRoomEnabled");
+      const body = await ctx.json(z.object({ questionBankId: z.string().uuid(), subject: z.string().max(80).default(""), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30) }));
+      assertPkBankAllowed(config, body.questionBankId);
+      const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
+      if (!bank) throw badRequest("請選擇有效的自我測驗題庫");
+      const result = await createMatch(user.userId, { mode: "1v1", teamMode: "solo", questionBankId: body.questionBankId, sourceType: "bank", sourceId: body.questionBankId, subject: body.subject || bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: false, rewardNova: 0, rewardXp: 0 });
+      const startsAt = new Date(Date.now() + 3000);
+      await db.update(pkMatches).set({ status: "countdown", startsAt, updatedAt: new Date() }).where(eq(pkMatches.id, result.match.id));
+      return { matchId: result.match.id, status: "ready", preparation: { estimatedSeconds: 3, message: "題目已建立完成，3 秒後開始自我測驗。" } };
     },
   }),
   route({

@@ -2629,6 +2629,8 @@ export const pkMatches = pgTable(
     mode: text("mode").notNull().default("1v1"),
     teamMode: text("team_mode").notNull().default("solo"),
     questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "restrict" }),
+    sourceType: text("source_type").notNull().default("bank"), // bank | vocabulary | folder | material
+    sourceId: uuid("source_id"),
     subject: text("subject").notNull().default("英文"),
     grade: text("grade").notNull().default(""),
     unit: text("unit").notNull().default(""),
@@ -2648,7 +2650,7 @@ export const pkMatches = pgTable(
     createdAt: created(),
     updatedAt: updated(),
   },
-  (t) => [index("pk_matches_status_idx").on(t.status, t.createdAt), index("pk_matches_owner_idx").on(t.ownerId, t.createdAt), index("pk_matches_live_idx").on(t.status, t.startsAt)],
+  (t) => [index("pk_matches_status_idx").on(t.status, t.createdAt), index("pk_matches_owner_idx").on(t.ownerId, t.createdAt), index("pk_matches_live_idx").on(t.status, t.startsAt), index("pk_matches_source_idx").on(t.sourceType, t.sourceId)],
 );
 
 export const pkTeams = pgTable(

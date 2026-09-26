@@ -285,8 +285,8 @@ export default function OnlinePkPage() {
 
       {!match && (
         <>
-          <Tabs tabs={[{ key: "quick", label: "⚡ 快速配對" }, { key: "friends", label: "♟ 邀請好友" }, { key: "room", label: "▣ 自訂房間" }]} active={section} onChange={setSection} />
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
+          <Tabs tabs={[{ key: "quick", label: "⚡ 快速配對" }, { key: "friends", label: "♟ 邀請好友" }, { key: "room", label: "▣ 自訂房間" }, { key: "self", label: "◎ 自我挑戰" }]} active={section} onChange={setSection} />
+          {section === "self" ? <Card title="◎ 自我挑戰" subtitle="先選擇題庫，伺服器建立並鎖定題目後才開始；不會建立假對手。"><div className="space-y-4"><Field label="題庫"><Select value={form.questionBankId} onChange={(event) => setForm({ ...form, questionBankId: event.target.value })}><option value="">請選擇題庫</option>{questionBanks.data?.banks.map(({ bank, questionCount }) => <option key={bank.id} value={bank.id}>{bank.name}（{questionCount} 題）</option>)}</Select></Field><p className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">題目會先完成建立與驗證，預估 3 秒後開放作答。若要使用我的單字、資料夾或教材，請進入「挑戰」頁建立後再邀請好友。</p><Button loading={busy} disabled={!form.questionBankId} onClick={async () => { setBusy(true); try { const result = await apiPost<{ matchId: string; preparation: { message: string } }>("/pk/self-test", form); setMatchId(result.matchId); toast.push("success", result.preparation.message); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); } }}>建立題目並開始</Button></div></Card> : <div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
             <Card title={section === "quick" ? "⚡ 快速配對" : section === "friends" ? "♟ 邀請好友 PK" : "▣ 建立自訂房間"} subtitle="所有選項會送到伺服器，房間開始後不能任意修改題目規則。">
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -309,7 +309,7 @@ export default function OnlinePkPage() {
               </div>
             </Card>
             <SideInfo overview={overview.data} onOpenActivity={(subject) => setForm((current) => ({ ...current, subject }))} />
-          </div>
+          </div>}
         </>
       )}
 

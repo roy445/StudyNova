@@ -12,6 +12,7 @@ export const DEFAULT_AI_POLICIES: Record<string, Omit<AiPolicy, "id" | "createdA
   wrong_answer_review: { feature: "wrong_answer_review", strategy: "teaching", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true, proOnly: false },
   ocr_solution: { feature: "ocr_solution", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true, proOnly: false },
   question_generation: { feature: "question_generation", strategy: "structured", allowDirectAnswer: true, requireDetailedAnalysis: true, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "", version: 1, enabled: true, proOnly: false },
+  ai_folder_creation: { feature: "ai_folder_creation", strategy: "guided", allowDirectAnswer: true, requireDetailedAnalysis: false, allowWebSearch: false, maxHintLevel: 5, systemPolicy: "管理員可控制 Novi 是否能在使用者確認後建立單字資料夾。", version: 1, enabled: true, proOnly: false },
 };
 
 export async function getAiPolicy(feature: string): Promise<AiPolicy | null> {

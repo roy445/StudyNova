@@ -17,6 +17,7 @@ import {
   aiArtifacts,
   storageObjects,
   aiUsageLogs,
+  vocabularyFolders,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, todayStr } from "../core";
@@ -296,13 +297,13 @@ export const routes: RouteDef[] = [
             `你是 StudyNova 的 AI 學習助理 Novi，服務台灣國高中學生。${MODES[conv.mode as keyof typeof MODES] ?? MODES.teacher}\n` +
             policyInstructions(policy, { examMode: conv.mode === "exam" || conv.mode === "hint" }) + "\n" +
             "你不能自行修改使用者資料。若需要建立任務／筆記／測驗或修改讀書計畫，請在 action 欄位提出建議，等使用者確認。\n" +
-            '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_material|create_quiz|update_plan|create_artifact","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
+            '回傳 JSON：{"reply":"回覆內容（markdown）","importance":"normal|important|critical","action":{"type":"create_task|create_note|create_material|create_quiz|create_vocabulary_folder|update_plan|create_artifact","payload":{...},"preview":"一句話說明將要做什麼"}|null,"memory":[{"key":"","value":""}]}\n' +
             "個人記憶規則：memory 只能保存使用者明確表達且對未來學習有必要的偏好，key 只能是 preferred_name、learning_style、explanation_preference、reminder_preference；不得保存身分證、地址、聯絡方式、健康、財務或其他不必要私人資訊。\n" +
             "importance 規則：normal 是一般說明；important 是考試重點、常見錯誤或需要特別注意的內容；critical 是安全、截止時間、明確答案或不可忽略的關鍵提醒。回答中請用 markdown 條列與粗體呈現重點。\n" +
             "朋友聊天語氣規則：像一位真誠、懂學習的朋友陪學生聊天，不要像制式客服或教科書。可以自然使用『欸、其實、你可以先、沒事、我們一起看』等口語，但不要過度裝熟或使用粗俗語言。每次回覆至少補充一點有用的解釋或下一步，不要只回一句空泛鼓勵。依情境加入 1 到 3 個自然的符號或表情，例如 🙂、👍、✨、💡、📌；不要每句都放，也不要讓表情取代內容。可以使用『哈哈』『懂你』等朋友式反應，但遇到錯誤、考試重點或重要提醒仍要清楚、準確、尊重。不要輸出貼圖網址、圖片 Markdown 或虛構貼圖代碼；若需要可用文字搭配表情呈現。\n" +
             "化學與數學公式規則：優先直接輸出 Unicode 化學式，例如 H₂O、CO₂、HCl、O₃、SO₄²⁻，不要輸出美元符號、LaTeX 分隔符或程式碼標記；元素名稱與元素符號要同時清楚顯示，例如 氫（H）、氧（O）、氯（Cl）。\n" +
             "產物規則：當學生要求把本次重點做成 PDF、手寫風格圖片、手繪重點或心智圖時，先在 reply 說明你要整理的內容，再提出 create_artifact action 等待確認。payload 必須是 {kind:'pdf'|'handwritten_note'|'mind_map',title,body}；body 只放本次對話已確認的重點，不可杜撰。確認後系統會直接在對話顯示可開啟的產物；只有 Nova Pro 可以下載檔案，免費使用者只能預覽並被引導到學習中心產物專區。\n" +
-            "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_material payload：{title, subject, content, summary}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；update_plan payload：{blocks:[{subject,minutes,focus}]}。使用者說加入教材或保存教材重點時，提出 create_material；使用者說保存重點、整理筆記時，提出 create_note。\n" +
+            "create_task payload：{title, detail}；create_note payload：{title, subject, body}；create_material payload：{title, subject, content, summary}；create_quiz payload：{subject, topic, count, difficulty, sourceText}；create_vocabulary_folder payload：{name, vocabularyIds?:string[]}；update_plan payload：{blocks:[{subject,minutes,focus}]}。使用者說加入教材或保存教材重點時，提出 create_material；使用者說保存重點、整理筆記時，提出 create_note；使用者說把單字整理成資料夾時，提出 create_vocabulary_folder。\n" +
             "繁體中文回答。不得杜撰使用者資料。若本次訊息附有圖片，必須實際查看圖片；圖片是主要證據，OCR 文字只是輔助。不要回答使用者沒有傳圖片。",
           parts: [
             { kind: "text", text: context ? `使用者已授權的學習資料：\n${context}` : "使用者未授權任何個人資料，只能根據對話內容回答。" },
@@ -326,7 +327,7 @@ export const routes: RouteDef[] = [
         }
         throw fail("AI_EMPTY_RESULT", { message: "AI 這次沒有回傳可用答案，系統已記錄診斷資訊，請重新送出；若持續發生請提供錯誤代碼。", details: diagnostic });
       }
-      const actionTypes = ["create_task", "create_note", "create_material", "create_quiz", "update_plan", "create_artifact"];
+      const actionTypes = ["create_task", "create_note", "create_material", "create_quiz", "create_vocabulary_folder", "update_plan", "create_artifact"];
       const actionAliases: Record<string, string> = { add_material: "create_material", add_to_materials: "create_material", save_note: "create_note", add_note: "create_note", save_highlight: "create_note" };
       const rawAction = data.action;
       const normalizedActionType = rawAction?.type ? (actionAliases[String(rawAction.type)] ?? String(rawAction.type)) : "";
@@ -440,6 +441,13 @@ export const routes: RouteDef[] = [
           throw fail("AI_MATERIAL_WRITE_FAILED", { details: { stage: "materials.insert", table: "study_materials", actionType: action.type, payloadKeys: Object.keys(payload), cause: error instanceof Error ? error.message.slice(0, 240) : "unknown" } });
         }
         result = { material: rows[0] };
+      } else if (action.type === "create_vocabulary_folder") {
+        const folderPolicy = await getAiPolicy("ai_folder_creation");
+        if (folderPolicy?.enabled === false) throw fail("AI_ACTION_UNSUPPORTED", { message: "管理員目前停用 AI 建立資料夾功能。" });
+        if (folderPolicy?.proOnly && !(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "AI 建立資料夾目前為 Nova Pro 專屬功能。" });
+        const parsed = z.object({ name: z.string().min(1).max(80), vocabularyIds: z.array(z.string().uuid()).max(500).default([]) }).parse(payload);
+        const folder = (await db.insert(vocabularyFolders).values({ userId: user.userId, name: parsed.name.trim() }).returning())[0];
+        result = { folder, added: 0, preview: `已建立「${folder.name}」資料夾，接著可從我的單字批次加入內容。` };
       } else if (action.type === "create_quiz") {
         const parsed = z
           .object({
