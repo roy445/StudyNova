@@ -26,7 +26,15 @@ export function parseNumberedChoiceQuestionText(text: string): DeterministicQues
     const stem = block.slice(0, optionStarts[0].index ?? 0).trim();
     const options = optionStarts.map((option, optionIndex) => block.slice((option.index ?? 0) + option[0].length, optionStarts[optionIndex + 1]?.index ?? block.length).trim());
     if (!stem || options.some((option) => !option)) continue;
-    result.push({ questionNumber: number, subject: "英文", topic: "英文片語", level: "senior", difficulty: "normal", type: "single", stem, options, answer: answers.has(number) ? [answers.get(number)!] : [], explanation: "", confidence: answers.has(number) ? 1 : 0.7, answerSource: answers.has(number) ? "PDF 答案區" : "待人工確認" });
+    const answerLetter = answers.get(number);
+    const answerIndex = answerLetter ? answerLetter.charCodeAt(0) - 65 : -1;
+    const correctOption = answerIndex >= 0 && answerIndex < options.length ? options[answerIndex] : "（答案待人工確認）";
+    const explanation = answerLetter
+      ? number <= 350
+        ? `題目要找出「${stem}」所對應的英文片語。正確答案 ${answerLetter} 為「${correctOption}」，因此選 ${answerLetter}。`
+        : `題目詢問英文片語「${stem}」的中文意思。正確答案 ${answerLetter} 為「${correctOption}」，因此選 ${answerLetter}。`
+      : "PDF 未提供可對應的答案，請人工確認。";
+    result.push({ questionNumber: number, subject: "英文", topic: "英文片語", level: "senior", difficulty: "normal", type: "single", stem, options, answer: answerLetter ? [answerLetter] : [], explanation, confidence: answerLetter ? 1 : 0.7, answerSource: answerLetter ? "PDF 答案區" : "待人工確認" });
   }
   return result;
 }
