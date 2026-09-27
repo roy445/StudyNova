@@ -28,7 +28,7 @@ import {
   wrongQuestions,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { badRequest, conflict, forbidden, joinCode, notFound, randomToken, sha256, todayStr } from "../core";
+import { badRequest, conflict, fail, forbidden, joinCode, notFound, randomToken, sha256, todayStr } from "../core";
 import { ensureReviewItem } from "../review-service";
 import { bumpAchievement, grantLearningReward, progressActivities, progressDailyTask } from "../economy";
 import { notify } from "../notify";
@@ -102,7 +102,7 @@ function settingsError(config: PkConfig, area: keyof PkConfig) {
 async function assertPkBankAllowed(config: PkConfig, bankId: string) {
   if (!config.allowedBankIds.length) return;
   const activeConfigured = await db.select({ id: questionBanks.id }).from(questionBanks).where(and(ne(questionBanks.status, "archived"), inArray(questionBanks.id, config.allowedBankIds))).limit(1);
-  if (activeConfigured.length && !config.allowedBankIds.includes(bankId)) throw forbidden("這個題庫目前未開放線上 PK");
+  if (activeConfigured.length && !config.allowedBankIds.includes(bankId)) throw fail("PK_BANK_NOT_OPEN");
 }
 
 function normalizedOptions(options: string[]) {
@@ -132,7 +132,7 @@ async function generateMatchQuestions(tx: any, matchId: string, input: MatchInpu
     options.forEach((option) => usedOptions.add(normalizePkText(option)));
   }
 
-  if (blueprints.length < input.questionCount) throw badRequest(`目前「${input.subject}」可用且不重複的 PK 題目不足（${blueprints.length}/${input.questionCount}）`);
+  if (blueprints.length < input.questionCount) throw fail("PK_BANK_EMPTY", { details: { available: blueprints.length, requested: input.questionCount, subject: input.subject } });
   await tx.insert(pkMatchQuestions).values(blueprints.map((question, orderIndex) => ({ matchId, orderIndex, type: question.type, stem: question.stem, canonicalOptions: question.options, canonicalAnswer: question.answer, explanation: question.explanation ?? "", sourceLabel: question.sourceLabel ?? "", unit: question.unit ?? input.unit, fingerprint: pkQuestionFingerprint(question) })));
 }
 
@@ -155,7 +155,7 @@ async function activeFriends(userId: string, ids: string[]) {
 async function createMatch(ownerId: string, input: MatchInput, roomInput?: { name: string; visibility: z.infer<typeof visibility>; password: string; maxPlayers: number; inviteIds: string[]; roomMode: z.infer<typeof teamMode> }) {
   const config = await getPkConfig();
   const bank = (await db.select({ id: questionBanks.id, name: questionBanks.name, subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, input.questionBankId)).limit(1))[0];
-  if (!bank) throw badRequest("請選擇有效的 PK 題庫");
+  if (!bank) throw fail("PK_BANK_NOT_FOUND");
   if (!config.allowedModes.includes(input.mode)) throw badRequest("這個 PK 模式目前未被管理員允許");
   if (input.questionCount < config.minQuestions || input.questionCount > config.maxQuestions) throw badRequest(`題數必須介於 ${config.minQuestions}～${config.maxQuestions} 題`);
   if (input.questionTimeSec < config.minTimeSec || input.questionTimeSec > config.maxTimeSec) throw badRequest(`每題時間必須介於 ${config.minTimeSec}～${config.maxTimeSec} 秒`);
@@ -384,7 +384,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ mode: matchMode, questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), teamMode: teamMode.default("solo") }));
       await assertPkBankAllowed(config, body.questionBankId);
       const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
-      if (!bank) throw badRequest("請選擇有效的 PK 題庫");
+      if (!bank) throw fail("PK_BANK_NOT_FOUND");
       if (!config.allowedModes.includes(body.mode)) throw badRequest("這個 PK 模式目前未開放");
       const existing = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"))).limit(1))[0];
       if (existing) return { queue: existing, matched: false, message: "正在尋找對手……" };
@@ -423,7 +423,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]) }));
       await assertPkBankAllowed(config, body.questionBankId);
       const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
-      if (!bank) throw badRequest("請選擇有效的 PK 題庫");
+      if (!bank) throw fail("PK_BANK_NOT_FOUND");
       if (body.visibility === "private" && !body.password) throw badRequest("私人房間請設定房間密碼，或使用分享連結邀請");
       const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, questionBankId: body.questionBankId, subject: bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
       return { match: result.match, room: result.room, shareUrl: `/online-pk?room=${result.room?.shareToken ?? ""}` };

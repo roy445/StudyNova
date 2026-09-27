@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Skeleton, useToast } from "@/components/ui";
 import { apiPatch, apiPut, errorMessage, useApi } from "@/lib/api";
 
@@ -11,6 +12,8 @@ export default function AdminChallengesPage() {
   const toast = useToast();
   const list = useApi<{ challenges: Challenge[] }>("/admin/challenges");
   const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
+  const banks = useApi<{ banks: Array<{ bank: { id: string; name: string; subject: string; bankKind: string; status: string }; questionCount: number }> }>("/admin/question-banks");
+  const pkConfig = useApi<{ config: { allowedBankIds: string[]; [key: string]: unknown } }>("/admin/pk/config");
   const current = (settings.data?.settings.find((item) => item.key === "challenge_vocabulary_source")?.value ?? {}) as Settings;
   const [minimumWords, setMinimumWords] = useState(100);
   const [manualOpen, setManualOpen] = useState(false);
@@ -46,6 +49,15 @@ export default function AdminChallengesPage() {
     }
   }
 
+  async function saveOpenBanks(allowedBankIds: string[]) {
+    if (!pkConfig.data?.config) return;
+    try {
+      await apiPut("/admin/pk/config", { value: { ...pkConfig.data.config, allowedBankIds } });
+      await pkConfig.reload();
+      toast.push("success", allowedBankIds.length ? "競賽題庫開放清單已更新" : "競賽中心已開放全部題庫");
+    } catch (error) { toast.push("error", errorMessage(error)); }
+  }
+
   return (
     <div className="space-y-4">
       <Card title="⚔️ 挑戰功能管理" subtitle="集中管理所有挑戰、參與狀態與字詞百科題庫開放規則。">
@@ -64,6 +76,13 @@ export default function AdminChallengesPage() {
             <p className="mt-2 text-xs leading-6 text-muted">一般模式依題型分配每題秒數，基礎題通常 30 秒；速戰速決模式固定每題 10 秒。逾時會記錄為「未作答」，不會被誤算成答錯後要求確認。</p>
           </div>
         </div>
+      </Card>
+
+      <Card title="▦ 競賽題庫與 PK 開放設定" subtitle="挑戰與 Online PK 題庫集中在這裡；一般學習題庫仍維持獨立管理。">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted"><span>目前 {banks.data?.banks.length ?? 0} 個題庫；空清單代表全部題庫開放。</span><div className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => void saveOpenBanks([])}>開放全部題庫</Button><Link href="/admin/ops?tab=bank" className="rounded-xl border border-[var(--line)] px-3 py-2 hover:bg-white/5">前往匯入題庫</Link></div></div>
+        {banks.loading && <Skeleton lines={3} />}
+        <div className="grid gap-2 sm:grid-cols-2">{banks.data?.banks.map(({ bank, questionCount }) => { const allowed = pkConfig.data?.config.allowedBankIds ?? []; const checked = allowed.length === 0 || allowed.includes(bank.id); return <label key={bank.id} className={`flex items-center gap-2 rounded-xl border p-3 text-xs ${checked ? "border-[#37d3ff]/40 bg-[#37d3ff]/5" : "border-[var(--line)]"}`}><input type="checkbox" checked={checked} onChange={(event) => { const all = banks.data?.banks.map(({ bank: item }) => item.id) ?? []; const next = event.target.checked ? [...new Set([...allowed, bank.id])] : all.filter((id) => id !== bank.id && (allowed.length === 0 || allowed.includes(id))); void saveOpenBanks(next); }} className="accent-[#37d3ff]" /><span className="min-w-0 flex-1 truncate">{bank.name}・{bank.subject}</span><Badge tone={bank.bankKind === "challenge" ? "violet" : "cyan"}>{bank.bankKind === "challenge" ? "挑戰／PK" : "一般題庫"}</Badge><span className="text-muted">{questionCount} 題</span></label>; })}</div>
+        {!banks.loading && !banks.data?.banks.length && <EmptyState icon="▦" title="目前沒有題庫" hint="請先到匯入題庫建立並匯入競賽題庫。" />}
       </Card>
 
       <Card title="目前挑戰" subtitle="關閉只停止後續作答，歷史參與紀錄仍會保留。">

@@ -329,7 +329,7 @@ export const routes: RouteDef[] = [
             challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: group[0].example, options: [...options].sort(() => Math.random() - 0.5), answer });
           }
         }
-        if (challengeItems.length < 5) throw badRequest("目前題庫不足，請稍後再試");
+        if (challengeItems.length < 5) throw fail("CHAL_BANK_EMPTY");
       }
       const rows = await db
         .insert(challenges)
@@ -369,7 +369,7 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
-      if (!challenge) throw notFound("找不到挑戰");
+      if (!challenge) throw fail("CHAL_MATCH_NOT_FOUND");
       const ids = await friendIds(user.userId);
       if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       if (challenge.kind !== "word") throw badRequest("這不是單字挑戰");
@@ -389,7 +389,7 @@ export const routes: RouteDef[] = [
         return !usedQuestions.has(questionKey) && !options.some((option) => usedOptions.has(option));
       });
       const rows = freshRows.slice(0, count);
-      if (!rows.length) throw badRequest("這位使用者已完成目前題庫的題目與選項，請等待新的題庫內容");
+      if (!rows.length) throw fail("CHAL_BANK_EMPTY", { message: "這位使用者已完成目前題庫的題目與選項，請等待新的題庫內容" });
       await db.insert(challengeQuestionHistory).values(rows.map((record) => ({ userId: user.userId, challengeId: challenge.id, questionFingerprint: challengeQuestionFingerprint(record as Record<string, unknown>), appearedDate, options: Array.isArray((record as Record<string, unknown>).options) ? ((record as Record<string, unknown>).options as unknown[]).map(String) : [] }))).onConflictDoNothing();
       return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal", timeMode: payload.timeMode ?? "standard" }, words: rows };
     },
@@ -402,7 +402,7 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
-      if (!challenge || challenge.kind !== "word") throw notFound("找不到單字挑戰");
+      if (!challenge || challenge.kind !== "word") throw fail("CHAL_MATCH_NOT_FOUND");
       const ids = await friendIds(user.userId);
       if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       const payload = challenge.payload as { readyUserIds?: string[] };
@@ -421,8 +421,8 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ questionIndex: z.number().int().min(0).max(200), correct: z.boolean(), response: z.string().max(500).default("") }));
       const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
-      if (!challenge || challenge.status !== "open") throw notFound("找不到進行中的挑戰");
-      if (challenge.expiresAt && new Date(challenge.expiresAt) <= new Date()) throw badRequest("這個挑戰已經結束");
+      if (!challenge || challenge.status !== "open") throw fail("CHAL_MATCH_NOT_FOUND");
+      if (challenge.expiresAt && new Date(challenge.expiresAt) <= new Date()) throw fail("CHAL_MATCH_ENDED");
       const allowedIds = await friendIds(user.userId);
       if (challenge.creatorId !== user.userId && !allowedIds.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       const challengePayload = challenge.payload as { items?: Array<Record<string, unknown>> };
@@ -455,7 +455,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ score: z.number().int().min(0).max(10000), durationSec: z.number().int().min(0).max(36000), records: z.array(z.object({ word: z.string().max(400), prompt: z.string().max(1000), expected: z.string().max(400), response: z.string().max(400), correct: z.boolean(), timedOut: z.boolean() })).max(200).default([]) }));
       const c = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
-      if (!c) throw notFound("找不到挑戰");
+      if (!c) throw fail("CHAL_MATCH_NOT_FOUND");
       if (c.status !== "open") throw fail("SOCIAL_CHALLENGE_ENDED", { message: "這個挑戰目前已暫停或關閉" });
       if (new Date(c.expiresAt) < new Date()) throw fail("SOCIAL_CHALLENGE_ENDED");
       const submitFriendIds = await friendIds(user.userId);

@@ -21,6 +21,8 @@ export type ErrorCategory =
   | "FILE"
   | "WEEK"
   | "SOCIAL"
+  | "CHAL"
+  | "PK"
   | "ADMIN"
   | "RATE"
   | "NF"
@@ -153,6 +155,18 @@ export const ERROR_CATALOG = {
   SOCIAL_ROOM_NOT_FOUND: def("SN-SOCIAL-9007", 404, "SOCIAL", "找不到讀書房代碼", "請向房主確認 6 碼邀請碼。"),
   SOCIAL_SHARE_NOT_FOUND: def("SN-SOCIAL-9008", 404, "SOCIAL", "這個分享連結不存在或已被移除", "請向分享者索取新的連結。"),
   SOCIAL_QUIZ_NOT_OWNED: def("SN-SOCIAL-9009", 403, "SOCIAL", "只能用自己的測驗建立挑戰", "請先建立一份屬於你的測驗。"),
+
+  /* ------------------------------------------------------- CHAL / PK 97xx */
+  CHAL_BANK_NOT_FOUND: def("SN-CHAL-9701", 404, "CHAL", "找不到挑戰題庫", "請重新整理挑戰中心，或請管理員確認題庫是否仍開放。"),
+  CHAL_BANK_NOT_OPEN: def("SN-CHAL-9702", 403, "CHAL", "這個挑戰題庫目前未開放", "請改選其他已開放的挑戰題庫。"),
+  CHAL_BANK_EMPTY: def("SN-CHAL-9703", 409, "CHAL", "挑戰題庫目前沒有足夠題目", "請選擇至少有 5 題的題庫，或請管理員先完成匯入。"),
+  CHAL_MATCH_NOT_FOUND: def("SN-CHAL-9704", 404, "CHAL", "找不到挑戰賽事", "請重新整理挑戰中心後再試一次。"),
+  CHAL_MATCH_ENDED: def("SN-CHAL-9705", 409, "CHAL", "這場挑戰已結束", "請建立新的挑戰。"),
+  PK_BANK_NOT_FOUND: def("SN-PK-9711", 404, "PK", "找不到 PK 題庫", "請重新整理 PK 專區，或請管理員確認開放題庫設定。"),
+  PK_BANK_NOT_OPEN: def("SN-PK-9712", 403, "PK", "這個 PK 題庫目前未開放", "請改選其他已開放的 PK 題庫。"),
+  PK_BANK_EMPTY: def("SN-PK-9713", 409, "PK", "PK 題庫目前沒有足夠題目", "題庫至少需要 5 題可用題目才能開始 PK。"),
+  PK_MATCH_NOT_FOUND: def("SN-PK-9714", 404, "PK", "找不到 PK 賽場", "請重新整理 PK 專區後再試一次。"),
+  PK_MATCH_ENDED: def("SN-PK-9715", 409, "PK", "PK 賽場已結束", "請建立新的 PK 賽場。"),
 
   /* --------------------------------------------------------- ADMIN 95xx */
   ADMIN_TARGET_PROTECTED: def("SN-ADMIN-9501", 400, "ADMIN", "不能對擁有者執行此操作", "擁有者帳號受到保護。"),

@@ -37,6 +37,7 @@ const NAV: NavItem[] = [
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
   { href: "/weekly", label: "小考", icon: "weekly" },
+  { href: "/challenge", label: "好友挑戰", icon: "challenge" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
 
@@ -84,6 +85,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/export", label: "資料匯出", icon: "archive" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
+  { href: "/challenge", label: "好友挑戰", icon: "challenge" },
   { href: "/online-pk", label: "線上 PK", icon: "challenge" },
   { href: "/report", label: "學習報告", icon: "report" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
