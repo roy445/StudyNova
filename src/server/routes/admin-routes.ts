@@ -1512,8 +1512,9 @@ export const routes: RouteDef[] = [
       if (job.status !== "ready") throw badRequest("題目尚未分析完成，不能確認匯入");
       await db.update(questionImportJobs).set({ status: "importing", acceptedQuestions: 0, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
       let imported = 0;
+      let skipped = 0;
       for (const item of job.preview) {
-        if (item.importAction === "exclude" || item.status === "DUPLICATE") continue;
+        if (item.importAction === "exclude" || item.status === "DUPLICATE") { skipped += 1; continue; }
         const subject = String(item.subject || "其他");
         const stem = String(item.stem || "");
         if (!stem) continue;
@@ -1522,10 +1523,11 @@ export const routes: RouteDef[] = [
         if (rows[0]) {
           imported += 1;
           if (imported % 10 === 0) await db.update(questionImportJobs).set({ acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
-        }
+        } else skipped += 1;
       }
       await db.update(questionImportJobs).set({ status: "confirmed", acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
-      return { jobId: job.id, imported };
+      const questionBankCount = job.questionBankId ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, job.questionBankId), sql`${questions.status} <> 'draft'`)))[0]?.count ?? 0) : null;
+      return { jobId: job.id, imported, skipped, failed: 0, total: job.preview.length, questionBankId: job.questionBankId, questionBankCount };
     },
   }),
   route({
