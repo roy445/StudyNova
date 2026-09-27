@@ -292,6 +292,8 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async () => {
       const config = await getPkConfig();
+      await db.execute(sql`UPDATE questions q SET bank_id = qb.id, status = 'published', updated_at = now() FROM question_banks qb WHERE q.bank_id IS NULL AND q.origin = 'bank' AND q.target_bank = 'exclusive' AND q.created_at >= qb.created_at AND qb.bank_kind = 'exclusive' AND qb.name = 'PK題庫'`);
+      await db.execute(sql`UPDATE question_banks qb SET status = 'published', updated_at = now() WHERE qb.name = 'PK題庫' AND qb.status = 'draft' AND EXISTS (SELECT 1 FROM questions q WHERE q.bank_id = qb.id)`);
       const banks = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id} and ${questions.status} <> 'draft')::int` }).from(questionBanks).where(and(ne(questionBanks.status, "archived"), config.allowedBankIds.length ? inArray(questionBanks.id, config.allowedBankIds) : sql`true`)).orderBy(asc(questionBanks.name));
       return { banks: banks.filter((row) => Number(row.questionCount) >= 5) };
     },

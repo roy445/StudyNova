@@ -1363,6 +1363,10 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const subject = ctx.query.get("subject");
       const status = ctx.query.get("status");
+      // Repair legacy imports on read as well as via the explicit reconcile
+      // action. The old importer stored exclusive-bank questions without a
+      // bank_id, which made the UI report zero even though the rows existed.
+      await db.execute(sql`UPDATE questions q SET bank_id = qb.id, status = 'published', updated_at = now() FROM question_banks qb WHERE q.bank_id IS NULL AND q.origin = 'bank' AND q.target_bank = 'exclusive' AND q.created_at >= qb.created_at AND qb.bank_kind = 'exclusive' AND qb.name = 'PK題庫'`);
       const rows = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id})::int` }).from(questionBanks).where(and(subject ? eq(questionBanks.subject, subject) : sql`true`, status ? eq(questionBanks.status, status) : sql`true`)).orderBy(desc(questionBanks.updatedAt));
       return { banks: rows };
     },
@@ -1390,6 +1394,23 @@ export const routes: RouteDef[] = [
       if (!rows[0]) throw notFound("找不到題庫");
       await adminLog({ actorId: admin.userId, action: "question-bank.update", targetType: "question_bank", targetId: rows[0].id, after: body, ip: ctx.ip });
       return { bank: rows[0] };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/question-banks/:id/reconcile",
+    auth: "admin",
+    handler: async (ctx) => {
+      const bank = (await db.select().from(questionBanks).where(eq(questionBanks.id, ctx.params.id)).limit(1))[0];
+      if (!bank) throw notFound("找不到題庫");
+      // Legacy PK imports may have the questions but no bank_id. Restrict the
+      // repair to questions created after this bank, so other banks are not
+      // silently claimed. The admin explicitly triggers this operation.
+      const candidates = await db.select({ id: questions.id }).from(questions).where(and(sql`${questions.bankId} is null`, or(eq(questions.origin, "bank"), eq(questions.origin, "admin")), gte(questions.createdAt, bank.createdAt)));
+      if (candidates.length) await db.update(questions).set({ bankId: bank.id, status: "published", updatedAt: new Date() }).where(inArray(questions.id, candidates.map((row) => row.id)));
+      await db.update(questionBanks).set({ status: "published", updatedAt: new Date() }).where(eq(questionBanks.id, bank.id));
+      const count = (await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, bank.id), sql`${questions.status} <> 'draft'`)))[0]?.count ?? 0;
+      return { bankId: bank.id, rebound: candidates.length, questionCount: Number(count) };
     },
   }),
   route({
