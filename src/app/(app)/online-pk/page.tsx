@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
 import { apiPost, errorMessage, useApi } from "@/lib/api";
@@ -277,6 +278,12 @@ export default function OnlinePkPage() {
             <div className="glass-soft rounded-2xl px-3 py-3"><p className="text-[10px] text-muted">PK 中</p><p className="mt-1 text-2xl font-black text-[#37d3ff]">{overview.data?.pkOnline ?? "—"}</p></div>
             <div className="glass-soft rounded-2xl px-3 py-3"><p className="text-[10px] text-muted">找對手</p><p className="mt-1 text-2xl font-black text-[#ffc857]">{overview.data?.matchmaking ?? "—"}</p></div>
           </div>
+        </div>
+        <div className="relative z-10 mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+          <Link href="/challenge" className="focus-ring inline-flex items-center rounded-xl border border-[#a78bfa]/40 bg-[#a78bfa]/10 px-3 py-2 text-xs font-bold text-[#ddd6fe] transition hover:border-[#a78bfa]/70 hover:bg-[#a78bfa]/20">
+            ⚔️ 好友挑戰
+          </Link>
+          <span className="text-xs text-muted">好友挑戰已集中到 PK 專區，可從這裡進入。</span>
         </div>
         {disableAll && <div className="mt-5 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">線上 PK 目前由管理員暫停，既有結算資料不受影響。</div>}
       </section>
