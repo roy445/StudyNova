@@ -60,7 +60,7 @@ import {
   pkPresence,
   pkRooms,
 } from "@/db/schema";
-import { normalizeQuestionRows } from "../question-import";
+import { normalizeQuestionRows, questionDedupeKey } from "../question-import";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, randomToken, sha256 } from "../core";
 import { adminLog, adjustNovaByAdmin, grantMembership, grantNova, grantXp } from "../economy";
@@ -1436,7 +1436,8 @@ export const routes: RouteDef[] = [
       const fileProgress = job.totalFiles ? Math.round((job.processedFiles / job.totalFiles) * 100) : 0;
       const chunkProgress = job.analysisTotalChunks ? Math.round((job.analysisProcessedChunks / job.analysisTotalChunks) * 100) : 0;
       const progress = job.status === "ready" || job.status === "confirmed" ? 100 : job.status === "importing" ? (job.totalQuestions ? Math.min(99, Math.round((job.acceptedQuestions / job.totalQuestions) * 100)) : 0) : job.analysisTotalChunks ? Math.min(99, chunkProgress) : fileProgress;
-      const elapsedSeconds = job.analysisStartedAt ? Math.max(0, (Date.now() - job.analysisStartedAt.getTime()) / 1000) : 0;
+      const elapsedEnd = job.status === "ready" || job.status === "confirmed" ? job.analysisLastChunkAt?.getTime() ?? Date.now() : Date.now();
+      const elapsedSeconds = job.analysisStartedAt ? Math.max(0, (elapsedEnd - job.analysisStartedAt.getTime()) / 1000) : 0;
       const averageSeconds = job.analysisProcessedChunks > 0 ? elapsedSeconds / job.analysisProcessedChunks : 0;
       const estimatedSecondsRemaining = job.analysisTotalChunks > job.analysisProcessedChunks && averageSeconds > 0 ? Math.ceil((job.analysisTotalChunks - job.analysisProcessedChunks) * averageSeconds) : 0;
       return { ...job, progress, estimatedSecondsRemaining, analysisElapsedSeconds: Math.round(elapsedSeconds) };
@@ -1527,7 +1528,9 @@ export const routes: RouteDef[] = [
       }
       await db.update(questionImportJobs).set({ status: "confirmed", acceptedQuestions: imported, updatedAt: new Date() }).where(eq(questionImportJobs.id, job.id));
       const questionBankCount = job.questionBankId ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, job.questionBankId), sql`${questions.status} <> 'draft'`)))[0]?.count ?? 0) : null;
-      return { jobId: job.id, imported, skipped, failed: 0, total: job.preview.length, questionBankId: job.questionBankId, questionBankCount };
+      const analysisEnd = job.analysisLastChunkAt?.getTime() ?? Date.now();
+      const analysisElapsedSeconds = job.analysisStartedAt ? Math.round((analysisEnd - job.analysisStartedAt.getTime()) / 1000) : 0;
+      return { jobId: job.id, imported, skipped, duplicateSkipped: job.preview.filter((item) => item.status === "DUPLICATE").length, failed: 0, total: job.preview.length, questionBankId: job.questionBankId, questionBankCount, analysisElapsedSeconds };
     },
   }),
   route({
@@ -1561,7 +1564,32 @@ export const routes: RouteDef[] = [
         if (rows[0]) imported += 1; else skipped += 1;
       }
       await adminLog({ actorId: admin.userId, action: "questions.import", targetType: "questions", targetId: "bank", after: { submitted: preview.length, accepted, imported, skipped, invalid: invalid.length }, ip: ctx.ip });
-      return { submitted: preview.length, accepted, imported, skipped, invalid, warnings: preview.flatMap((item) => item.issues.filter((issue) => issue.severity === "warning").map((issue) => ({ index: item.index, field: issue.field, code: issue.code, warning: issue.message }))) };
+      return { submitted: preview.length, accepted, imported, skipped, duplicateSkipped: preview.filter((item) => item.status === "DUPLICATE").length, invalid, warnings: preview.flatMap((item) => item.issues.filter((issue) => issue.severity === "warning").map((issue) => ({ index: item.index, field: issue.field, code: issue.code, warning: issue.message }))) };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/questions/deduplicate",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ confirm: z.literal(true) }));
+      if (!body.confirm) throw badRequest("必須明確確認才可清理重複題目");
+      const startedAt = Date.now();
+      const rows = await db.select({ id: questions.id, subject: questions.subject, stem: questions.stem, answer: questions.answer, createdAt: questions.createdAt }).from(questions).orderBy(asc(questions.createdAt), asc(questions.id));
+      const kept = new Set<string>();
+      const duplicateKeys = new Set<string>();
+      const duplicateIds: string[] = [];
+      for (const row of rows) {
+        const answer = Array.isArray(row.answer) ? row.answer.map(String) : [];
+        const key = questionDedupeKey(row.subject, row.stem, answer);
+        if (kept.has(key)) { duplicateIds.push(row.id); duplicateKeys.add(key); }
+        else kept.add(key);
+      }
+      if (duplicateIds.length) await db.delete(questions).where(inArray(questions.id, duplicateIds));
+      const elapsedSeconds = Math.round((Date.now() - startedAt) / 10) / 100;
+      await adminLog({ actorId: admin.userId, action: "questions.deduplicate", targetType: "questions", targetId: "all", after: { checked: rows.length, duplicateGroups: duplicateKeys.size, deleted: duplicateIds.length, elapsedSeconds }, ip: ctx.ip });
+      return { checked: rows.length, duplicateGroups: duplicateKeys.size, deleted: duplicateIds.length, remaining: rows.length - duplicateIds.length, elapsedSeconds };
     },
   }),
 

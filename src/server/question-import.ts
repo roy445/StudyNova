@@ -24,6 +24,7 @@ const MAX_STRING = 20000;
 const text = (value: unknown, max = MAX_STRING) => typeof value === "string" || typeof value === "number" ? String(value).trim().slice(0, max) : "";
 const first = (row: Record<string, unknown>, keys: string[]) => keys.map((key) => row[key]).find((value) => value !== undefined && value !== null && value !== "");
 const asArray = (value: unknown): string[] => Array.isArray(value) ? value.flatMap((item) => typeof item === "object" && item ? [text((item as Record<string, unknown>).text ?? (item as Record<string, unknown>).label)] : [text(item)]).filter(Boolean).slice(0, 20) : value === undefined || value === null || value === "" ? [] : [text(value)];
+export const questionDedupeKey = (subject: string, stem: string, answer: string[]) => fingerprint(subject, stem, answer.join("|"));
 
 function inferType(row: Record<string, unknown>, options: string[], answer: string[]) {
   const supplied = text(first(row, ["type", "questionType", "kind"])).toLowerCase().replace(/[ -]/g, "_");
@@ -65,7 +66,7 @@ export function normalizeQuestionRows(payload: unknown, defaults: Partial<Pick<N
       difficulty: (["easy", "normal", "hard", "exam", "advanced"].includes(text(first(row, ["difficulty", "難度"]))) ? text(first(row, ["difficulty", "難度"])) : defaults.difficulty ?? "normal") as NormalizedQuestion["difficulty"],
       type, stem, options, answer, explanation,
       metadata: { originalIndex: index, originalType: row.type ?? null, tags: asArray(row.tags), estimatedSeconds: Number(row.estimatedSeconds ?? 0) || 0, points: Number(row.points ?? 1) || 1 },
-      fingerprint: fingerprint(text(first(row, ["subject", "科目"])) || defaults.subject || "其他", stem, answer.join("|")),
+      fingerprint: questionDedupeKey(text(first(row, ["subject", "科目"])) || defaults.subject || "其他", stem, answer),
     };
     const issues: ImportIssue[] = [];
     if (!stem) issues.push({ index, field: "question", code: "MISSING_STEM", message: "缺少 question／stem／content／title／prompt 題目欄位。", severity: "error" });
@@ -77,7 +78,8 @@ export function normalizeQuestionRows(payload: unknown, defaults: Partial<Pick<N
     if (seen.has(item.fingerprint)) issues.push({ index, code: "DUPLICATE_IN_FILE", message: "與本次檔案中的另一題重複。", severity: "warning" });
     seen.add(item.fingerprint);
     const hasError = issues.some((issue) => issue.severity === "error");
-    previews.push({ ...item, index, issues, status: hasError ? "ERROR" : issues.length ? "WARNING" : "READY" });
+    const isDuplicate = issues.some((issue) => issue.code === "DUPLICATE_IN_FILE");
+    previews.push({ ...item, index, issues, status: hasError ? "ERROR" : isDuplicate ? "DUPLICATE" : issues.length ? "WARNING" : "READY" });
   });
   return { previews, issues: truncated ? [{ index: MAX_ITEMS, code: "MAX_ITEMS", message: `單次最多處理 ${MAX_ITEMS} 題，超出部分未納入預覽。`, severity: "warning" as const }] : [], truncated };
 }

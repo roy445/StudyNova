@@ -25,6 +25,7 @@ describe("question import normalization", () => {
   it("marks duplicates without failing unrelated questions", () => {
     const result = normalizeQuestionRows([{ question: "相同", answer: "答案" }, { question: "相同", answer: "答案" }, { question: "不同", answer: "答案" }]);
     expect(result.previews[1].issues.some((issue) => issue.code === "DUPLICATE_IN_FILE")).toBe(true);
+    expect(result.previews[1].status).toBe("DUPLICATE");
     expect(result.previews[2].status).not.toBe("ERROR");
   });
   it("supports unicode, emoji, and formulas", () => {

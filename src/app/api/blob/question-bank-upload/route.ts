@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { questionImportJobs, storageObjects } from "@/db/schema";
 import { requireAdmin } from "@/server/auth";
 import { extractJson, runAi } from "@/server/ai";
-import { normalizeQuestionRows } from "@/server/question-import";
+import { normalizeQuestionRows, questionDedupeKey } from "@/server/question-import";
 import { extractPdfQuestionChunks, parseNumberedChoiceQuestionText, renderPdfImagePages } from "@/server/pdf-question-extract";
 
 export const runtime = "nodejs";
@@ -20,6 +20,7 @@ type DraftItem = Record<string, unknown> & {
   type: string;
   answer: string[];
   options: string[];
+  fingerprint: string;
   status: "READY" | "NEEDS_REVIEW" | "DUPLICATE";
 };
 
@@ -118,6 +119,7 @@ function normalizeItem(item: Record<string, unknown>, sourceObjectId: string, so
     options,
     answer,
     explanation: safeText(item.explanation || "", 6000),
+    fingerprint: questionDedupeKey(classifySubject(item.subject, stem), stem, answer),
     confidence,
     status: reasons.length ? "NEEDS_REVIEW" : "READY",
     reviewReasons: reasons,
@@ -157,6 +159,7 @@ export async function POST(request: Request) {
           const directRows = directTextRows(rawBuffer.toString("utf8"), blob.contentType);
           let parsed: unknown;
           if (directRows !== null) {
+            await db.update(questionImportJobs).set({ analysisStartedAt: new Date(), status: "analyzing", updatedAt: new Date() }).where(eq(questionImportJobs.id, payload.jobId));
             parsed = directRows;
           } else if (isPdf) {
             const chunks = await extractPdfQuestionChunks(rawBuffer);
@@ -165,7 +168,8 @@ export async function POST(request: Request) {
               const deterministicQuestions = parseNumberedChoiceQuestionText(textChunks.map((chunk) => chunk.text).join("\n"));
               if (deterministicQuestions.length >= 5) {
                 parsed = { questions: deterministicQuestions, answerKeys: [], answerRegions: [] };
-                await db.update(questionImportJobs).set({ analysisTotalChunks: 1, analysisProcessedChunks: 1, totalQuestions: deterministicQuestions.length, status: "analyzing", updatedAt: new Date() }).where(eq(questionImportJobs.id, payload.jobId));
+                const completedAt = new Date();
+                await db.update(questionImportJobs).set({ analysisStartedAt: completedAt, analysisLastChunkAt: completedAt, analysisTotalChunks: 1, analysisProcessedChunks: 1, totalQuestions: deterministicQuestions.length, status: "analyzing", updatedAt: completedAt }).where(eq(questionImportJobs.id, payload.jobId));
               } else {
               const analysisStartedAt = new Date();
               await db.update(questionImportJobs).set({ analysisTotalChunks: textChunks.length, analysisProcessedChunks: 0, analysisStartedAt, analysisLastChunkAt: null, status: "analyzing", updatedAt: analysisStartedAt }).where(eq(questionImportJobs.id, payload.jobId));
@@ -254,8 +258,13 @@ ${chunk.text}` }],
           const answerKeys = Array.isArray((parsed as Record<string, unknown>).answerKeys) ? ((parsed as { answerKeys: Array<Record<string, unknown>> }).answerKeys) : [];
           const job = (await db.select().from(questionImportJobs).where(eq(questionImportJobs.id, payload.jobId)).limit(1))[0];
           if (job) {
-            const existingKeys = new Set(job.preview.map((item) => `${item.subject}|${item.stem}|${Array.isArray(item.answer) ? item.answer.join("|") : ""}`));
-            const merged = [...job.preview, ...preview.filter((item) => { const key = `${item.subject}|${item.stem}|${item.answer.join("|")}`; if (existingKeys.has(key)) return false; existingKeys.add(key); return true; })];
+            const existingKeys = new Set(job.preview.map((item) => String(item.fingerprint || questionDedupeKey(String(item.subject || "其他"), String(item.stem || ""), Array.isArray(item.answer) ? item.answer.map(String) : []))));
+            const merged = [...job.preview, ...preview.map((item) => {
+              const key = item.fingerprint;
+              if (existingKeys.has(key)) return { ...item, status: "DUPLICATE" as const, reviewReasons: [...(Array.isArray(item.reviewReasons) ? item.reviewReasons : []), "與本次匯入或先前檔案的題目重複，將自動略過"] };
+              existingKeys.add(key);
+              return item;
+            })];
             const mergedPreview = merged.map((item) => ({ ...item, answerKeys }));
             // Large PDFs can produce thousands of questions. Sending the whole
             // preview as one JSONB parameter can exceed serverless/Neon limits.
@@ -267,7 +276,9 @@ ${chunk.text}` }],
                 processedFiles: job.processedFiles + 1,
                 totalQuestions: merged.length,
                 acceptedQuestions: merged.filter((item) => item.status !== "DUPLICATE").length,
+                duplicateQuestions: merged.filter((item) => item.status === "DUPLICATE").length,
                 status: job.processedFiles + 1 >= job.totalFiles ? "ready" : "analyzing",
+                analysisLastChunkAt: job.processedFiles + 1 >= job.totalFiles ? new Date() : undefined,
                 updatedAt: new Date(),
               }).where(eq(questionImportJobs.id, job.id));
             }
