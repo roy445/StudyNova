@@ -18,7 +18,6 @@ import {
   pkRewards,
   pkRooms,
   pkTeams,
-  questionBanks,
   questions,
   studyMaterials,
   userVocabularies,
@@ -42,14 +41,13 @@ const teamMode = z.enum(["solo", "team"]);
 const visibility = z.enum(["public", "private"]);
 const playerState = z.enum(["online", "recently_active"]);
 
+const pkGrade = z.enum(["JUNIOR_HIGH", "SENIOR_HIGH"]);
+
 type MatchInput = {
   mode: z.infer<typeof matchMode>;
   teamMode: z.infer<typeof teamMode>;
-  questionBankId: string;
-  sourceType?: "bank" | "vocabulary" | "folder" | "material";
-  sourceId?: string | null;
+  gradeLevel: z.infer<typeof pkGrade>;
   subject: string;
-  grade: string;
   unit: string;
   difficulty: string;
   questionCount: number;
@@ -99,12 +97,6 @@ function settingsError(config: PkConfig, area: keyof PkConfig) {
   if (area === "customRoomEnabled" && !config.customRoomEnabled) throw badRequest("自訂房間目前未開放");
 }
 
-async function assertPkBankAllowed(config: PkConfig, bankId: string) {
-  if (!config.allowedBankIds.length) return;
-  const activeConfigured = await db.select({ id: questionBanks.id }).from(questionBanks).where(and(ne(questionBanks.status, "archived"), inArray(questionBanks.id, config.allowedBankIds))).limit(1);
-  if (activeConfigured.length && !config.allowedBankIds.includes(bankId)) throw fail("PK_BANK_NOT_OPEN");
-}
-
 function normalizedOptions(options: string[]) {
   return [...new Set(options.map((option) => option.trim()).filter(Boolean))];
 }
@@ -119,7 +111,8 @@ async function generateMatchQuestions(tx: any, matchId: string, input: MatchInpu
   const fingerprints = await recentQuestionFingerprints(tx, input.subject);
   const usedOptions = new Set<string>();
   const blueprints: PkQuestionBlueprint[] = [];
-  const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(eq(questions.bankId, input.questionBankId), ne(questions.status, "draft"))).orderBy(sql`random()`).limit(Math.min(500, input.questionCount * 8));
+  const level = input.gradeLevel === "SENIOR_HIGH" ? "senior" : "junior";
+  const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(eq(questions.level, level), eq(questions.status, "published"), eq(questions.availableForPk, true))).orderBy(sql`random()`).limit(Math.min(1000, input.questionCount * 12));
   for (const current of sourceRows) {
     if (blueprints.length >= input.questionCount) break;
     const answer = String(current.answer[0] ?? "").trim();
@@ -154,8 +147,6 @@ async function activeFriends(userId: string, ids: string[]) {
 
 async function createMatch(ownerId: string, input: MatchInput, roomInput?: { name: string; visibility: z.infer<typeof visibility>; password: string; maxPlayers: number; inviteIds: string[]; roomMode: z.infer<typeof teamMode> }) {
   const config = await getPkConfig();
-  const bank = (await db.select({ id: questionBanks.id, name: questionBanks.name, subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, input.questionBankId)).limit(1))[0];
-  if (!bank) throw fail("PK_BANK_NOT_FOUND");
   if (!config.allowedModes.includes(input.mode)) throw badRequest("這個 PK 模式目前未被管理員允許");
   if (input.questionCount < config.minQuestions || input.questionCount > config.maxQuestions) throw badRequest(`題數必須介於 ${config.minQuestions}～${config.maxQuestions} 題`);
   if (input.questionTimeSec < config.minTimeSec || input.questionTimeSec > config.maxTimeSec) throw badRequest(`每題時間必須介於 ${config.minTimeSec}～${config.maxTimeSec} 秒`);
@@ -164,7 +155,7 @@ async function createMatch(ownerId: string, input: MatchInput, roomInput?: { nam
   if (roomInput && invited.length !== roomInput.inviteIds.length) throw forbidden("只能邀請已經成為好友的使用者");
 
   const result = await db.transaction(async (tx) => {
-    const matchRows = await tx.insert(pkMatches).values({ ownerId, status: roomInput ? "waiting" : "matching", mode: input.mode, teamMode: input.teamMode, questionBankId: input.questionBankId, sourceType: input.sourceType ?? "bank", sourceId: input.sourceId ?? null, subject: bank.subject, grade: input.grade, unit: input.unit, difficulty: input.difficulty, questionCount: input.questionCount, questionTimeSec: input.questionTimeSec, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, rewardNova: input.rewardNova, rewardXp: input.rewardXp }).returning();
+    const matchRows = await tx.insert(pkMatches).values({ ownerId, status: roomInput ? "waiting" : "matching", mode: input.mode, teamMode: input.teamMode, questionBankId: null, sourceType: "canonical_questions", sourceId: null, subject: "全站題目", grade: input.gradeLevel, unit: input.unit, difficulty: input.difficulty, questionCount: input.questionCount, questionTimeSec: input.questionTimeSec, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, rewardNova: input.rewardNova, rewardXp: input.rewardXp }).returning();
     const match = matchRows[0];
     await generateMatchQuestions(tx, match.id, input);
     let room = null;
@@ -289,35 +280,6 @@ async function matchPayload(matchId: string, userId: string) {
 
 export const routes: RouteDef[] = [
   route({
-    method: "GET",
-    path: "/pk/question-banks",
-    auth: "user",
-    handler: async () => {
-      const config = await getPkConfig();
-      await db.execute(sql`UPDATE questions q SET bank_id = qb.id, status = 'published', updated_at = now() FROM question_banks qb WHERE q.bank_id IS NULL AND q.origin = 'bank' AND q.target_bank = 'exclusive' AND q.created_at >= qb.created_at AND qb.bank_kind = 'exclusive' AND qb.name = 'PK題庫'`);
-      await db.execute(sql`UPDATE questions q SET status = 'published', updated_at = now() FROM question_banks qb WHERE q.bank_id = qb.id AND qb.name = 'PK題庫' AND q.status = 'draft'`);
-      await db.execute(sql`UPDATE question_banks qb SET status = 'published', updated_at = now() WHERE qb.name = 'PK題庫' AND qb.status = 'draft' AND EXISTS (SELECT 1 FROM questions q WHERE q.bank_id = qb.id)`);
-      const banks = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id} and ${questions.status} <> 'draft')::int` }).from(questionBanks).where(ne(questionBanks.status, "archived")).orderBy(asc(questionBanks.name));
-      const usable = banks.filter((row) => Number(row.questionCount) >= 5);
-      const configured = config.allowedBankIds.length ? usable.filter((row) => config.allowedBankIds.includes(row.bank.id)) : usable;
-      // A stale allow-list must never make the player see an empty selector.
-      // When none of its IDs still exists, recover to all real usable banks.
-      return { banks: configured.length ? configured : usable };
-    },
-  }),
-  route({
-    method: "GET",
-    path: "/pk/sources",
-    auth: "user",
-    handler: async (ctx) => {
-      const user = ctx.requireUser();
-      const banks = await db.select({ id: questionBanks.id, name: questionBanks.name, subject: questionBanks.subject, count: sql<number>`(select count(*) from ${questions} q where q.bank_id = ${questionBanks.id} and q.status <> 'draft')::int` }).from(questionBanks).where(ne(questionBanks.status, "archived")).orderBy(asc(questionBanks.name));
-      const folders = await db.select({ id: vocabularyFolders.id, name: vocabularyFolders.name, count: sql<number>`count(${vocabularyFolderItems.vocabularyId})::int` }).from(vocabularyFolders).leftJoin(vocabularyFolderItems, eq(vocabularyFolderItems.folderId, vocabularyFolders.id)).where(eq(vocabularyFolders.userId, user.userId)).groupBy(vocabularyFolders.id).orderBy(asc(vocabularyFolders.name));
-      const materials = await db.select({ id: studyMaterials.id, title: studyMaterials.title, subject: studyMaterials.subject }).from(studyMaterials).where(eq(studyMaterials.userId, user.userId)).orderBy(desc(studyMaterials.createdAt)).limit(100);
-      return { banks, folders, materials, vocabulary: { id: null, name: "我的單字", sourceType: "vocabulary" } };
-    },
-  }),
-  route({
     method: "POST",
     path: "/pk/self-test",
     auth: "user",
@@ -326,11 +288,8 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const config = await getPkConfig();
       settingsError(config, "customRoomEnabled");
-      const body = await ctx.json(z.object({ questionBankId: z.string().uuid(), subject: z.string().max(80).default(""), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30) }));
-      await assertPkBankAllowed(config, body.questionBankId);
-      const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
-      if (!bank) throw badRequest("請選擇有效的自我測驗題庫");
-      const result = await createMatch(user.userId, { mode: "1v1", teamMode: "solo", questionBankId: body.questionBankId, sourceType: "bank", sourceId: body.questionBankId, subject: body.subject || bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: false, rewardNova: 0, rewardXp: 0 });
+      const body = await ctx.json(z.object({ gradeLevel: pkGrade, questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30) }));
+      const result = await createMatch(user.userId, { mode: "1v1", teamMode: "solo", gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: "normal", questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: false, rewardNova: 0, rewardXp: 0 });
       const startsAt = new Date(Date.now() + 3000);
       await db.update(pkMatches).set({ status: "countdown", startsAt, updatedAt: new Date() }).where(eq(pkMatches.id, result.match.id));
       return { matchId: result.match.id, status: "ready", preparation: { estimatedSeconds: 3, message: "題目已建立完成，3 秒後開始自我測驗。" } };
@@ -381,21 +340,18 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const config = await getPkConfig();
       settingsError(config, "quickMatchEnabled");
-      const body = await ctx.json(z.object({ mode: matchMode, questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), teamMode: teamMode.default("solo") }));
-      await assertPkBankAllowed(config, body.questionBankId);
-      const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
-      if (!bank) throw fail("PK_BANK_NOT_FOUND");
+      const body = await ctx.json(z.object({ mode: matchMode, gradeLevel: pkGrade, teamMode: teamMode.default("solo") }));
       if (!config.allowedModes.includes(body.mode)) throw badRequest("這個 PK 模式目前未開放");
       const existing = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"))).limit(1))[0];
       if (existing) return { queue: existing, matched: false, message: "正在尋找對手……" };
       const now = new Date();
-      const rows = await db.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: body.questionBankId, subject: bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
-      const candidate = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.questionBankId, body.questionBankId), eq(pkMatchmakingQueue.difficulty, body.difficulty), lte(pkMatchmakingQueue.questionCount, body.questionCount + 5), gte(pkMatchmakingQueue.questionCount, body.questionCount - 5), sql`${pkMatchmakingQueue.userId} <> ${user.userId}`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
+      const rows = await db.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: "normal", questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
+      const candidate = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), sql`${pkMatchmakingQueue.userId} <> ${user.userId}`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
       if (!candidate) return { queue: rows[0], matched: false, message: "正在尋找對手……" };
       const updated = await db.update(pkMatchmakingQueue).set({ status: "matched" }).where(and(eq(pkMatchmakingQueue.id, candidate.id), eq(pkMatchmakingQueue.status, "waiting"))).returning();
       if (!updated[0]) return { queue: rows[0], matched: false, message: "正在尋找對手……" };
       await db.update(pkMatchmakingQueue).set({ status: "matched" }).where(and(eq(pkMatchmakingQueue.id, rows[0].id), eq(pkMatchmakingQueue.status, "waiting")));
-      const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, questionBankId: body.questionBankId, subject: bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: Math.max(body.questionCount, candidate.questionCount), questionTimeSec: body.questionTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
+      const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: "normal", questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
       await db.insert(pkMatchPlayers).values({ matchId: match.match.id, userId: candidate.userId, optionOrders: await questionOrders(db, match.match.id, candidate.userId) }).onConflictDoNothing();
       await emitMatchEvent(match.match.id, "match_found", null, { matchId: match.match.id, playerCount: 2 });
       return { queue: updated[0], matched: true, matchId: match.match.id, message: "已找到對手！" };
@@ -420,12 +376,9 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const config = await getPkConfig();
       settingsError(config, "customRoomEnabled");
-      const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), questionBankId: z.string().uuid(), grade: z.string().max(40).default(""), unit: z.string().max(80).default(""), difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), questionCount: z.number().int().min(5).max(50).default(10), questionTimeSec: z.number().int().min(5).max(120).default(30), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]) }));
-      await assertPkBankAllowed(config, body.questionBankId);
-      const bank = (await db.select({ subject: questionBanks.subject }).from(questionBanks).where(eq(questionBanks.id, body.questionBankId)).limit(1))[0];
-      if (!bank) throw fail("PK_BANK_NOT_FOUND");
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), gradeLevel: pkGrade, allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]) }));
       if (body.visibility === "private" && !body.password) throw badRequest("私人房間請設定房間密碼，或使用分享連結邀請");
-      const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, questionBankId: body.questionBankId, subject: bank.subject, grade: body.grade, unit: body.unit, difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
+      const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: "normal", questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
       return { match: result.match, room: result.room, shareUrl: `/online-pk?room=${result.room?.shareToken ?? ""}` };
     },
   }),

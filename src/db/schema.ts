@@ -483,6 +483,7 @@ export const questions = pgTable(
     points: integer("points").notNull().default(1),
     status: text("status").notNull().default("draft"),
     level: text("level").notNull().default("junior"),
+    availableForPk: boolean("available_for_pk").notNull().default(true),
     difficulty: text("difficulty").notNull().default("normal"),
     type: text("type").notNull().default("single"), // single | multiple | fill | truefalse | short | reading
     stem: text("stem").notNull(),

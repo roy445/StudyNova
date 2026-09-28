@@ -75,6 +75,7 @@ import { getRegistrationControl } from "../registration";
 import { getPkConfig, normalizePkConfig } from "../pk-config";
 import { finishPkMatch } from "./pk-routes";
 import { publishPkEvent } from "../pk-realtime";
+import { renderCjkHealthPng } from "../image-rendering/renderer";
 
 function validateCustomizationTokens(tokens: Record<string, string>) {
   const allowed = new Set(["primary", "secondary", "accent", "surface", "line", "radius", "shadow", "glow", "buttonRadius", "motion", "pageBackground", "fontSize", "fontWeight", "spacing"]);
@@ -2097,6 +2098,15 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/image-font-health",
+    auth: "admin",
+    handler: async () => {
+      const result = await renderCjkHealthPng();
+      return { health: { ...result, data: undefined }, previewDataUrl: `data:image/png;base64,${result.data.toString("base64")}` };
+    },
+  }),
   route({
     method: "POST",
     path: "/admin/push/test",
