@@ -1970,8 +1970,8 @@ export const routes: RouteDef[] = [
       const matches = await db.select({ match: pkMatches, roomName: pkRooms.name }).from(pkMatches).leftJoin(pkRooms, eq(pkRooms.id, pkMatches.roomId)).orderBy(desc(pkMatches.createdAt)).limit(30);
       const withCounts = [];
       for (const row of matches) {
-        const count = await db.select({ count: sql<number>`count(*)::int` }).from(pkMatchPlayers).where(and(eq(pkMatchPlayers.matchId, row.match.id), eq(pkMatchPlayers.role, "player")));
-        withCounts.push({ ...row.match, roomName: row.roomName ?? null, playerCount: Number(count[0]?.count ?? 0) });
+        const count = await db.select({ role: pkMatchPlayers.role, count: sql<number>`count(*)::int` }).from(pkMatchPlayers).where(eq(pkMatchPlayers.matchId, row.match.id)).groupBy(pkMatchPlayers.role);
+        withCounts.push({ ...row.match, roomName: row.roomName ?? null, playerCount: Number(count.find((item) => item.role === "player")?.count ?? 0), botCount: Number(count.find((item) => item.role === "bot")?.count ?? 0) });
       }
       return { config: await getPkConfig(), stats: { online: Number(online[0]?.count ?? 0), pkOnline: Number(pkOnline[0]?.count ?? 0), waitingRooms: Number(waitingRooms[0]?.count ?? 0), liveMatches: Number(liveMatches[0]?.count ?? 0), matching: Number(matching[0]?.count ?? 0) }, matches: withCounts, anomalies };
     },

@@ -154,7 +154,8 @@ async function addBotOpponent(matchId: string) {
 async function submitBotAnswer(matchId: string, match: typeof pkMatches.$inferSelect, question: PkQuestionRow) {
   const bot = (await db.select().from(pkMatchPlayers).where(and(eq(pkMatchPlayers.matchId, matchId), eq(pkMatchPlayers.role, "bot"))).limit(1))[0];
   if (!bot || bot.answeredCount !== question.orderIndex) return;
-  const correctChance = match.difficulty === "easy" ? 0.72 : match.difficulty === "hard" ? 0.42 : 0.57;
+  const botConfig = await getPkConfig();
+  const correctChance = botConfig.botSkill === "easy" ? 0.42 : botConfig.botSkill === "hard" ? 0.78 : 0.6;
   const isCorrect = Math.random() < correctChance;
   const selectedOption = isCorrect ? question.canonicalAnswer : (question.canonicalOptions.find((option) => normalizePkText(option) !== normalizePkText(question.canonicalAnswer)) ?? question.canonicalAnswer);
   const responseMs = Math.max(500, Math.min(match.questionTimeSec * 1000, 900 + Math.floor(Math.random() * 1800)));
@@ -370,6 +371,7 @@ export const routes: RouteDef[] = [
       const rows = await db.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
       const candidate = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), sql`${pkMatchmakingQueue.userId} <> ${user.userId}`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
       if (!candidate) {
+        if (!config.botEnabled || !config.botFillQuickMatch) return { queue: rows[0], matched: false, message: "目前沒有足夠真人，請稍候或稍後再試。" };
         const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
         await addBotOpponent(match.match.id);
         const startsAt = new Date(Date.now() + 3_000);

@@ -8,6 +8,9 @@ export type PkConfig = {
   friendMatchEnabled: boolean;
   customRoomEnabled: boolean;
   publicArenaEnabled: boolean;
+  botEnabled: boolean;
+  botFillQuickMatch: boolean;
+  botSkill: "easy" | "normal" | "hard";
   allowedModes: string[];
   /** Empty means all non-archived banks for backwards compatibility. */
   allowedBankIds: string[];
@@ -27,6 +30,9 @@ export const DEFAULT_PK_CONFIG: PkConfig = {
   friendMatchEnabled: true,
   customRoomEnabled: true,
   publicArenaEnabled: true,
+  botEnabled: true,
+  botFillQuickMatch: true,
+  botSkill: "normal",
   allowedModes: ["1v1", "2v2", "3v3", "多人"],
   allowedBankIds: [],
   maxPlayers: 12,
@@ -54,6 +60,9 @@ function clampConfig(value: Record<string, unknown>): PkConfig {
     friendMatchEnabled: value.friendMatchEnabled !== false,
     customRoomEnabled: value.customRoomEnabled !== false,
     publicArenaEnabled: value.publicArenaEnabled !== false,
+    botEnabled: value.botEnabled !== false,
+    botFillQuickMatch: value.botFillQuickMatch !== false,
+    botSkill: value.botSkill === "easy" || value.botSkill === "hard" ? value.botSkill : "normal",
     allowedModes: allowed.length ? allowed : DEFAULT_PK_CONFIG.allowedModes,
     allowedBankIds,
     maxPlayers: Math.max(2, Math.min(12, Number(value.maxPlayers ?? DEFAULT_PK_CONFIG.maxPlayers)) || DEFAULT_PK_CONFIG.maxPlayers),
