@@ -145,13 +145,13 @@ Seed 只建立平台初始資料，不會自動授予任何使用者管理員權
 
 開發／單機空資料庫可依目前 schema 執行 `pnpm exec drizzle-kit push`。**不要將通用 `drizzle-kit migrate` 當作本 repository 的 production bootstrap**：舊 SQL migrations 存在重複 numeric prefix，而 checked-in `drizzle/meta` 尚未建立可代表完整歷史的 journal；migration-only 無法由 repository 證明會重建完整 schema。
 
-對已具有 StudyNova 既有基礎 schema 的 production/staging，release pipeline 可使用下列命令套用本專案明列的增量 migrations（0083–0088）：
+對已具有 StudyNova 既有基礎 schema 的 production/staging，release pipeline 可使用下列命令套用本專案明列的增量 migrations（0083–0089）：
 
 ```bash
 DATABASE_URL="$DATABASE_URL" pnpm run db:migrate:release
 ```
 
-此 runner 使用 PostgreSQL advisory lock、逐檔交易和 SHA-256 checksum，成功項目寫入 `studynova_release_migrations`；它**不會**重建全部早期資料表。首次建置或 schema 尚未盤點的環境，先在隔離 staging 依現行完整 schema 建立 baseline 並核驗後再部署；不要直接對 production 執行未知的全量 schema push。Docker runner image 會包含 `drizzle/` 與 release runner，以供獨立 release step 呼叫。
+此 runner 使用 PostgreSQL advisory lock、逐檔交易和 SHA-256 checksum，成功項目寫入 `studynova_release_migrations`；它**不會**重建全部早期資料表。為相容舊版 `focus_sessions` 基礎 schema，runner 會先套用 0089（若缺少則新增 nullable `completed_at`），再執行會調整該欄位的 0088；因此不必手動改已發布的 0088，也不會覆寫已套用 migration checksum。首次建置或 schema 尚未盤點的環境，先在隔離 staging 依現行完整 schema 建立 baseline 並核驗後再部署；不要直接對 production 執行未知的全量 schema push。Docker runner image 會包含 `drizzle/` 與 release runner，以供獨立 release step 呼叫。
 
 首次呼叫 `/api/health` 會執行冪等 seed。Seed 使用 `platform_settings.seed.version` 管理版本，不會覆蓋學生資料或刪除生產資料。`ai_solution` 的正式 permission 也包含在 seed version 10；既有 feature row 只更新顯示名稱，不覆蓋管理員目前設定的額度、啟用狀態或 Nova cost。
 
@@ -164,7 +164,7 @@ DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:migrate:ai-soluti
 DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:check:ai-solution
 ```
 
-`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。此檢查和專用 migration 不會代替基礎 schema 建置；production 不可盲目執行全量 `drizzle-kit push/migrate`。已完成 schema baseline 盤點的環境，依前述 release procedure 套用 0083–0088，再執行本節的 AI solution 專用檢查／migration（若其 migration 尚未套用）。部署啟動後呼叫 `/api/health` 會觸發 seed version 10；seed 失敗時 readiness 會回 HTTP 503。
+`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。此檢查和專用 migration 不會代替基礎 schema 建置；production 不可盲目執行全量 `drizzle-kit push/migrate`。已完成 schema baseline 盤點的環境，依前述 release procedure 套用 0083–0089，再執行本節的 AI solution 專用檢查／migration（若其 migration 尚未套用）。部署啟動後呼叫 `/api/health` 會觸發 seed version 10；seed 失敗時 readiness 會回 HTTP 503。
 
 預期的成功 log 應包含 `feature_permissions` 查詢成功、`ai_solution` permission 已解析，且 `/api/v1/ai/solution/analyze` 的 external provider request 會在 quota preflight 之後出現。若 schema／連線／資料庫權限錯誤，log 會以 `[quota] database failure` 並標示 `schema_migration`、`connection`、`permission_denied` 或 `query_error`，不會偽裝成 permission 缺失。
 

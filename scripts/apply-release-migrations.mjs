@@ -10,6 +10,7 @@ const releaseMigrations = [
   "0086_queue_worker_leases.sql",
   "0087_quiz_history_user_fk_repair.sql",
   "0088_focus_timer_sessions.sql",
+  "0089_focus_sessions_completed_at_repair.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
@@ -31,7 +32,7 @@ try {
     )
   `);
 
-  for (const name of releaseMigrations) {
+  const applyMigration = async (name) => {
     const sql = await readFile(resolve("drizzle", name), "utf8");
     const sha256 = createHash("sha256").update(sql).digest("hex");
     const existing = await client.query("SELECT sha256 FROM studynova_release_migrations WHERE name = $1", [name]);
@@ -40,7 +41,7 @@ try {
         throw new Error(`Applied migration checksum mismatch: ${name}. Restore the original file or add a new migration.`);
       }
       console.log(`Already applied: ${name}`);
-      continue;
+      return;
     }
 
     await client.query("BEGIN");
@@ -53,6 +54,15 @@ try {
       await client.query("ROLLBACK");
       throw new Error(`Failed migration ${name}: ${error instanceof Error ? error.message : "unknown database error"}`);
     }
+  };
+
+  for (const name of releaseMigrations) {
+    // 0088 alters completed_at but older supported baselines may not have it.
+    // Apply the forward-only 0089 repair first, keeping 0088's published checksum unchanged.
+    if (name === "0088_focus_timer_sessions.sql") {
+      await applyMigration("0089_focus_sessions_completed_at_repair.sql");
+    }
+    await applyMigration(name);
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Migration runner failed.");
