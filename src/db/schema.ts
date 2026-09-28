@@ -2691,7 +2691,7 @@ export const pkMatchPlayers = pgTable(
     currentQuestionStartedAt: timestamp("current_question_started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("pk_match_players_uq").on(t.matchId, t.userId), index("pk_match_players_match_idx").on(t.matchId, t.score), index("pk_match_players_presence_idx").on(t.userId, t.connectionState)],
+  (t) => [uniqueIndex("pk_match_players_uq").on(t.matchId, t.userId, t.role), index("pk_match_players_match_idx").on(t.matchId, t.score), index("pk_match_players_presence_idx").on(t.userId, t.connectionState)],
 );
 
 export const pkMatchQuestions = pgTable(
