@@ -24,7 +24,18 @@ const MAX_STRING = 20000;
 const text = (value: unknown, max = MAX_STRING) => typeof value === "string" || typeof value === "number" ? String(value).trim().slice(0, max) : "";
 const first = (row: Record<string, unknown>, keys: string[]) => keys.map((key) => row[key]).find((value) => value !== undefined && value !== null && value !== "");
 const asArray = (value: unknown): string[] => Array.isArray(value) ? value.flatMap((item) => typeof item === "object" && item ? [text((item as Record<string, unknown>).text ?? (item as Record<string, unknown>).label)] : [text(item)]).filter(Boolean).slice(0, 20) : value === undefined || value === null || value === "" ? [] : [text(value)];
-export const questionDedupeKey = (subject: string, stem: string, answer: string[]) => fingerprint(subject, stem, answer.join("|"));
+/**
+ * A question is the same question even when an importer supplies a different
+ * subject label, answer formatting, or question number. Strip those unstable
+ * parts before comparing so duplicates cannot slip into the bank.
+ */
+export const questionContentKey = (stem: string) => fingerprint(
+  stem
+    .replace(/^\s*(?:question\s*)?\(?\d+\)?(?:\s*[.)、:：-]|\s+)\s*/i, "")
+    .replace(/[\s「」『』“”"‘’'.,，。！？!?：:；;（）()【】[\]、]/g, "")
+    .toLocaleLowerCase(),
+);
+export const questionDedupeKey = (_subject: string, stem: string, _answer: string[]) => questionContentKey(stem);
 
 function inferType(row: Record<string, unknown>, options: string[], answer: string[]) {
   const supplied = text(first(row, ["type", "questionType", "kind"])).toLowerCase().replace(/[ -]/g, "_");

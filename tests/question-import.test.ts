@@ -33,4 +33,11 @@ describe("question import normalization", () => {
     expect(result.previews[0].stem).toContain("π");
     expect(result.previews[0].stem).toContain("🚀");
   });
+  it("deduplicates numbering, subject, and answer formatting differences", () => {
+    const result = normalizeQuestionRows([
+      { subject: "英文", question: "1. What is the answer?", answer: "A" },
+      { subject: "其他", question: "(2) What is the answer?", answer: "B" },
+    ]);
+    expect(result.previews[1].status).toBe("DUPLICATE");
+  });
 });
