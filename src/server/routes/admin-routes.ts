@@ -56,6 +56,7 @@ import {
   pkMatchEvents,
   pkMatchQuestions,
   pkMatchPlayers,
+  pkBotProfiles,
   pkMatches,
   pkPresence,
   pkRooms,
@@ -1984,11 +1985,11 @@ export const routes: RouteDef[] = [
       const match = (await db.select().from(pkMatches).where(eq(pkMatches.id, ctx.params.id)).limit(1))[0];
       if (!match) throw notFound("找不到 PK 賽場");
       const [players, questions, events] = await Promise.all([
-        db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId }).from(pkMatchPlayers).innerJoin(users, eq(users.userId, pkMatchPlayers.userId)).where(eq(pkMatchPlayers.matchId, match.id)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score)),
+        db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, match.id)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score)),
         db.select().from(pkMatchQuestions).where(eq(pkMatchQuestions.matchId, match.id)).orderBy(asc(pkMatchQuestions.orderIndex)),
         db.select().from(pkMatchEvents).where(eq(pkMatchEvents.matchId, match.id)).orderBy(desc(pkMatchEvents.sequence)).limit(100),
       ]);
-      return { match, players, questions, events };
+      return { match, players: players.map((row) => ({ ...row, player: { ...row.player, userId: row.player.role === "bot" ? `bot:${row.player.botProfileId ?? row.player.id}` : row.player.userId }, displayName: row.player.role === "bot" ? row.botName ?? "PK Bot" : row.displayName, novaId: row.player.role === "bot" ? `${row.botName ?? "PK-BOT"}-BOT` : row.novaId })), questions, events };
     },
   }),
   route({

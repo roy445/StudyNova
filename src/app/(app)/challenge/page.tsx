@@ -66,6 +66,7 @@ function decorateChallengeWord(word: ChallengeWord, index: number, mode: Challen
 }
 
 function QuizRunner({ title, challengeId, words, direction, difficulty, challengeMode = "choice", timeMode = "standard", onFinish, onExit }: QuizRunnerProps) {
+  const toast = useToast();
   const [index, setIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [startedAt] = useState(() => Date.now());
@@ -114,13 +115,23 @@ function QuizRunner({ title, challengeId, words, direction, difficulty, challeng
   async function choose(answer: string, timedOut = false) {
     if (selected !== null || submitting) return;
     setSelected(answer || "__timeout__");
-    const expected = mode === "part_of_speech" ? current.partOfSpeech : mode === "listening" ? current.word : mode === "semantic_image" ? "語意圖片" : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
-    const isCorrect = !timedOut && (mode === "semantic_image" ? current.semanticOptions?.find((option) => option.id === answer)?.correct === true : answer.trim().toLocaleLowerCase() === expected.trim().toLocaleLowerCase());
+    let expected = mode === "part_of_speech" ? current.partOfSpeech : mode === "listening" ? current.word : mode === "semantic_image" ? "語意圖片" : current.answer ?? (actualDirection === "zh2en" ? current.word : current.meaning);
+    let isCorrect = !timedOut && (mode === "semantic_image" ? current.semanticOptions?.find((option) => option.id === answer)?.correct === true : answer.trim().toLocaleLowerCase() === expected.trim().toLocaleLowerCase());
+    if (challengeId) {
+      try {
+        const verdict = await apiPost<{ isCorrect: boolean; expectedAnswer: string }>(`/challenges/${challengeId}/answer`, { questionIndex: index, correct: isCorrect, response: answer });
+        isCorrect = verdict.isCorrect;
+        expected = verdict.expectedAnswer || expected;
+      } catch (error) {
+        toast.push("error", errorMessage(error));
+        setSelected(null);
+        return;
+      }
+    }
     const nextCorrect = correct + (isCorrect ? 1 : 0);
     const nextRecords = [...records, { number: index + 1, word: current.word, prompt: actualDirection === "zh2en" ? current.meaning : current.word, expected, response: answer, correct: isCorrect, timedOut }];
     setRecords(nextRecords);
     setCorrect(nextCorrect);
-    if (challengeId) void apiPost(`/challenges/${challengeId}/answer`, { questionIndex: index, correct: isCorrect, response: answer });
     if (!isCorrect) {
       const addToWrongBook = timedOut ? false : window.confirm(`答錯了：${current.word}\n要加入錯題本，之後到「學習中心 → 錯題本」複習嗎？`);
       void apiPost("/words/answer", { wordId: current.id, correct: false, mode: "challenge", addToWrongBook });

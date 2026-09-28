@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -327,6 +328,132 @@ export const studyMaterialPages = pgTable(
     objectId: uuid("object_id").references(() => storageObjects.id, { onDelete: "set null" }),
   },
   (t) => [index("mat_pages_idx").on(t.materialId, t.pageNumber)],
+);
+
+export const studyMaterialReadingProgress = pgTable(
+  "study_material_reading_progress",
+  {
+    id: id(),
+    materialId: uuid("material_id").notNull().references(() => studyMaterials.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    currentPage: integer("current_page").notNull().default(1),
+    currentBlockId: uuid("current_block_id"),
+    percent: real("percent").notNull().default(0),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("material_reading_progress_uq").on(t.materialId, t.userId), index("material_reading_progress_user_idx").on(t.userId, t.lastReadAt)],
+);
+
+export const studyMaterialHighlights = pgTable(
+  "study_material_highlights",
+  {
+    id: id(),
+    materialId: uuid("material_id").notNull().references(() => studyMaterials.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    pageNumber: integer("page_number").notNull().default(1),
+    blockId: uuid("block_id"),
+    selectedText: text("selected_text").notNull(),
+    color: text("color").notNull().default("yellow"),
+    note: text("note").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("material_highlights_user_idx").on(t.userId, t.createdAt), index("material_highlights_material_idx").on(t.materialId, t.pageNumber)],
+);
+
+export const contentUnderstandingDocuments = pgTable(
+  "content_understanding_documents",
+  {
+    id: id(),
+    materialId: uuid("material_id").notNull().references(() => studyMaterials.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    status: text("status").notNull().default("queued"), // queued | processing | ready | failed
+    language: text("language").notNull().default("zh-TW"),
+    summary: text("summary").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("content_understanding_material_version_uq").on(t.materialId, t.version), index("content_understanding_user_idx").on(t.userId, t.createdAt)],
+);
+
+export const contentUnderstandingBlocks = pgTable(
+  "content_understanding_blocks",
+  {
+    id: id(),
+    documentId: uuid("document_id").notNull().references(() => contentUnderstandingDocuments.id, { onDelete: "cascade" }),
+    pageNumber: integer("page_number").notNull().default(1),
+    orderIndex: integer("order_index").notNull().default(0),
+    blockType: text("block_type").notNull().default("paragraph"), // title | paragraph | list | table | formula | code | quote
+    headingPath: jsonb("heading_path").$type<string[]>().notNull().default([]),
+    content: text("content").notNull(),
+    plainText: text("plain_text").notNull(),
+    semanticTags: jsonb("semantic_tags").$type<string[]>().notNull().default([]),
+    confidence: real("confidence").notNull().default(0),
+    sourceRef: jsonb("source_ref").$type<Record<string, number | string>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("content_understanding_block_order_uq").on(t.documentId, t.pageNumber, t.orderIndex), index("content_understanding_block_doc_idx").on(t.documentId, t.pageNumber)],
+);
+
+export const contentReadingSegments = pgTable(
+  "content_reading_segments",
+  {
+    id: id(),
+    documentId: uuid("document_id").notNull().references(() => contentUnderstandingDocuments.id, { onDelete: "cascade" }),
+    blockId: uuid("block_id").references(() => contentUnderstandingBlocks.id, { onDelete: "set null" }),
+    orderIndex: integer("order_index").notNull().default(0),
+    text: text("text").notNull(),
+    language: text("language").notNull().default("zh-TW"),
+    pronunciationHints: jsonb("pronunciation_hints").$type<string[]>().notNull().default([]),
+    estimatedSeconds: integer("estimated_seconds").notNull().default(0),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("content_reading_segment_order_uq").on(t.documentId, t.orderIndex), index("content_reading_segment_doc_idx").on(t.documentId, t.orderIndex)],
+);
+
+export const ttsJobs = pgTable(
+  "tts_jobs",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    materialId: uuid("material_id").references(() => studyMaterials.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id").references(() => contentUnderstandingDocuments.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull().default("cosyvoice"),
+    voice: text("voice").notNull().default("default"),
+    language: text("language").notNull().default("zh-TW"),
+    speed: real("speed").notNull().default(1),
+    status: text("status").notNull().default("queued"), // queued | processing | completed | failed | cancelled
+    progress: real("progress").notNull().default(0),
+    idempotencyKey: text("idempotency_key").notNull(),
+    errorCode: text("error_code").notNull().default(""),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("tts_job_idem_uq").on(t.userId, t.idempotencyKey), index("tts_job_user_idx").on(t.userId, t.createdAt), index("tts_job_status_idx").on(t.status, t.updatedAt)],
+);
+
+export const ttsSegments = pgTable(
+  "tts_segments",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => ttsJobs.id, { onDelete: "cascade" }),
+    segmentIndex: integer("segment_index").notNull(),
+    text: text("text").notNull(),
+    status: text("status").notNull().default("queued"),
+    objectId: uuid("object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    durationMs: integer("duration_ms").notNull().default(0),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("tts_segment_order_uq").on(t.jobId, t.segmentIndex), index("tts_segment_job_idx").on(t.jobId, t.status)],
 );
 
 export const ocrDocuments = pgTable(
@@ -816,9 +943,16 @@ export const focusSessions = pgTable(
     minutes: integer("minutes").notNull(),
     reflection: text("reflection").notNull().default(""),
     roomId: uuid("room_id"),
-    completedAt: created(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    plannedMinutes: integer("planned_minutes").notNull().default(0),
+    elapsedSeconds: integer("elapsed_seconds").notNull().default(0),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    status: text("status").notNull().default("completed"),
+    rewardGranted: boolean("reward_granted").notNull().default(true),
+    studyRecorded: boolean("study_recorded").notNull().default(true),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
   },
-  (t) => [index("focus_user_idx").on(t.userId)],
+  (t) => [index("focus_user_idx").on(t.userId), uniqueIndex("focus_one_active_per_user_uq").on(t.userId).where(sql`${t.status} in ('running', 'paused')`)],
 );
 
 /* ---------------------------------------------------------- VOCAB/VOICE */
@@ -1437,6 +1571,7 @@ export const shares = pgTable(
   {
     id: id(),
     userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    artifactId: uuid("artifact_id").references(() => aiArtifacts.id, { onDelete: "set null" }),
     kind: text("kind").notNull(),
     slug: text("slug").notNull(),
     title: text("title").notNull(),
@@ -1445,7 +1580,54 @@ export const shares = pgTable(
     viewCount: integer("view_count").notNull().default(0),
     createdAt: created(),
   },
-  (t) => [uniqueIndex("shares_slug_uq").on(t.slug), index("shares_user_idx").on(t.userId)],
+  (t) => [uniqueIndex("shares_slug_uq").on(t.slug), index("shares_user_idx").on(t.userId), index("shares_artifact_idx").on(t.artifactId)],
+);
+
+export const shareAnalytics = pgTable(
+  "share_analytics",
+  {
+    id: id(),
+    shareId: uuid("share_id").notNull().references(() => shares.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(), // shareCreated | shareOpened | shareCopied | imageDownloaded | contentImported | favoriteAdded
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [index("share_analytics_share_idx").on(t.shareId, t.createdAt), index("share_analytics_event_idx").on(t.eventType, t.createdAt)],
+);
+
+export const shareCopies = pgTable(
+  "share_copies",
+  {
+    id: id(),
+    shareId: uuid("share_id").notNull().references(() => shares.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    copiedKind: text("copied_kind").notNull().default("reference"), // reference | note | material
+    copyId: uuid("copy_id"),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("share_copies_once_uq").on(t.shareId, t.userId), index("share_copies_user_idx").on(t.userId, t.createdAt)],
+);
+
+export const illustrations = pgTable(
+  "illustrations",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    assetUrl: text("asset_url").notNull().default(""),
+    fallbackIcon: text("fallback_icon").notNull().default("✦"),
+    category: text("category").notNull().default("STUDY"),
+    subjects: jsonb("subjects").$type<string[]>().notNull().default([]),
+    keywords: jsonb("keywords").$type<string[]>().notNull().default([]),
+    contentTypes: jsonb("content_types").$type<string[]>().notNull().default([]),
+    style: text("style").notNull().default("Cute Study"),
+    status: text("status").notNull().default("ACTIVE"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    useContexts: jsonb("use_contexts").$type<string[]>().notNull().default(["share", "note", "pdf", "mind_map"]),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("illustrations_name_uq").on(t.name), index("illustrations_status_idx").on(t.status, t.sortOrder), index("illustrations_category_idx").on(t.category)],
 );
 
 export const referrals = pgTable("referrals", {
@@ -2165,6 +2347,7 @@ export const jobQueue = pgTable(
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error").notNull().default(""),
     runAt: timestamp("run_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     createdAt: created(),
   },
@@ -2654,6 +2837,32 @@ export const pkMatches = pgTable(
   (t) => [index("pk_matches_status_idx").on(t.status, t.createdAt), index("pk_matches_owner_idx").on(t.ownerId, t.createdAt), index("pk_matches_live_idx").on(t.status, t.startsAt), index("pk_matches_source_idx").on(t.sourceType, t.sourceId)],
 );
 
+export const pkBotProfiles = pgTable(
+  "pk_bot_profiles",
+  {
+    id: id(),
+    botKey: text("bot_key").notNull(),
+    displayName: text("display_name").notNull(),
+    avatarUrl: text("avatar_url").notNull().default(""),
+    avatarSeed: text("avatar_seed").notNull().default("nova-bot"),
+    personality: text("personality").notNull().default("friendly"),
+    gradeLevels: jsonb("grade_levels").$type<string[]>().notNull().default([]),
+    subjectPreferences: jsonb("subject_preferences").$type<string[]>().notNull().default([]),
+    difficulty: text("difficulty").notNull().default("normal"),
+    accuracy: real("accuracy").notNull().default(0.72),
+    responseMinMs: integer("response_min_ms").notNull().default(850),
+    responseMaxMs: integer("response_max_ms").notNull().default(3200),
+    questionPreferences: jsonb("question_preferences").$type<Record<string, unknown>>().notNull().default({}),
+    winRate: real("win_rate").notNull().default(0),
+    botLevel: integer("bot_level").notNull().default(1),
+    botXp: integer("bot_xp").notNull().default(0),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("pk_bot_profiles_key_uq").on(t.botKey), index("pk_bot_profiles_active_idx").on(t.enabled, t.difficulty)],
+);
+
 export const pkTeams = pgTable(
   "pk_teams",
   {
@@ -2673,7 +2882,8 @@ export const pkMatchPlayers = pgTable(
   {
     id: id(),
     matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "cascade" }),
+    botProfileId: uuid("bot_profile_id").references(() => pkBotProfiles.id, { onDelete: "set null" }),
     teamId: uuid("team_id").references(() => pkTeams.id, { onDelete: "set null" }),
     role: text("role").notNull().default("player"),
     connectionState: text("connection_state").notNull().default("connected"),
@@ -2691,7 +2901,43 @@ export const pkMatchPlayers = pgTable(
     currentQuestionStartedAt: timestamp("current_question_started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("pk_match_players_uq").on(t.matchId, t.userId, t.role), index("pk_match_players_match_idx").on(t.matchId, t.score), index("pk_match_players_presence_idx").on(t.userId, t.connectionState)],
+  (t) => [uniqueIndex("pk_match_players_uq").on(t.matchId, t.userId, t.role), uniqueIndex("pk_match_players_bot_profile_uq").on(t.matchId, t.botProfileId).where(sql`${t.botProfileId} IS NOT NULL`), index("pk_match_players_match_idx").on(t.matchId, t.score), index("pk_match_players_presence_idx").on(t.userId, t.connectionState)],
+);
+
+export const pkBotSessions = pgTable(
+  "pk_bot_sessions",
+  {
+    id: id(),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    playerId: uuid("player_id").notNull().references(() => pkMatchPlayers.id, { onDelete: "cascade" }),
+    botProfileId: uuid("bot_profile_id").notNull().references(() => pkBotProfiles.id, { onDelete: "cascade" }),
+    state: text("state").notNull().default("active"), // active | finished | cancelled
+    lastQuestionIndex: integer("last_question_index").notNull().default(-1),
+    lastActionAt: timestamp("last_action_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("pk_bot_sessions_match_profile_uq").on(t.matchId, t.botProfileId), uniqueIndex("pk_bot_sessions_player_uq").on(t.playerId), index("pk_bot_sessions_state_idx").on(t.state, t.updatedAt)],
+);
+
+export const pkBotJobs = pgTable(
+  "pk_bot_jobs",
+  {
+    id: id(),
+    sessionId: uuid("session_id").notNull().references(() => pkBotSessions.id, { onDelete: "cascade" }),
+    matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    questionIndex: integer("question_index").notNull(),
+    questionId: uuid("question_id"),
+    status: text("status").notNull().default("queued"), // queued | running | completed | failed | cancelled
+    availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+    attempts: integer("attempts").notNull().default(0),
+    idempotencyKey: text("idempotency_key").notNull(),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("pk_bot_jobs_idem_uq").on(t.idempotencyKey), index("pk_bot_jobs_due_idx").on(t.status, t.availableAt), index("pk_bot_jobs_match_idx").on(t.matchId, t.questionIndex)],
 );
 
 export const pkMatchQuestions = pgTable(
@@ -2718,8 +2964,9 @@ export const pkPlayerAnswers = pgTable(
   {
     id: id(),
     matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    playerId: uuid("player_id").references(() => pkMatchPlayers.id, { onDelete: "cascade" }),
     questionId: uuid("question_id").notNull().references(() => pkMatchQuestions.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "cascade" }),
     selectedOption: text("selected_option").notNull(),
     responseMs: integer("response_ms").notNull().default(0),
     isCorrect: boolean("is_correct").notNull().default(false),
@@ -2728,7 +2975,7 @@ export const pkPlayerAnswers = pgTable(
     idempotencyKey: text("idempotency_key").notNull(),
     answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("pk_player_answers_once_uq").on(t.matchId, t.questionId, t.userId), uniqueIndex("pk_player_answers_idem_uq").on(t.idempotencyKey), index("pk_player_answers_match_idx").on(t.matchId, t.answeredAt)],
+  (t) => [uniqueIndex("pk_player_answers_once_uq").on(t.matchId, t.questionId, t.userId), uniqueIndex("pk_player_answers_player_once_uq").on(t.matchId, t.questionId, t.playerId).where(sql`${t.playerId} IS NOT NULL`), uniqueIndex("pk_player_answers_idem_uq").on(t.idempotencyKey), index("pk_player_answers_match_idx").on(t.matchId, t.answeredAt)],
 );
 
 export const pkMatchScores = pgTable(
@@ -2776,7 +3023,7 @@ export const pkMatchmakingQueue = pgTable(
     questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "restrict" }),
     status: text("status").notNull().default("waiting"),
     options: jsonb("options").$type<Record<string, unknown>>().notNull().default({}),
-    joinedAt: created(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },

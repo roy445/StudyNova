@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { legalConsents, legalDocuments, platformSettings, systemLogs, users } from "@/db/schema";
 import { classifyAuditPath, writeAudit } from "./audit";
 import { ensureIdentityGroupSchema } from "./db-compat";
+import { classifyDatabaseError, extractDatabaseDiagnostics } from "./db-diagnostics";
 
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export type AuthMode = "none" | "optional" | "user" | "admin";
@@ -98,6 +99,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/learning-routes"),
     import("./routes/word-detail-routes"),
     import("./routes/content-routes"),
+    import("./routes/reading-routes"),
     import("./routes/ai-routes"),
     import("./routes/social-routes"),
     import("./routes/economy-routes"),
@@ -229,13 +231,24 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
         await writeAudit({ userId: user.userId, eventType: audit.eventType, module: audit.module, action: audit.action, resourceId: params.id, outcome: "failure", errorCategory: err.code, ip, userAgent: req.headers.get("user-agent") ?? "", metadata: { status: err.status, httpStatus: err.status, route: def.path, method: def.method, errorCode: err.code } });
       }
       if (err.status >= 500) {
-        await logSystemError(`api:${def.method} ${def.path}`, err.message, { ip, code: err.code, requestId: err.requestId }, user?.userId ?? null);
+        await logSystemError(`api:${def.method} ${def.path}`, err.message, { ip, code: err.code, requestId: err.requestId, route: def.path, method: def.method, stage: "route_handler" }, user?.userId ?? null);
       }
       return errorResponse(err);
     }
     const requestId = newRequestId();
-    const internal = fail("SYS_INTERNAL", { details: { requestId } });
-    await logSystemError(`api:${def.method} ${def.path}`, safeErrorMessage(err), { ip, code: internal.code, requestId: internal.requestId }, user?.userId ?? null);
+    const database = extractDatabaseDiagnostics(err);
+    const databaseKind = classifyDatabaseError(err);
+    const errorKey = databaseKind === "schema"
+      ? (def.path === "/pk/matchmaking/join" ? "PK_MATCHMAKING_STORAGE_ERROR" : "SYS_DB_SCHEMA_MISMATCH")
+      : databaseKind === "unavailable" ? "SYS_DB_UNAVAILABLE" : "SYS_INTERNAL";
+    const internal = fail(errorKey, { requestId, details: { requestId, stage: `${def.method} ${def.path}` } });
+    // Never persist raw driver messages: Drizzle may include SQL and query parameters.
+    const message = database
+      ? `Database operation failed (${database.code})`
+      : /failed query:/i.test(err instanceof Error ? err.message : String(err))
+        ? "Database operation failed (query omitted)"
+        : safeErrorMessage(err);
+    await logSystemError(`api:${def.method} ${def.path}`, message, { ip, code: internal.code, requestId, route: def.path, method: def.method, stage: "route_handler", ...(database ? { database } : {}) }, user?.userId ?? null);
     return errorResponse(internal);
   }
 }

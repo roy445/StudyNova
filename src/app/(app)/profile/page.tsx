@@ -278,7 +278,7 @@ function ProfileInner() {
                 onClick={async () => {
                   try {
                     await apiPost("/auth/password/change", pwd);
-                    toast.push("success", "密碼已更新");
+                    toast.push("success", "密碼已更新；其他裝置的登入工作階段已登出。");
                     setPwd({ current: "", next: "" });
                   } catch (err) {
                     toast.push("error", errorMessage(err));

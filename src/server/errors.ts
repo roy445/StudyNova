@@ -167,6 +167,7 @@ export const ERROR_CATALOG = {
   PK_BANK_EMPTY: def("SN-PK-9713", 409, "PK", "PK 題庫目前沒有足夠題目", "題庫至少需要 5 題可用題目才能開始 PK。"),
   PK_MATCH_NOT_FOUND: def("SN-PK-9714", 404, "PK", "找不到 PK 賽場", "請重新整理 PK 專區後再試一次。"),
   PK_MATCH_ENDED: def("SN-PK-9715", 409, "PK", "PK 賽場已結束", "請建立新的 PK 賽場。"),
+  PK_MATCHMAKING_STORAGE_ERROR: def("SN-PK-9716", 503, "PK", "真人配對暫時無法使用", "請稍後重新搜尋；若持續發生，請提供錯誤代碼與追蹤編號，管理員可在系統紀錄查看資料庫診斷。"),
 
   /* --------------------------------------------------------- ADMIN 95xx */
   ADMIN_TARGET_PROTECTED: def("SN-ADMIN-9501", 400, "ADMIN", "不能對擁有者執行此操作", "擁有者帳號受到保護。"),
@@ -190,6 +191,7 @@ export const ERROR_CATALOG = {
   /* ----------------------------------------------------------- SYS 99xx */
   SYS_INTERNAL: def("SN-SYS-9901", 500, "SYS", "系統發生錯誤，請稍後再試", "我們已自動記錄這個錯誤，你可以附上錯誤代碼回報問題。"),
   SYS_DB_UNAVAILABLE: def("SN-SYS-9902", 503, "SYS", "資料庫暫時無法連線", "請稍後再試；若持續發生請通知管理員。"),
+  SYS_DB_SCHEMA_MISMATCH: def("SN-SYS-9906", 503, "SYS", "系統資料結構正在同步，這項功能暫時無法使用", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號，管理員可依系統紀錄補齊資料庫 migration。"),
   SERVICE_MAINTENANCE: def("SN-SYS-9905", 503, "SYS", "服務目前暫停中", "請稍後再試。"),
   SYS_NOT_FOUND: def("SN-SYS-9903", 404, "SYS", "找不到資料", "資料可能已被刪除。"),
   SYS_CONFLICT: def("SN-SYS-9904", 409, "SYS", "資料狀態衝突", "請重新整理頁面後再試一次。"),
@@ -237,7 +239,7 @@ export class AppError extends Error {
 }
 
 /** 由代碼目錄建立錯誤 */
-export function fail(key: ErrorKey, override?: { message?: string; hint?: string; details?: unknown }): AppError {
+export function fail(key: ErrorKey, override?: { message?: string; hint?: string; details?: unknown; requestId?: string }): AppError {
   const d = ERROR_CATALOG[key];
   return new AppError({
     status: d.status,
@@ -246,6 +248,7 @@ export function fail(key: ErrorKey, override?: { message?: string; hint?: string
     message: override?.message ?? d.message,
     hint: override?.hint ?? d.hint,
     details: override?.details,
+    requestId: override?.requestId,
   });
 }
 

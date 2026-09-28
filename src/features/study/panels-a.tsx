@@ -7,7 +7,7 @@ import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
-type Material = { id: string; title: string; subject: string; kind: string; status: string; summary: string; content: string; tags: string[]; createdAt: string; visibility: string };
+type Material = { id: string; title: string; subject: string; kind: string; status: string; summary: string; content: string; tags: string[]; createdAt: string; visibility: string; shareSlug?: string | null };
 
 export function MaterialsPanel() {
   const toast = useToast();
@@ -26,6 +26,8 @@ export function MaterialsPanel() {
   const [packageMaterial, setPackageMaterial] = useState<Material | null>(null);
   const [packageSteps, setPackageSteps] = useState<string[]>(["notes", "key_points", "vocabulary", "quiz", "flashcards", "review"]);
   const [learningPackage, setLearningPackage] = useState<{ id: string; status: string; progress: number; currentStep: string; errors: Record<string, string>; selectedSteps: string[] } | null>(null);
+  const [understanding, setUnderstanding] = useState<Record<string, { document: { status: string; summary: string } | null; blocks: Array<{ id: string; blockType: string; plainText: string; headingPath: string[] }>; segments: Array<{ id: string; text: string }> }>>({});
+  const [understandingBusy, setUnderstandingBusy] = useState(false);
   const PACKAGE_STEPS = [{ key: "notes", label: "建立筆記" }, { key: "key_points", label: "建立重點" }, { key: "vocabulary", label: "建立單字卡" }, { key: "quiz", label: "建立測驗" }, { key: "flashcards", label: "建立記憶卡" }, { key: "review", label: "建立複習內容" }];
   const [readingProgress, setReadingProgress] = useState<Record<string, number>>(() => {
     if (typeof window === "undefined") return {};
@@ -40,6 +42,7 @@ export function MaterialsPanel() {
     const next = { ...readingProgress, [materialId]: Math.max(0, Math.min(100, Math.round(value))) };
     setReadingProgress(next);
     window.localStorage.setItem("studynova-reading-progress", JSON.stringify(next));
+    void apiPatch(`/materials/${materialId}/reading-progress`, { currentPage: 1, percent: next[materialId] }).catch(() => undefined);
   }
 
   function addHighlight(materialId: string) {
@@ -48,6 +51,7 @@ export function MaterialsPanel() {
     const next = { ...highlights, [materialId]: Array.from(new Set([...(highlights[materialId] ?? []), text])).slice(-30) };
     setHighlights(next);
     window.localStorage.setItem("studynova-material-highlights", JSON.stringify(next));
+    void apiPost(`/materials/${materialId}/highlights`, { pageNumber: 1, selectedText: text, color: "yellow" }).catch(() => undefined);
     toast.push("success", "已加入閱讀標註");
   }
 
@@ -91,6 +95,32 @@ export function MaterialsPanel() {
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  async function understand(m: Material) {
+    setUnderstandingBusy(true);
+    try {
+      const created = await apiPost<{ job: { id: string } }>(`/materials/${m.id}/understand`, {});
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        const status = await apiGet<{ job: { status: string }; items: Array<{ status: string; errorMessage: string }> }>(`/ai/background-jobs/${created.job.id}`);
+        if (status.items[0]?.status === "completed") {
+          const result = await apiGet<{ document: { status: string; summary: string } | null; blocks: Array<{ id: string; blockType: string; plainText: string; headingPath: string[] }>; segments: Array<{ id: string; text: string }> }>(`/materials/${m.id}/understanding`);
+          setUnderstanding((current) => ({ ...current, [m.id]: result }));
+          toast.push("success", "教材已完成內容理解，可依區塊閱讀與朗讀");
+          return;
+        }
+        if (["failed", "cancelled"].includes(status.job.status)) throw new Error(status.items[0]?.errorMessage || "教材理解失敗");
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+      }
+      throw new Error("教材理解仍在背景處理，請稍後重新開啟");
+    } catch (err) { toast.push("error", errorMessage(err)); } finally { setUnderstandingBusy(false); }
+  }
+
+  async function startTts(m: Material) {
+    try {
+      await apiPost("/tts/jobs", { materialId: m.id, provider: "cosyvoice", voice: "default", language: "zh-TW", speed: 1, idempotencyKey: `material:${m.id}:default` });
+      toast.push("success", "AI 朗讀已排入背景工作；完成後可從朗讀工作查看音檔");
+    } catch (err) { toast.push("error", errorMessage(err)); }
   }
 
   async function startLearningPackage() {
@@ -215,8 +245,9 @@ export function MaterialsPanel() {
                 {detail.summary}
               </div>
             )}
-            <div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="ghost" onClick={() => addHighlight(detail.id)}>標註選取文字</Button><label className="flex min-w-[180px] flex-1 items-center gap-2 text-[11px] text-muted"><span>閱讀進度</span><input type="range" min="0" max="100" value={readingProgress[detail.id] ?? 0} onChange={(e) => saveReadingProgress(detail.id, Number(e.target.value))} className="min-w-0 flex-1" /></label></div>
+            <div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="ghost" onClick={() => addHighlight(detail.id)}>標註選取文字</Button><Button size="sm" variant="ghost" loading={understandingBusy} onClick={() => void understand(detail)}>內容理解</Button><Button size="sm" variant="ghost" onClick={() => void startTts(detail)}>AI 朗讀</Button><label className="flex min-w-[180px] flex-1 items-center gap-2 text-[11px] text-muted"><span>閱讀進度</span><input type="range" min="0" max="100" value={readingProgress[detail.id] ?? 0} onChange={(e) => saveReadingProgress(detail.id, Number(e.target.value))} className="min-w-0 flex-1" /></label></div>
             <div className="max-h-64 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-xl bg-black/25 p-3 text-xs leading-relaxed select-text">{detail.content || "（沒有文字內容）"}</div>
+            {understanding[detail.id]?.blocks?.length ? <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs">{understanding[detail.id].blocks.map((block) => <div key={block.id} className="rounded-lg bg-black/15 p-2"><Badge tone="cyan">{block.blockType}</Badge>{block.headingPath?.length ? <p className="mt-1 text-[10px] text-muted">{block.headingPath.join(" / ")}</p> : null}<p className="mt-1 whitespace-pre-wrap leading-5">{block.plainText}</p></div>)}</div> : null}
             {(highlights[detail.id] ?? []).length > 0 && <div className="glass-soft space-y-1 p-3 text-xs"><p className="font-medium">我的閱讀標註</p>{(highlights[detail.id] ?? []).map((item, index) => <p key={`${item}-${index}`} className="rounded-lg bg-yellow-300/10 p-2 text-yellow-100">{item}</p>)}</div>}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" loading={analyzing} onClick={() => analyze(detail)}>
@@ -227,15 +258,28 @@ export function MaterialsPanel() {
                 variant="ghost"
                 onClick={async () => {
                   const vis = detail.visibility === "private" ? "link" : "private";
-                  await apiPatch(`/materials/${detail.id}`, { visibility: vis });
+                  const result = await apiPatch<{ material: Material }>(`/materials/${detail.id}`, { visibility: vis });
                   toast.push("success", vis === "link" ? "已建立分享連結權限" : "已改為私人");
                   await reload();
-                  setDetail({ ...detail, visibility: vis });
+                  setDetail({ ...detail, visibility: vis, shareSlug: result.material.shareSlug });
                 }}
               >
                 {detail.visibility === "private" ? "設為可分享" : "設為私人"}
               </Button>
             </div>
+            {detail.visibility === "link" && detail.shareSlug && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs">
+                <span className="break-all text-muted">持有此連結的登入使用者可查看</span>
+                <Button size="sm" variant="ghost" onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`${window.location.origin}/materials/shared/${detail.shareSlug}`);
+                    toast.push("success", "教材分享連結已複製");
+                  } catch {
+                    toast.push("error", "無法複製連結，請確認瀏覽器剪貼簿權限");
+                  }
+                }}>複製分享連結</Button>
+              </div>
+            )}
             {analysis && (
               <div className="glass-soft space-y-2 p-3 text-xs">
                 {Array.isArray(analysis.keyPoints) && (

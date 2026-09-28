@@ -168,9 +168,13 @@ export default function GradesPage() {
                   variant="ghost"
                   className="mt-1.5"
                   onClick={async () => {
-                    await apiDelete(`/exams/${e.id}`);
-                    toast.push("success", "已刪除");
-                    await exams.reload();
+                    try {
+                      await apiDelete(`/exams/${e.id}`);
+                      toast.push("success", "已刪除考試");
+                      await exams.reload();
+                    } catch (error) {
+                      toast.push("error", errorMessage(error));
+                    }
                   }}
                 >
                   刪除
@@ -200,8 +204,13 @@ export default function GradesPage() {
                   <button
                     onClick={async () => {
                       if (!confirm("刪除這筆成績？")) return;
-                      await apiDelete(`/grades/${r.id}`);
-                      await grades.reload();
+                      try {
+                        await apiDelete(`/grades/${r.id}`);
+                        toast.push("success", "已刪除成績");
+                        await grades.reload();
+                      } catch (error) {
+                        toast.push("error", errorMessage(error));
+                      }
                     }}
                     className="text-xs text-muted hover:text-rose-300"
                   >

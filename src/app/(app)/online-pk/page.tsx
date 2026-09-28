@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Skeleton, Stat, Tabs, useToast } from "@/components/ui";
-import { apiPost, errorMessage, useApi } from "@/lib/api";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Skeleton, Stat, useToast } from "@/components/ui";
+import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
 
 type PkConfig = {
   enabled: boolean;
@@ -11,6 +11,7 @@ type PkConfig = {
   friendMatchEnabled: boolean;
   customRoomEnabled: boolean;
   publicArenaEnabled: boolean;
+  botEnabled: boolean;
   allowedModes: string[];
   maxPlayers: number;
   minQuestions: number;
@@ -49,6 +50,7 @@ type GradeLevel = "JUNIOR_HIGH" | "SENIOR_HIGH";
 type Difficulty = "easy" | "normal" | "hard";
 type CreateForm = { mode: "1v1" | "2v2" | "3v3" | "多人"; gradeLevel: GradeLevel; difficulty: Difficulty; teamMode: "solo" | "team" };
 const DEFAULT_FORM: CreateForm = { mode: "1v1", gradeLevel: "JUNIOR_HIGH", difficulty: "normal", teamMode: "solo" };
+const MATCHMAKING_STATUSES = ["已加入真人配對佇列", "正在尋找相同條件的真人玩家", "找到對手後會自動進入賽場"] as const;
 
 function randomKey() {
   return window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -79,8 +81,9 @@ function playTone(enabled: boolean, correct: boolean) {
 export default function OnlinePkPage() {
   const toast = useToast();
   const overview = useApi<Overview>("/pk/overview");
+  const setOverviewData = overview.setData;
   const friends = useApi<FriendsResponse>("/friends");
-  const [section, setSection] = useState("quick");
+  const [section, setSection] = useState<"quick" | "bot" | "friends" | "room" | "self">("quick");
   const [form, setForm] = useState<CreateForm>(DEFAULT_FORM);
   const [friendIds, setFriendIds] = useState<string[]>([]);
   const [roomName, setRoomName] = useState("我的 PK 房");
@@ -93,6 +96,7 @@ export default function OnlinePkPage() {
   const [showRanking, setShowRanking] = useState(true);
   const [busy, setBusy] = useState(false);
   const [queueing, setQueueing] = useState(false);
+  const [queueMessage, setQueueMessage] = useState("");
   const [matchId, setMatchId] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchData | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
@@ -108,7 +112,7 @@ export default function OnlinePkPage() {
   const loadMatch = async (id: string) => {
     setMatchLoading(true);
     try {
-      const value = await (await import("@/lib/api")).apiGet<MatchData>(`/pk/matches/${id}`);
+      const value = await apiGet<MatchData>(`/pk/matches/${id}`);
       setMatch(value);
       if (value.match.status === "in_progress" && !questionStartedAt) setQuestionStartedAt(Date.now());
       if (value.match.status === "completed") setQueueing(false);
@@ -126,6 +130,26 @@ export default function OnlinePkPage() {
     }
     return undefined;
   }, [overview.data?.myMatchId, matchId]);
+
+  useEffect(() => {
+    if (!queueing) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const freshOverview = await apiGet<Overview>("/pk/overview", { fresh: true });
+          setOverviewData(() => freshOverview);
+          if (freshOverview.myMatchId) {
+            setMatchId(freshOverview.myMatchId);
+            setQueueing(false);
+            setQueueMessage("");
+          }
+        } catch {
+          // Keep the queue UI available; the next poll or visible error will recover.
+        }
+      })();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [queueing, setOverviewData]);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -185,19 +209,42 @@ export default function OnlinePkPage() {
   const leaderboard = useMemo(() => [...(match?.players ?? [])].filter((player) => player.role === "player").sort((a, b) => b.score - a.score || b.correctCount - a.correctCount), [match?.players]);
   const isHost = Boolean(match && match.room && match.room.hostId === match.me.userId);
 
-  async function quickMatch() {
+  async function quickMatch(restart = false) {
     setBusy(true);
     try {
+      if (restart) await apiPost("/pk/matchmaking/cancel", {});
       const result = await apiPost<{ matched: boolean; matchId?: string; message: string }>("/pk/matchmaking/join", { mode: form.mode, gradeLevel: form.gradeLevel, difficulty: form.difficulty, teamMode: form.teamMode });
-      if (result.matchId) { setMatchId(result.matchId); setQueueing(false); toast.push("success", result.message); }
-      else { setQueueing(true); toast.push("info", result.message); }
+      if (result.matchId) { setMatchId(result.matchId); setQueueing(false); setQueueMessage(""); toast.push("success", result.message); }
+      else { setQueueing(true); setQueueMessage(result.message); toast.push("info", result.message); }
       await overview.reload();
+    } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
+  }
+
+  async function startBotMatch() {
+    setBusy(true);
+    try {
+      const result = await apiPost<{ matchId: string; preparation: { message: string } }>("/pk/bot-match", { mode: form.mode, gradeLevel: form.gradeLevel, difficulty: form.difficulty, teamMode: form.teamMode });
+      setMatchId(result.matchId);
+      setQueueing(false);
+      setQueueMessage("");
+      toast.push("success", result.preparation.message);
+      await overview.reload();
+    } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
+  }
+
+  async function switchToBotMatch() {
+    setBusy(true);
+    try {
+      await apiPost("/pk/matchmaking/cancel", {});
+      setQueueing(false);
+      setQueueMessage("");
+      setSection("bot");
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
 
   async function cancelQueue() {
     setBusy(true);
-    try { await apiPost("/pk/matchmaking/cancel", {}); setQueueing(false); await overview.reload(); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
+    try { await apiPost("/pk/matchmaking/cancel", {}); setQueueing(false); setQueueMessage(""); await overview.reload(); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
 
   async function createRoom() {
@@ -291,9 +338,10 @@ export default function OnlinePkPage() {
 
       {!match && (
         <>
-          {queueing && <MatchmakingScreen gradeLevel={form.gradeLevel} mode={form.mode} onCancel={() => void cancelQueue()} busy={busy} />}
-          <Tabs tabs={[{ key: "quick", label: "⚡ 快速配對" }, { key: "friends", label: "♟ 邀請好友" }, { key: "room", label: "▣ 自訂房間" }, { key: "self", label: "◎ 自我挑戰" }]} active={section} onChange={setSection} />
-          {section === "self" ? <Card title="◎ 自我挑戰" subtitle="系統會從全站統一題目來源自動抽取，不需要選擇題庫。"><div className="space-y-4"><Field label="學段"><div className="grid grid-cols-2 gap-2">{(["JUNIOR_HIGH", "SENIOR_HIGH"] as GradeLevel[]).map((grade) => <button key={grade} type="button" onClick={() => setForm({ ...form, gradeLevel: grade })} className={`rounded-xl border px-3 py-3 text-sm font-semibold ${form.gradeLevel === grade ? "border-[#37d3ff]/70 bg-[#37d3ff]/15 text-[#b9f2ff]" : "border-[var(--line)] bg-white/[.03]"}`}>{grade === "JUNIOR_HIGH" ? "國中" : "高中"}</button>)}</div></Field><Field label="難度"><Select value={form.difficulty} onChange={(event) => setForm({ ...form, difficulty: event.target.value as Difficulty })}><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field><p className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">正式題目會依學段、難度、發布狀態與 PK 開放狀態由伺服器抽取。</p><Button loading={busy} onClick={async () => { setBusy(true); try { const result = await apiPost<{ matchId: string; preparation: { message: string } }>("/pk/self-test", { gradeLevel: form.gradeLevel, difficulty: form.difficulty, questionCount: 10, questionTimeSec: 30 }); setMatchId(result.matchId); toast.push("success", result.preparation.message); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); } }}>開始自我挑戰</Button></div></Card> : <div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]"><Card title={section === "quick" ? "⚡ 快速配對" : section === "friends" ? "♟ 邀請好友 PK" : "▣ 建立自訂房間"} subtitle="只需選擇模式、學段與難度；真人優先，等待不足時由 Nova Bot 補位。"><div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="模式"><Select value={form.mode} onChange={(event) => setForm({ ...form, mode: event.target.value as CreateForm["mode"] })}>{(config?.allowedModes ?? ["1v1"]).map((mode) => <option key={mode} value={mode}>{mode}</option>)}</Select></Field><Field label="學段"><Select value={form.gradeLevel} onChange={(event) => setForm({ ...form, gradeLevel: event.target.value as GradeLevel })}><option value="JUNIOR_HIGH">國中</option><option value="SENIOR_HIGH">高中</option></Select></Field><Field label="難度"><Select value={form.difficulty} onChange={(event) => setForm({ ...form, difficulty: event.target.value as Difficulty })}><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field></div>{section === "quick" && <div className="rounded-2xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">系統會先尋找相同模式、學段與難度的真人；若目前沒有足夠真人，伺服器會以 Nova Bot 補位，不會讓你卡在無限等待。</div>}{section === "friends" && <FriendPicker friends={friends.data?.friends ?? []} selected={friendIds} onChange={setFriendIds} loading={friends.loading} />}{section !== "quick" && <div className="grid gap-3 sm:grid-cols-2"><Field label="房間名稱"><Input value={roomName} onChange={(event) => setRoomName(event.target.value)} maxLength={80} /></Field><Field label="房間人數"><Input type="number" min={2} max={config?.maxPlayers ?? 12} value={roomMaxPlayers} onChange={(event) => setRoomMaxPlayers(Number(event.target.value))} /></Field></div>}{section === "room" && <div className="grid gap-3 sm:grid-cols-2"><Field label="加入現有房間碼"><Input value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase())} placeholder="六碼房間碼" /></Field><Field label="房間密碼"><Input type="password" value={roomPassword} onChange={(event) => setRoomPassword(event.target.value)} placeholder="私人房間密碼" /></Field></div>}{section !== "quick" && <div className="flex flex-wrap gap-2 text-xs"><label className="glass-soft flex items-center gap-2 px-3 py-2"><input type="checkbox" checked={roomPrivate} onChange={(event) => setRoomPrivate(event.target.checked)} className="accent-[#37d3ff]" />私人房間</label><label className="glass-soft flex items-center gap-2 px-3 py-2"><input type="checkbox" checked={allowLateJoin} onChange={(event) => setAllowLateJoin(event.target.checked)} className="accent-[#37d3ff]" />允許遲到加入</label><label className="glass-soft flex items-center gap-2 px-3 py-2"><input type="checkbox" checked={allowSpectators} onChange={(event) => setAllowSpectators(event.target.checked)} className="accent-[#37d3ff]" />允許觀戰</label></div>}<div className="flex flex-wrap gap-2"><Button loading={busy} disabled={Boolean(disableAll) || (section === "friends" && !friendIds.length)} onClick={() => void (section === "quick" ? quickMatch() : createRoom())}>{section === "quick" ? "⚡ 開始快速配對" : section === "friends" ? `建立房間並邀請 ${friendIds.length} 位` : "建立 PK 房間"}</Button>{section === "room" && <Button variant="ghost" loading={busy} onClick={() => void joinRoom()}>加入房間</Button>}{queueing && <Button variant="ghost" loading={busy} onClick={() => void cancelQueue()}>取消配對</Button>}</div></div></Card><SideInfo overview={overview.data} /></div>}
+          {queueing ? <MatchmakingScreen gradeLevel={form.gradeLevel} mode={form.mode} message={queueMessage} onCancel={() => void cancelQueue()} onSearchAgain={() => void quickMatch(true)} onSwitchToBot={() => void switchToBotMatch()} busy={busy} botEnabled={config?.botEnabled ?? false} /> : <>
+            <PkModeNavigation active={section} onChange={setSection} botEnabled={config?.botEnabled ?? false} />
+            {section === "self" ? <Card title="◎ 自我挑戰" subtitle="系統會從全站統一題目來源自動抽取，不需要選擇題庫。"><div className="space-y-4"><Field label="學段"><div className="grid grid-cols-2 gap-2">{(["JUNIOR_HIGH", "SENIOR_HIGH"] as GradeLevel[]).map((grade) => <button key={grade} type="button" onClick={() => setForm({ ...form, gradeLevel: grade })} className={`rounded-xl border px-3 py-3 text-sm font-semibold ${form.gradeLevel === grade ? "border-[#37d3ff]/70 bg-[#37d3ff]/15 text-[#b9f2ff]" : "border-[var(--line)] bg-white/[.03]"}`}>{grade === "JUNIOR_HIGH" ? "國中" : "高中"}</button>)}</div></Field><Field label="難度"><Select value={form.difficulty} onChange={(event) => setForm({ ...form, difficulty: event.target.value as Difficulty })}><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field><p className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">正式題目會依學段、難度、發布狀態與 PK 開放狀態由伺服器抽取。</p><Button loading={busy} onClick={async () => { setBusy(true); try { const result = await apiPost<{ matchId: string; preparation: { message: string } }>("/pk/self-test", { gradeLevel: form.gradeLevel, difficulty: form.difficulty, questionCount: 10, questionTimeSec: 30 }); setMatchId(result.matchId); toast.push("success", result.preparation.message); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); } }}>開始自我挑戰</Button></div></Card> : <div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]"><Card title={section === "quick" ? "真人配對" : section === "bot" ? "獨立人機對戰" : section === "friends" ? "邀請好友 PK" : "建立自訂房間"} subtitle={section === "quick" ? "只搜尋符合條件的真人玩家；真人與 Bot 對戰完全分開。" : section === "bot" ? "直接建立獨立人機對戰，不會佔用或偽裝成真人配對。" : section === "friends" ? "建立好友專屬賽場，邀請指定同學一起 PK。" : "設定房間規則後，分享房間碼邀請玩家。"}><div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="模式"><Select value={form.mode} onChange={(event) => setForm({ ...form, mode: event.target.value as CreateForm["mode"] })}>{(config?.allowedModes ?? ["1v1"]).map((mode) => <option key={mode} value={mode}>{mode}</option>)}</Select></Field><Field label="學段"><Select value={form.gradeLevel} onChange={(event) => setForm({ ...form, gradeLevel: event.target.value as GradeLevel })}><option value="JUNIOR_HIGH">國中</option><option value="SENIOR_HIGH">高中</option></Select></Field><Field label="難度"><Select value={form.difficulty} onChange={(event) => setForm({ ...form, difficulty: event.target.value as Difficulty })}><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field></div>{section === "quick" && <div className="rounded-2xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">真人配對只會匹配真實玩家，不會自動加入 Bot。若目前人數不足，你可以重新搜尋或切換到獨立的人機對戰。</div>}{section === "bot" && <div className="rounded-2xl border border-violet-300/20 bg-violet-300/5 p-3 text-xs leading-5 text-muted">每場 Bot 對戰都使用獨立的比賽與 Bot 狀態；Bot 不會建立或登入 users 帳號，也不會出現在真人配對名單。</div>}{section === "friends" && <FriendPicker friends={friends.data?.friends ?? []} selected={friendIds} onChange={setFriendIds} loading={friends.loading} />}{(section === "friends" || section === "room") && <div className="grid gap-3 sm:grid-cols-2"><Field label="房間名稱"><Input value={roomName} onChange={(event) => setRoomName(event.target.value)} maxLength={80} /></Field><Field label="房間人數"><Input type="number" min={2} max={config?.maxPlayers ?? 12} value={roomMaxPlayers} onChange={(event) => setRoomMaxPlayers(Number(event.target.value))} /></Field></div>}{section === "room" && <div className="grid gap-3 sm:grid-cols-2"><Field label="加入現有房間碼"><Input value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase())} placeholder="六碼房間碼" /></Field><Field label="房間密碼"><Input type="password" value={roomPassword} onChange={(event) => setRoomPassword(event.target.value)} placeholder="私人房間密碼" /></Field></div>}{(section === "friends" || section === "room") && <div className="flex flex-wrap gap-2 text-xs"><label className="glass-soft flex items-center gap-2 px-3 py-2"><input type="checkbox" checked={roomPrivate} onChange={(event) => setRoomPrivate(event.target.checked)} className="accent-[#37d3ff]" />私人房間</label><label className="glass-soft flex items-center gap-2 px-3 py-2"><input type="checkbox" checked={allowLateJoin} onChange={(event) => setAllowLateJoin(event.target.checked)} className="accent-[#37d3ff]" />允許遲到加入</label><label className="glass-soft flex items-center gap-2 px-3 py-2"><input type="checkbox" checked={allowSpectators} onChange={(event) => setAllowSpectators(event.target.checked)} className="accent-[#37d3ff]" />允許觀戰</label></div>}<div className="flex flex-wrap gap-2"><Button loading={busy} disabled={Boolean(disableAll) || (section === "friends" && !friendIds.length) || (section === "bot" && config?.botEnabled === false)} onClick={() => void (section === "quick" ? quickMatch() : section === "bot" ? startBotMatch() : createRoom())}>{section === "quick" ? "搜尋真人對手" : section === "bot" ? "開始人機對戰" : section === "friends" ? `建立房間並邀請 ${friendIds.length} 位` : "建立 PK 房間"}</Button>{section === "room" && <Button variant="ghost" loading={busy} onClick={() => void joinRoom()}>加入房間</Button>}</div></div></Card><SideInfo overview={overview.data} /></div>}
+          </>}
         </>
       )}
 
@@ -303,11 +351,26 @@ export default function OnlinePkPage() {
   );
 }
 
-function MatchmakingScreen({ gradeLevel, mode, onCancel, busy }: { gradeLevel: GradeLevel; mode: string; onCancel: () => void; busy: boolean }) {
+function MatchmakingScreen({ gradeLevel, mode, message, onCancel, onSearchAgain, onSwitchToBot, busy, botEnabled }: { gradeLevel: GradeLevel; mode: string; message: string; onCancel: () => void; onSearchAgain: () => void; onSwitchToBot: () => void; busy: boolean; botEnabled: boolean }) {
   const [statusIndex, setStatusIndex] = useState(0);
-  const statuses = ["正在尋找對手", "正在掃描線上玩家", "正在等待相同學段的玩家", "正在建立比賽"];
-  useEffect(() => { const timer = window.setInterval(() => setStatusIndex((index) => (index + 1) % statuses.length), 1800); return () => window.clearInterval(timer); }, [statuses.length]);
-  return <Card title="⚡ 正在配對" subtitle={`${gradeLevel === "JUNIOR_HIGH" ? "國中" : "高中"} · ${mode}`}><div className="relative flex min-h-[330px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-[#37d3ff]/20 bg-[radial-gradient(circle_at_center,rgba(55,211,255,.12),transparent_55%)] p-8 text-center"><div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0%,rgba(125,211,252,.08)_48%,transparent_52%)] bg-[length:100%_180px] animate-[scan_3s_linear_infinite]" /><div className="relative flex h-36 w-36 items-center justify-center"><span className="absolute inset-0 rounded-full border border-[#37d3ff]/30 animate-ping" /><span className="absolute inset-3 rounded-full border border-[#a78bfa]/40 animate-[ping_2.4s_ease-in-out_infinite]" /><span className="absolute inset-7 rounded-full border border-[#f472b6]/35 animate-[ping_3.2s_ease-in-out_infinite]" /><div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-4xl shadow-[0_0_60px_rgba(55,211,255,.35)]">⚡</div></div><p className="relative mt-7 text-xl font-black text-[#dff9ff]">{statuses[statusIndex]}……</p><p className="relative mt-2 text-sm text-muted">題目將由全站統一題目來源自動抽取</p><Button className="relative mt-6" variant="ghost" loading={busy} onClick={onCancel}>取消配對</Button></div></Card>;
+  const noPlayers = message.includes("沒有足夠真人");
+  useEffect(() => {
+    if (noPlayers) return;
+    const timer = window.setInterval(() => setStatusIndex((index) => (index + 1) % MATCHMAKING_STATUSES.length), 2500);
+    return () => window.clearInterval(timer);
+  }, [noPlayers]);
+  return <Card title={noPlayers ? "目前沒有足夠的真人玩家" : "正在尋找真人對手"} subtitle={`${gradeLevel === "JUNIOR_HIGH" ? "國中" : "高中"} · ${mode} · 真人配對`}><div className="flex flex-col gap-4 rounded-2xl border border-[#37d3ff]/20 bg-[radial-gradient(circle_at_top,rgba(55,211,255,.10),transparent_65%)] p-5 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-[#37d3ff]" /><p className="font-semibold text-[#dff9ff]">{noPlayers ? "真人配對仍開放搜尋" : MATCHMAKING_STATUSES[statusIndex]}</p></div><p className="mt-1 text-sm leading-6 text-muted">{noPlayers ? "不會自動改成 Bot 對戰。你可以再搜一次，或自行選擇人機對戰。" : "配對成功後會自動進入賽場；這裡只會匹配真人玩家。"}</p></div><div className="flex shrink-0 flex-wrap gap-2"><Button size="sm" variant="outline" onClick={onSearchAgain} loading={busy}>重新搜尋</Button><Button size="sm" disabled={!botEnabled} onClick={onSwitchToBot} loading={busy}>改成人機對戰</Button><Button size="sm" variant="ghost" onClick={onCancel} loading={busy}>取消</Button></div></div></Card>;
+}
+
+function PkModeNavigation({ active, onChange, botEnabled }: { active: "quick" | "bot" | "friends" | "room" | "self"; onChange: (key: "quick" | "bot" | "friends" | "room" | "self") => void; botEnabled: boolean }) {
+  const items = [
+    { key: "quick" as const, title: "真人配對", detail: "搜尋在線玩家", icon: "◉" },
+    { key: "bot" as const, title: "人機對戰", detail: botEnabled ? "獨立 Bot 賽場" : "目前暫停", icon: "◇" },
+    { key: "friends" as const, title: "邀請好友", detail: "指定同學一起玩", icon: "♧" },
+    { key: "room" as const, title: "自訂房間", detail: "自行設定規則", icon: "▦" },
+    { key: "self" as const, title: "自我挑戰", detail: "單人練習", icon: "◎" },
+  ];
+  return <div role="tablist" aria-label="PK 對戰模式" className="rounded-2xl border border-white/10 bg-[#091222]/80 p-1.5 shadow-[0_8px_30px_rgba(0,0,0,.18)]"><div className="no-scrollbar flex gap-1 overflow-x-auto">{items.map((item) => <button key={item.key} type="button" role="tab" aria-selected={active === item.key} onClick={() => onChange(item.key)} className={`focus-ring flex min-w-[125px] flex-1 items-center gap-2 rounded-xl px-3 py-2.5 text-left transition sm:min-w-0 ${active === item.key ? "border border-[#37d3ff]/35 bg-[#37d3ff]/10 text-white shadow-[inset_0_0_20px_rgba(55,211,255,.07)]" : "border border-transparent text-muted hover:bg-white/[.04] hover:text-white"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-base ${active === item.key ? "bg-[#37d3ff]/15 text-[#7dd3fc]" : "bg-white/[.04]"}`}>{item.icon}</span><span className="min-w-0"><span className="block whitespace-nowrap text-xs font-semibold sm:text-sm">{item.title}</span><span className="mt-0.5 block whitespace-nowrap text-[10px] text-muted">{item.detail}</span></span></button>)}</div></div>;
 }
 
 function FriendPicker({ friends, selected, onChange, loading }: { friends: Friend[]; selected: string[]; onChange: (ids: string[]) => void; loading: boolean }) {

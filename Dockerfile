@@ -21,6 +21,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/drizzle.config.json ./drizzle.config.json
 COPY --from=builder /app/src/db ./src/db
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/scripts/apply-release-migrations.mjs ./scripts/apply-release-migrations.mjs
 USER nextjs
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1

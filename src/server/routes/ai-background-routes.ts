@@ -11,7 +11,7 @@ const itemSchema = z.record(z.string(), z.unknown());
 const createSchema = z.object({
   kind: z.string().trim().min(1).max(80),
   feature: z.string().trim().min(1).max(120),
-  items: z.array(itemSchema).min(1).max(100_000),
+  items: z.array(itemSchema).min(1).max(1_000),
   batchSize: z.number().int().min(1).max(100).optional(),
   idempotencyKey: z.string().trim().min(1).max(240),
   input: z.record(z.string(), z.unknown()).optional(),
@@ -27,7 +27,7 @@ async function enqueue(jobId: string, runAt?: Date | null) {
 
 export const routes = [
   route({
-    method: "POST", path: "/ai/background-jobs", auth: "user", rate: { limit: 10, windowSec: 3600 },
+    method: "POST", path: "/ai/background-jobs", auth: "admin", rate: { limit: 40, windowSec: 3600 },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(createSchema);

@@ -20,7 +20,8 @@ export async function GET() {
       const res = await ensureSeeded();
       checks.seed = res.seeded ? "applied" : "ready";
     } catch {
-      checks.seed = "pending";
+      checks.seed = "error";
+      ok = false;
     }
   }
   return Response.json(

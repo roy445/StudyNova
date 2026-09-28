@@ -51,6 +51,10 @@ Header: x-cron-secret: <CRON_SECRET>
 
 需要在外部排程器設定呼叫，例如 GitHub Actions、Vercel Cron、Cloud Scheduler、crontab 或 VPS systemd timer。`CRON_SECRET` 必須與外部排程器使用的 secret 相同。實際任務清單可在管理後台 Cron 分頁查看。
 
+**背景工作的必要設定：**若部署環境沒有常駐 worker（例如 Vercel serverless），請每分鐘呼叫一次 `task=queue_drain`，並傳送相同的 `x-cron-secret`。這會處理到期的 PostgreSQL queue 工作，包括延遲 PK Bot 回合、AI 背景工作與朗讀片段；只呼叫每日提醒等低頻任務，不能保證這些工作及時執行。不要把 `CRON_SECRET` 放在 URL query string 或 client bundle。
+
+`drizzle/0086_queue_worker_leases.sql` 為 queue 加上 `started_at` lease；部署 crash recovery 程式碼前先套用此 migration，逾時且仍標記 `running` 的工作才會被安全回收。
+
 ## 三、環境變數
 
 ### 必填
@@ -61,6 +65,7 @@ Header: x-cron-secret: <CRON_SECRET>
 | `SESSION_SECRET` | HttpOnly session、簽名與部分私有資源所需的長隨機密鑰 | PowerShell RNG 指令（見下方） |
 | `APP_URL` | 公開網站 URL；AI provider referer、重設密碼與分享連結使用 | `https://studynova.example.com` |
 | `NODE_ENV` | 正式環境設為 `production` | `production` |
+| `TTS_REQUEST_TIMEOUT_MS` | 外部 TTS worker 單段請求逾時上限（5 秒至 5 分鐘；預設 120 秒） | `120000` |
 
 ### AI（Gemini-only 建議設定 1～3 組）
 
@@ -78,9 +83,9 @@ Header: x-cron-secret: <CRON_SECRET>
 
 | 變數 | 必填性 | 說明 |
 |---|---|---|
-| `REDIS_URL` | 選填 | 設定後使用 Redis + BullMQ；未設定時自動使用 PostgreSQL queue adapter |
+| `REDIS_URL` | 不需要 | 本版本背景工作使用 PostgreSQL `job_queue`；設定此變數不會啟用 Redis/BullMQ consumer |
 
-正式環境若有較多背景工作、OCR、AI 與週期任務，建議設定 Redis，例如 `redis://:password@host:6379/0`。
+正式環境需設定每分鐘觸發的 `queue_drain` cron，否則 PostgreSQL queue 中的 PK Bot、AI 與 TTS 工作不會及時執行。未來若部署獨立 Redis worker，需先部署實際 consumer 並確認 adapter/worker 協定後才設定 Redis。
 
 ### Object Storage
 
@@ -132,24 +137,21 @@ pnpm exec drizzle-kit push
 
 Seed 只建立平台初始資料，不會自動授予任何使用者管理員權限。所有新註冊帳號一律是 `student`。請在 Neon SQL Editor 執行 `database/admin-role.sql`：先查詢使用者，再明確將指定帳號更新為 `admin` 或 `owner`。
 
-### 必要服務
+### 必要服務與資料庫 schema 部署
 
-- **PostgreSQL 14 以上**；你的 Neon database 直接符合需求。
+- **PostgreSQL 14 以上**；Neon database 符合需求。
 - Drizzle ORM 連線透過 `DATABASE_URL` 建立 connection pool。
-- 必須先執行 schema 同步，再啟動正式服務。
+- 必須先完成 schema 部署，再啟動使用新欄位的程式碼。
 
-開發／單機：
+開發／單機空資料庫可依目前 schema 執行 `pnpm exec drizzle-kit push`。**不要將通用 `drizzle-kit migrate` 當作本 repository 的 production bootstrap**：舊 SQL migrations 存在重複 numeric prefix，而 checked-in `drizzle/meta` 尚未建立可代表完整歷史的 journal；migration-only 無法由 repository 證明會重建完整 schema。
 
-```bash
-npx drizzle-kit push
-```
-
-正式環境建議：
+對已具有 StudyNova 既有基礎 schema 的 production/staging，release pipeline 可使用下列命令套用本專案明列的增量 migrations（0083–0088）：
 
 ```bash
-npx drizzle-kit generate
-npx drizzle-kit migrate
+DATABASE_URL="$DATABASE_URL" pnpm run db:migrate:release
 ```
+
+此 runner 使用 PostgreSQL advisory lock、逐檔交易和 SHA-256 checksum，成功項目寫入 `studynova_release_migrations`；它**不會**重建全部早期資料表。首次建置或 schema 尚未盤點的環境，先在隔離 staging 依現行完整 schema 建立 baseline 並核驗後再部署；不要直接對 production 執行未知的全量 schema push。Docker runner image 會包含 `drizzle/` 與 release runner，以供獨立 release step 呼叫。
 
 首次呼叫 `/api/health` 會執行冪等 seed。Seed 使用 `platform_settings.seed.version` 管理版本，不會覆蓋學生資料或刪除生產資料。`ai_solution` 的正式 permission 也包含在 seed version 10；既有 feature row 只更新顯示名稱，不覆蓋管理員目前設定的額度、啟用狀態或 Nova cost。
 
@@ -162,7 +164,7 @@ DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:migrate:ai-soluti
 DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:check:ai-solution
 ```
 
-`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。若 production 尚未套用完整 schema，先執行既有的 `pnpm exec drizzle-kit push` 或正式的 `pnpm exec drizzle-kit migrate`，再執行上述 0042 migration。部署啟動後呼叫 `/api/health` 會觸發 seed version 10；也可依部署平台的 release hook 執行相同 seed 流程。
+`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。此檢查和專用 migration 不會代替基礎 schema 建置；production 不可盲目執行全量 `drizzle-kit push/migrate`。已完成 schema baseline 盤點的環境，依前述 release procedure 套用 0083–0088，再執行本節的 AI solution 專用檢查／migration（若其 migration 尚未套用）。部署啟動後呼叫 `/api/health` 會觸發 seed version 10；seed 失敗時 readiness 會回 HTTP 503。
 
 預期的成功 log 應包含 `feature_permissions` 查詢成功、`ai_solution` permission 已解析，且 `/api/v1/ai/solution/analyze` 的 external provider request 會在 quota preflight 之後出現。若 schema／連線／資料庫權限錯誤，log 會以 `[quota] database failure` 並標示 `schema_migration`、`connection`、`permission_denied` 或 `query_error`，不會偽裝成 permission 缺失。
 
@@ -236,7 +238,8 @@ OPENAI_MODEL=gpt-4.1-mini
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
 
-REDIS_URL=redis://:<redis-password>@<redis-host>:6379/0
+# 不需要 Redis：本版本使用 PostgreSQL job_queue + queue_drain cron
+REDIS_URL=
 
 S3_ENDPOINT=https://<s3-compatible-endpoint>
 S3_REGION=auto
@@ -266,11 +269,11 @@ EMAIL_FROM=StudyNova <your-gmail-address>
 | Service | 預設位置 | 用途 |
 |---|---|---|
 | `db` | `postgresql://postgres:postgres@db:5432/studynova` | PostgreSQL 16 |
-| `redis` | `redis://redis:6379` | Redis 7 + BullMQ |
+| `redis` | `redis://redis:6379` | 僅供其他本機開發服務使用；StudyNova job queue 不依賴它 |
 | `minio` | `http://localhost:9000`、Console `http://localhost:9001` | S3 相容物件儲存 |
 | `app` | `http://localhost:3000` | StudyNova Next.js app |
 
-如果採用 Neon 部署，Compose 中的 `db`、`redis`、`minio` 都可以不啟動；只需把 `DATABASE_URL` 指向 Neon。若未設定 `REDIS_URL`，StudyNova 會使用 PostgreSQL queue adapter。若未設定 S3 組合，檔案會暫存於 Neon PostgreSQL 的 bytea 欄位，正式環境仍建議另接 R2 或其他 S3 相容儲存。
+如果採用 Neon 部署，Compose 中的 `db`、`redis`、`minio` 都可以不啟動；只需把 `DATABASE_URL` 指向 Neon。StudyNova job queue 一律使用 PostgreSQL，並需配置 `queue_drain` cron。若未設定 S3 組合，檔案會暫存於 Neon PostgreSQL 的 bytea 欄位，正式環境仍建議另接 R2 或其他 S3 相容儲存。
 
 ## 詞庫匯入
 

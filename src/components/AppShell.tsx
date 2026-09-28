@@ -41,29 +41,19 @@ const NAV: NavItem[] = [
 ];
 
   const PAGE_PROMPTS: Record<string, string> = {
-  "/dashboard": "如果今天不知道要做什麼，不妨參考看看：單字、小知識或讀書計畫都可以，照你的步調就好。",
-  "/study": "需要我陪你複習錯題、練單字，或安排一段專注時間嗎？",
-  "/weekly": "這裡可以查看每週小考、單字與解析；要不要先看看本週重點？",
-  "/challenge": "想和好友比一場嗎？可以選每日單字或已開放的每週小考。",
-  "/online-pk": "準備好和真實對手比速度與正確率了嗎？答案由伺服器驗證，放心專注在下一題。",
-  "/grades": "我可以幫你看成績趨勢，找出下一個最值得補強的科目。",
-  "/ai": "把題目或不懂的地方交給我，我可以用更有趣的方式拆解。",
-  "/solve": "其他科目的題目也可以帶到解題專區，我會陪你一步一步看。",
-  "/profile": "要調整 Novi、學習設定或查看 PRO 身分嗎？我可以陪你一起設定。",
+  "/dashboard": "首頁：今日摘要、任務與學習入口。",
+  "/study": "學習中心：教材、單字、錯題與專注紀錄。",
+  "/weekly": "每週小考、題目與解析。",
+  "/challenge": "好友挑戰與活動入口。",
+  "/online-pk": "真人配對、Bot 練習、好友房間與自我挑戰。",
+  "/grades": "成績紀錄、趨勢與目標。",
+  "/ai": "輸入問題或上傳內容開始 AI 分析。",
+  "/solve": "輸入題目文字或上傳題目圖片。",
+  "/profile": "帳號、學習設定與會員資訊。",
 };
 
-const ENCOURAGEMENTS: Array<{ text: string; state: NoviState }> = [
-  { text: "慢慢來也沒關係，今天完成一小步，就是在變強。", state: "cheer" },
-  { text: "你不需要一次做到完美，只要比昨天多理解一點。", state: "happy" },
-  { text: "把現在的專注留給眼前這一題，答案會一步一步清楚。", state: "thinking" },
-  { text: "每一次回想，都是在替記憶鋪一條更穩的路。", state: "remind" },
-  { text: "相信累積的力量，你正在成為更好的自己。", state: "success" },
-  { text: "千里之行，始於足下。先完成眼前這一步，Novi 陪你一起走。", state: "cheer" },
-  { text: "學而不思則罔，思而不學則殆。今天也留一點時間動手練習吧。", state: "remind" },
-];
-
 const NOVI_MODES = [
-  { key: "teacher", label: "學習教練", description: "陪你規劃學習、拆解觀念，讓今天先完成一小步。" },
+  { key: "teacher", label: "學習教練", description: "規劃學習順序並拆解觀念。" },
   { key: "solve", label: "解題模式", description: "一步一步分析題目，不直接跳到答案。" },
   { key: "hint", label: "提示模式", description: "只給剛剛好的提示，保留你自己思考的空間。" },
   { key: "exam", label: "考試模式", description: "用考試節奏練習，先作答再看解析。" },
@@ -130,7 +120,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const pathname = usePathname();
   const router = useRouter();
   const featureKey = Object.entries(FEATURE_BY_PATH).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "all";
-  const pagePrompt = Object.entries(PAGE_PROMPTS).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "需要我協助你完成目前這一步嗎？";
+  const pagePrompt = Object.entries(PAGE_PROMPTS).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "選擇一項功能，或在下方輸入問題。";
   const toast = useToast();
   const [noviOpen, setNoviOpen] = useState(false);
   const [noviMinimized, setNoviMinimized] = useState(false);
@@ -142,7 +132,6 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const [noviState, setNoviState] = useState<NoviState>("idle");
   const [advice, setAdvice] = useState<string>("");
   const [adviceLoading, setAdviceLoading] = useState(false);
-  const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [updateApplying, setUpdateApplying] = useState(false);
@@ -268,30 +257,6 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     return () => window.clearTimeout(timer);
   }, [usageRules, markUsageRulesRead]);
 
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const schedule = (delay: number) => {
-      timer = setTimeout(() => {
-        if (cancelled) return;
-        const next = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
-        setEncouragement(next);
-        setNoviState(next.state);
-        timer = setTimeout(() => {
-          if (cancelled) return;
-          setEncouragement(null);
-          setNoviState("idle");
-          schedule(45_000 + Math.random() * 75_000);
-        }, 9_000);
-      }, delay);
-    };
-    schedule(25_000 + Math.random() * 45_000);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, []);
-
   const touchNovi = useCallback(() => {
     setNoviMinimized(false);
     setNoviOpen(true);
@@ -303,7 +268,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       setNoviMinimized(true);
     }, 90_000);
     return () => window.clearTimeout(timer);
-  }, [noviOpen, quickChatReply, advice, encouragement]);
+  }, [noviOpen, quickChatReply, advice]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
@@ -635,12 +600,6 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
 
       {/* Novi dock */}
       <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5">
-        {!noviOpen && encouragement && (
-          <button type="button" onClick={() => setNoviOpen(true)} className="glass anim-pop max-w-[min(82vw,300px)] p-3 text-left text-xs leading-relaxed text-[#e8edff] shadow-[0_0_28px_rgba(55,211,255,0.18)]">
-            <span className="mb-1 block text-[10px] font-semibold tracking-wider text-[#37d3ff]">Novi 給你的話</span>
-            {encouragement.text}
-          </button>
-        )}
         {noviOpen && (
           <div className="glass novi-mobile-panel anim-pop w-[min(92vw,340px)] p-3">
             <div className="flex items-start gap-2">
@@ -648,7 +607,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Novi 小助理</p>
                 <p className="text-[11px] text-muted">Lv.{level}・你的專屬 AI 學習夥伴</p>
-                {!encouragement && <p className="mt-1 text-[11px] text-[#7dd3fc]">{pagePrompt}</p>}
+                <p className="mt-1 text-[11px] text-[#7dd3fc]">{pagePrompt}</p>
               </div>
               <button onClick={() => setNoviOpen(false)} aria-label="收起 Novi" className="focus-ring rounded-lg px-1.5 text-muted hover:bg-white/10">
                 ✕
@@ -669,7 +628,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
               </div>
             </div>
             <div className="mt-2 max-h-40 overflow-y-auto scroll-thin rounded-xl bg-black/25 p-2.5 text-xs leading-relaxed">
-              {adviceLoading ? <Skeleton lines={2} /> : encouragement?.text || advice || pagePrompt || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
+              {adviceLoading ? <Skeleton lines={2} /> : advice || pagePrompt || summary.data?.greeting || "請輸入問題，或選擇下方功能。"}
             </div>
             <div role="menu" aria-label="Novi 快速功能" className="mt-2 grid grid-cols-2 gap-1.5">
               <Button size="sm" variant="ghost" onClick={() => askQuick("today_advice")}>
@@ -715,8 +674,8 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
               >
                 －
               </button>
-              <button onClick={() => { touchNovi(); setQuickChatReply((current) => current || "嗨！點下面的輸入框就能直接和我聊天。你不一定要完美，我們先完成下一步。\n\n我會固定在右下角，方便你隨時找到我。 "); }} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
-                <NoviAvatar size={58} state={encouragement?.state ?? (noviOpen ? "happy" : "idle")} level={level} />
+              <button onClick={() => { touchNovi(); setQuickChatReply((current) => current || "請在下方輸入問題，也可以使用今日建議、弱點分析或最近錯題功能。"); }} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
+                <NoviAvatar size={58} state={noviOpen ? "happy" : "idle"} level={level} />
               </button>
             </>
           )}

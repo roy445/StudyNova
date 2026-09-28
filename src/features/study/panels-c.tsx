@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
-import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { WordDetailSheet } from "@/components/WordDetailSheet";
 import { MemoryCard } from "@/components/MemoryCard";
@@ -662,6 +662,7 @@ export function FocusPanel() {
   const [subject, setSubject] = useState("英文");
   const [reflection, setReflection] = useState("");
   const [saving, setSaving] = useState(false);
+  const [timerSessionId, setTimerSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!running) return;
@@ -681,16 +682,64 @@ export function FocusPanel() {
 
   const pct = ((target * 60 - left) / (target * 60)) * 100;
 
+  async function startTimer() {
+    try {
+      const result = await apiPost<{ session: { id: string } }>("/focus/start", { minutes: target });
+      setTimerSessionId(result.session.id);
+      setDone(false);
+      setRunning(true);
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
+
+  async function pauseTimer() {
+    if (!timerSessionId) return;
+    try {
+      await apiPost("/focus/pause", { sessionId: timerSessionId });
+      setRunning(false);
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
+
+  async function resumeTimer() {
+    if (!timerSessionId) return;
+    try {
+      await apiPost("/focus/resume", { sessionId: timerSessionId });
+      setRunning(true);
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
+
+  async function resetTimer() {
+    if (timerSessionId) {
+      try {
+        await apiPost("/focus/cancel", { sessionId: timerSessionId });
+      } catch (err) {
+        toast.push("error", errorMessage(err));
+        return;
+      }
+    }
+    setTimerSessionId(null);
+    setRunning(false);
+    setDone(false);
+    setLeft(target * 60);
+  }
+
   async function complete() {
     setSaving(true);
     try {
+      if (!timerSessionId) throw new Error("請先開始專注計時");
       const res = await apiPost<{ reward: { nova: number; xp: number }; streak: number }>("/focus/complete", {
-        minutes: target,
+        sessionId: timerSessionId,
         subject,
         reflection,
       });
       toast.push("success", `專注完成！+${res.reward.nova} Nova / +${res.reward.xp} XP・連續 ${res.streak} 天`);
       setDone(false);
+      setTimerSessionId(null);
       setReflection("");
       setLeft(target * 60);
       await history.reload();
@@ -723,6 +772,7 @@ export function FocusPanel() {
               {[15, 25, 45, 60].map((m) => (
                 <button
                   key={m}
+                  disabled={Boolean(timerSessionId)}
                   onClick={() => { setTarget(m); setLeft(m * 60); setRunning(false); }}
                   className={`focus-ring rounded-xl border px-3 py-1.5 text-xs ${target === m ? "border-[#37d3ff] bg-[#37d3ff]/15" : "border-[var(--line)]"}`}
                 >
@@ -731,6 +781,7 @@ export function FocusPanel() {
               ))}
               <Input
                 type="number"
+                disabled={Boolean(timerSessionId)}
                 min={1}
                 max={300}
                 value={target}
@@ -743,8 +794,8 @@ export function FocusPanel() {
               />
             </div>
             <div className="flex gap-2">
-              {!running ? <Button onClick={() => setRunning(true)}>▶ 開始</Button> : <Button variant="ghost" onClick={() => setRunning(false)}>⏸ 暫停</Button>}
-              <Button variant="outline" onClick={() => { setRunning(false); setLeft(target * 60); }}>
+              {!timerSessionId ? <Button onClick={() => void startTimer()}>▶ 開始</Button> : running ? <Button variant="ghost" onClick={() => void pauseTimer()}>⏸ 暫停</Button> : <Button onClick={() => void resumeTimer()}>▶ 繼續</Button>}
+              <Button variant="outline" onClick={() => void resetTimer()}>
                 重設
               </Button>
               <Button variant="ghost" onClick={() => { setRunning(false); setDone(true); }}>
@@ -990,16 +1041,41 @@ export function VisualNotesPanel() {
   const [style, setStyle] = useState<VisualNote["style"]>("cute");
   const [icon, setIcon] = useState("✦");
   const [visual, setVisual] = useState<VisualNote | null>(null);
+  const [artifactId, setArtifactId] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   async function generate() {
     if (sourceText.trim().length < 20) return toast.push("error", "請先貼上至少 20 個字的教材或筆記");
     setBusy(true);
     try {
-      const result = await apiPost<{ visual: VisualNote }>("/visual-notes/generate", { title, sourceText, style });
-      setVisual(result.visual);
-      toast.push("success", "AI 已整理成心智圖");
+      const result = await apiPost<{ visual?: VisualNote; artifactId?: string; job?: { id: string } }>("/visual-notes/generate", { title, sourceText, style, icon });
+      if (result.visual) { setVisual(result.visual); setArtifactId(result.artifactId ?? null); toast.push("success", "AI 已整理成心智圖"); }
+      else if (result.job?.id) { setJobId(result.job.id); toast.push("info", "已加入背景工作，完成後會自動顯示心智圖"); }
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
+  }
+  useEffect(() => {
+    if (!jobId) return;
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const result = await apiGet<{ job: { status: string }; items: Array<{ output: unknown | null; status: string; errorMessage: string }> }>(`/ai/background-jobs/${jobId}`);
+        const item = result.items[0];
+        if (item?.status === "completed") {
+          const output = (item.output ?? {}) as { visual?: VisualNote; artifactId?: string };
+          if (output.visual) setVisual(output.visual);
+          setArtifactId(output.artifactId ?? null); setJobId(null); toast.push("success", "背景工作完成，心智圖已保存"); return;
+        }
+        if (["failed", "cancelled"].includes(result.job.status)) { setJobId(null); toast.push("error", item?.errorMessage || "心智圖背景工作失敗"); return; }
+        if (!stopped) window.setTimeout(() => void poll(), 1800);
+      } catch (error) { if (!stopped) { setJobId(null); toast.push("error", errorMessage(error)); } }
+    };
+    void poll();
+    return () => { stopped = true; };
+  }, [jobId, toast]);
+  async function shareVisual() {
+    if (!artifactId) return toast.push("info", "心智圖完成保存後才能分享");
+    try { const result = await apiPost<{ url: string }>("/shares", { kind: "visual_note", title, artifactId, payload: { style }, visibility: "link" }); toast.push("success", `分享連結已建立：${result.url}`); } catch (error) { toast.push("error", errorMessage(error)); }
   }
   function svgText() {
     if (!svgRef.current) return null;

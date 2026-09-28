@@ -232,7 +232,8 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const week = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, ctx.params.id)).limit(1))[0];
-      if (!week) throw fail("WEEK_NOT_FOUND");
+      if (!week || week.status !== "published") throw fail("WEEK_NOT_FOUND");
+      await assertAccess(week, user.userId, user.isPro);
       const rows = await db
         .insert(weeklyExamResults)
         .values({ weekId: week.id, userId: user.userId, reciteCompleted: true })
@@ -250,6 +251,9 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const weekId = ctx.params.id;
+      const week = (await db.select().from(weeklyExamWeeks).where(eq(weeklyExamWeeks.id, weekId)).limit(1))[0];
+      if (!week || week.status !== "published") throw fail("WEEK_NOT_FOUND");
+      await assertAccess(week, user.userId, user.isPro);
       const rows = await db.select().from(weeklyExamResults).where(eq(weeklyExamResults.weekId, weekId));
       const scores = rows.map((r) => r.score).sort((a, b) => b - a);
       const mine = rows.find((r) => r.userId === user.userId) ?? null;

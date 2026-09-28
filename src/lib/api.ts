@@ -23,7 +23,11 @@ export class ApiRequestError extends Error {
   }
   /** 顯示給使用者的完整訊息（含專屬錯誤代碼） */
   get display() {
-    return `${this.message}（${this.code}）`;
+    return [
+      `${this.message}（${this.code}）`,
+      this.hint,
+      this.requestId ? `追蹤編號：${this.requestId}` : "",
+    ].filter(Boolean).join("；");
   }
 }
 
@@ -54,23 +58,24 @@ async function parse<T>(res: Response): Promise<T> {
   return json.data as T;
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const cached = GET_CACHE.get(path);
+export async function apiGet<T>(path: string, options: { fresh?: boolean } = {}): Promise<T> {
+  const fresh = options.fresh === true;
+  const cached = fresh ? undefined : GET_CACHE.get(path);
   if (cached && cached.expiresAt > Date.now()) return cached.value as T;
-  if (cached) GET_CACHE.delete(path);
-  const inflight = GET_INFLIGHT.get(path);
+  if (!fresh && cached) GET_CACHE.delete(path);
+  const inflight = fresh ? undefined : GET_INFLIGHT.get(path);
   if (inflight) return inflight as Promise<T>;
   const request = (async () => {
     const res = await fetch(`/api/v1${path}`, { credentials: "same-origin", cache: "no-store" });
     const value = await parse<T>(res);
-    GET_CACHE.set(path, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
+    if (!fresh) GET_CACHE.set(path, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
     return value;
   })();
-  GET_INFLIGHT.set(path, request);
+  if (!fresh) GET_INFLIGHT.set(path, request);
   try {
     return await request;
   } finally {
-    if (GET_INFLIGHT.get(path) === request) GET_INFLIGHT.delete(path);
+    if (!fresh && GET_INFLIGHT.get(path) === request) GET_INFLIGHT.delete(path);
   }
 }
 
@@ -117,6 +122,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const mounted = useRef(true);
+  const updateData = useCallback((updater: (prev: T | null) => T | null) => setData((prev) => updater(prev)), []);
 
   useEffect(() => {
     mounted.current = true;
@@ -139,7 +145,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
     } catch (err) {
       if (mounted.current) {
         const info = errorInfo(err);
-        setError(info.message);
+        setError([info.message, info.code ? `錯誤代碼：${info.code}` : "", info.hint, info.requestId ? `追蹤編號：${info.requestId}` : ""].filter(Boolean).join("；"));
         setErrorCode(info.code);
       }
     } finally {
@@ -184,7 +190,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
     error,
     errorCode,
     reload: load,
-    setData: (updater) => setData((prev) => updater(prev)),
+    setData: updateData,
   };
 }
 
@@ -198,7 +204,7 @@ export function useAsyncAction<TArgs extends unknown[], TResult>(fn: (...args: T
       try {
         return await fn(...args);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "操作失敗");
+        setError(errorMessage(err));
         return null;
       } finally {
         setPending(false);

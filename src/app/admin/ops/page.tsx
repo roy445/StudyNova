@@ -81,11 +81,14 @@ export default function AdminOpsPage() {
   const [tab, setTab] = useState(() => searchParams.get("tab") || "ai");
   const [bankFilters, setBankFilters] = useState({ q: "", subject: "", bankCategory: "", type: "", difficulty: "", level: "", origin: "", bankId: "" });
   const [bankPage, setBankPage] = useState(1);
+  const changeBankFilters = (patch: Partial<typeof bankFilters>) => {
+    setBankFilters((current) => ({ ...current, ...patch }));
+    setBankPage(1);
+  };
   const bankQueryParams = new URLSearchParams(Object.entries(bankFilters).filter(([, value]) => value.trim()).map(([key, value]) => [key, value]));
   bankQueryParams.set("limit", "100");
   bankQueryParams.set("offset", String((bankPage - 1) * 100));
   const bankQuery = bankQueryParams.toString();
-  useEffect(() => { setBankPage(1); }, [JSON.stringify(bankFilters)]);
   const ai = useApi<{ providers: Provider[]; failures: Array<{ id: string; provider: string; feature: string; failureCategory: string; createdAt: string }>; byFeature: Array<{ feature: string; c: number; ok: number }>; configured: boolean }>(
     "/admin/ai/health",
   );
@@ -537,8 +540,8 @@ export default function AdminOpsPage() {
               <Select value="custom" onChange={(e) => {
                 const examples: Record<string, typeof pushForm> = {
                   custom: pushForm,
-                  welcome: { title: "🌟 Novi 歡迎你回來", message: "今天先完成 10 個單字，讓進步從一小步開始！", link: "/dashboard", audience: "all" },
-                  inactive: { title: "🐦 Novi 的小提醒", message: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/study", audience: "users" },
+                  welcome: { title: "StudyNova 今日摘要", message: "今日任務與學習摘要已更新，請前往 Dashboard 查看。", link: "/dashboard", audience: "all" },
+                  inactive: { title: "StudyNova 複習提醒", message: "你的錯題與學習紀錄已保留，請前往學習中心查看待複習內容。", link: "/study", audience: "users" },
                   weekly: { title: "🏁 每週小考開放", message: "準備好和好友比一場了嗎？現在就來挑戰！", link: "/weekly", audience: "all" },
                   reward: { title: "🎁 限定獎勵解鎖", message: "完成今日任務即可領取 Nova 與 XP，快來看看！", link: "/profile?tab=nova", audience: "pro" },
                 };
@@ -774,16 +777,16 @@ export default function AdminOpsPage() {
           {importResult && <pre className="mt-2 max-h-52 overflow-auto scroll-thin rounded-xl bg-black/30 p-2 text-[11px]">{JSON.stringify(importResult, null, 2)}</pre>}
           <div className="mt-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="搜尋題目／主題／來源"><Input value={bankFilters.q} onChange={(event) => setBankFilters({ ...bankFilters, q: event.target.value })} placeholder="輸入關鍵字後按 Enter 或離開欄位" /></Field>
-              <Field label="專屬題庫"><Select value={bankFilters.bankId} onChange={(event) => setBankFilters({ ...bankFilters, bankId: event.target.value })}><option value="">全部題庫</option>{questionBanks.data?.banks.map(({ bank: item }) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>
-              <Field label="科目"><Select value={bankFilters.subject} onChange={(event) => setBankFilters({ ...bankFilters, subject: event.target.value })}><option value="">全部科目</option><option value="英文">英文</option><option value="數學">數學</option><option value="國文">國文</option><option value="自然">自然</option><option value="物理">物理</option><option value="化學">化學</option><option value="生物">生物</option><option value="歷史">歷史</option><option value="地理">地理</option><option value="公民">公民</option><option value="其他">其他</option></Select></Field>
-              <Field label="題庫分類"><Input value={bankFilters.bankCategory} onChange={(event) => setBankFilters({ ...bankFilters, bankCategory: event.target.value })} placeholder="例如：高中英文" /></Field>
-              <Field label="題型"><Select value={bankFilters.type} onChange={(event) => setBankFilters({ ...bankFilters, type: event.target.value })}><option value="">全部題型</option><option value="single">單選</option><option value="multiple">複選</option><option value="truefalse">是非</option><option value="fill">填空</option><option value="matching">配合</option><option value="calculation">計算</option><option value="essay">作文／申論</option><option value="short">簡答</option></Select></Field>
-              <Field label="難度"><Select value={bankFilters.difficulty} onChange={(event) => setBankFilters({ ...bankFilters, difficulty: event.target.value })}><option value="">全部難度</option><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field>
-              <Field label="學段"><Select value={bankFilters.level} onChange={(event) => setBankFilters({ ...bankFilters, level: event.target.value })}><option value="">全部學段</option><option value="junior">國中／junior</option><option value="senior">高中以上／senior</option></Select></Field>
-              <Field label="來源"><Select value={bankFilters.origin} onChange={(event) => setBankFilters({ ...bankFilters, origin: event.target.value })}><option value="">全部來源</option><option value="ai">AI 產生</option><option value="bank">題庫匯入</option><option value="admin">管理員建立</option><option value="user">使用者</option></Select></Field>
+              <Field label="搜尋題目／主題／來源"><Input value={bankFilters.q} onChange={(event) => changeBankFilters({ q: event.target.value })} placeholder="輸入關鍵字後按 Enter 或離開欄位" /></Field>
+              <Field label="專屬題庫"><Select value={bankFilters.bankId} onChange={(event) => changeBankFilters({ bankId: event.target.value })}><option value="">全部題庫</option>{questionBanks.data?.banks.map(({ bank: item }) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>
+              <Field label="科目"><Select value={bankFilters.subject} onChange={(event) => changeBankFilters({ subject: event.target.value })}><option value="">全部科目</option><option value="英文">英文</option><option value="數學">數學</option><option value="國文">國文</option><option value="自然">自然</option><option value="物理">物理</option><option value="化學">化學</option><option value="生物">生物</option><option value="歷史">歷史</option><option value="地理">地理</option><option value="公民">公民</option><option value="其他">其他</option></Select></Field>
+              <Field label="題庫分類"><Input value={bankFilters.bankCategory} onChange={(event) => changeBankFilters({ bankCategory: event.target.value })} placeholder="例如：高中英文" /></Field>
+              <Field label="題型"><Select value={bankFilters.type} onChange={(event) => changeBankFilters({ type: event.target.value })}><option value="">全部題型</option><option value="single">單選</option><option value="multiple">複選</option><option value="truefalse">是非</option><option value="fill">填空</option><option value="matching">配合</option><option value="calculation">計算</option><option value="essay">作文／申論</option><option value="short">簡答</option></Select></Field>
+              <Field label="難度"><Select value={bankFilters.difficulty} onChange={(event) => changeBankFilters({ difficulty: event.target.value })}><option value="">全部難度</option><option value="easy">基礎</option><option value="normal">標準</option><option value="hard">進階</option></Select></Field>
+              <Field label="學段"><Select value={bankFilters.level} onChange={(event) => changeBankFilters({ level: event.target.value })}><option value="">全部學段</option><option value="junior">國中／junior</option><option value="senior">高中以上／senior</option></Select></Field>
+              <Field label="來源"><Select value={bankFilters.origin} onChange={(event) => changeBankFilters({ origin: event.target.value })}><option value="">全部來源</option><option value="ai">AI 產生</option><option value="bank">題庫匯入</option><option value="admin">管理員建立</option><option value="user">使用者</option></Select></Field>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted"><span>符合 {bank.data?.total ?? 0} 題；每頁顯示 100 題（第 {bank.data?.total ? (bankPage - 1) * 100 + 1 : 0}–{Math.min(bankPage * 100, bank.data?.total ?? 0)} 題）</span><Button size="sm" variant="ghost" onClick={() => setBankFilters({ q: "", subject: "", bankCategory: "", type: "", difficulty: "", level: "", origin: "", bankId: "" })}>清除篩選</Button></div>
+            <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted"><span>符合 {bank.data?.total ?? 0} 題；每頁顯示 100 題（第 {bank.data?.total ? (bankPage - 1) * 100 + 1 : 0}–{Math.min(bankPage * 100, bank.data?.total ?? 0)} 題）</span><Button size="sm" variant="ghost" onClick={() => changeBankFilters({ q: "", subject: "", bankCategory: "", type: "", difficulty: "", level: "", origin: "", bankId: "" })}>清除篩選</Button></div>
           </div>
           <div className="mt-3 max-h-64 space-y-1 overflow-y-auto scroll-thin text-xs">
             {bank.data?.questions.map((q) => (

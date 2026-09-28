@@ -6,6 +6,9 @@ import {
   friends,
   pkActivities,
   pkActivityParticipants,
+  pkBotProfiles,
+  pkBotJobs,
+  pkBotSessions,
   pkAuditLogs,
   pkMatchEvents,
   pkMatchQuestions,
@@ -35,12 +38,13 @@ import { recordStudy } from "./learning-routes";
 import { getPkConfig, type PkConfig } from "../pk-config";
 import { calculatePkScore, calculateRanks, matchPlayerCount, normalizePkText, pkOptionOrder, pkQuestionFingerprint, type PkQuestionBlueprint } from "../pk-utils";
 import { publishPkEvent, sseResponse } from "../pk-realtime";
+import { scheduleBotJobsForMatch } from "../pk-bot-engine";
+import { queue } from "../queue";
 
 const matchMode = z.enum(["1v1", "2v2", "3v3", "多人"]);
 const teamMode = z.enum(["solo", "team"]);
 const visibility = z.enum(["public", "private"]);
 const playerState = z.enum(["online", "recently_active"]);
-const NOVA_BOT_USER_ID = "00000000-0000-4000-8000-000000000001";
 
 const pkGrade = z.enum(["JUNIOR_HIGH", "SENIOR_HIGH"]);
 
@@ -146,24 +150,20 @@ async function activeFriends(userId: string, ids: string[]) {
   return rows.map((row) => row.friendId);
 }
 
-async function addBotOpponent(matchId: string) {
-  const orders = await questionOrders(db, matchId, NOVA_BOT_USER_ID);
-  await db.insert(pkMatchPlayers).values({ matchId, userId: NOVA_BOT_USER_ID, role: "bot", connectionState: "connected", optionOrders: orders }).onConflictDoNothing();
+async function addBotOpponents(matchId: string, count: number) {
+  const profiles = await db.select().from(pkBotProfiles).where(eq(pkBotProfiles.enabled, true)).orderBy(asc(pkBotProfiles.botLevel), asc(pkBotProfiles.createdAt)).limit(Math.max(0, count));
+  for (const profile of profiles) {
+    const orders = await questionOrders(db, matchId, profile.id);
+    const player = (await db.insert(pkMatchPlayers).values({ matchId, userId: null, botProfileId: profile.id, role: "bot", connectionState: "connected", optionOrders: orders }).onConflictDoNothing().returning())[0];
+    if (!player) continue;
+    await db.insert(pkBotSessions).values({ matchId, playerId: player.id, botProfileId: profile.id }).onConflictDoNothing();
+  }
 }
 
-async function submitBotAnswer(matchId: string, match: typeof pkMatches.$inferSelect, question: PkQuestionRow) {
-  const bot = (await db.select().from(pkMatchPlayers).where(and(eq(pkMatchPlayers.matchId, matchId), eq(pkMatchPlayers.role, "bot"))).limit(1))[0];
-  if (!bot || bot.answeredCount !== question.orderIndex) return;
-  const botConfig = await getPkConfig();
-  const correctChance = botConfig.botSkill === "easy" ? 0.42 : botConfig.botSkill === "hard" ? 0.78 : 0.6;
-  const isCorrect = Math.random() < correctChance;
-  const selectedOption = isCorrect ? question.canonicalAnswer : (question.canonicalOptions.find((option) => normalizePkText(option) !== normalizePkText(question.canonicalAnswer)) ?? question.canonicalAnswer);
-  const responseMs = Math.max(500, Math.min(match.questionTimeSec * 1000, 900 + Math.floor(Math.random() * 1800)));
-  const score = calculatePkScore({ correct: isCorrect, elapsedMs: responseMs, comboBefore: bot.combo, questionTimeSec: match.questionTimeSec });
-  const now = new Date();
-  const inserted = await db.insert(pkPlayerAnswers).values({ matchId, questionId: question.id, userId: NOVA_BOT_USER_ID, selectedOption, responseMs, isCorrect, scoreAwarded: score.points, comboAfter: score.combo, idempotencyKey: `bot:${matchId}:${question.id}` }).onConflictDoNothing().returning({ id: pkPlayerAnswers.id });
-  if (!inserted[0]) return;
-  await db.update(pkMatchPlayers).set({ score: sql`${pkMatchPlayers.score} + ${score.points}`, combo: score.combo, maxCombo: sql`greatest(${pkMatchPlayers.maxCombo}, ${score.combo})`, correctCount: sql`${pkMatchPlayers.correctCount} + ${isCorrect ? 1 : 0}`, answeredCount: sql`${pkMatchPlayers.answeredCount} + 1`, totalResponseMs: sql`${pkMatchPlayers.totalResponseMs} + ${responseMs}`, fastestResponseMs: bot.fastestResponseMs === null ? responseMs : sql`least(${pkMatchPlayers.fastestResponseMs}, ${responseMs})`, lastHeartbeatAt: now, currentQuestionStartedAt: now }).where(eq(pkMatchPlayers.id, bot.id));
+async function enqueueInitialBotJobs(matchId: string, startsAt: Date) {
+  await scheduleBotJobsForMatch(matchId, startsAt);
+  const jobs = await db.select({ id: pkBotJobs.id, availableAt: pkBotJobs.availableAt }).from(pkBotJobs).where(and(eq(pkBotJobs.matchId, matchId), eq(pkBotJobs.status, "queued")));
+  for (const job of jobs) await queue().enqueue({ name: "pk_bot_turn", payload: { jobId: job.id }, uniqueKey: `pk-bot:${job.id}:${job.availableAt.getTime()}`, runAt: job.availableAt });
 }
 
 async function createMatch(ownerId: string, input: MatchInput, roomInput?: { name: string; visibility: z.infer<typeof visibility>; password: string; maxPlayers: number; inviteIds: string[]; roomMode: z.infer<typeof teamMode> }) {
@@ -252,16 +252,16 @@ export async function finishPkMatch(matchId: string) {
   const completed = await db.update(pkMatches).set({ status: "completed", finishedAt: new Date(), updatedAt: new Date() }).where(and(eq(pkMatches.id, matchId), sql`${pkMatches.status} in ('in_progress', 'paused', 'countdown')`, isNull(pkMatches.finishedAt))).returning();
   const match = completed[0] ?? (await db.select().from(pkMatches).where(and(eq(pkMatches.id, matchId), eq(pkMatches.status, "completed"))).limit(1))[0];
   if (!match) return null;
-  const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId }).from(pkMatchPlayers).innerJoin(users, eq(users.userId, pkMatchPlayers.userId)).where(eq(pkMatchPlayers.matchId, matchId));
-  const ranked = calculateRanks(players.map((row) => row.player));
+  const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, matchId));
+  const ranked = calculateRanks(players.filter((row) => row.player.role !== "spectator").map((row) => row.player));
   const byPlayerId = new Map(ranked.map((row) => [row.player.id, row.rank]));
   for (const row of ranked) {
     await db.update(pkMatchPlayers).set({ rank: row.rank, connectionState: "finished", finishedAt: new Date() }).where(eq(pkMatchPlayers.id, row.player.id));
-    if (row.player.role === "bot") continue;
+    if (row.player.role !== "player" || !row.player.userId) continue;
     await db.insert(pkMatchScores).values({ matchId, userId: row.player.userId, score: row.player.score, rank: row.rank, combo: row.player.combo, correctCount: row.player.correctCount, answeredCount: row.player.answeredCount }).onConflictDoUpdate({ target: [pkMatchScores.matchId, pkMatchScores.userId], set: { score: row.player.score, rank: row.rank, combo: row.player.combo, correctCount: row.player.correctCount, answeredCount: row.player.answeredCount, updatedAt: new Date() } });
   }
   for (const row of players) {
-    if (row.player.role === "bot") continue;
+    if (row.player.role !== "player" || !row.player.userId) continue;
     const answers = await db.select({ questionId: pkPlayerAnswers.questionId, isCorrect: pkPlayerAnswers.isCorrect }).from(pkPlayerAnswers).where(and(eq(pkPlayerAnswers.matchId, matchId), eq(pkPlayerAnswers.userId, row.player.userId)));
     const questionsById = answers.length ? await db.select().from(pkMatchQuestions).where(inArray(pkMatchQuestions.id, answers.map((answer) => answer.questionId))) : [];
     for (const answer of answers.filter((item) => !item.isCorrect)) {
@@ -280,7 +280,7 @@ export async function finishPkMatch(matchId: string) {
   }
   await db.update(pkPresence).set({ state: "recently_active", currentMatchId: null, currentRoomId: null, updatedAt: new Date() }).where(eq(pkPresence.currentMatchId, matchId));
   await emitMatchEvent(matchId, "match_finished", null, { matchId });
-  return { match, players: ranked.map((row) => ({ ...players.find((item) => item.player.userId === row.player.userId), rank: row.rank })) };
+  return { match, players: ranked.map((row) => ({ ...players.find((item) => item.player.id === row.player.id), rank: row.rank })) };
 }
 
 async function matchPayload(matchId: string, userId: string) {
@@ -288,7 +288,7 @@ async function matchPayload(matchId: string, userId: string) {
   if (!match) throw notFound("找不到 PK 賽場");
   const player = await getPlayer(matchId, userId);
   if (!player) throw forbidden("你不是這場 PK 的參與者");
-  const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId }).from(pkMatchPlayers).innerJoin(users, eq(users.userId, pkMatchPlayers.userId)).where(eq(pkMatchPlayers.matchId, matchId)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score));
+  const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, matchId)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score));
   const questionRows = await db.select().from(pkMatchQuestions).where(eq(pkMatchQuestions.matchId, matchId)).orderBy(asc(pkMatchQuestions.orderIndex));
   const room = match.roomId ? (await db.select().from(pkRooms).where(eq(pkRooms.id, match.roomId)).limit(1))[0] ?? null : null;
   const answerCount = await db.select({ count: sql<number>`count(*)::int` }).from(pkPlayerAnswers).where(and(eq(pkPlayerAnswers.matchId, matchId), eq(pkPlayerAnswers.userId, userId)));
@@ -296,7 +296,7 @@ async function matchPayload(matchId: string, userId: string) {
     match: { id: match.id, roomId: match.roomId, status: match.status, mode: match.mode, teamMode: match.teamMode, subject: match.subject, grade: match.grade, unit: match.unit, difficulty: match.difficulty, questionCount: match.questionCount, questionTimeSec: match.questionTimeSec, currentQuestion: match.currentQuestion, startsAt: match.startsAt, endsAt: match.endsAt, finishedAt: match.finishedAt, allowLateJoin: match.allowLateJoin, allowSpectators: match.allowSpectators, showRanking: match.showRanking },
     room: room ? { id: room.id, name: room.name, roomCode: room.roomCode, shareToken: room.shareToken, visibility: room.visibility, maxPlayers: room.maxPlayers, status: room.status, hostId: room.hostId } : null,
     me: { userId, score: player.score, combo: player.combo, maxCombo: player.maxCombo, correctCount: player.correctCount, answeredCount: Number(answerCount[0]?.count ?? 0), rank: player.rank },
-    players: players.map((row) => ({ ...row.player, displayName: row.player.role === "bot" ? "Nova Bot 🤖" : row.displayName, novaId: row.player.role === "bot" ? "NOVA-BOT" : row.novaId, optionOrders: undefined })),
+    players: players.map((row) => ({ ...row.player, userId: row.player.role === "bot" ? `bot:${row.player.botProfileId ?? row.player.id}` : row.player.userId, displayName: row.player.role === "bot" ? `${row.botName || "PK Bot"} 🤖` : row.displayName, novaId: row.player.role === "bot" ? `${row.botName || "PK-BOT"}-BOT` : row.novaId, optionOrders: undefined })),
     questions: questionRows.map((question) => publicQuestion(question, userId, matchId)),
   };
 }
@@ -316,6 +316,30 @@ export const routes: RouteDef[] = [
       const startsAt = new Date(Date.now() + 3000);
       await db.update(pkMatches).set({ status: "countdown", startsAt, updatedAt: new Date() }).where(eq(pkMatches.id, result.match.id));
       return { matchId: result.match.id, status: "ready", preparation: { estimatedSeconds: 3, message: "題目已建立完成，3 秒後開始自我測驗。" } };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/pk/bot-match",
+    auth: "user",
+    rate: { limit: 20, windowSec: 3600, key: "pk-bot-match" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const config = await getPkConfig();
+      if (!config.enabled || !config.botEnabled) throw badRequest("Bot 練習場目前由管理員暫停");
+      const body = await ctx.json(z.object({ mode: matchMode.default("1v1"), gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), teamMode: teamMode.default("solo"), questionCount: z.number().int().min(5).max(50).default(config.minQuestions), questionTimeSec: z.number().int().min(5).max(120).default(config.minTimeSec) }));
+      const targetCount = matchPlayerCount(body.mode);
+      const available = await db.select({ count: sql<number>`count(*)::int` }).from(pkBotProfiles).where(eq(pkBotProfiles.enabled, true));
+      if (Number(available[0]?.count ?? 0) < targetCount - 1) throw badRequest("目前沒有足夠的 Bot Profile 可建立這個模式");
+      const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: body.questionCount, questionTimeSec: body.questionTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
+      await addBotOpponents(result.match.id, targetCount - 1);
+      const startsAt = new Date(Date.now() + 3_000);
+      await db.update(pkMatches).set({ status: "countdown", startsAt, updatedAt: new Date() }).where(eq(pkMatches.id, result.match.id));
+      await enqueueInitialBotJobs(result.match.id, startsAt);
+      void queue().drain(1);
+      await emitMatchEvent(result.match.id, "match_found", null, { matchId: result.match.id, playerCount: targetCount, bot: true, explicitBotMatch: true });
+      await emitMatchEvent(result.match.id, "countdown_started", null, { startsAt: startsAt.toISOString(), bot: true });
+      return { matchId: result.match.id, status: "ready", bot: true, playerCount: targetCount, preparation: { estimatedSeconds: 3, message: "Bot 練習場已建立；Bot 會由背景 worker 依 Profile 速度與正確率作答。" } };
     },
   }),
   route({
@@ -371,15 +395,7 @@ export const routes: RouteDef[] = [
       const rows = await db.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
       const candidate = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), sql`${pkMatchmakingQueue.userId} <> ${user.userId}`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
       if (!candidate) {
-        if (!config.botEnabled || !config.botFillQuickMatch) return { queue: rows[0], matched: false, message: "目前沒有足夠真人，請稍候或稍後再試。" };
-        const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
-        await addBotOpponent(match.match.id);
-        const startsAt = new Date(Date.now() + 3_000);
-        await db.update(pkMatchmakingQueue).set({ status: "bot_matched" }).where(and(eq(pkMatchmakingQueue.id, rows[0].id), eq(pkMatchmakingQueue.status, "waiting")));
-        await db.update(pkMatches).set({ status: "countdown", startsAt, updatedAt: new Date() }).where(eq(pkMatches.id, match.match.id));
-        await emitMatchEvent(match.match.id, "match_found", null, { matchId: match.match.id, playerCount: 2, bot: true });
-        await emitMatchEvent(match.match.id, "countdown_started", null, { startsAt: startsAt.toISOString(), bot: true });
-        return { queue: { ...rows[0], status: "bot_matched" }, matched: true, bot: true, matchId: match.match.id, message: "目前沒有足夠真人，Nova Bot 已補位！" };
+        return { queue: rows[0], matched: false, message: "目前沒有足夠真人；一般快速配對不會自動加入 Bot，請改用『Bot 練習場』。" };
       }
       const updated = await db.update(pkMatchmakingQueue).set({ status: "matched" }).where(and(eq(pkMatchmakingQueue.id, candidate.id), eq(pkMatchmakingQueue.status, "waiting"))).returning();
       if (!updated[0]) return { queue: rows[0], matched: false, message: "正在尋找對手……" };
@@ -525,23 +541,22 @@ export const routes: RouteDef[] = [
       if (!question) throw badRequest("題目不屬於這場 PK");
       const previousAnswers = await db.select({ id: pkPlayerAnswers.id }).from(pkPlayerAnswers).where(and(eq(pkPlayerAnswers.matchId, ctx.params.id), eq(pkPlayerAnswers.userId, user.userId)));
       if (previousAnswers.length !== question.orderIndex) throw conflict("請依照題目順序作答");
-      const existing = (await db.select().from(pkPlayerAnswers).where(eq(pkPlayerAnswers.idempotencyKey, body.idempotencyKey)).limit(1))[0];
+      const existing = (await db.select().from(pkPlayerAnswers).where(and(eq(pkPlayerAnswers.idempotencyKey, body.idempotencyKey), eq(pkPlayerAnswers.matchId, ctx.params.id), eq(pkPlayerAnswers.userId, user.userId))).limit(1))[0];
       if (existing) return { accepted: false, replay: true, isCorrect: existing.isCorrect, scoreAwarded: existing.scoreAwarded, combo: existing.comboAfter, score: access.player.score };
       const serverElapsedMs = access.player.currentQuestionStartedAt ? Math.max(0, Date.now() - access.player.currentQuestionStartedAt.getTime()) : access.match.questionTimeSec * 1000;
       const withinTime = serverElapsedMs <= access.match.questionTimeSec * 1000 + 1_000;
       const isCorrect = withinTime && normalizePkText(body.selectedOption) === normalizePkText(question.canonicalAnswer);
       const result = calculatePkScore({ correct: isCorrect, elapsedMs: serverElapsedMs, comboBefore: access.player.combo, questionTimeSec: access.match.questionTimeSec });
-      const answerRows = await db.insert(pkPlayerAnswers).values({ matchId: ctx.params.id, questionId: question.id, userId: user.userId, selectedOption: body.selectedOption, responseMs: serverElapsedMs, isCorrect, scoreAwarded: result.points, comboAfter: result.combo, idempotencyKey: body.idempotencyKey }).onConflictDoNothing().returning();
+      const answerRows = await db.insert(pkPlayerAnswers).values({ matchId: ctx.params.id, playerId: access.player.id, questionId: question.id, userId: user.userId, selectedOption: body.selectedOption, responseMs: serverElapsedMs, isCorrect, scoreAwarded: result.points, comboAfter: result.combo, idempotencyKey: body.idempotencyKey }).onConflictDoNothing().returning();
       if (!answerRows[0]) return { accepted: false, replay: true, isCorrect: false, scoreAwarded: 0, combo: access.player.combo, score: access.player.score };
       const nextQuestionStartedAt = new Date();
       const updated = (await db.update(pkMatchPlayers).set({ score: sql`${pkMatchPlayers.score} + ${result.points}`, combo: result.combo, maxCombo: sql`greatest(${pkMatchPlayers.maxCombo}, ${result.combo})`, correctCount: sql`${pkMatchPlayers.correctCount} + ${isCorrect ? 1 : 0}`, answeredCount: sql`${pkMatchPlayers.answeredCount} + 1`, totalResponseMs: sql`${pkMatchPlayers.totalResponseMs} + ${serverElapsedMs}`, fastestResponseMs: access.player.fastestResponseMs === null ? serverElapsedMs : sql`least(${pkMatchPlayers.fastestResponseMs}, ${serverElapsedMs})`, lastHeartbeatAt: nextQuestionStartedAt, currentQuestionStartedAt: nextQuestionStartedAt }).where(and(eq(pkMatchPlayers.matchId, ctx.params.id), eq(pkMatchPlayers.userId, user.userId))).returning())[0];
       if (!updated) throw conflict("玩家狀態已改變，請重新連線");
       await db.insert(pkMatchScores).values({ matchId: ctx.params.id, userId: user.userId, score: updated.score, rank: updated.rank ?? 0, combo: updated.combo, correctCount: updated.correctCount, answeredCount: updated.answeredCount }).onConflictDoUpdate({ target: [pkMatchScores.matchId, pkMatchScores.userId], set: { score: updated.score, combo: updated.combo, correctCount: updated.correctCount, answeredCount: updated.answeredCount, updatedAt: new Date() } });
-      await submitBotAnswer(ctx.params.id, access.match, question);
       if (body.responseMs < 250) await emitMatchEvent(ctx.params.id, "anomaly_detected", user.userId, { kind: "very_fast_answer", responseMs: body.responseMs, questionId: question.id });
       await emitMatchEvent(ctx.params.id, "answer_submitted", user.userId, { userId: user.userId, score: updated.score, combo: updated.combo, answeredCount: updated.answeredCount });
-      const totalPlayers = await db.select({ count: sql<number>`count(*)::int` }).from(pkMatchPlayers).where(eq(pkMatchPlayers.matchId, ctx.params.id));
-      const completedPlayers = await db.select({ count: sql<number>`count(*)::int` }).from(pkMatchPlayers).where(and(eq(pkMatchPlayers.matchId, ctx.params.id), gte(pkMatchPlayers.answeredCount, access.match.questionCount)));
+      const totalPlayers = await db.select({ count: sql<number>`count(*)::int` }).from(pkMatchPlayers).where(and(eq(pkMatchPlayers.matchId, ctx.params.id), inArray(pkMatchPlayers.role, ["player", "bot"])));
+      const completedPlayers = await db.select({ count: sql<number>`count(*)::int` }).from(pkMatchPlayers).where(and(eq(pkMatchPlayers.matchId, ctx.params.id), inArray(pkMatchPlayers.role, ["player", "bot"]), gte(pkMatchPlayers.answeredCount, access.match.questionCount)));
       if (Number(totalPlayers[0]?.count ?? 0) > 0 && Number(totalPlayers[0]?.count ?? 0) === Number(completedPlayers[0]?.count ?? 0)) await finishPkMatch(ctx.params.id);
       return { accepted: true, replay: false, isCorrect, scoreAwarded: result.points, combo: result.combo, score: updated.score, serverResponseMs: serverElapsedMs, finished: Boolean((await db.select({ status: pkMatches.status }).from(pkMatches).where(eq(pkMatches.id, ctx.params.id)).limit(1))[0]?.status === "completed") };
     },

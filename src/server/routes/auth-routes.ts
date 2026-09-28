@@ -1,5 +1,6 @@
+import { cookies } from "next/headers";
 import { z } from "zod";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import { db } from "@/db";
 import { users, deletedAccounts, userSettings, passwordResetTokens, sessions, memberships, novaAccounts, assistantProfiles, assistantInventory, assistantItems, accountAppeals, legalDocuments, legalConsents } from "@/db/schema";
@@ -17,7 +18,7 @@ import {
   unauthorized,
   verifyPassword,
 } from "../core";
-import { createSession, destroySession, getSession, isAdminRole } from "../auth";
+import { createSession, destroySession, getSession, isAdminRole, SESSION_COOKIE } from "../auth";
 import { ensureDailyTasks, ensureUserEconomy, allFeatureStates, novaBalance } from "../economy";
 import { notify } from "../notify";
 import { sendPasswordResetEmail } from "../email";
@@ -327,8 +328,13 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ current: z.string().min(1).max(128), next: passwordSchema }));
       const rows = await db.select().from(users).where(eq(users.userId, user.userId)).limit(1);
       if (!rows[0] || !verifyPassword(body.current, rows[0].passwordHash)) throw fail("AUTH_PASSWORD_WRONG");
-      await db.update(users).set({ passwordHash: hashPassword(body.next), updatedAt: new Date() }).where(eq(users.userId, user.userId));
-      return { changed: true };
+      const token = (await cookies()).get(SESSION_COOKIE)?.value;
+      const currentTokenHash = token ? sha256(token) : null;
+      await db.transaction(async (tx) => {
+        await tx.update(users).set({ passwordHash: hashPassword(body.next), updatedAt: new Date() }).where(eq(users.userId, user.userId));
+        await tx.delete(sessions).where(currentTokenHash ? and(eq(sessions.userId, user.userId), ne(sessions.tokenHash, currentTokenHash)) : eq(sessions.userId, user.userId));
+      });
+      return { changed: true, otherSessionsRevoked: true };
     },
   }),
 
@@ -443,7 +449,16 @@ export const routes: RouteDef[] = [
       const rows = await db.select().from(users).where(eq(users.userId, user.userId)).limit(1);
       if (!rows[0] || !verifyPassword(body.password, rows[0].passwordHash)) throw fail("AUTH_PASSWORD_WRONG");
       if (rows[0].role === "owner") throw fail("AUTH_OWNER_PROTECTED");
-      await db.delete(users).where(eq(users.userId, user.userId));
+      await db.transaction(async (tx) => {
+        const deletedAt = new Date();
+        for (const [identifierType, identifier] of [["email", rows[0].email.toLowerCase()], ["nova_id", rows[0].novaId]] as const) {
+          await tx.insert(deletedAccounts).values({ identifierType, identifier, reason: "self_delete", deletedAt }).onConflictDoUpdate({
+            target: [deletedAccounts.identifierType, deletedAccounts.identifier],
+            set: { reason: "self_delete", deletedAt },
+          });
+        }
+        await tx.delete(users).where(eq(users.userId, user.userId));
+      });
       await destroySession();
       return { deleted: true };
     },

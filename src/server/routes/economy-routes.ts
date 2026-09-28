@@ -12,7 +12,6 @@ import {
   assistantInventory,
   assistantTransactions,
   novaProExchangePlans,
-  novaProExchangeTransactions,
   memberships,
   membershipHistory,
   coupons,
@@ -22,7 +21,7 @@ import {
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, notFound, randomToken } from "../core";
-import { allFeatureStates, grantLearningReward, grantMembership, grantNova, grantXp, isProUser } from "../economy";
+import { allFeatureStates, exchangeNovaForPro, grantLearningReward, grantNova, grantXp, isProUser } from "../economy";
 import { notify } from "../notify";
 
 function reindeerSignature(payload: string) {
@@ -183,13 +182,15 @@ export const routes: RouteDef[] = [
       const owned = await db.select().from(assistantInventory).where(and(eq(assistantInventory.userId, user.userId), eq(assistantInventory.itemId, item.id))).limit(1);
       if (owned[0]) throw fail("NOVA_ITEM_OWNED");
 
-      await grantNova({
-        userId: user.userId,
-        amount: -item.priceNova,
-        reason: `購買 Novi 商品：${item.name}`,
-        source: "shop",
-        idempotencyKey: `shop:${user.userId}:${item.id}`,
-      });
+      if (item.priceNova > 0) {
+        await grantNova({
+          userId: user.userId,
+          amount: -item.priceNova,
+          reason: `購買 Novi 商品：${item.name}`,
+          source: "shop",
+          idempotencyKey: `shop:${user.userId}:${item.id}`,
+        });
+      }
       const rows = await db.insert(assistantInventory).values({ userId: user.userId, itemId: item.id }).onConflictDoNothing().returning();
       if (!rows[0]) throw fail("NOVA_ITEM_OWNED");
       await db.insert(assistantTransactions).values({ userId: user.userId, itemId: item.id, kind: "purchase", costNova: item.priceNova });
@@ -215,14 +216,12 @@ export const routes: RouteDef[] = [
       if (!plan) throw notFound("找不到可用的 Nova Pro 方案");
       if (plan.days > 30) throw badRequest("Nova Pro 兌換方案最多 30 天");
       const idempotencyKey = body.requestId ?? crypto.randomUUID();
-      const previous = (await db.select().from(novaProExchangeTransactions).where(eq(novaProExchangeTransactions.idempotencyKey, idempotencyKey)).limit(1))[0];
-      if (previous && previous.userId !== user.userId) throw conflict("此兌換請求識別碼已被使用");
-      if (previous) return { exchanged: false, plan, transaction: previous, balance: (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0 };
-      await grantNova({ userId: user.userId, amount: -plan.priceNova, reason: `Nova 點數兌換 Nova Pro ${plan.days} 天`, source: "pro_exchange", idempotencyKey: `proexchange:${idempotencyKey}` });
-      await grantMembership({ userId: user.userId, days: plan.days, actorId: user.userId, reason: `Nova 點數兌換 ${plan.days} 天`, action: "extend" });
-      const transaction = (await db.insert(novaProExchangeTransactions).values({ userId: user.userId, days: plan.days, priceNova: plan.priceNova, idempotencyKey }).returning())[0];
+      const result = await exchangeNovaForPro({ userId: user.userId, days: plan.days, priceNova: plan.priceNova, requestId: idempotencyKey });
+      if (result.status === "conflict") throw conflict("此兌換請求識別碼已被使用");
+      if (result.status === "active") throw conflict("Nova Pro 有效期間不可兌換，請於會員到期後再試");
+      const transaction = result.transaction;
       await notify({ userId: user.userId, kind: "membership", title: "✨ Nova Pro 兌換成功", body: `已使用 ${plan.priceNova} Nova 兌換 ${plan.days} 天 Nova Pro。`, link: "/profile?tab=pass", dedupeKey: `proexchange-notify:${transaction.id}` });
-      return { exchanged: true, plan, transaction, balance: (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0 };
+      return { exchanged: result.status === "exchanged", plan, transaction, balance: (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0 };
     },
   }),
 

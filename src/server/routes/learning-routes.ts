@@ -718,31 +718,97 @@ export const routes: RouteDef[] = [
   /* -------------------------------------------------------- focus */
   route({
     method: "POST",
-    path: "/focus/complete",
+    path: "/focus/start",
+    auth: "user",
+    rate: { limit: 10, windowSec: 3600, key: "focus-start" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ minutes: z.number().int().min(1).max(300) }));
+      const now = new Date();
+      const rows = await db.transaction(async (tx) => {
+        await tx.update(focusSessions).set({ status: "cancelled", completedAt: now }).where(and(eq(focusSessions.userId, user.userId), inArray(focusSessions.status, ["running", "paused"])));
+        return tx.insert(focusSessions).values({ userId: user.userId, minutes: 0, plannedMinutes: body.minutes, elapsedSeconds: 0, status: "running", startedAt: now, rewardGranted: false, studyRecorded: false, completedAt: null }).returning();
+      });
+      return { session: rows[0] };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/pause",
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(
-        z.object({
-          minutes: z.number().int().min(1).max(300),
-          subject: z.string().min(1).max(20),
-          reflection: z.string().max(500).optional(),
-          roomId: z.string().uuid().nullable().optional(),
-        }),
-      );
-      const rows = await db
-        .insert(focusSessions)
-        .values({ userId: user.userId, minutes: body.minutes, subject: body.subject, reflection: body.reflection ?? "", roomId: body.roomId ?? null })
-        .returning();
-      const { streak } = await recordStudy({ userId: user.userId, kind: "focus", subject: body.subject, minutes: body.minutes, detail: { sessionId: rows[0].id } });
-      const reward = await grantLearningReward({
-        userId: user.userId,
-        nova: Math.max(3, Math.round(body.minutes / 5)),
-        xp: Math.max(5, body.minutes * 2),
-        reason: `專注學習 ${body.minutes} 分鐘`,
-        idempotencyKey: `focus:${rows[0].id}`,
-      });
-      return { session: rows[0], reward, streak };
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid() }));
+      const session = (await db.select().from(focusSessions).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId), eq(focusSessions.status, "running"))).limit(1))[0];
+      if (!session) throw badRequest("找不到進行中的專注計時，請重新開始");
+      const now = new Date();
+      const elapsedSeconds = session.elapsedSeconds + Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
+      const rows = await db.update(focusSessions).set({ status: "paused", elapsedSeconds, pausedAt: now }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), eq(focusSessions.status, "running"))).returning();
+      if (!rows[0]) throw badRequest("專注計時狀態已變更，請重新整理");
+      return { session: rows[0] };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/resume",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid() }));
+      const now = new Date();
+      const rows = await db.update(focusSessions).set({ status: "running", startedAt: now, pausedAt: null }).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId), eq(focusSessions.status, "paused"))).returning();
+      if (!rows[0]) throw badRequest("找不到暫停中的專注計時，請重新開始");
+      return { session: rows[0] };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/cancel",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid() }));
+      const rows = await db.update(focusSessions).set({ status: "cancelled", completedAt: new Date() }).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId), inArray(focusSessions.status, ["running", "paused"]))).returning({ id: focusSessions.id });
+      return { cancelled: Boolean(rows[0]) };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/complete",
+    auth: "user",
+    rate: { limit: 30, windowSec: 3600, key: "focus-complete" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid(), subject: z.string().min(1).max(20), reflection: z.string().max(500).optional() }));
+      let session = (await db.select().from(focusSessions).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId))).limit(1))[0];
+      if (!session || session.status === "cancelled") throw badRequest("專注計時不存在或已取消，請重新開始");
+      if (session.status !== "completed") {
+        const now = new Date();
+        const elapsed = session.elapsedSeconds + (session.status === "running" ? Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000)) : 0);
+        const billableSeconds = Math.min(elapsed, session.plannedMinutes * 60);
+        const minutes = Math.floor(billableSeconds / 60);
+        if (minutes < 1) throw badRequest("至少專注一分鐘後才能完成記錄");
+        const completed = await db.update(focusSessions).set({ minutes, subject: body.subject, reflection: body.reflection ?? "", elapsedSeconds: billableSeconds, status: "completed", completedAt: now, pausedAt: null }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), inArray(focusSessions.status, ["running", "paused"]))).returning();
+        if (!completed[0]) throw badRequest("專注計時狀態已變更，請重新整理");
+        session = completed[0];
+      }
+      let streak = 0;
+      if (!session.studyRecorded) {
+        const recorded = await recordStudy({ userId: user.userId, kind: "focus", subject: session.subject, minutes: session.minutes, detail: { sessionId: session.id } });
+        streak = recorded.streak;
+        await db.update(focusSessions).set({ studyRecorded: true }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), eq(focusSessions.studyRecorded, false)));
+      }
+      let reward = { nova: 0, xp: 0 };
+      if (!session.rewardGranted) {
+        reward = await grantLearningReward({ userId: user.userId, nova: Math.max(3, Math.round(session.minutes / 5)), xp: Math.max(5, session.minutes * 2), reason: `專注學習 ${session.minutes} 分鐘`, idempotencyKey: `focus:${session.id}` });
+        await db.update(focusSessions).set({ rewardGranted: true }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), eq(focusSessions.rewardGranted, false)));
+      }
+      session = (await db.select().from(focusSessions).where(eq(focusSessions.id, session.id)).limit(1))[0] ?? session;
+      return { session, reward, streak };
     },
   }),
 
@@ -752,7 +818,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const rows = await db.select().from(focusSessions).where(eq(focusSessions.userId, user.userId)).orderBy(desc(focusSessions.completedAt)).limit(50);
+      const rows = await db.select().from(focusSessions).where(and(eq(focusSessions.userId, user.userId), eq(focusSessions.status, "completed"), sql`${focusSessions.completedAt} is not null`)).orderBy(desc(focusSessions.completedAt)).limit(50);
       return { sessions: rows };
     },
   }),
@@ -1205,7 +1271,8 @@ export const routes: RouteDef[] = [
       }
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : null;
       const requestedLimit = Number(ctx.query.get("limit") ?? 500);
-      const unlockedOnly = ctx.query.get("unlocked") === "true";
+      // 只有明確開放且透過 source=vocabulary 的百科挑戰可讀取全庫；一般查詢不可用 query 參數繞過解鎖。
+      const unlockedOnly = source !== "vocabulary";
       const baseLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
       const [{ total: totalRow }] = await db.select({ total: count() }).from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined);
       const totalWords = Number(totalRow ?? 0);
@@ -1308,13 +1375,13 @@ function buildNoviAdvice(input: {
   stats: SubjectStat[];
 }) {
   const parts: string[] = [];
-  parts.push(`${input.displayName}，今天累積 ${input.minutes} / ${input.goal} 分鐘`);
-  if (input.streak > 1) parts.push(`已連續學習 ${input.streak} 天，保持節奏！`);
+  parts.push(`今天累積學習 ${input.minutes} / ${input.goal} 分鐘`);
+  if (input.streak > 1) parts.push(`連續學習紀錄：${input.streak} 天`);
   const rising = input.stats.find((s) => s.trend === "up");
-  if (rising) parts.push(`${rising.subject}從 ${Math.round(rising.first)} 進步到 ${Math.round(rising.latest)}，做得很好。`);
+  if (rising) parts.push(`${rising.subject}近期平均：${Math.round(rising.first)} → ${Math.round(rising.latest)} 分`);
   if (input.weakest && input.stats.length) parts.push(`${input.weakest.subject}平均 ${input.weakest.average} 分，是目前最需要補強的科目。`);
-  if (input.dueWrong > 0) parts.push(`有 ${input.dueWrong} 題錯題到了複習時間，建議先花 15 分鐘處理。`);
+  if (input.dueWrong > 0) parts.push(`待複習錯題：${input.dueWrong} 題`);
   if (input.upcoming) parts.push(`距離「${input.upcoming.name}」還有 ${input.upcoming.days} 天。`);
-  if (parts.length === 1) parts.push("先從今日任務開始，完成第一項就能拿到 Nova！");
+  if (parts.length === 1) parts.push("目前沒有其他待處理項目。");
   return parts.join("　");
 }

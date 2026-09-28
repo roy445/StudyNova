@@ -1,9 +1,11 @@
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   studyMaterials,
   studyMaterialPages,
+  friends,
+  friendBlocks,
   ocrDocuments,
   ocrPages,
   notes,
@@ -50,6 +52,17 @@ export async function extractText(mime: string, data: Buffer, userId: string, su
 }
 
 const visibility = z.enum(["private", "friends", "group", "link", "public"]);
+
+async function canViewMaterial(material: typeof studyMaterials.$inferSelect, viewerId: string, viaShareSlug = false) {
+  if (material.userId === viewerId) return true;
+  if (material.visibility === "public") return true;
+  if (material.visibility === "link") return viaShareSlug && Boolean(material.shareSlug);
+  if (material.visibility !== "friends") return false;
+  const blocked = (await db.select({ id: friendBlocks.id }).from(friendBlocks).where(or(and(eq(friendBlocks.userId, material.userId), eq(friendBlocks.blockedId, viewerId)), and(eq(friendBlocks.userId, viewerId), eq(friendBlocks.blockedId, material.userId)))).limit(1))[0];
+  if (blocked) return false;
+  const friendship = (await db.select({ id: friends.id }).from(friends).where(or(and(eq(friends.userId, material.userId), eq(friends.friendId, viewerId)), and(eq(friends.userId, viewerId), eq(friends.friendId, material.userId)))).limit(1))[0];
+  return Boolean(friendship);
+}
 
 function parseQuickMemoryText(raw: string) {
   return raw
@@ -98,12 +111,14 @@ export const contentRoutes: RouteDef[] = [
         .values({ userId: user.userId, title, subject: "英文", kind: file instanceof File ? "pdf" : "text", status: "processing", content: sanitizeText(rawText) })
         .returning();
       const material = created[0];
+      let storedObjectId: string | null = null;
 
       try {
         if (file instanceof File) {
           const buf = Buffer.from(await file.arrayBuffer());
           const mime = file.type || "application/octet-stream";
           const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: buf, allow: ["pdf", "text", "image"] });
+          storedObjectId = stored.id;
           const kind = mime === "application/pdf" ? "pdf" : mime.startsWith("image/") ? "image" : "txt";
           if (kind !== "txt") await consumeFeature(user.userId, "material_organize");
           const text = await extractText(mime, buf, user.userId, subject);
@@ -112,10 +127,12 @@ export const contentRoutes: RouteDef[] = [
             .update(studyMaterials)
             .set({ kind, content: text, status: "ready", updatedAt: new Date() })
             .where(eq(studyMaterials.id, material.id));
+          storedObjectId = null;
         } else {
           await db.update(studyMaterials).set({ status: "ready", updatedAt: new Date() }).where(eq(studyMaterials.id, material.id));
         }
       } catch (err) {
+        if (storedObjectId) await deleteObject(storedObjectId, user.userId, false).catch(() => undefined);
         await db
           .update(studyMaterials)
           .set({ status: "failed", errorMessage: err instanceof Error ? err.message.slice(0, 200) : "處理失敗" })
@@ -139,11 +156,27 @@ export const contentRoutes: RouteDef[] = [
       const user = ctx.requireUser();
       const m = (await db.select().from(studyMaterials).where(eq(studyMaterials.id, ctx.params.id)).limit(1))[0];
       if (!m) throw notFound("找不到教材");
-      if (m.userId !== user.userId && m.visibility === "private") throw forbidden();
+      if (!(await canViewMaterial(m, user.userId))) throw notFound("找不到教材");
       const pages = await db.select().from(studyMaterialPages).where(eq(studyMaterialPages.materialId, m.id)).orderBy(asc(studyMaterialPages.pageNumber));
       return {
         material: m,
         pages: pages.map((p) => ({ ...p, fileUrl: p.objectId ? signObjectUrl(p.objectId, user.userId) : null })),
+      };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/materials/shared/:slug",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const material = (await db.select().from(studyMaterials).where(eq(studyMaterials.shareSlug, ctx.params.slug)).limit(1))[0];
+      if (!material || !(await canViewMaterial(material, user.userId, true))) throw notFound("找不到可讀取的分享教材");
+      const pages = await db.select().from(studyMaterialPages).where(eq(studyMaterialPages.materialId, material.id)).orderBy(asc(studyMaterialPages.pageNumber));
+      return {
+        material: { id: material.id, title: material.title, subject: material.subject, kind: material.kind, summary: material.summary, tags: material.tags, content: material.content, createdAt: material.createdAt },
+        pages: pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, text: page.text, fileUrl: page.objectId ? signObjectUrl(page.objectId, user.userId) : null })),
       };
     },
   }),
@@ -160,8 +193,9 @@ export const contentRoutes: RouteDef[] = [
       const m = (await db.select().from(studyMaterials).where(eq(studyMaterials.id, ctx.params.id)).limit(1))[0];
       if (!m) throw notFound("找不到教材");
       if (m.userId !== user.userId) throw forbidden();
+      if (body.visibility === "group") throw badRequest("目前尚未支援指定群組的教材分享；請選擇私人、好友、連結或公開。");
       const patch: Record<string, unknown> = { ...body, updatedAt: new Date() };
-      if (body.visibility && body.visibility !== "private" && !m.shareSlug) patch.shareSlug = slugToken(14);
+      if (body.visibility && body.visibility !== "private" && (m.visibility === "private" || !m.shareSlug)) patch.shareSlug = slugToken(14);
       const rows = await db.update(studyMaterials).set(patch).where(eq(studyMaterials.id, m.id)).returning();
       return { material: rows[0] };
     },
@@ -1063,12 +1097,22 @@ stage = "ai_provider";
 
       const buf = Buffer.from(await file.arrayBuffer());
       const stored = await putObject({ userId: user.userId, filename: file.name || "record.webm", mimeType: file.type || "audio/webm", data: buf, allow: ["audio"] });
-      const rec = (
-        await db
-          .insert(voiceRecords)
-          .values({ userId: user.userId, objectId: stored.id, mode, subject, referenceText, durationSec: Math.round(durationSec), status: "processing" })
-          .returning()
-      )[0];
+      let rec: (typeof voiceRecords.$inferSelect) | undefined;
+      try {
+        rec = (
+          await db
+            .insert(voiceRecords)
+            .values({ userId: user.userId, objectId: stored.id, mode, subject, referenceText, durationSec: Math.round(durationSec), status: "processing" })
+            .returning()
+        )[0];
+      } catch (error) {
+        await deleteObject(stored.id, user.userId, false).catch(() => undefined);
+        throw error;
+      }
+      if (!rec) {
+        await deleteObject(stored.id, user.userId, false).catch(() => undefined);
+        throw fail("SYS_INTERNAL", { details: { stage: "voice_record_persist", returnedRows: 0 } });
+      }
 
       try {
         const { data } = await runAiJson<{

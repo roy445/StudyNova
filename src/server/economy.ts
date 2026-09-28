@@ -8,6 +8,7 @@ import {
   assistantLevels,
   memberships,
   membershipHistory,
+  novaProExchangeTransactions,
   featurePermissions,
   featureUsage,
   achievements,
@@ -176,6 +177,35 @@ export async function grantLearningReward(params: {
   return { nova, xp, doubled: pro, balance: novaRes?.balance ?? (await novaBalance(params.userId)), levelUp: xpRes?.levelUp ?? false, level: xpRes?.level ?? 0 };
 }
 
+/** Atomically exchange Nova for Pro so a partial DB failure cannot charge without granting membership. */
+export async function exchangeNovaForPro(params: { userId: string; days: number; priceNova: number; requestId: string }) {
+  return db.transaction(async (tx) => {
+    await tx.insert(memberships).values({ userId: params.userId, tier: "free" }).onConflictDoNothing();
+    const membership = (await tx.select().from(memberships).where(eq(memberships.userId, params.userId)).for("update").limit(1))[0];
+    const previous = (await tx.select().from(novaProExchangeTransactions).where(eq(novaProExchangeTransactions.idempotencyKey, params.requestId)).limit(1))[0];
+    if (previous) return previous.userId === params.userId ? { status: "existing" as const, transaction: previous } : { status: "conflict" as const, transaction: previous };
+    if (membership?.tier === "pro" && (!membership.expiresAt || membership.expiresAt > new Date())) return { status: "active" as const, transaction: null };
+
+    if (params.priceNova > 0) {
+      const ledgerKey = `proexchange:${params.requestId}`;
+      const priorDebit = (await tx.select({ id: novaTransactions.id }).from(novaTransactions).where(eq(novaTransactions.idempotencyKey, ledgerKey)).limit(1))[0];
+      if (!priorDebit) {
+        await tx.insert(novaAccounts).values({ userId: params.userId }).onConflictDoNothing();
+        const debited = await tx.update(novaAccounts).set({ balance: sql`${novaAccounts.balance} - ${params.priceNova}`, lifetimeSpent: sql`${novaAccounts.lifetimeSpent} + ${params.priceNova}`, updatedAt: new Date() }).where(and(eq(novaAccounts.userId, params.userId), gte(novaAccounts.balance, params.priceNova))).returning({ balance: novaAccounts.balance });
+        if (!debited[0]) throw fail("NOVA_INSUFFICIENT");
+        await tx.insert(novaTransactions).values({ userId: params.userId, amount: -params.priceNova, balanceAfter: debited[0].balance, reason: `Nova 點數兌換 Nova Pro ${params.days} 天`, source: "pro_exchange", actorId: params.userId, idempotencyKey: ledgerKey });
+      }
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + params.days * 86_400_000);
+    await tx.update(memberships).set({ tier: "pro", expiresAt, grantedBy: params.userId, updatedAt: now }).where(eq(memberships.userId, params.userId));
+    await tx.insert(membershipHistory).values({ userId: params.userId, action: "extend", tier: "pro", days: params.days, reason: `Nova 點數兌換 ${params.days} 天`, actorId: params.userId });
+    const transaction = (await tx.insert(novaProExchangeTransactions).values({ userId: params.userId, days: params.days, priceNova: params.priceNova, idempotencyKey: params.requestId }).returning())[0];
+    return { status: "exchanged" as const, transaction, expiresAt };
+  });
+}
+
 /* ------------------------------------------------------- FEATURE GATE */
 type QuotaPermission = FeaturePermissionPolicy;
 
@@ -278,6 +308,7 @@ export async function consumeFeature(userId: string, feature: string, units = 1,
     .values({ userId, feature, usageDate: today, count: 0 })
     .onConflictDoNothing();
 
+  let usageId: string | undefined;
   if (!state.unlimited) {
     const updated = await db
       .update(featureUsage)
@@ -290,25 +321,39 @@ export async function consumeFeature(userId: string, feature: string, units = 1,
           sql`(${featureUsage.unlimited} = true or ${featureUsage.count} + ${units} <= ${state.limit})`,
         ),
       )
-      .returning({ count: featureUsage.count });
+      .returning({ id: featureUsage.id, count: featureUsage.count });
     if (!updated[0]) {
       throw fail("QUOTA_EXHAUSTED", { message: `今日「${state.label}」已達上限（${state.limit} 次）`, details: { feature, limit: state.limit } });
     }
+    usageId = updated[0].id;
   } else {
-    await db
+    const updated = await db
       .update(featureUsage)
       .set({ count: sql`${featureUsage.count} + ${units}` })
-      .where(and(eq(featureUsage.userId, userId), eq(featureUsage.feature, feature), eq(featureUsage.usageDate, today)));
+      .where(and(eq(featureUsage.userId, userId), eq(featureUsage.feature, feature), eq(featureUsage.usageDate, today)))
+      .returning({ id: featureUsage.id });
+    usageId = updated[0]?.id;
   }
 
   if (state.novaCost > 0) {
-    await grantNova({
-      userId,
-      amount: -state.novaCost * units,
-      reason: `使用功能：${state.label}`,
-      source: "feature",
-      idempotencyKey: chargeKey,
-    });
+    try {
+      await grantNova({
+        userId,
+        amount: -state.novaCost * units,
+        reason: `使用功能：${state.label}`,
+        source: "feature",
+        idempotencyKey: chargeKey,
+      });
+    } catch (error) {
+      if (usageId) {
+        try {
+          await db.update(featureUsage).set({ count: sql`greatest(0, ${featureUsage.count} - ${units})` }).where(eq(featureUsage.id, usageId));
+        } catch (rollbackError) {
+          console.error("[quota] failed to compensate reservation after Nova charge failure", { userId, feature, usageId, error: rollbackError instanceof Error ? rollbackError.message.slice(0, 180) : "unknown" });
+        }
+      }
+      throw error;
+    }
   }
   return featureState(userId, feature);
 }

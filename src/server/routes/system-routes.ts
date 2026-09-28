@@ -5,7 +5,7 @@ import { pushSubscriptions, notifications, users, novaTransactions, questions, j
 import { route, type Ctx, type RouteDef } from "../router";
 import { badRequest, fail, hashPassword, verifyPassword, generateNovaId, safeErrorMessage, toCsv, todayStr } from "../core";
 import { listNotifications, markRead, unreadCount, pushConfigured, sendPush } from "../notify";
-import { CRON_TASKS, queue, runCronTask, isWeekOpen, type JobName } from "../queue";
+import { CRON_TASKS, queue, runCronTask, isWeekOpen, type CronTask } from "../queue";
 import { storageHealth, activeDriver, putObject, readObject, deleteObject } from "../storage";
 import { aiConfigured, providerConfigs, providerMetrics, runAi } from "../ai";
 import { grantNova, allFeatureStates, ensureDailyTasks } from "../economy";
@@ -32,10 +32,14 @@ async function handleCron(ctx: Ctx) {
   const provided = ctx.req.headers.get("x-cron-secret") ?? bearer;
   if (!secret) throw fail("ADMIN_CRON_SECRET_MISSING");
   if (provided !== secret) throw fail("ADMIN_CRON_SECRET_INVALID");
-  const task = (ctx.query.get("task") ?? "daily_tasks_refresh") as JobName;
+  const task = (ctx.query.get("task") ?? "daily_tasks_refresh") as CronTask;
   if (!CRON_TASKS.some((t) => t.task === task)) throw fail("ADMIN_CRON_TASK_UNKNOWN");
   const requestedUid = ctx.query.get("uid") ?? "";
-  const taskUid = requestedUid && !requestedUid.includes("%") ? requestedUid : `${todayStr()}:${new Date().getUTCHours()}`;
+  const now = new Date();
+  const fallbackUid = task === "weekly_exam_open"
+    ? `${todayStr()}:${now.getUTCHours()}:${Math.floor(now.getUTCMinutes() / 30)}`
+    : `${todayStr()}:${now.getUTCHours()}`;
+  const taskUid = requestedUid && !requestedUid.includes("%") ? requestedUid : fallbackUid;
   return runCronTask(task, taskUid);
 }
 
@@ -190,7 +194,7 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const body = await ctx.json(z.object({ task: z.string().max(60) }));
       if (!CRON_TASKS.some((t) => t.task === body.task)) throw fail("ADMIN_CRON_TASK_UNKNOWN");
-      return runCronTask(body.task as JobName, `manual:${Date.now()}`);
+      return runCronTask(body.task as CronTask, `manual:${Date.now()}`);
     },
   }),
 
@@ -209,28 +213,45 @@ export const routes: RouteDef[] = [
         out.push({ name: "Database", status: "error", detail: "無法連線資料庫" });
       }
       const q = queue();
-      const qh = await q.health();
-      out.push({ name: "Queue / Worker", status: qh.status, detail: `${q.name}｜待處理 ${qh.pending}` });
+      let qh: Awaited<ReturnType<typeof q.health>> | null = null;
+      try {
+        qh = await q.health();
+        out.push({ name: "Queue / Worker", status: qh.status, detail: `${q.name}｜待處理 ${qh.pending}｜${qh.detail}` });
+      } catch (error) {
+        out.push({ name: "Queue / Worker", status: "error", detail: error instanceof Error ? error.message.slice(0, 180) : "queue health query failed" });
+      }
       out.push({
         name: "Redis",
-        status: process.env.REDIS_URL ? qh.status : "warning",
-        detail: process.env.REDIS_URL ? qh.detail : "未設定 REDIS_URL，使用 PostgreSQL Queue Adapter",
+        status: process.env.REDIS_URL ? "warning" : "healthy",
+        detail: process.env.REDIS_URL ? "已設定但本版本不使用 Redis dispatch；請確認 PostgreSQL queue_drain cron" : "未設定 REDIS_URL，使用 PostgreSQL Queue Adapter",
       });
-      const sh = await storageHealth();
-      out.push({ name: "Storage", status: sh.status, detail: sh.detail });
-      const providers = await providerMetrics();
-      const okProvider = providers.find((p) => p.configured && p.enabled && !p.cooldownUntil);
-      out.push({
-        name: "AI Provider",
-        status: !aiConfigured() ? "error" : okProvider ? "healthy" : "warning",
-        detail: aiConfigured() ? `可用：${providers.filter((p) => p.configured).map((p) => p.provider).join(", ")}` : "未設定任何 AI API Key",
-      });
+      try {
+        const sh = await storageHealth();
+        out.push({ name: "Storage", status: sh.status, detail: sh.detail });
+      } catch (error) {
+        out.push({ name: "Storage", status: "error", detail: error instanceof Error ? error.message.slice(0, 180) : "storage health query failed" });
+      }
+      try {
+        const providers = await providerMetrics();
+        const okProvider = providers.find((p) => p.configured && p.enabled && !p.cooldownUntil);
+        out.push({
+          name: "AI Provider",
+          status: !aiConfigured() ? "error" : okProvider ? "healthy" : "warning",
+          detail: aiConfigured() ? `可用：${providers.filter((p) => p.configured).map((p) => p.provider).join(", ")}` : "未設定任何 AI API Key",
+        });
+      } catch (error) {
+        out.push({ name: "AI Provider", status: "error", detail: error instanceof Error ? error.message.slice(0, 180) : "provider health query failed" });
+      }
       out.push({ name: "OCR / TTS", status: aiConfigured() ? "healthy" : "warning", detail: aiConfigured() ? "使用 AI Provider 視覺與語音能力" : "需要 AI Provider" });
       try { const cjk = await runCjkHealth(); out.push({ name: "CJK Font", status: cjk.healthy ? "healthy" : "error", detail: cjk.healthy ? `Noto Sans CJK TC 已嵌入（${cjk.bytes} bytes）` : `字型健康檢查失敗：${cjk.missingGlyphs.join(",") || cjk.pdf.error || cjk.image.error || "renderer"}` }); } catch (error) { out.push({ name: "CJK Font", status: "error", detail: error instanceof Error ? error.message : String(error) }); }
       out.push({ name: "Push", status: pushConfigured() ? "healthy" : "warning", detail: pushConfigured() ? "VAPID 已設定" : "未設定 VAPID 金鑰" });
       out.push({ name: "Cron", status: process.env.CRON_SECRET ? "healthy" : "warning", detail: process.env.CRON_SECRET ? "CRON_SECRET 已設定" : "未設定 CRON_SECRET" });
-      const [obj] = await db.select({ c: sql<number>`count(*)::int`, bytes: sql<number>`coalesce(sum(${storageObjects.sizeBytes}),0)::int` }).from(storageObjects);
-      out.push({ name: "Object Usage", status: "healthy", detail: `${obj?.c ?? 0} 個檔案／${Math.round((obj?.bytes ?? 0) / 1024)} KB（driver: ${activeDriver()}）` });
+      try {
+        const [obj] = await db.select({ c: sql<number>`count(*)::int`, bytes: sql<number>`coalesce(sum(${storageObjects.sizeBytes}),0)::int` }).from(storageObjects);
+        out.push({ name: "Object Usage", status: "healthy", detail: `${obj?.c ?? 0} 個檔案／${Math.round((obj?.bytes ?? 0) / 1024)} KB（driver: ${activeDriver()}）` });
+      } catch (error) {
+        out.push({ name: "Object Usage", status: "error", detail: error instanceof Error ? error.message.slice(0, 180) : "object usage query failed" });
+      }
       return { services: out, checkedAt: new Date().toISOString() };
     },
   }),

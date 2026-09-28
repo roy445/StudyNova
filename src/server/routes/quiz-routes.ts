@@ -7,9 +7,11 @@ import {
   quizQuestionHistory,
   quizAttempts,
   answers,
+  studyRecords,
   wrongQuestions,
   studyMaterials,
   dailyWords,
+  dailyWordAppearances,
   wordProgress,
   sentences,
   sentenceProgress,
@@ -499,9 +501,12 @@ export const routes: RouteDef[] = [
       return {
         attempt,
         quiz,
+        // 正解與解析只在提交後開放；進行中的 attempt 仍可查看題幹與自己的作答。
+        reviewAvailable: attempt.status === "submitted",
         review: qs.map((q) => {
           const a = saved.find((s) => s.questionId === q.id);
-          return { questionId: q.id, stem: q.stem, options: q.options, type: q.type, answer: q.answer, explanation: q.explanation, response: a?.response ?? [], isCorrect: a?.isCorrect ?? false };
+          const submitted = attempt.status === "submitted";
+          return { questionId: q.id, stem: q.stem, options: q.options, type: q.type, ...(submitted ? { answer: q.answer, explanation: q.explanation, isCorrect: a?.isCorrect ?? false } : {}), response: a?.response ?? [] };
         }),
       };
     },
@@ -615,11 +620,14 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/words/answer",
     auth: "user",
+    rate: { limit: 120, windowSec: 3600, key: "words-answer" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ wordId: z.string().uuid(), correct: z.boolean(), mode: z.string().max(20).default("card"), selfRating: z.enum(["again", "hard", "good", "easy"]).optional(), addToWrongBook: z.boolean().default(false) }));
       const word = (await db.select().from(dailyWords).where(eq(dailyWords.id, body.wordId)).limit(1))[0];
       if (!word) throw notFound("找不到單字");
+      const appeared = await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWordAppearances.wordId, word.id))).limit(1);
+      if (!appeared[0]) throw forbidden("這個單字尚未解鎖，請先完成每日單字安排");
       const now = new Date();
       await db.insert(wordProgress).values({ userId: user.userId, wordId: word.id, firstSeenAt: now }).onConflictDoNothing();
       const rows = await db
@@ -677,19 +685,30 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/words/session-complete",
     auth: "user",
+    rate: { limit: 5, windowSec: 3600, key: "words-session-complete" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ correct: z.number().int().min(0).max(200), total: z.number().int().min(1).max(200), seconds: z.number().int().min(0).max(7200) }));
-      const sessionKey = `words:${user.userId}:${Date.now()}`;
+      await ctx.json(z.object({ correct: z.number().int().min(0).max(200), total: z.number().int().min(1).max(200), seconds: z.number().int().min(0).max(7200) }));
+      const date = todayStr();
+      const appearances = await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWordAppearances.appearanceDate, date)));
+      const appearedIds = appearances.map((item) => item.wordId);
+      if (!appearedIds.length) throw badRequest("今天尚未安排可完成的單字，請先載入每日單字");
+      const reviewRows = await db.select({ wordId: wordProgress.wordId, lastCorrect: wordProgress.lastCorrect }).from(wordProgress).where(and(eq(wordProgress.userId, user.userId), inArray(wordProgress.wordId, appearedIds), sql`${wordProgress.updatedAt} >= now() - interval '24 hours'`));
+      if (reviewRows.length < Math.min(3, appearedIds.length)) throw badRequest("請先完成至少三個今日已解鎖單字的複習");
+      const correct = reviewRows.filter((row) => row.lastCorrect === true).length;
+      const total = reviewRows.length;
+      const minutes = Math.max(1, Math.min(30, Math.round(total / 2)));
+      const sessionKey = `words:${user.userId}:${date}`;
       const reward = await grantLearningReward({
         userId: user.userId,
-        nova: 5 + Math.round((body.correct / body.total) * 10),
-        xp: 10 + body.correct * 2,
-        reason: `完成單字練習 ${body.correct}/${body.total}`,
+        nova: 5 + Math.round((correct / total) * 10),
+        xp: 10 + correct * 2,
+        reason: `完成單字練習 ${correct}/${total}`,
         idempotencyKey: sessionKey,
       });
-      await recordStudy({ userId: user.userId, kind: "words", subject: "英文", minutes: Math.max(1, Math.round(body.seconds / 60)) });
-      return { reward };
+      const recorded = await db.select({ id: studyRecords.id }).from(studyRecords).where(and(eq(studyRecords.userId, user.userId), eq(studyRecords.kind, "words"), sql`${studyRecords.detail}->>'sessionKey' = ${sessionKey}`)).limit(1);
+      if (!recorded[0]) await recordStudy({ userId: user.userId, kind: "words", subject: "英文", minutes, detail: { sessionKey, total, correct } });
+      return { reward, total, correct, minutes };
     },
   }),
 

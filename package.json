@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "db:migrate:release": "node scripts/apply-release-migrations.mjs",
     "db:migrate:ai-solution": "node scripts/apply-ai-solution-migration.mjs",
     "db:check:ai-solution": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f scripts/check-ai-solution-permission.sql"
   },

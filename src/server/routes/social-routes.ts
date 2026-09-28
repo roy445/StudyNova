@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, inArray, ne, or, sql, gte, lte, asc } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, or, sql, gte, lte, asc } from "drizzle-orm";
 import { db } from "@/db";
 import {
   users,
@@ -29,15 +29,27 @@ import {
   challengeAnswers,
   challengeSettlements,
   novaTransactions,
+  shareAnalytics,
+  shareCopies,
+  aiArtifacts,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, forbidden, fingerprint, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
 import { grantLearningReward } from "../economy";
 import { notify } from "../notify";
+import { objectOwner, readObject } from "../storage";
 
 async function friendIds(userId: string) {
   const rows = await db.select({ friendId: friends.friendId }).from(friends).where(eq(friends.userId, userId));
   return rows.map((r) => r.friendId);
+}
+
+async function canViewShare(row: typeof shares.$inferSelect, viewerId: string | null) {
+  if (row.visibility === "public" || row.visibility === "link") return true;
+  if (!viewerId || row.userId === viewerId) return Boolean(viewerId);
+  if (row.visibility !== "friends") return false;
+  const friendship = await db.select({ userId: friends.userId }).from(friends).where(or(and(eq(friends.userId, viewerId), eq(friends.friendId, row.userId)), and(eq(friends.userId, row.userId), eq(friends.friendId, viewerId)))).limit(1);
+  return Boolean(friendship[0]);
 }
 
 async function vocabularyChallengeSetting() {
@@ -55,6 +67,37 @@ function normalizeChallengeOption(value: unknown) {
 function challengeQuestionFingerprint(item: Record<string, unknown>) {
   const options = Array.isArray(item.options) ? item.options.map(normalizeChallengeOption).sort().join("|") : "";
   return fingerprint("challenge-question", String(item.word ?? ""), `${String(item.meaning ?? "")}|${options}`);
+}
+
+function publicChallengePayload(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const payload = value as Record<string, unknown>;
+  if (!Array.isArray(payload.items)) return payload;
+  return {
+    ...payload,
+    items: payload.items.map((raw) => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+      const item = raw as Record<string, unknown>;
+      const safe = { ...item };
+      delete safe.answer;
+      delete safe.answerLabel;
+      delete safe.expected;
+      delete safe.canonicalAnswer;
+      delete safe.correct;
+      const semanticOptions = safe.semanticOptions;
+      delete safe.semanticOptions;
+      const publicSemanticOptions = Array.isArray(semanticOptions) ? semanticOptions.map((option) => {
+        if (!option || typeof option !== "object" || Array.isArray(option)) return {};
+        const publicOption = { ...(option as Record<string, unknown>) };
+        delete publicOption.correct;
+        return publicOption;
+      }) : undefined;
+      return {
+        ...safe,
+        ...(publicSemanticOptions ? { semanticOptions: publicSemanticOptions } : {}),
+      };
+    }),
+  };
 }
 
 async function settleChallengeStake(challenge: typeof challenges.$inferSelect) {
@@ -250,7 +293,7 @@ export const routes: RouteDef[] = [
           .innerJoin(users, eq(users.userId, challengeParticipants.userId))
           .where(eq(challengeParticipants.challengeId, c.id))
           .orderBy(desc(challengeParticipants.score), asc(challengeParticipants.durationSec));
-        out.push({ ...c, participants: parts, joined: parts.some((p) => p.userId === user.userId) });
+        out.push({ ...c, payload: publicChallengePayload(c.payload), participants: parts, joined: parts.some((p) => p.userId === user.userId) });
       }
       return { challenges: out };
     },
@@ -314,19 +357,21 @@ export const routes: RouteDef[] = [
           for (let i = 0; i < Math.min(count, distinctPool.length); i += 1) {
             const current = distinctPool[i];
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
-            const answer = body.challengeMode === "part_of_speech" ? current.partOfSpeech : direction === "zh2en" ? current.word : current.meaning;
+            const answer = body.challengeMode === "semantic_image" ? `${current.id}-correct` : body.challengeMode === "part_of_speech" ? current.partOfSpeech : direction === "zh2en" ? current.word : current.meaning;
+            const answerLabel = body.challengeMode === "semantic_image" ? "語意圖片" : answer;
             const options = body.challengeMode === "part_of_speech"
               ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4)
               : [answer, ...distinctPool.filter((item) => item.id !== current.id).map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean)].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4);
-            challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: current.example, options: options.sort(() => Math.random() - 0.5), answer });
+            challengeItems.push({ ...current, direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: current.example, options: options.sort(() => Math.random() - 0.5), answer, answerLabel });
           }
         } else {
           for (let i = 0; i < Math.min(count, Math.floor(distinctPool.length / 4)); i += 1) {
             const group = distinctPool.slice(i * 4, i * 4 + 4);
             const direction = body.direction === "mixed" ? (i % 2 === 0 ? "zh2en" : "en2zh") : body.direction;
-            const answer = body.challengeMode === "part_of_speech" ? group[0].partOfSpeech : direction === "zh2en" ? group[0].word : group[0].meaning;
+            const answer = body.challengeMode === "semantic_image" ? `${group[0].id}-correct` : body.challengeMode === "part_of_speech" ? group[0].partOfSpeech : direction === "zh2en" ? group[0].word : group[0].meaning;
+            const answerLabel = body.challengeMode === "semantic_image" ? "語意圖片" : answer;
             const options = body.challengeMode === "part_of_speech" ? [answer, "n.", "v.", "adj.", "adv.", "prep.", "conj."].filter((item, itemIndex, all) => all.indexOf(item) === itemIndex).slice(0, 4) : group.map((item) => direction === "zh2en" ? item.word : item.meaning).filter(Boolean);
-            challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: group[0].example, options: [...options].sort(() => Math.random() - 0.5), answer });
+            challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: group[0].example, options: [...options].sort(() => Math.random() - 0.5), answer, answerLabel });
           }
         }
         if (challengeItems.length < 5) throw fail("CHAL_BANK_EMPTY");
@@ -358,7 +403,7 @@ export const routes: RouteDef[] = [
       for (const id of body.inviteIds) {
         await notify({ userId: id, kind: "challenge", title: `⚔️ ${user.displayName} 向你發起挑戰`, body: body.title, link: "/challenge", dedupeKey: `chal:${rows[0].id}:${id}`, push: true });
       }
-      return { challenge: rows[0] };
+      return { challenge: { ...rows[0], payload: publicChallengePayload(rows[0].payload) } };
     },
   }),
 
@@ -374,6 +419,7 @@ export const routes: RouteDef[] = [
       if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       if (challenge.kind !== "word") throw badRequest("這不是單字挑戰");
       if (challenge.status !== "open") throw badRequest("這個挑戰目前已暫停或關閉");
+      if (challenge.expiresAt && new Date(challenge.expiresAt) <= new Date()) throw fail("SOCIAL_CHALLENGE_ENDED");
       const payload = challenge.payload as { track?: "junior" | "senior"; questionCount?: number; difficulty?: string; direction?: string; timeMode?: "standard" | "sprint"; items?: Array<Record<string, unknown>>; readyUserIds?: string[] };
       const track = payload.track === "senior" ? "senior" : "junior";
       const count = Math.max(5, Math.min(200, Number(payload.questionCount ?? 10)));
@@ -391,7 +437,22 @@ export const routes: RouteDef[] = [
       const rows = freshRows.slice(0, count);
       if (!rows.length) throw fail("CHAL_BANK_EMPTY", { message: "這位使用者已完成目前題庫的題目與選項，請等待新的題庫內容" });
       await db.insert(challengeQuestionHistory).values(rows.map((record) => ({ userId: user.userId, challengeId: challenge.id, questionFingerprint: challengeQuestionFingerprint(record as Record<string, unknown>), appearedDate, options: Array.isArray((record as Record<string, unknown>).options) ? ((record as Record<string, unknown>).options as unknown[]).map(String) : [] }))).onConflictDoNothing();
-      return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal", timeMode: payload.timeMode ?? "standard" }, words: rows };
+      const publicWords = rows.map((row) => {
+        const item = row as Record<string, unknown>;
+        const semanticOptions = Array.isArray(item.semanticOptions)
+          ? item.semanticOptions.map((option) => {
+              const value = option as Record<string, unknown>;
+              return { id: value.id, label: value.label, emoji: value.emoji, imageUrl: value.imageUrl };
+            })
+          : undefined;
+        return {
+          id: item.id, word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech,
+          example: item.example, exampleZh: item.exampleZh, level: item.level,
+          direction: item.direction, challengeMode: item.challengeMode, timeMode: item.timeMode,
+          options: item.options, sentence: item.sentence, semanticOptions,
+        };
+      });
+      return { challengeId: challenge.id, title: challenge.title, expiresAt: challenge.expiresAt, readyCount: payload.readyUserIds?.length ?? 0, ready: (payload.readyUserIds ?? []).includes(user.userId), settings: { track, count, direction: payload.direction ?? "mixed", difficulty: payload.difficulty ?? "normal", timeMode: payload.timeMode ?? "standard" }, words: publicWords };
     },
   }),
 
@@ -403,6 +464,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const challenge = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
       if (!challenge || challenge.kind !== "word") throw fail("CHAL_MATCH_NOT_FOUND");
+      if (challenge.status !== "open" || (challenge.expiresAt && new Date(challenge.expiresAt) <= new Date())) throw fail("SOCIAL_CHALLENGE_ENDED");
       const ids = await friendIds(user.userId);
       if (challenge.creatorId !== user.userId && !ids.includes(challenge.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       const payload = challenge.payload as { readyUserIds?: string[] };
@@ -417,6 +479,7 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/challenges/:id/answer",
     auth: "user",
+    rate: { limit: 300, windowSec: 3600, key: "challenge-answer" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ questionIndex: z.number().int().min(0).max(200), correct: z.boolean(), response: z.string().max(500).default("") }));
@@ -428,13 +491,17 @@ export const routes: RouteDef[] = [
       const challengePayload = challenge.payload as { items?: Array<Record<string, unknown>> };
       const item = challengePayload.items?.[body.questionIndex];
       if (!item) throw badRequest("題目不存在或已失效");
-      const expected = String(item.answer ?? "").trim().toLocaleLowerCase();
+      const canonicalAnswer = String(item.challengeMode === "semantic_image" ? `${String(item.id ?? "")}-correct` : item.answer ?? "").trim();
+      if (!canonicalAnswer) throw badRequest("這道題目缺少有效答案，請聯絡管理員");
+      const displayAnswer = String(item.answerLabel ?? (item.challengeMode === "semantic_image" ? "語意圖片" : item.answer) ?? "").trim();
+      const expected = canonicalAnswer.toLocaleLowerCase();
       const actualCorrect = expected.length > 0 && expected === body.response.trim().toLocaleLowerCase();
       await db.insert(challengeParticipants).values({ challengeId: challenge.id, userId: user.userId }).onConflictDoNothing();
       const inserted = await db.insert(challengeAnswers).values({ challengeId: challenge.id, userId: user.userId, questionIndex: body.questionIndex, correct: actualCorrect, response: body.response }).onConflictDoNothing().returning();
       if (!inserted[0]) {
+        const previous = (await db.select({ correct: challengeAnswers.correct }).from(challengeAnswers).where(and(eq(challengeAnswers.challengeId, challenge.id), eq(challengeAnswers.userId, user.userId), eq(challengeAnswers.questionIndex, body.questionIndex))).limit(1))[0];
         const current = (await db.select({ points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount }).from(challengeParticipants).where(and(eq(challengeParticipants.challengeId, challenge.id), eq(challengeParticipants.userId, user.userId))).limit(1))[0];
-        return { accepted: false, points: current?.points ?? 0, correctCount: current?.correctCount ?? 0, wrongCount: current?.wrongCount ?? 0, reason: "這一題已經提交過" };
+        return { accepted: false, isCorrect: previous?.correct ?? false, expectedAnswer: displayAnswer, points: current?.points ?? 0, correctCount: current?.correctCount ?? 0, wrongCount: current?.wrongCount ?? 0, reason: "這一題已經提交過" };
       }
       let pointsAwarded = 0;
       if (actualCorrect) {
@@ -443,7 +510,7 @@ export const routes: RouteDef[] = [
         await db.update(challengeAnswers).set({ pointsAwarded }).where(eq(challengeAnswers.id, inserted[0].id));
       }
       const updated = await db.update(challengeParticipants).set({ points: sql`${challengeParticipants.points} + ${pointsAwarded}`, correctCount: sql`${challengeParticipants.correctCount} + ${actualCorrect ? 1 : 0}`, wrongCount: sql`${challengeParticipants.wrongCount} + ${actualCorrect ? 0 : 1}`, score: sql`${challengeParticipants.score} + ${pointsAwarded}` }).where(and(eq(challengeParticipants.challengeId, challenge.id), eq(challengeParticipants.userId, user.userId))).returning({ points: challengeParticipants.points, correctCount: challengeParticipants.correctCount, wrongCount: challengeParticipants.wrongCount });
-      return { accepted: true, pointsAwarded, points: updated[0]?.points ?? pointsAwarded, correctCount: updated[0]?.correctCount ?? (actualCorrect ? 1 : 0), wrongCount: updated[0]?.wrongCount ?? (actualCorrect ? 0 : 1), firstCorrect: pointsAwarded === 1 };
+      return { accepted: true, isCorrect: actualCorrect, expectedAnswer: displayAnswer, pointsAwarded, points: updated[0]?.points ?? pointsAwarded, correctCount: updated[0]?.correctCount ?? (actualCorrect ? 1 : 0), wrongCount: updated[0]?.wrongCount ?? (actualCorrect ? 0 : 1), firstCorrect: pointsAwarded === 1 };
     },
   }),
 
@@ -451,28 +518,35 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/challenges/:id/submit",
     auth: "user",
+    rate: { limit: 20, windowSec: 3600, key: "challenge-submit" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ score: z.number().int().min(0).max(10000), durationSec: z.number().int().min(0).max(36000), records: z.array(z.object({ word: z.string().max(400), prompt: z.string().max(1000), expected: z.string().max(400), response: z.string().max(400), correct: z.boolean(), timedOut: z.boolean() })).max(200).default([]) }));
+      const body = await ctx.json(z.object({ score: z.number().int().min(0).max(10000), durationSec: z.number().int().min(0).max(36000), records: z.array(z.object({ word: z.string().max(400), prompt: z.string().max(1000), expected: z.string().max(400), response: z.string().max(400), correct: z.boolean(), timedOut: z.boolean() })).max(200).optional() }));
       const c = (await db.select().from(challenges).where(eq(challenges.id, ctx.params.id)).limit(1))[0];
       if (!c) throw fail("CHAL_MATCH_NOT_FOUND");
+      if (c.kind !== "word") throw badRequest("這個挑戰類型不接受單字測驗交卷");
       if (c.status !== "open") throw fail("SOCIAL_CHALLENGE_ENDED", { message: "這個挑戰目前已暫停或關閉" });
-      if (new Date(c.expiresAt) < new Date()) throw fail("SOCIAL_CHALLENGE_ENDED");
+      if (new Date(c.expiresAt) <= new Date()) throw fail("SOCIAL_CHALLENGE_ENDED");
       const submitFriendIds = await friendIds(user.userId);
       if (c.creatorId !== user.userId && !submitFriendIds.includes(c.creatorId)) throw forbidden("只有挑戰發起人或好友可以參加");
       const payload = c.payload as { items?: Array<Record<string, unknown>> };
-      const verifiedRecords = body.records.map((record) => {
-        const item = payload.items?.find((candidate) => String(candidate.word ?? "") === record.word);
-        const expectedAnswer = String(item?.answer ?? record.expected ?? "").trim().toLocaleLowerCase();
-        const actualCorrect = !record.timedOut && expectedAnswer.length > 0 && expectedAnswer === record.response.trim().toLocaleLowerCase();
-        return { ...record, correct: actualCorrect, item };
+      const challengeItems = payload.items ?? [];
+      if (!challengeItems.length) throw badRequest("本場挑戰沒有可結算的題目");
+      const answerRows = await db.select({ questionIndex: challengeAnswers.questionIndex, response: challengeAnswers.response, correct: challengeAnswers.correct }).from(challengeAnswers).where(and(eq(challengeAnswers.challengeId, c.id), eq(challengeAnswers.userId, user.userId))).orderBy(asc(challengeAnswers.questionIndex));
+      if (answerRows.length !== challengeItems.length) throw badRequest("請完成並保存本場所有題目後再提交");
+      const verifiedRecords = answerRows.map((answerRow) => {
+        const item = challengeItems[answerRow.questionIndex];
+        if (!item) throw badRequest("伺服器作答紀錄與本場題目不符");
+        const expectedAnswer = String(item.challengeMode === "semantic_image" ? "語意圖片" : item.answerLabel ?? item.answer ?? "").trim();
+        return { word: String(item.word ?? ""), prompt: String(item.meaning ?? item.word ?? ""), expected: expectedAnswer, response: answerRow.response, correct: answerRow.correct, timedOut: !answerRow.response.trim(), item };
       });
       await db.insert(challengeParticipants).values({ challengeId: c.id, userId: user.userId }).onConflictDoNothing();
       const rows = await db
         .update(challengeParticipants)
         .set({ score: verifiedRecords.length ? verifiedRecords.filter((record) => record.correct).length : 0, durationSec: body.durationSec, finishedAt: new Date() })
-        .where(and(eq(challengeParticipants.challengeId, c.id), eq(challengeParticipants.userId, user.userId)))
+        .where(and(eq(challengeParticipants.challengeId, c.id), eq(challengeParticipants.userId, user.userId), isNull(challengeParticipants.finishedAt)))
         .returning();
+      if (!rows[0]) throw conflict("這場挑戰已完成提交，不可再次變更分數");
       for (const record of verifiedRecords) {
         const item = record.item;
         const options = Array.isArray(item?.options) ? item.options.map(String) : [];
@@ -623,16 +697,23 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const body = await ctx.json(
         z.object({
-          kind: z.enum(["quiz", "note", "achievement", "grades", "challenge", "plan", "weekly"]),
+          kind: z.enum(["quiz", "note", "achievement", "grades", "challenge", "plan", "weekly", "artifact", "visual_note", "tts"]),
           title: z.string().min(1).max(80),
           payload: z.record(z.string(), z.unknown()).default({}),
-          visibility: z.enum(["link", "friends", "public"]).default("link"),
+          artifactId: z.string().uuid().nullable().optional(),
+          visibility: z.enum(["private", "link", "friends", "public"]).default("link"),
         }),
       );
+      if (JSON.stringify(body.payload).length > 50_000) throw badRequest("分享內容過大，請先保存到教材或筆記再分享");
+      if (body.artifactId) {
+        const artifact = (await db.select({ id: aiArtifacts.id, userId: aiArtifacts.userId }).from(aiArtifacts).where(eq(aiArtifacts.id, body.artifactId)).limit(1))[0];
+        if (!artifact || artifact.userId !== user.userId) throw forbidden("只能分享自己的 AI 產物");
+      }
       const rows = await db
         .insert(shares)
-        .values({ userId: user.userId, kind: body.kind, slug: slugToken(14), title: body.title, payload: body.payload as Record<string, unknown>, visibility: body.visibility })
+        .values({ userId: user.userId, artifactId: body.artifactId ?? null, kind: body.kind, slug: slugToken(14), title: body.title, payload: body.payload as Record<string, unknown>, visibility: body.visibility })
         .returning();
+      if (rows[0]) await db.insert(shareAnalytics).values({ shareId: rows[0].id, eventType: "shareCreated", userId: user.userId, metadata: { visibility: body.visibility, kind: body.kind } });
       return { share: rows[0], url: `/s/${rows[0].slug}` };
     },
   }),
@@ -661,13 +742,62 @@ export const routes: RouteDef[] = [
   route({
     method: "GET",
     path: "/shares/public/:slug",
-    auth: "none",
+    auth: "optional",
     handler: async (ctx) => {
       const row = (await db.select().from(shares).where(eq(shares.slug, ctx.params.slug)).limit(1))[0];
-      if (!row || row.visibility === "friends") throw fail("SOCIAL_SHARE_NOT_FOUND");
+      if (!row || !(await canViewShare(row, ctx.user?.userId ?? null))) throw fail("SOCIAL_SHARE_NOT_FOUND");
       await db.update(shares).set({ viewCount: sql`${shares.viewCount} + 1` }).where(eq(shares.id, row.id));
+      await db.insert(shareAnalytics).values({ shareId: row.id, eventType: "shareOpened", userId: ctx.user?.userId ?? null, metadata: { route: "api" } });
       const owner = (await db.select({ displayName: users.displayName, novaId: users.novaId }).from(users).where(eq(users.userId, row.userId)).limit(1))[0];
-      return { share: { kind: row.kind, title: row.title, payload: row.payload, createdAt: row.createdAt }, owner };
+      return { share: { id: row.id, slug: row.slug, kind: row.kind, title: row.title, payload: row.payload, artifactId: row.artifactId, visibility: row.visibility, createdAt: row.createdAt }, owner };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/shares/public/:slug/asset",
+    auth: "optional",
+    handler: async (ctx) => {
+      const row = (await db.select().from(shares).where(eq(shares.slug, ctx.params.slug)).limit(1))[0];
+      if (!row || !(await canViewShare(row, ctx.user?.userId ?? null))) throw fail("SOCIAL_SHARE_NOT_FOUND");
+      let objectId = row.artifactId ? (await db.select({ objectId: aiArtifacts.objectId }).from(aiArtifacts).where(eq(aiArtifacts.id, row.artifactId)).limit(1))[0]?.objectId ?? null : null;
+      if (!objectId && typeof row.payload.objectId === "string") objectId = row.payload.objectId;
+      if (!objectId) throw notFound("這個分享沒有檔案產物");
+      const owner = await objectOwner(objectId);
+      if (!owner || owner.userId !== row.userId) throw forbidden("分享檔案權限不正確");
+      const object = await readObject(objectId);
+      await db.insert(shareAnalytics).values({ shareId: row.id, eventType: "imageDownloaded", userId: ctx.user?.userId ?? null, metadata: { mimeType: object.mimeType } });
+      const cacheControl = row.visibility === "public" || row.visibility === "link" ? "public, max-age=300" : "private, no-store";
+      return new Response(new Uint8Array(object.data), { headers: { "content-type": object.mimeType, "cache-control": cacheControl, "content-disposition": `inline; filename="${encodeURIComponent(object.filename)}"`, "x-content-type-options": "nosniff" } });
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/shares/:id/copy",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const row = (await db.select().from(shares).where(eq(shares.id, ctx.params.id)).limit(1))[0];
+      if (!row || !(await canViewShare(row, user.userId))) throw fail("SOCIAL_SHARE_NOT_FOUND");
+      const body = await ctx.json(z.object({ copiedKind: z.enum(["reference", "note", "material"]).default("reference") }));
+      const inserted = await db.insert(shareCopies).values({ shareId: row.id, userId: user.userId, copiedKind: body.copiedKind }).onConflictDoNothing().returning();
+      await db.insert(shareAnalytics).values({ shareId: row.id, eventType: body.copiedKind === "reference" ? "contentImported" : "shareCopied", userId: user.userId, metadata: { copiedKind: body.copiedKind } });
+      return { copied: Boolean(inserted[0]), copy: inserted[0] ?? (await db.select().from(shareCopies).where(and(eq(shareCopies.shareId, row.id), eq(shareCopies.userId, user.userId))).limit(1))[0] ?? null };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/shares/:id/events",
+    auth: "optional",
+    rate: { limit: 60, windowSec: 3600, key: "share-events" },
+    handler: async (ctx) => {
+      const row = (await db.select({ id: shares.id, visibility: shares.visibility, userId: shares.userId }).from(shares).where(eq(shares.id, ctx.params.id)).limit(1))[0];
+      if (!row || !(await canViewShare(row as typeof shares.$inferSelect, ctx.user?.userId ?? null))) throw fail("SOCIAL_SHARE_NOT_FOUND");
+      const body = await ctx.json(z.object({ eventType: z.enum(["shareOpened", "imageDownloaded", "contentImported", "favoriteAdded"]), metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}) }));
+      await db.insert(shareAnalytics).values({ shareId: row.id, eventType: body.eventType, userId: ctx.user?.userId ?? null, metadata: body.metadata });
+      return { recorded: true };
     },
   }),
 

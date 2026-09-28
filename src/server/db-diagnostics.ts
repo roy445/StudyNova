@@ -1,0 +1,46 @@
+export type DatabaseDiagnostics = {
+  code?: string;
+  schema?: string;
+  table?: string;
+  column?: string;
+  constraint?: string;
+};
+
+export type DatabaseErrorKind = "schema" | "unavailable" | "other";
+
+const SQLSTATE = /^[0-9A-Z]{5}$/;
+const SCHEMA_ERROR_CODES = new Set(["42P01", "42703", "42704"]);
+const CONNECTION_ERROR_PREFIXES = ["08"];
+const CONNECTION_ERROR_CODES = new Set(["57P01", "57P02", "57P03", "53300"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** Walk common Drizzle/driver cause wrappers and copy only safe, structured fields. */
+export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics | null {
+  let current: unknown = error;
+  const visited = new Set<unknown>();
+  for (let depth = 0; depth < 6 && isRecord(current) && !visited.has(current); depth += 1) {
+    visited.add(current);
+    const rawCode = current.code;
+    if (typeof rawCode === "string" && SQLSTATE.test(rawCode)) {
+      const diagnostics: DatabaseDiagnostics = { code: rawCode };
+      for (const key of ["schema", "table", "column", "constraint"] as const) {
+        const value = current[key];
+        if (typeof value === "string" && /^[a-zA-Z0-9_]{1,128}$/.test(value)) diagnostics[key] = value;
+      }
+      return diagnostics;
+    }
+    current = current.cause ?? current.originalError ?? current.original ?? current.driverError;
+  }
+  return null;
+}
+
+export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
+  const code = extractDatabaseDiagnostics(error)?.code;
+  if (!code) return "other";
+  if (SCHEMA_ERROR_CODES.has(code)) return "schema";
+  if (CONNECTION_ERROR_CODES.has(code) || CONNECTION_ERROR_PREFIXES.some((prefix) => code.startsWith(prefix))) return "unavailable";
+  return "other";
+}

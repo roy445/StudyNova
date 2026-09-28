@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "quiz_question_history" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "quiz_id" uuid NOT NULL REFERENCES "quizzes"("id") ON DELETE CASCADE,
   "question_fingerprint" text NOT NULL,
   "appeared_date" text NOT NULL,

@@ -5,6 +5,7 @@ import {
   aiBackgroundItems,
   aiBackgroundJobs,
   aiBackgroundUsageClaims,
+  aiArtifacts,
   examQuestionGenerationJobs,
   examQuestionGenerationItems,
   questions,
@@ -12,6 +13,10 @@ import {
 import { consumeFeature } from "./economy";
 import { analyzeQuestionWithAi } from "./question-analysis";
 import { generateExamQuestion } from "./exam-question-generation";
+import { runAiJson } from "./ai";
+import { chooseIllustration, normalizeVisualNote, renderVisualNote } from "./visual-note";
+import { deleteObject, putObject } from "./storage";
+import { understandMaterial } from "./content-understanding";
 
 export type AiBackgroundStatus = "queued" | "processing" | "paused" | "completed" | "partial" | "failed" | "cancelled";
 export type AiBackgroundItemStatus = "queued" | "processing" | "completed" | "failed" | "cancelled";
@@ -141,6 +146,35 @@ export async function getAiBackgroundProgress(jobId: string): Promise<AiBackgrou
 
 async function processItem(job: typeof aiBackgroundJobs.$inferSelect, item: typeof aiBackgroundItems.$inferSelect) {
   const input = item.input ?? {};
+  if (job.kind === "visual_note") {
+    const title = typeof input.title === "string" ? input.title : "我的學習重點";
+    const sourceText = typeof input.sourceText === "string" ? input.sourceText : "";
+    const style = input.style === "handwritten" || input.style === "doodle" || input.style === "sticker" || input.style === "clean" ? input.style : "cute";
+    const { data } = await runAiJson<{ title?: string; central?: string; nodes?: unknown[] }>({
+      feature: "ai_visual_note",
+      userId: job.userId,
+      system: "你是 StudyNova 的學習重點整理器。請把教材整理成適合心智圖的繁體中文結構。只輸出 JSON：title、central、nodes。nodes 最多 8 個，每個 children 最多 8 個。保留重要英文術語與公式，不要捏造教材沒有的資訊。summary 要短而清楚。",
+      parts: [{ kind: "text", text: `標題：${title}\n視覺風格：${style}\n教材：\n${sourceText}` }],
+      maxOutputTokens: 2800,
+    }, { title, central: title, nodes: [] });
+    const illustration = await chooseIllustration({ keywords: sourceText.split(/\s+/).slice(0, 12), context: "mind_map" });
+    const visual = normalizeVisualNote({ ...data, title, style, icon: typeof input.icon === "string" ? input.icon : illustration.icon, illustrationId: illustration.id, illustrationUrl: illustration.url });
+    const rendered = await renderVisualNote(visual);
+    const stored = await putObject({ userId: job.userId, filename: `${title.slice(0, 60)}.png`, mimeType: "image/png", data: rendered.data, allow: ["image"] });
+    let artifact: { id: string } | undefined;
+    try {
+      artifact = (await db.insert(aiArtifacts).values({ userId: job.userId!, kind: "mind_map", title: visual.title, objectId: stored.id, preview: sourceText.slice(0, 500), metadata: { mimeType: "image/png", renderer: rendered.renderer, illustrationId: illustration.id, visual } }).returning({ id: aiArtifacts.id }))[0];
+    } catch (error) {
+      if (job.userId) await deleteObject(stored.id, job.userId, false).catch(() => undefined);
+      throw error;
+    }
+    return { visual, artifactId: artifact?.id ?? null, objectId: stored.id, mimeType: "image/png" };
+  }
+  if (job.kind === "content_understanding") {
+    const materialId = typeof input.materialId === "string" ? input.materialId : "";
+    if (!materialId || !job.userId) throw new AiBackgroundError("AI_INPUT_INVALID", "缺少教材理解必要資料。", false);
+    return understandMaterial({ materialId, userId: job.userId });
+  }
   if (job.kind === "question_analysis") {
     const questionId = typeof input.questionId === "string" ? input.questionId : "";
     if (!questionId) throw new AiBackgroundError("AI_INPUT_INVALID", "缺少 questionId。");
@@ -170,8 +204,17 @@ async function processItem(job: typeof aiBackgroundJobs.$inferSelect, item: type
 }
 
 async function claimUsage(job: typeof aiBackgroundJobs.$inferSelect, item: typeof aiBackgroundItems.$inferSelect) {
-  const quotaFeature = typeof job.input?.quotaFeature === "string" ? job.input.quotaFeature : job.feature;
-  const units = typeof job.input?.quotaUnits === "number" ? Math.max(1, Math.floor(job.input.quotaUnits)) : 1;
+  const quotaByKind: Record<string, string> = {
+    visual_note: "ai_visual",
+    content_understanding: "material_organize",
+    question_analysis: "question_analysis",
+    exam_question_generation: "exam_question_generation",
+  };
+  const quotaFeature = quotaByKind[job.kind];
+  const units = 1;
+  if (job.userId && (!quotaFeature || job.feature !== quotaFeature)) {
+    throw new AiBackgroundError("AI_QUOTA_POLICY_UNKNOWN", "這種 AI 背景工作沒有有效的伺服器配額政策。", false);
+  }
   const key = `ai-job:${job.id}:item:${item.id}`;
   const claimed = (await db.insert(aiBackgroundUsageClaims).values({ jobId: job.id, itemId: item.id, userId: job.userId, idempotencyKey: key, units }).onConflictDoNothing().returning({ id: aiBackgroundUsageClaims.id }))[0];
   if (!claimed) return false;
@@ -211,6 +254,14 @@ export async function processAiBackgroundBatch(jobId: string, workerId = `worker
   const claimedBatch = (await db.update(aiBackgroundBatches).set({ status: "processing", lockedBy: workerId, lockedAt: now, startedAt: batch.startedAt ?? now, updatedAt: now }).where(and(eq(aiBackgroundBatches.id, batch.id), or(eq(aiBackgroundBatches.status, "queued"), and(eq(aiBackgroundBatches.status, "processing"), sql`${aiBackgroundBatches.lockedAt} < now() - interval '10 minutes'`)))).returning())[0];
   if (!claimedBatch) return getAiBackgroundProgress(jobId);
   await db.update(aiBackgroundJobs).set({ status: "processing", startedAt: job.startedAt ?? now, updatedAt: now }).where(eq(aiBackgroundJobs.id, jobId));
+
+  const staleBefore = new Date(now.getTime() - 10 * 60_000);
+  const staleItems = await db.select().from(aiBackgroundItems).where(and(eq(aiBackgroundItems.batchId, batch.id), eq(aiBackgroundItems.status, "processing"), lte(aiBackgroundItems.updatedAt, staleBefore)));
+  for (const stale of staleItems) {
+    const nextRetry = stale.retryCount + 1;
+    const finalFailure = nextRetry > stale.maxRetries;
+    await db.update(aiBackgroundItems).set({ status: finalFailure ? "failed" : "queued", retryCount: nextRetry, errorCode: "AI_WORKER_INTERRUPTED", errorMessage: "背景工作逾時中斷，系統已回收工作並安排重試。", completedAt: finalFailure ? now : null, updatedAt: now }).where(and(eq(aiBackgroundItems.id, stale.id), eq(aiBackgroundItems.status, "processing"), lte(aiBackgroundItems.updatedAt, staleBefore)));
+  }
 
   const items = await db.select().from(aiBackgroundItems).where(and(eq(aiBackgroundItems.batchId, batch.id), inArray(aiBackgroundItems.status, ["queued", "failed"]))).orderBy(asc(aiBackgroundItems.itemIndex));
   for (const item of items) {

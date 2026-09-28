@@ -638,13 +638,13 @@ export const routes: RouteDef[] = [
         {
           feature: "novi_quick",
           userId: user.userId,
-            system: '你是 Novi，用 2-3 句話像朋友一樣給學生具體建議。可以加入 1 個自然表情或符號，但內容必須有用、不可空泛。回傳 JSON：{"text":""}。繁體中文，口語、溫暖、正向但務實，必須引用提供的真實數據。',
+            system: '你是 Novi 學習助理。根據提供的真實數據，用 1-2 句繁體中文提供具體資訊或可執行建議。禁止名言、格言、勵志語、打氣、空泛問候或與數據無關的稱讚；不可捏造資料。回傳 JSON：{"text":""}。',
           parts: [{ kind: "text", text: `類型：${body.kind}\n成績：${JSON.stringify(stats)}\n今日計畫：${JSON.stringify(plan.blocks)}\n未解決錯題：${dueWrong?.c ?? 0}` }],
           maxOutputTokens: 400,
         },
         {},
       );
-      return { text: data.text ?? "先完成今天的第一個學習區塊吧！", aiUsed: true };
+      return { text: data.text ?? "目前無法整理建議，請稍後重試。", aiUsed: true };
     },
   }),
 

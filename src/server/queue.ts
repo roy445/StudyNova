@@ -22,6 +22,7 @@ import {
   aiMessages,
   fileContexts,
   dailyKnowledgeItems,
+  pkBotJobs,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
@@ -30,6 +31,8 @@ import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core
 import { analyzeQuestionWithAi } from "./question-analysis";
 import { checkDisplayName } from "./name-moderation";
 import { processAiBackgroundBatch } from "./ai-background";
+import { processTtsJob } from "./tts";
+import { processPkBotJob } from "./pk-bot-engine";
 import { DAILY_KNOWLEDGE_SUBJECTS, generateDailyKnowledge, fingerprint } from "./daily-knowledge";
 
 export type JobName =
@@ -49,11 +52,14 @@ export type JobName =
   | "activity_promote"
   | "question_analysis_batch"
   | "ai_background_batch"
+  | "tts_job"
+  | "pk_bot_turn"
   | "data_retention"
   | "name_moderation_scan";
 
 
 export type JobPayload = Record<string, unknown>;
+export type CronTask = JobName | "queue_drain";
 
 export interface QueueAdapter {
   readonly name: string;
@@ -128,6 +134,8 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     const open = weeks.filter((w) => isWeekOpen(w));
     if (!open.length) return "目前沒有開放中的每週小考";
     const students = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
+    const now = new Date();
+    const notificationWindow = `${todayStr()}:${now.getUTCHours()}:${Math.floor(now.getUTCMinutes() / 30)}`;
     let sent = 0;
     for (const week of open) {
       for (const s of students) {
@@ -137,7 +145,7 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
           title: `📚 ${week.title} 已開放`,
           body: "本週補習小考開放中，快去完成快速背誦與測驗！",
           link: "/weekly",
-          dedupeKey: `weekopen:${week.id}:${s.userId}:${todayStr()}`,
+          dedupeKey: `weekopen:${week.id}:${s.userId}:${notificationWindow}`,
           push: true,
         });
         if (created) sent += 1;
@@ -362,6 +370,27 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     return progress ? `AI 背景工作進度 ${progress.completedItems}/${progress.totalItems}` : "AI 背景工作不存在";
   },
 
+  async tts_job(payload) {
+    const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
+    if (!jobId) throw new Error("缺少 TTS 工作 ID");
+    const job = await processTtsJob(jobId);
+    return `TTS 工作 ${job.id} 已完成`;
+  },
+
+  async pk_bot_turn(payload) {
+    const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
+    if (!jobId) throw new Error("缺少 Bot 回合工作 ID");
+    const result = await processPkBotJob(jobId);
+    if (result.nextJobId) {
+      const next = (await db.select({ availableAt: pkBotJobs.availableAt }).from(pkBotJobs).where(eq(pkBotJobs.id, result.nextJobId)).limit(1))[0];
+      await queue().enqueue({ name: "pk_bot_turn", payload: { jobId: result.nextJobId }, uniqueKey: `pk-bot:${result.nextJobId}:${next?.availableAt?.getTime() ?? Date.now()}`, runAt: next?.availableAt ?? new Date() });
+    } else if (!result.done) {
+      const current = (await db.select({ status: pkBotJobs.status, availableAt: pkBotJobs.availableAt }).from(pkBotJobs).where(eq(pkBotJobs.id, jobId)).limit(1))[0];
+      if (current?.status === "queued") await queue().enqueue({ name: "pk_bot_turn", payload: { jobId }, uniqueKey: `pk-bot:${jobId}:${current.availableAt.getTime()}`, runAt: current.availableAt });
+    }
+    return result.done ? `Bot 回合 ${jobId} 已完成` : `Bot 回合 ${jobId} 等待開場`;
+  },
+
   async question_analysis_batch(payload) {
     const batchId = typeof payload.batchId === "string" ? payload.batchId : "";
     if (!batchId) throw new Error("缺少批次分析 ID");
@@ -437,6 +466,8 @@ class PostgresQueue implements QueueAdapter {
   }
 
   async drain(limit = 20) {
+    const staleBefore = new Date(Date.now() - 10 * 60_000);
+    await db.update(jobQueue).set({ status: "pending", lastError: "Worker lease expired; job recovered for retry", startedAt: null }).where(and(eq(jobQueue.status, "running"), lte(jobQueue.startedAt, staleBefore)));
     const due = await db
       .select()
       .from(jobQueue)
@@ -449,7 +480,7 @@ class PostgresQueue implements QueueAdapter {
     for (const job of due) {
       const claimed = await db
         .update(jobQueue)
-        .set({ status: "running", attempts: sql`${jobQueue.attempts} + 1` })
+        .set({ status: "running", startedAt: new Date(), attempts: sql`${jobQueue.attempts} + 1` })
         .where(and(eq(jobQueue.id, job.id), eq(jobQueue.status, "pending")))
         .returning({ id: jobQueue.id });
       if (!claimed[0]) continue;
@@ -462,9 +493,17 @@ class PostgresQueue implements QueueAdapter {
         processed += 1;
       } catch (err) {
         const message = err instanceof Error ? err.message.slice(0, 300) : "unknown";
-        await db.update(jobQueue).set({ status: "failed", lastError: message, finishedAt: new Date() }).where(eq(jobQueue.id, job.id));
-        results.push({ name: job.name, ok: false, detail: message });
-        failed += 1;
+        const attemptNumber = job.attempts + 1;
+        const maxAttempts = 5;
+        if (attemptNumber < maxAttempts) {
+          const delayMs = Math.min(15 * 60_000, 30_000 * 2 ** (attemptNumber - 1));
+          await db.update(jobQueue).set({ status: "pending", lastError: message, runAt: new Date(Date.now() + delayMs), startedAt: null, finishedAt: null }).where(eq(jobQueue.id, job.id));
+          results.push({ name: job.name, ok: false, detail: `retry ${attemptNumber + 1}/${maxAttempts} scheduled in ${Math.ceil(delayMs / 1000)}s: ${message}` });
+        } else {
+          await db.update(jobQueue).set({ status: "failed", lastError: message, finishedAt: new Date() }).where(eq(jobQueue.id, job.id));
+          results.push({ name: job.name, ok: false, detail: `failed after ${maxAttempts} attempts: ${message}` });
+          failed += 1;
+        }
       }
     }
     return { processed, failed, results };
@@ -482,46 +521,23 @@ class PostgresQueue implements QueueAdapter {
 /* --------------------------------------------------- redis adapter */
 
 class RedisQueue implements QueueAdapter {
-  readonly name = "bullmq";
+  readonly name = "postgres-fallback";
   private fallback = new PostgresQueue();
 
   async enqueue(job: { name: JobName; payload?: JobPayload; uniqueKey: string; runAt?: Date }) {
-    // 沒有明確啟用常駐 BullMQ worker 時，不能只把任務放進 Redis；改走可由 Cron drain 的 PostgreSQL queue。
-    if (process.env.STUDYNOVA_BULLMQ_WORKER !== "1") return this.fallback.enqueue(job);
-    try {
-      const { Queue } = await import("bullmq");
-      const queue = new Queue("studynova", { connection: { url: process.env.REDIS_URL! } as never });
-      await queue.add(job.name, job.payload ?? {}, {
-        jobId: job.uniqueKey,
-        delay: job.runAt ? Math.max(0, job.runAt.getTime() - Date.now()) : 0,
-        removeOnComplete: 200,
-        removeOnFail: 200,
-      });
-      await queue.close();
-      return { queued: true };
-    } catch {
-      return this.fallback.enqueue(job);
-    }
+    // This repository has no BullMQ Worker process. Never put work in Redis
+    // where the deployed app/cron cannot consume it; PostgreSQL is authoritative.
+    return this.fallback.enqueue(job);
   }
 
-  /** Workers pull from BullMQ (see scripts/worker.ts); drain also flushes the pg mirror. */
+  /** Redis configuration is intentionally not used for dispatch until a consumer exists. */
   async drain(limit = 20) {
     return this.fallback.drain(limit);
   }
 
   async health() {
-    try {
-      const IORedis = (await import("ioredis")).default;
-      const client = new IORedis(process.env.REDIS_URL!, { maxRetriesPerRequest: 1, lazyConnect: true });
-      await client.connect();
-      const pong = await client.ping();
-      await client.quit();
-      const pg = await this.fallback.health();
-      return { status: pong === "PONG" ? ("healthy" as const) : ("warning" as const), detail: "Redis + BullMQ", pending: pg.pending };
-    } catch {
-      const pg = await this.fallback.health();
-      return { status: "warning" as const, detail: "Redis 無法連線，已降級為 PostgreSQL queue", pending: pg.pending };
-    }
+    const pg = await this.fallback.health();
+    return { status: "warning" as const, detail: "此部署未啟動 BullMQ consumer；工作已安全改走 PostgreSQL queue，需設定 queue_drain cron", pending: pg.pending };
   }
 }
 
@@ -531,7 +547,8 @@ export function queue(): QueueAdapter {
   return adapter;
 }
 
-export const CRON_TASKS: Array<{ task: JobName; label: string; schedule: string }> = [
+export const CRON_TASKS: Array<{ task: CronTask; label: string; schedule: string }> = [
+  { task: "queue_drain", label: "背景工作佇列（AI／朗讀／PK Bot）", schedule: "每分鐘" },
   { task: "daily_tasks_refresh", label: "重建每日任務", schedule: "每日 00:05" },
   { task: "daily_knowledge_refresh", label: "每日知識生成與驗證", schedule: "每日 00:10" },
   { task: "review_reminder", label: "錯題複習提醒", schedule: "每日 19:00" },
@@ -546,8 +563,9 @@ export const CRON_TASKS: Array<{ task: JobName; label: string; schedule: string 
   { task: "study_reminder", label: "每日讀書提醒", schedule: "每日 20:00" },
 ];
 
-export async function runCronTask(task: JobName, taskUid: string) {
+export async function runCronTask(task: CronTask, taskUid: string) {
   const q = queue();
+  if (task === "queue_drain") return { deduped: false, ...(await q.drain(10)) };
   const { queued } = await q.enqueue({ name: task, uniqueKey: `${task}:${taskUid}` });
   if (!queued) return { deduped: true, processed: 0, failed: 0, results: [] as Array<{ name: string; ok: boolean; detail: string }> };
   const out = await q.drain(50);

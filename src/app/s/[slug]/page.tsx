@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { friends, shares, users } from "@/db/schema";
 import { LogoMark, StarField } from "@/components/brand";
 import { getSession } from "@/server/auth";
+import { ShareActions } from "./share-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,9 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
               </div>
             ))}
         </div>
+
+        {share.artifactId && <a href={`/api/v1/shares/public/${encodeURIComponent(share.slug)}/asset`} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-2xl border border-[#37d3ff]/30 bg-white/5 p-2"><img src={`/api/v1/shares/public/${encodeURIComponent(share.slug)}/asset`} alt={`${share.title} 預覽`} className="max-h-[420px] w-full object-contain" /></a>}
+        <ShareActions shareId={share.id} loggedIn={Boolean(session)} />
 
         <Link
           href="/register"
