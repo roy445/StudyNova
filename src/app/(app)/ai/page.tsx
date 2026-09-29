@@ -189,7 +189,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
   }
 
   return (
-    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+    <div className="grid w-full min-w-0 max-w-full gap-4 overflow-x-clip lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
       <Card
         title="對話"
         action={
@@ -197,7 +197,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
             ＋ 新對話
           </Button>
         }
-        className="lg:sticky lg:top-20 lg:h-fit"
+        className="w-full min-w-0 max-w-full overflow-x-clip lg:sticky lg:top-20 lg:h-fit"
       >
         {convs.loading && <Skeleton lines={3} />}
         {convs.error && <ErrorState message={convs.error} onRetry={convs.reload} />}
@@ -242,7 +242,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
         </Button>
       </Card>
 
-      <Card className="flex min-w-0 min-h-[70dvh] flex-col">
+      <Card className="flex w-full min-w-0 max-w-full min-h-[70dvh] flex-col overflow-x-clip">
         {!activeId ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
             <NoviAvatar size={100} state="idle" />

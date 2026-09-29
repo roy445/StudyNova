@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
-import { inferSpeechLanguage, splitSpeechText, type BrowserSpeechLanguage } from "@/lib/browser-speech";
+import { inferSpeechLanguage, splitSpeechText, stripPronunciationAnnotations, type BrowserSpeechLanguage } from "@/lib/browser-speech";
 
 type PlaybackState = "idle" | "speaking" | "paused";
 
@@ -81,7 +81,8 @@ export function BrowserSpeechControls({ text, className = "" }: { text: string; 
       setMessage("此瀏覽器不支援內建語音朗讀，請改用支援 Speech Synthesis 的瀏覽器。");
       return;
     }
-    const chunks = splitSpeechText(text);
+    const speechText = stripPronunciationAnnotations(text);
+    const chunks = splitSpeechText(speechText);
     if (!chunks.length) {
       setMessage("這份教材目前沒有可朗讀的文字。");
       return;
@@ -91,7 +92,7 @@ export function BrowserSpeechControls({ text, className = "" }: { text: string; 
     window.speechSynthesis.cancel();
     chunksRef.current = chunks;
     chunkIndexRef.current = 0;
-    languageRef.current = language === "auto" ? inferSpeechLanguage(text) : language;
+    languageRef.current = language === "auto" ? inferSpeechLanguage(speechText) : language;
     rateRef.current = rate;
     setPlayback("speaking");
     const targetLanguage = LANGUAGE_NAMES[languageRef.current];

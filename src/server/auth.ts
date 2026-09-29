@@ -13,6 +13,7 @@ export type AuthUser = {
   novaId: string;
   email: string;
   displayName: string;
+  avatarSeed?: string;
   role: string;
   status: string;
   onboarded: boolean;
@@ -74,6 +75,7 @@ export async function getSession(): Promise<SessionInfo | null> {
       novaId: users.novaId,
       email: users.email,
       displayName: users.displayName,
+      avatarSeed: users.avatarSeed,
       role: users.role,
       status: users.status,
       blockedUntil: users.blockedUntil,
@@ -117,6 +119,7 @@ export async function getSession(): Promise<SessionInfo | null> {
       novaId: row.novaId,
       email: row.email,
       displayName: row.displayName,
+      avatarSeed: row.avatarSeed,
       role: row.role,
       status: row.status,
       onboarded: row.onboarded,

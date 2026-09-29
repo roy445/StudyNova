@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, Progress } from "@/components/ui";
-import { inferSpeechLanguage } from "@/lib/browser-speech";
+import { inferSpeechLanguage, speechTextForVocabularyWord, stripPronunciationAnnotations } from "@/lib/browser-speech";
 
 export type MemoryCardWord = {
   id: string;
@@ -36,10 +36,11 @@ function readFavorites(storageKey: string) {
 }
 
 function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined" || !text.trim()) return false;
+  const speechText = stripPronunciationAnnotations(text);
+  if (typeof window === "undefined" || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined" || !speechText) return false;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text.trim());
-  utterance.lang = inferSpeechLanguage(text);
+  const utterance = new SpeechSynthesisUtterance(speechText);
+  utterance.lang = inferSpeechLanguage(speechText);
   utterance.rate = 0.88;
   utterance.pitch = 1;
   window.speechSynthesis.speak(utterance);
@@ -69,7 +70,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
     if (!autoPlay || !current || words.length < 2) return;
     if (autoTimer.current) clearTimeout(autoTimer.current);
     autoTimer.current = setTimeout(() => {
-      speak(current.word);
+      speak(speechTextForVocabularyWord(current.word, current.part_of_speech ?? "", current.meaning));
       autoTimer.current = setTimeout(() => {
         setRevealed(false);
         setIndex((value) => {
@@ -193,7 +194,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
           <Button variant="ghost" onClick={() => setRevealed((value) => !value)}>
             {revealed ? "隱藏中文" : "中文"}
           </Button>
-          <Button variant="ghost" onClick={() => { if (!speak(current.word)) window.alert("此瀏覽器不支援語音朗讀"); }}>
+          <Button variant="ghost" onClick={() => { if (!speak(speechTextForVocabularyWord(current.word, current.part_of_speech ?? "", current.meaning))) window.alert("此瀏覽器不支援語音朗讀"); }}>
             朗讀
           </Button>
           <Button variant="outline" onClick={goPrevious} disabled={!loop && index === 0}>

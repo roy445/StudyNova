@@ -579,15 +579,37 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
 .pk-score-pop { animation: pk-score-pop .52s cubic-bezier(.22,1,.36,1) both; }
 .pk-combo-fire { animation: pk-combo-fire .8s ease-in-out infinite; }
 .pk-rank-rise { animation: pk-rank-rise .5s cubic-bezier(.22,1,.36,1) both; }
+.pk-impact-stage { position: relative; isolation: isolate; display: grid; width: min(100%, 440px); height: 150px; place-items: center; overflow: hidden; }
+.pk-impact-stage::before { position: absolute; inset: 8%; z-index: -1; border-radius: 999px; background: radial-gradient(ellipse, rgba(55,211,255,.24), rgba(124,92,255,.12) 42%, transparent 72%); content: ""; animation: pk-impact-glow 1.4s .12s ease-out both; }
+.pk-impact-art { position: relative; z-index: 2; width: min(100%, 420px); height: auto; max-height: 142px; border-radius: 22px; object-fit: contain; filter: drop-shadow(0 0 20px rgba(55,211,255,.3)); animation: pk-impact-logo 1.25s cubic-bezier(.22,1,.36,1) both; }
+.pk-impact-beam { position: absolute; z-index: 1; top: 50%; width: 46%; height: 2px; opacity: 0; }
+.pk-impact-beam-left { left: -4%; background: linear-gradient(90deg, transparent, #37d3ff); box-shadow: 0 0 14px #37d3ff; animation: pk-impact-beam-left .56s .08s cubic-bezier(.22,1,.36,1) both; }
+.pk-impact-beam-right { right: -4%; background: linear-gradient(270deg, transparent, #ff9f43); box-shadow: 0 0 14px #ff9f43; animation: pk-impact-beam-right .56s .08s cubic-bezier(.22,1,.36,1) both; }
+.pk-impact-flash { position: absolute; z-index: 3; width: 64px; height: 64px; border-radius: 999px; background: radial-gradient(circle, rgba(255,255,255,.98) 0, rgba(255,200,87,.85) 16%, rgba(255,159,67,.26) 42%, transparent 72%); opacity: 0; animation: pk-impact-flash .72s .34s ease-out both; }
+.pk-impact-spark { position: absolute; z-index: 4; opacity: 0; font-size: 24px; line-height: 1; text-shadow: 0 0 12px currentColor; animation: pk-impact-spark .72s .36s cubic-bezier(.22,1,.36,1) both; }
+.pk-impact-spark-a { top: 24%; left: 27%; color: #7dd3fc; }
+.pk-impact-spark-b { top: 28%; right: 25%; color: #ffc857; animation-delay: .4s; }
+.pk-impact-spark-c { bottom: 18%; left: 35%; color: #ffc857; animation-delay: .42s; }
+.pk-impact-spark-d { right: 34%; bottom: 20%; color: #7dd3fc; animation-delay: .38s; }
+.pk-player-impact-left { animation: pk-player-impact-left .78s cubic-bezier(.22,1,.36,1) both; }
+.pk-player-impact-right { animation: pk-player-impact-right .78s cubic-bezier(.22,1,.36,1) both; }
 @keyframes pk-live-pulse { 0%,100% { opacity: .55; box-shadow: 0 0 0 0 rgba(55,211,255,.36); } 50% { opacity: 1; box-shadow: 0 0 0 7px rgba(55,211,255,0); } }
 @keyframes pk-answer-correct { from { transform: scale(.96); background-color: rgba(52,211,153,.08); } 50% { transform: scale(1.03); background-color: rgba(52,211,153,.25); } to { transform: scale(1); background-color: rgba(52,211,153,.13); } }
 @keyframes pk-answer-wrong { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } }
 @keyframes pk-countdown { from { opacity: 0; transform: scale(1.35) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes pk-impact-glow { 0% { opacity: 0; transform: scale(.72); } 48% { opacity: 1; transform: scale(1.08); } 100% { opacity: .72; transform: scale(1); } }
+@keyframes pk-impact-logo { 0% { opacity: 0; transform: translateY(8px) scale(.78) rotate(-2deg); } 38% { opacity: 1; transform: translateY(0) scale(1.08) rotate(1.2deg); } 56% { transform: scale(.96) rotate(-.6deg); } 74%,100% { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes pk-impact-beam-left { 0% { opacity: 0; transform: translateX(-26px) scaleX(.4); } 56% { opacity: 1; transform: translateX(48%) scaleX(1); } 100% { opacity: 0; transform: translateX(60%) scaleX(.6); } }
+@keyframes pk-impact-beam-right { 0% { opacity: 0; transform: translateX(26px) scaleX(.4); } 56% { opacity: 1; transform: translateX(-48%) scaleX(1); } 100% { opacity: 0; transform: translateX(-60%) scaleX(.6); } }
+@keyframes pk-impact-flash { 0% { opacity: 0; transform: scale(.45); } 24% { opacity: 1; transform: scale(1.45); } 100% { opacity: 0; transform: scale(2.1); } }
+@keyframes pk-impact-spark { 0% { opacity: 0; transform: scale(.4) rotate(-20deg); } 22% { opacity: 1; transform: scale(1.2) rotate(18deg); } 100% { opacity: 0; transform: translateY(-18px) scale(.7) rotate(48deg); } }
+@keyframes pk-player-impact-left { 0% { opacity: 0; transform: translateX(-42px) scale(.88); } 52% { opacity: 1; transform: translateX(7px) scale(1.06); } 72% { transform: translateX(-2px) scale(.99); } 100% { opacity: 1; transform: translateX(0) scale(1); } }
+@keyframes pk-player-impact-right { 0% { opacity: 0; transform: translateX(42px) scale(.88); } 52% { opacity: 1; transform: translateX(-7px) scale(1.06); } 72% { transform: translateX(2px) scale(.99); } 100% { opacity: 1; transform: translateX(0) scale(1); } }
 @keyframes pk-score-pop { from { opacity: 0; transform: translateY(7px) scale(.86); } 60% { opacity: 1; transform: translateY(-4px) scale(1.08); } to { transform: translateY(0) scale(1); } }
 @keyframes pk-combo-fire { 0%,100% { filter: drop-shadow(0 0 2px rgba(255,200,87,.35)); } 50% { filter: drop-shadow(0 0 12px rgba(255,120,70,.75)); } }
 @keyframes pk-rank-rise { from { opacity: .2; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
 @media (max-width: 640px) { .pk-nav-item { width: 100%; height: auto; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .pk-live-dot, .pk-answer-correct, .pk-answer-wrong, .pk-countdown, .pk-score-pop, .pk-combo-fire, .pk-rank-rise { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pk-live-dot, .pk-answer-correct, .pk-answer-wrong, .pk-countdown, .pk-score-pop, .pk-combo-fire, .pk-rank-rise, .pk-impact-stage::before, .pk-impact-art, .pk-impact-beam, .pk-impact-flash, .pk-impact-spark, .pk-player-impact-left, .pk-player-impact-right { animation: none; } .pk-impact-art { opacity: 1; } .pk-impact-flash { opacity: .6; } }
 
 @keyframes scan {
   0% { background-position: 0 -180px; }

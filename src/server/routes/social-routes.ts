@@ -131,7 +131,7 @@ export const routes: RouteDef[] = [
       const ids = await friendIds(user.userId);
       const list = ids.length
         ? await db
-            .select({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, level: assistantProfiles.level, xp: assistantProfiles.xp })
+            .select({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, avatarSeed: users.avatarSeed, level: assistantProfiles.level, xp: assistantProfiles.xp })
             .from(users)
             .leftJoin(assistantProfiles, eq(assistantProfiles.userId, users.userId))
             .where(inArray(users.userId, ids))
@@ -697,7 +697,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const body = await ctx.json(
         z.object({
-          kind: z.enum(["quiz", "note", "achievement", "grades", "challenge", "plan", "weekly", "artifact", "visual_note", "tts"]),
+          kind: z.enum(["quiz", "note", "achievement", "grades", "challenge", "plan", "weekly", "artifact", "visual_note", "tts", "vocabulary"]),
           title: z.string().min(1).max(80),
           payload: z.record(z.string(), z.unknown()).default({}),
           artifactId: z.string().uuid().nullable().optional(),
@@ -781,6 +781,15 @@ export const routes: RouteDef[] = [
       const row = (await db.select().from(shares).where(eq(shares.id, ctx.params.id)).limit(1))[0];
       if (!row || !(await canViewShare(row, user.userId))) throw fail("SOCIAL_SHARE_NOT_FOUND");
       const body = await ctx.json(z.object({ copiedKind: z.enum(["reference", "note", "material"]).default("reference") }));
+      if (row.kind === "vocabulary") {
+        const parsed = z.object({ words: z.array(z.object({ word: z.string().trim().min(1).max(200), meaning: z.string().max(1000).default(""), partOfSpeech: z.string().max(80).default(""), phonetic: z.string().max(160).default(""), example: z.string().max(1000).default(""), exampleZh: z.string().max(1000).default("") })).min(1).max(50) }).safeParse(row.payload);
+        if (!parsed.success) throw badRequest("這個分享的單字卡格式無效或超過 50 個單字");
+        const imported = await db.insert(userVocabularies).values(parsed.data.words.map((word) => ({ userId: user.userId, word: word.word, normalizedWord: word.word.toLocaleLowerCase("en-US"), meaning: word.meaning, partOfSpeech: word.partOfSpeech, phonetic: word.phonetic, example: word.example, exampleZh: word.exampleZh }))).onConflictDoNothing().returning({ id: userVocabularies.id });
+        const insertedCopy = await db.insert(shareCopies).values({ shareId: row.id, userId: user.userId, copiedKind: "reference" }).onConflictDoNothing().returning();
+        const copy = insertedCopy[0] ?? (await db.select().from(shareCopies).where(and(eq(shareCopies.shareId, row.id), eq(shareCopies.userId, user.userId))).limit(1))[0] ?? null;
+        await db.insert(shareAnalytics).values({ shareId: row.id, eventType: "contentImported", userId: user.userId, metadata: { copiedKind: "vocabulary", added: imported.length, duplicates: parsed.data.words.length - imported.length } });
+        return { copied: Boolean(insertedCopy[0]), copy, kind: "vocabulary", added: imported.length, duplicates: parsed.data.words.length - imported.length };
+      }
       const inserted = await db.insert(shareCopies).values({ shareId: row.id, userId: user.userId, copiedKind: body.copiedKind }).onConflictDoNothing().returning();
       await db.insert(shareAnalytics).values({ shareId: row.id, eventType: body.copiedKind === "reference" ? "contentImported" : "shareCopied", userId: user.userId, metadata: { copiedKind: body.copiedKind } });
       return { copied: Boolean(inserted[0]), copy: inserted[0] ?? (await db.select().from(shareCopies).where(and(eq(shareCopies.shareId, row.id), eq(shareCopies.userId, user.userId))).limit(1))[0] ?? null };

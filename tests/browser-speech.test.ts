@@ -1,11 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { inferSpeechLanguage, splitSpeechText } from "@/lib/browser-speech";
+import { inferSpeechLanguage, speechTextForVocabularyWord, splitSpeechText, stripPronunciationAnnotations } from "@/lib/browser-speech";
 
 describe("browser speech helpers", () => {
   it("infers Chinese, Russian, and English from lesson text", () => {
     expect(inferSpeechLanguage("這是一段課文" )).toBe("zh-TW");
     expect(inferSpeechLanguage("Это урок русского языка")).toBe("ru-RU");
     expect(inferSpeechLanguage("This is an English lesson.")).toBe("en-US");
+  });
+
+  it("does not speak KK or IPA pronunciation annotations", () => {
+    expect(stripPronunciationAnnotations("apple KK音標 [ˈæpəl]\nKK: /kæt/\n選項 [A]")).toBe("apple\n選項 [A]");
+    expect(stripPronunciationAnnotations("KK 音標：[kæt]\nIPA: /ˈæpəl/")).toBe("");
+  });
+
+  it("speaks stand-alone letters and marked abbreviations by letter name, but keeps words intact", () => {
+    expect(speechTextForVocabularyWord("B")).toBe("bee");
+    expect(speechTextForVocabularyWord("A", "letter", "英文字母")).toBe("ay");
+    expect(speechTextForVocabularyWord("a", "article", "冠詞")).toBe("uh");
+    expect(speechTextForVocabularyWord("cat", "noun", "貓")).toBe("cat");
+    expect(speechTextForVocabularyWord("USA", "acronym", "縮寫")).toBe("you, ess, ay");
   });
 
   it("splits long passages into bounded chunks without losing words", () => {

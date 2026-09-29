@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const maintenance = await getMaintenanceState();
   if (maintenance.enabled) return <MaintenanceScreen state={maintenance} />;
   return (
-    <AppShell maintenance={maintenance} user={{ userId: user.userId, novaId: user.novaId, displayName: user.displayName, role: user.role, isPro: user.isPro }}>
+    <AppShell maintenance={maintenance} user={{ userId: user.userId, novaId: user.novaId, displayName: user.displayName, avatarSeed: user.avatarSeed, role: user.role, isPro: user.isPro }}>
       {children}
     </AppShell>
   );

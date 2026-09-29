@@ -288,7 +288,7 @@ async function matchPayload(matchId: string, userId: string) {
   if (!match) throw notFound("找不到 PK 賽場");
   const player = await getPlayer(matchId, userId);
   if (!player) throw forbidden("你不是這場 PK 的參與者");
-  const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, matchId)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score));
+  const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, avatarSeed: users.avatarSeed, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, matchId)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score));
   const questionRows = await db.select().from(pkMatchQuestions).where(eq(pkMatchQuestions.matchId, matchId)).orderBy(asc(pkMatchQuestions.orderIndex));
   const room = match.roomId ? (await db.select().from(pkRooms).where(eq(pkRooms.id, match.roomId)).limit(1))[0] ?? null : null;
   const answerCount = await db.select({ count: sql<number>`count(*)::int` }).from(pkPlayerAnswers).where(and(eq(pkPlayerAnswers.matchId, matchId), eq(pkPlayerAnswers.userId, userId)));
@@ -296,7 +296,7 @@ async function matchPayload(matchId: string, userId: string) {
     match: { id: match.id, roomId: match.roomId, status: match.status, mode: match.mode, teamMode: match.teamMode, subject: match.subject, grade: match.grade, unit: match.unit, difficulty: match.difficulty, questionCount: match.questionCount, questionTimeSec: match.questionTimeSec, currentQuestion: match.currentQuestion, startsAt: match.startsAt, endsAt: match.endsAt, finishedAt: match.finishedAt, allowLateJoin: match.allowLateJoin, allowSpectators: match.allowSpectators, showRanking: match.showRanking },
     room: room ? { id: room.id, name: room.name, roomCode: room.roomCode, shareToken: room.shareToken, visibility: room.visibility, maxPlayers: room.maxPlayers, status: room.status, hostId: room.hostId } : null,
     me: { userId, score: player.score, combo: player.combo, maxCombo: player.maxCombo, correctCount: player.correctCount, answeredCount: Number(answerCount[0]?.count ?? 0), rank: player.rank },
-    players: players.map((row) => ({ ...row.player, userId: row.player.role === "bot" ? `bot:${row.player.botProfileId ?? row.player.id}` : row.player.userId, displayName: row.player.role === "bot" ? `${row.botName || "PK Bot"} 🤖` : row.displayName, novaId: row.player.role === "bot" ? `${row.botName || "PK-BOT"}-BOT` : row.novaId, optionOrders: undefined })),
+    players: players.map((row) => ({ ...row.player, userId: row.player.role === "bot" ? `bot:${row.player.botProfileId ?? row.player.id}` : row.player.userId, displayName: row.player.role === "bot" ? `${row.botName || "PK Bot"} 🤖` : row.displayName, novaId: row.player.role === "bot" ? `${row.botName || "PK-BOT"}-BOT` : row.novaId, avatarSeed: row.player.role === "bot" ? "nova" : row.avatarSeed, optionOrders: undefined })),
     questions: questionRows.map((question) => publicQuestion(question, userId, matchId)),
   };
 }

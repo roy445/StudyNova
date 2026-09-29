@@ -2,13 +2,16 @@
 
 import { useParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge, Button, Card, ErrorState, Skeleton, Stat, useToast } from "@/components/ui";
 import { errorMessage, shareContent, useApi } from "@/lib/api";
 
 type PublicNovi = {
   profile: {
+    userId: string;
     novaId: string;
     displayName: string;
+    avatarSeed: string;
     bio: string | null;
     level: number;
     xp: number;
@@ -48,8 +51,11 @@ export default function PublicNoviPage() {
         <div className="space-y-4">
           <Card className="overflow-hidden !p-0">
             <div className="relative flex flex-col items-center gap-4 bg-gradient-to-br from-[#7c5cff]/25 via-[#37d3ff]/10 to-[#ffc857]/15 p-6 text-center sm:flex-row sm:text-left">
-              <div className="rounded-3xl border border-white/15 bg-black/20 px-5 pt-3 shadow-[0_0_36px_rgba(55,211,255,0.16)]">
-                <NoviAvatar size={132} skin={data.skin} core={data.core} effect={data.effect} float={data.float} level={data.level} state="happy" />
+              <div className="flex items-end gap-3">
+                <UserAvatar userId={data.userId} avatarSeed={data.avatarSeed} displayName={data.displayName} size={72} className="ring-2 ring-white/20" />
+                <div className="rounded-3xl border border-white/15 bg-black/20 px-4 pt-2 shadow-[0_0_36px_rgba(55,211,255,0.16)]">
+                  <NoviAvatar size={112} skin={data.skin} core={data.core} effect={data.effect} float={data.float} level={data.level} state="happy" />
+                </div>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">

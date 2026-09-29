@@ -24,9 +24,21 @@ import { notify } from "../notify";
 import { sendPasswordResetEmail } from "../email";
 import { checkDisplayName } from "../name-moderation";
 import { getRegistrationControl } from "../registration";
+import { deleteObject, objectOwner, putObject, readObject } from "@/server/storage";
 
 const emailSchema = z.string().email("Email 格式不正確").max(180);
 const passwordSchema = z.string().min(8, "密碼至少 8 個字元").max(128);
+
+function uploadedAvatarObjectId(seed: string): string | null {
+  return /^upload:([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.exec(seed)?.[1] ?? null;
+}
+
+function avatarImageSignatureMatches(data: Buffer, mimeType: string): boolean {
+  if (mimeType === "image/jpeg") return data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
+  if (mimeType === "image/png") return data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (mimeType === "image/webp") return data.length >= 12 && data.toString("ascii", 0, 4) === "RIFF" && data.toString("ascii", 8, 12) === "WEBP";
+  return false;
+}
 
 async function createUniqueNovaId(): Promise<string> {
   for (let i = 0; i < 12; i += 1) {
@@ -427,6 +439,83 @@ export const routes: RouteDef[] = [
   }),
 
   route({
+    method: "POST",
+    path: "/account/avatar",
+    auth: "user",
+    rate: { limit: 8, windowSec: 3600 },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const form = await ctx.formData();
+      const file = form.get("file");
+      if (!(file instanceof File)) throw badRequest("請選擇一張頭像圖片");
+      const mimeType = file.type.toLowerCase().split(";")[0].trim();
+      if (!file.size || file.size > 1_500_000) throw fail("FILE_TOO_LARGE", { message: "頭像圖片不可超過 1.5 MB，請選擇較小的圖片。" });
+      if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) throw badRequest("頭像只接受 JPEG、PNG 或 WebP 圖片");
+      const data = Buffer.from(await file.arrayBuffer());
+      if (!avatarImageSignatureMatches(data, mimeType)) throw badRequest("圖片內容與檔案格式不符，請重新選擇圖片");
+
+      const current = (await db.select({ avatarSeed: users.avatarSeed }).from(users).where(eq(users.userId, user.userId)).limit(1))[0];
+      if (!current) throw notFound("找不到使用者資料");
+      const extension = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/png" ? "png" : "webp";
+      const stored = await putObject({ userId: user.userId, filename: `profile-avatar.${extension}`, mimeType, data, allow: ["image"] });
+      const nextSeed = `upload:${stored.id}`;
+      try {
+        await db.update(users).set({ avatarSeed: nextSeed, updatedAt: new Date() }).where(eq(users.userId, user.userId));
+      } catch (error) {
+        await deleteObject(stored.id, user.userId, false).catch(() => undefined);
+        throw error;
+      }
+      const previousId = uploadedAvatarObjectId(current.avatarSeed);
+      if (previousId && previousId !== stored.id) await deleteObject(previousId, user.userId, false).catch(() => undefined);
+      return { avatarSeed: nextSeed };
+    },
+  }),
+
+  route({
+    method: "DELETE",
+    path: "/account/avatar",
+    auth: "user",
+    rate: { limit: 20, windowSec: 3600 },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const current = (await db.select({ avatarSeed: users.avatarSeed }).from(users).where(eq(users.userId, user.userId)).limit(1))[0];
+      if (!current) throw notFound("找不到使用者資料");
+      await db.update(users).set({ avatarSeed: "nova", updatedAt: new Date() }).where(eq(users.userId, user.userId));
+      const previousId = uploadedAvatarObjectId(current.avatarSeed);
+      if (previousId) await deleteObject(previousId, user.userId, false).catch(() => undefined);
+      return { avatarSeed: "nova" };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/account/avatar/:userId",
+    auth: "user",
+    rate: { limit: 300, windowSec: 3600 },
+    handler: async (ctx) => {
+      ctx.requireUser();
+      const targetUserId = ctx.params.userId;
+      const target = (await db.select({ avatarSeed: users.avatarSeed }).from(users).where(eq(users.userId, targetUserId)).limit(1))[0];
+      const objectId = target ? uploadedAvatarObjectId(target.avatarSeed) : null;
+      if (!objectId) return new Response("Not found", { status: 404 });
+      const owner = await objectOwner(objectId);
+      if (owner?.userId !== targetUserId || !["image/jpeg", "image/png", "image/webp"].includes(owner.mimeType)) return new Response("Not found", { status: 404 });
+      const image = await readObject(objectId);
+      if (image.userId !== targetUserId) return new Response("Not found", { status: 404 });
+      return new Response(new Uint8Array(image.data) as unknown as BodyInit, {
+        headers: {
+          "content-type": image.mimeType,
+          "content-length": String(image.data.byteLength),
+          "cache-control": "private, max-age=86400, immutable",
+          "x-content-type-options": "nosniff",
+          "cross-origin-resource-policy": "same-site",
+          "referrer-policy": "no-referrer",
+        },
+      });
+    },
+  }),
+
+  route({
     method: "GET",
     path: "/account/overview",
     auth: "user",
@@ -470,7 +559,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const rows = await db
-        .select({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, bio: users.bio, createdAt: users.createdAt })
+        .select({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, avatarSeed: users.avatarSeed, bio: users.bio, createdAt: users.createdAt })
         .from(users)
         .where(eq(users.novaId, ctx.params.novaId.toUpperCase()))
         .limit(1);

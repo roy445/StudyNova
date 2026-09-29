@@ -4,8 +4,9 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NoviAvatar } from "@/components/brand";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
-import { apiGet, apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 
 type Novi = {
@@ -17,11 +18,30 @@ type Novi = {
   isPro: boolean;
 };
 
+async function prepareAvatarImage(file: File): Promise<{ blob: Blob; filename: string }> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type.toLowerCase())) throw new Error("請選擇 JPEG、PNG 或 WebP 圖片。")
+  if (file.size > 20 * 1024 * 1024) throw new Error("原始圖片超過 20 MB，請先選擇較小的圖片。")
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const context = canvas.getContext("2d")
+  if (!context) { bitmap.close(); throw new Error("此瀏覽器無法處理頭像圖片。") }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.84))
+  if (!blob) throw new Error("圖片縮小失敗，請換一張圖片或改用其他瀏覽器。")
+  if (blob.size > 1_500_000) throw new Error("縮小後圖片仍超過 1.5 MB，請選擇較簡單的圖片。")
+  const ext = blob.type === "image/png" ? "png" : blob.type === "image/jpeg" ? "jpg" : "webp"
+  return { blob, filename: `avatar.${ext}` }
+}
+
 function ProfileInner() {
   const toast = useToast();
   const params = useSearchParams();
   const [tab, setTab] = useState(params.get("tab") ?? "profile");
-  const me = useApi<{ user: { novaId: string; displayName: string; email: string; role: string; isPro: boolean; proExpiresAt: string | null }; settings: Record<string, unknown> | null; nova: number }>("/auth/me");
+  const me = useApi<{ user: { userId: string; novaId: string; displayName: string; avatarSeed: string; email: string; role: string; isPro: boolean; proExpiresAt: string | null }; settings: Record<string, unknown> | null; nova: number }>("/auth/me");
   const novi = useApi<Novi>("/novi");
   const nova = useApi<{ account: { balance: number; lifetimeEarned: number; lifetimeSpent: number }; ledger: Array<{ id: string; amount: number; reason: string; createdAt: string; balanceAfter: number }>; xp: Array<{ id: string; amount: number; reason: string; createdAt: string }> }>("/nova");
   const achievements = useApi<{ achievements: Array<{ id: string; code: string; title: string; description: string; icon: string; target: number; progress: number; unlockedAt: string | null; rewardNova: number }> }>("/achievements");
@@ -32,6 +52,8 @@ function ProfileInner() {
   const settings = useApi<{ settings: Record<string, unknown> }>("/account/settings");
 
   const [displayName, setDisplayName] = useState("");
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInput = useRef<HTMLInputElement>(null);
   const [coupon, setCoupon] = useState("");
   const [renewalReason, setRenewalReason] = useState("");
   const [renewalFeedback, setRenewalFeedback] = useState("");
@@ -58,6 +80,22 @@ function ProfileInner() {
       await Promise.all([nova.reload(), membership.reload(), me.reload()]);
     }).catch((err) => toast.push("error", errorMessage(err)));
   }, [params, toast, nova, membership, me]);
+
+  async function uploadAvatar(file: File) {
+    setAvatarBusy(true)
+    try {
+      const prepared = await prepareAvatarImage(file)
+      const form = new FormData()
+      form.append("file", prepared.blob, prepared.filename)
+      await apiPost("/account/avatar", form)
+      await me.reload()
+      toast.push("success", "個人頭像已更新；其他 StudyNova 使用者也能看到。")
+    } catch (err) {
+      toast.push("error", errorMessage(err))
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
 
   async function enablePush() {
     try {
@@ -86,7 +124,7 @@ function ProfileInner() {
     <div className="space-y-4">
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-col items-center gap-3 bg-gradient-to-r from-[#7c5cff]/20 to-[#ffc857]/10 p-5 sm:flex-row">
-          <NoviAvatar size={92} state="happy" level={profile?.level ?? 1} />
+          <UserAvatar userId={me.data?.user.userId} avatarSeed={me.data?.user.avatarSeed} displayName={me.data?.user.displayName} size={92} className="ring-2 ring-white/15" />
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <h1 className={`text-lg font-bold ${me.data?.user.isPro ? "pro-name" : ""}`}>{me.data?.user.displayName}</h1>
@@ -157,6 +195,17 @@ function ProfileInner() {
           )}
           <Card title="◎ 個人資料">
             <div className="space-y-3">
+              <div className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-white/[.025] p-3">
+                <UserAvatar userId={me.data?.user.userId} avatarSeed={me.data?.user.avatarSeed} displayName={me.data?.user.displayName} size={56} className="ring-2 ring-white/15" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="ghost" loading={avatarBusy} onClick={() => avatarInput.current?.click()}>上傳／更換頭像</Button>
+                    {me.data?.user.avatarSeed.startsWith("upload:") && <Button size="sm" variant="ghost" disabled={avatarBusy} onClick={async () => { setAvatarBusy(true); try { await apiDelete("/account/avatar"); await me.reload(); toast.push("success", "已移除自訂頭像"); } catch (err) { toast.push("error", errorMessage(err)); } finally { setAvatarBusy(false); } }}>移除</Button>}
+                  </div>
+                  <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label="選擇個人頭像圖片" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void uploadAvatar(file); }} />
+                  <p className="mt-1 text-xs text-muted">JPEG／PNG／WebP；圖片會先在此裝置縮小，不會送到 AI。</p>
+                </div>
+              </div>
               <Field label="顯示名稱">
                 <Input value={displayName || (me.data?.user.displayName ?? "")} onChange={(e) => setDisplayName(e.target.value)} />
               </Field>

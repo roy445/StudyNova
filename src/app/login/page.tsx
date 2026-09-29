@@ -29,7 +29,10 @@ export default function LoginPage() {
       const res = await apiPost<{ onboarded: boolean; displayName: string; firstLogin?: boolean }>("/auth/login", { identifier, password });
       trackAnalytics(res.firstLogin ? "first_login" : "login_success", { route: "/login" });
       toast.push("success", `歡迎回來，${res.displayName}！`);
-      router.replace(res.onboarded ? "/dashboard" : "/onboarding");
+      const requestedNext = new URLSearchParams(window.location.search).get("next");
+      const nextUrl = requestedNext ? new URL(requestedNext, window.location.origin) : null;
+      const safeNext = requestedNext?.startsWith("/") && nextUrl?.origin === window.location.origin ? `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}` : null;
+      router.replace(res.onboarded ? safeNext ?? "/dashboard" : "/onboarding");
       router.refresh();
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === "AUTH_ACCOUNT_DELETED") {
