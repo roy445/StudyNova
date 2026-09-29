@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiPatch, apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
+import { formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
 
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
-type ServiceControl = { enabled: boolean; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
+type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 type MaintenanceAction = "start" | "restore";
 const EXPORT_DATASETS = [["vocabulary", "我的單字"], ["notes", "我的筆記"], ["wrong", "錯題本"], ["studyMaterials", "學習資料"], ["plans", "學習計畫"], ["studyRecords", "學習紀錄"], ["focus", "專注紀錄"], ["tasks", "任務紀錄"], ["dailyTasks", "每日任務"], ["achievements", "成就徽章"], ["nova", "Nova 交易"], ["xp", "XP 紀錄"]] as const;
 const EXPORT_FORMATS = [["pdf", "PDF 單字書"], ["docx", "Word 單字書"], ["xlsx", "Excel 單字表"], ["csv", "CSV 表格"], ["json", "JSON"], ["txt", "純文字"], ["md", "Markdown"], ["zip", "ZIP 完整資料"]] as const;
@@ -24,7 +25,7 @@ export default function AdminSystemPage() {
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
   const service = useApi<ServiceControl>("/admin/service-control");
   const [maintenanceAction, setMaintenanceAction] = useState<MaintenanceAction | null>(null);
-  const [maintenanceForm, setMaintenanceForm] = useState({ title: "系統施工中", description: "StudyNova 目前正在進行系統維護，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "維護完成後會自動通知。" });
+  const [maintenanceForm, setMaintenanceForm] = useState({ category: "maintenance" as ServiceControl["category"], title: "系統施工中", description: "StudyNova 目前正在進行系統維護，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "維護完成後會自動通知。" });
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [summary, setSummary] = useState<{ total: number; pass: number; fail: number; skip: number; durationMs: number } | null>(null);
   const [running, setRunning] = useState(false);
@@ -32,10 +33,11 @@ export default function AdminSystemPage() {
   useEffect(() => {
     if (!service.data) return;
     const timer = window.setTimeout(() => setMaintenanceForm({
+      category: service.data?.category ?? "maintenance",
       title: service.data?.title ?? "",
       description: service.data?.description ?? "",
       badgeText: service.data?.badgeText ?? "",
-      estimatedRecoveryAt: service.data?.estimatedRecoveryAt ? service.data.estimatedRecoveryAt.slice(0, 16) : "",
+      estimatedRecoveryAt: formatTaipeiDateTimeInput(service.data?.estimatedRecoveryAt),
       message: service.data?.message ?? "",
     }), 0);
     return () => window.clearTimeout(timer);
@@ -43,7 +45,12 @@ export default function AdminSystemPage() {
 
   async function saveMaintenance() {
     if (!maintenanceAction) return;
-    if (maintenanceAction === "start" && maintenanceForm.estimatedRecoveryAt && new Date(maintenanceForm.estimatedRecoveryAt) <= new Date()) {
+    const estimatedRecoveryAt = parseTaipeiDateTimeInput(maintenanceForm.estimatedRecoveryAt);
+    if (maintenanceForm.estimatedRecoveryAt && !estimatedRecoveryAt) {
+      toast.push("error", "預計恢復時間格式無效，請重新選擇台灣時間");
+      return;
+    }
+    if (maintenanceAction === "start" && estimatedRecoveryAt && Date.parse(estimatedRecoveryAt) <= Date.now()) {
       toast.push("error", "預計恢復時間必須晚於現在");
       return;
     }
@@ -51,7 +58,7 @@ export default function AdminSystemPage() {
       await apiPatch("/admin/service-control", {
         enabled: maintenanceAction === "restore",
         ...maintenanceForm,
-        estimatedRecoveryAt: maintenanceForm.estimatedRecoveryAt ? new Date(maintenanceForm.estimatedRecoveryAt).toISOString() : null,
+        estimatedRecoveryAt,
         announceOnEnable: maintenanceAction === "restore",
       });
       toast.push("success", maintenanceAction === "start" ? "已依照設定開啟維護模式" : "已依照設定恢復網站並發送維護完成通知");
@@ -306,10 +313,10 @@ export default function AdminSystemPage() {
       <Modal open={maintenanceAction !== null} onClose={() => setMaintenanceAction(null)} title={maintenanceAction === "start" ? "設定網站維護" : "設定恢復網站與通知"} wide>
         <div className="space-y-3">
           <p className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs leading-5 text-muted">{maintenanceAction === "start" ? "儲存後會立即暫停學生端主要 API。請先確認所有文字、時間與通知內容。" : "儲存後會立即解除維護模式，並依照下方內容建立維護完成公告及通知。"}</p>
-          <div className="grid gap-3 sm:grid-cols-2"><Field label="頁面標題" required><Input value={maintenanceForm.title} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, title: e.target.value })} /></Field><Field label="徽章文字" required><Input value={maintenanceForm.badgeText} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, badgeText: e.target.value })} /></Field></div>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="公告類型"><Select value={maintenanceForm.category} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, category: e.target.value as ServiceControl["category"] })}><option value="maintenance">系統維護</option><option value="repair">系統修復</option><option value="major_release">重大版本更新</option></Select></Field><Field label="頁面標題" required><Input value={maintenanceForm.title} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, title: e.target.value })} /></Field><Field label="徽章文字" required><Input value={maintenanceForm.badgeText} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, badgeText: e.target.value })} /></Field></div>
           <Field label={maintenanceAction === "start" ? "維護說明" : "恢復後公告內容"} required><Textarea value={maintenanceForm.description} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, description: e.target.value })} className="!min-h-[100px]" /></Field>
           <Field label="使用者提示／通知訊息" required><Textarea value={maintenanceForm.message} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, message: e.target.value })} className="!min-h-[80px]" /></Field>
-          <Field label="預計恢復時間" hint="可留空；開始維護時會顯示給使用者"><Input type="datetime-local" value={maintenanceForm.estimatedRecoveryAt} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, estimatedRecoveryAt: e.target.value })} /></Field>
+          <Field label="預計恢復時間（台灣時間）" hint="倒數與頁面顯示都使用這個時間；不需在說明文字重複輸入"><Input type="datetime-local" value={maintenanceForm.estimatedRecoveryAt} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, estimatedRecoveryAt: e.target.value })} /></Field>
           <Button full onClick={saveMaintenance}>{maintenanceAction === "start" ? "確認設定並開始維護" : "確認設定並恢復網站、發送通知"}</Button>
         </div>
       </Modal>

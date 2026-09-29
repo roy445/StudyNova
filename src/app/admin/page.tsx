@@ -63,7 +63,7 @@ type CompressionSettings = { enabled: boolean; maxOriginalBytes: number; maxBatc
 const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = { enabled: true, maxOriginalBytes: 100 * 1024 * 1024, maxBatchFiles: 20, maxProcessingSeconds: 120, maxPdfPages: 100, maxImagePixels: 144000000, minImageQuality: 35, maxIterations: 8, allowPdf: true, allowImages: true, allowBatch: true, proOnly: false, dailyFree: 10, dailyPro: 100 };
 const DEFAULT_PK_ACTIVITY_START = "2026-09-26T09:00";
 const DEFAULT_PK_ACTIVITY_END = "2026-10-03T23:59";
-type ServiceControl = { enabled: boolean; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
+type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 type PkAdminConfig = { enabled: boolean; quickMatchEnabled: boolean; friendMatchEnabled: boolean; customRoomEnabled: boolean; publicArenaEnabled: boolean; botEnabled: boolean; botFillQuickMatch: boolean; botSkill: "easy" | "normal" | "hard"; allowedModes: string[]; allowedBankIds: string[]; maxPlayers: number; minQuestions: number; maxQuestions: number; minTimeSec: number; maxTimeSec: number; defaultRewardNova: number; defaultRewardXp: number; activityId: string | null };
 type PkAdminOverview = { config: PkAdminConfig; stats: { online: number; pkOnline: number; waitingRooms: number; liveMatches: number; matching: number }; matches: Array<{ id: string; status: string; subject: string; mode: string; difficulty: string; questionCount: number; createdAt: string; roomName: string | null; playerCount: number; botCount: number }>; anomalies: Array<{ id: string; matchId: string; eventType: string; payload: Record<string, unknown>; createdAt: string }> };
 type PkActivity = { id: string; name: string; cover: string; subject: string; scope: string; description: string; startsAt: string; endsAt: string; questionCount: number; difficulty: string; rewardNova: number; rewardXp: number; status: string };
@@ -167,7 +167,7 @@ export default function AdminOverviewPage() {
   async function restoreService() {
     if (!window.confirm("確定要立即恢復網站嗎？所有一般使用者將可重新進入網站。")) return;
     try {
-      await apiPatch("/admin/service-control", { enabled: true, title: serviceControl.data?.title ?? "系統施工中", description: serviceControl.data?.description ?? "", badgeText: serviceControl.data?.badgeText ?? "", estimatedRecoveryAt: null, message: serviceControl.data?.message ?? "" });
+      await apiPatch("/admin/service-control", { enabled: true, category: serviceControl.data?.category ?? "maintenance", title: serviceControl.data?.title ?? "系統施工中", description: serviceControl.data?.description ?? "", badgeText: serviceControl.data?.badgeText ?? "", estimatedRecoveryAt: null, message: serviceControl.data?.message ?? "" });
       await serviceControl.reload();
       toast.push("success", "🚀 網站已立即恢復");
     } catch (err) { toast.push("error", errorMessage(err)); }

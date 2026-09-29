@@ -1,9 +1,12 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { platformSettings } from "@/db/schema";
+import { formatTaipeiDateTime } from "@/lib/date-time";
+import { normalizeMaintenanceCategory, type MaintenanceCategory } from "@/lib/maintenance";
 
 export type MaintenanceState = {
   enabled: boolean;
+  category: MaintenanceCategory;
   title: string;
   description: string;
   badgeText: string;
@@ -16,6 +19,7 @@ export type MaintenanceState = {
 
 const DEFAULT_STATE: MaintenanceState = {
   enabled: false,
+  category: "maintenance",
   title: "系統施工中",
   description: "StudyNova 目前正在進行系統維護與更新，暫時無法使用。",
   badgeText: "系統維護中，請稍候",
@@ -43,6 +47,7 @@ export async function getMaintenanceState(): Promise<MaintenanceState> {
       ...value,
       // Existing service_control uses enabled=true for normal service and false for maintenance.
       enabled: isStoredMaintenanceEnabled(value, Boolean(row)),
+      category: normalizeMaintenanceCategory(value.category),
       estimatedRecoveryAt: value.estimatedRecoveryAt ?? null,
       startedAt: value.startedAt ?? null,
       updatedByName: value.updatedByName ?? null,
@@ -56,7 +61,5 @@ export async function getMaintenanceState(): Promise<MaintenanceState> {
 
 export function maintenanceDateLabel(value: string | null): string | null {
   if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-TW", { dateStyle: "medium", timeStyle: "short" });
+  return formatTaipeiDateTime(value);
 }

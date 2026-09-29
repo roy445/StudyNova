@@ -1,4 +1,6 @@
 import { maintenanceDateLabel, type MaintenanceState } from "@/server/maintenance";
+import { MaintenanceCountdown } from "@/components/MaintenanceCountdown";
+import { maintenanceCategoryLabel } from "@/lib/maintenance";
 
 export function MaintenanceScreen({ state }: { state: MaintenanceState }) {
   const recoveryLabel = maintenanceDateLabel(state.estimatedRecoveryAt);
@@ -34,7 +36,7 @@ export function MaintenanceScreen({ state }: { state: MaintenanceState }) {
             </svg>
           </div>
 
-          <p className="mt-5 text-[11px] font-black uppercase tracking-[0.3em] text-amber-200/90 sm:text-xs">StudyNova · {state.badgeText}</p>
+          <p className="mt-5 text-[11px] font-black uppercase tracking-[0.3em] text-amber-200/90 sm:text-xs">StudyNova · {maintenanceCategoryLabel(state.category)} · {state.badgeText}</p>
           <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-4xl">{state.title || "StudyNova 正在進行系統維護"}</h1>
           <p className="mx-auto mt-4 max-w-xl whitespace-pre-line text-sm leading-7 text-slate-300 sm:text-base">{state.description || "我們正在進行系統維護與更新。"}</p>
 
@@ -42,8 +44,10 @@ export function MaintenanceScreen({ state }: { state: MaintenanceState }) {
 
           <div className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-2">
             {state.startedAt && <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">開始時間</p><p className="mt-1 text-sm font-semibold text-slate-200">{startedLabel}</p></div>}
-            {state.estimatedRecoveryAt && <div className="rounded-2xl border border-amber-200/20 bg-amber-300/[0.06] p-4"><p className="text-[11px] font-bold uppercase tracking-wider text-amber-200/75">預計恢復時間</p><p className="mt-1 text-sm font-semibold text-amber-50">{recoveryLabel}</p></div>}
+            {state.estimatedRecoveryAt && <div className="rounded-2xl border border-amber-200/20 bg-amber-300/[0.06] p-4"><p className="text-[11px] font-bold uppercase tracking-wider text-amber-200/75">預計恢復時間（台灣時間）</p><p className="mt-1 text-sm font-semibold text-amber-50">{recoveryLabel}</p></div>}
           </div>
+
+          <MaintenanceCountdown targetAt={state.estimatedRecoveryAt} />
 
           <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-cyan-200/15 bg-cyan-300/[0.045] px-4 py-3 text-sm leading-6 text-cyan-50">
             <p className="font-bold">你的帳號沒有被登出</p>

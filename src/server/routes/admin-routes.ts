@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAINTENANCE_CATEGORIES, normalizeMaintenanceCategory } from "@/lib/maintenance";
 import { and, asc, desc, eq, ilike, or, sql, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -539,6 +540,7 @@ export const routes: RouteDef[] = [
       const value = (row?.value ?? {}) as Record<string, unknown>;
       return {
         enabled: value.enabled !== false,
+        category: normalizeMaintenanceCategory(value.category),
         title: typeof value.title === "string" ? value.title : "系統施工中",
         description: typeof value.description === "string" ? value.description : "StudyNova 目前正在進行系統維護與更新，暫時無法使用。",
         badgeText: typeof value.badgeText === "string" ? value.badgeText : "系統維護中，請稍候",
@@ -560,6 +562,7 @@ export const routes: RouteDef[] = [
       const current = (existing?.value ?? {}) as Record<string, unknown>;
       const body = await ctx.json(z.object({
         enabled: z.boolean(),
+        category: z.enum(MAINTENANCE_CATEGORIES).optional(),
         title: z.string().trim().min(1).max(120).default("系統施工中"),
         description: z.string().trim().max(1000).default("StudyNova 目前正在進行系統維護與更新，暫時無法使用。"),
         badgeText: z.string().trim().max(120).default("系統維護中，請稍候"),
@@ -571,6 +574,7 @@ export const routes: RouteDef[] = [
       const value = {
         ...current,
         ...body,
+        category: body.category ?? normalizeMaintenanceCategory(current.category),
         startedAt: body.enabled ? null : (typeof current.startedAt === "string" ? current.startedAt : now),
         updatedByName: admin.displayName,
         updatedAt: now,

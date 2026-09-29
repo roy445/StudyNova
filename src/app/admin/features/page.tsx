@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, ErrorState, Field, Input, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { formatTaipeiDateTime, formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
 
 type Feature = { id: string; feature: string; label: string; category?: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number };
-type ServiceControl = { enabled: boolean; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
+type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 const CATEGORY: Record<string, string[]> = {
   AI: ["ai", "novi", "solution", "ocr", "quiz"],
   學習: ["word", "vocabulary", "study", "wrong", "sentence", "material", "plan"],
@@ -25,10 +26,10 @@ export default function AdminFeaturesPage() {
   const [category, setCategory] = useState("全部");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
-  const [maintenanceDraft, setMaintenanceDraft] = useState({ title: "系統施工中", description: "StudyNova 目前正在進行系統維護與更新，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "請稍後再回來看看！" });
+  const [maintenanceDraft, setMaintenanceDraft] = useState({ category: "maintenance" as ServiceControl["category"], title: "系統施工中", description: "StudyNova 目前正在進行系統維護與更新，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "請稍後再回來看看！" });
   useEffect(() => {
     if (!service.data) return;
-    const timer = window.setTimeout(() => setMaintenanceDraft({ title: service.data!.title, description: service.data!.description, badgeText: service.data!.badgeText, estimatedRecoveryAt: service.data!.estimatedRecoveryAt ? service.data!.estimatedRecoveryAt.slice(0, 16) : "", message: service.data!.message }), 0);
+    const timer = window.setTimeout(() => setMaintenanceDraft({ category: service.data!.category ?? "maintenance", title: service.data!.title, description: service.data!.description, badgeText: service.data!.badgeText, estimatedRecoveryAt: formatTaipeiDateTimeInput(service.data!.estimatedRecoveryAt), message: service.data!.message }), 0);
     return () => window.clearTimeout(timer);
   }, [service.data]);
   const features = useMemo(() => (state.data?.features ?? []).filter((feature) => (category === "全部" || categoryOf(feature.feature) === category) && `${feature.feature} ${feature.label}`.toLowerCase().includes(query.toLowerCase())), [category, query, state.data]);
@@ -45,9 +46,18 @@ export default function AdminFeaturesPage() {
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
   async function saveService(enabled: boolean) {
+    const estimatedRecoveryAt = parseTaipeiDateTimeInput(maintenanceDraft.estimatedRecoveryAt);
+    if (maintenanceDraft.estimatedRecoveryAt && !estimatedRecoveryAt) {
+      toast.push("error", "預計恢復時間格式無效，請重新選擇台灣時間");
+      return;
+    }
+    if (!enabled && estimatedRecoveryAt && Date.parse(estimatedRecoveryAt) <= Date.now()) {
+      toast.push("error", "預計恢復時間必須晚於現在");
+      return;
+    }
     setBusy(true);
     try {
-      await apiPatch("/admin/service-control", { enabled, ...maintenanceDraft, estimatedRecoveryAt: maintenanceDraft.estimatedRecoveryAt ? new Date(maintenanceDraft.estimatedRecoveryAt).toISOString() : null, announceOnEnable: enabled });
+      await apiPatch("/admin/service-control", { enabled, ...maintenanceDraft, estimatedRecoveryAt, announceOnEnable: enabled });
       await service.reload();
       toast.push("success", enabled ? "全站服務已恢復" : "已開始全站施工");
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
@@ -57,13 +67,14 @@ export default function AdminFeaturesPage() {
     <Card title="全站服務總開關" subtitle="這是唯一的全站服務狀態來源；施工會在 server-side 擋住公開頁與學生端 App，不刪除 session、不清除 cookie，管理員仍可進入後台恢復。維護快捷中心也會同步這個開關。">
       <div className="flex flex-wrap items-center gap-3"><span className={`rounded-full px-3 py-1 text-xs ${service.data?.enabled !== false ? "bg-emerald-400/15 text-emerald-300" : "bg-orange-400/15 text-orange-200"}`}>{service.data?.enabled !== false ? "🟢 正常服務" : "🟠 施工中"}</span><Button size="sm" variant={service.data?.enabled === false ? "primary" : "ghost"} loading={busy} onClick={() => void saveService(true)}>🚀 立即恢復網站</Button><Button size="sm" variant="ghost" loading={busy} onClick={() => void saveService(false)}>開始施工</Button></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label="公告類型"><Select value={maintenanceDraft.category} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, category: event.target.value as ServiceControl["category"] }))}><option value="maintenance">系統維護</option><option value="repair">系統修復</option><option value="major_release">重大版本更新</option></Select></Field>
         <Field label="施工標題"><Input value={maintenanceDraft.title} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, title: event.target.value }))} /></Field>
         <Field label="封條文字"><Input value={maintenanceDraft.badgeText} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, badgeText: event.target.value }))} /></Field>
-        <Field label="預計恢復時間"><Input type="datetime-local" value={maintenanceDraft.estimatedRecoveryAt} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, estimatedRecoveryAt: event.target.value }))} /></Field>
+        <Field label="預計恢復時間（台灣時間）" hint="倒數與頁面顯示都使用此欄位；不需在說明文字重複輸入時間"><Input type="datetime-local" value={maintenanceDraft.estimatedRecoveryAt} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, estimatedRecoveryAt: event.target.value }))} /></Field>
         <Field label="自訂通知內容"><Input value={maintenanceDraft.message} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, message: event.target.value }))} /></Field>
       </div>
       <Field label="施工說明"><Textarea value={maintenanceDraft.description} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, description: event.target.value }))} className="mt-1" /></Field>
-      {service.data && <div className="mt-4 grid gap-1 rounded-2xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs text-muted sm:grid-cols-2"><span>開始時間：{service.data.startedAt ? new Date(service.data.startedAt).toLocaleString("zh-TW") : "尚未施工"}</span><span>預計恢復：{service.data.estimatedRecoveryAt ? new Date(service.data.estimatedRecoveryAt).toLocaleString("zh-TW") : "未設定"}</span><span>最後修改管理員：{service.data.updatedByName ?? "—"}</span><span>最後修改時間：{service.data.updatedAt ? new Date(service.data.updatedAt).toLocaleString("zh-TW") : "—"}</span></div>}
+      {service.data && <div className="mt-4 grid gap-1 rounded-2xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs text-muted sm:grid-cols-2"><span>開始時間：{service.data.startedAt ? formatTaipeiDateTime(service.data.startedAt) : "尚未施工"}</span><span>預計恢復（台灣時間）：{service.data.estimatedRecoveryAt ? formatTaipeiDateTime(service.data.estimatedRecoveryAt) : "未設定"}</span><span>最後修改管理員：{service.data.updatedByName ?? "—"}</span><span>最後修改時間：{service.data.updatedAt ? formatTaipeiDateTime(service.data.updatedAt) : "—"}</span></div>}
     </Card>
     <Card title="分類與功能總控" subtitle="關閉功能只會影響使用者端，不會刪除既有資料。">
       <div className="flex flex-wrap items-center gap-2"><Select value={category} onChange={(event) => setCategory(event.target.value)} className="!w-auto"><option>全部</option>{Object.keys(CATEGORY).map((item) => <option key={item}>{item}</option>)}</Select><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋功能名稱…" className="!w-48" /><Button size="sm" variant="ghost" loading={busy} onClick={() => bulk(false)}>關閉目前分類</Button><Button size="sm" loading={busy} onClick={() => bulk(true)}>開啟目前分類</Button><Badge tone="cyan">顯示 {features.length} 項</Badge></div>
