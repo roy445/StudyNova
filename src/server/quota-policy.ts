@@ -1,4 +1,5 @@
 export const AI_SOLUTION_FEATURE = "ai_solution" as const;
+export const AI_SOLUTION_UPLOAD_FEATURE = "ai_solution_upload" as const;
 
 export type FeaturePermissionPolicy = {
   feature: string;
@@ -26,6 +27,7 @@ export const SERVER_FEATURE_DEFAULTS: readonly FeaturePermissionPolicy[] = [
   { feature: "image_ocr", label: "圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 50, monthlyLimit: 0, novaCost: 0 },
   { feature: "multi_image_ocr", label: "多圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 0, proDailyLimit: 10, monthlyLimit: 0, novaCost: 0 },
   { feature: AI_SOLUTION_FEATURE, label: "AI 解題初次分析", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 30, monthlyLimit: 0, novaCost: 10 },
+  { feature: AI_SOLUTION_UPLOAD_FEATURE, label: "AI 解題圖片／檔案上傳", enabled: true, proOnly: false, freeDailyLimit: 8, proDailyLimit: 50, monthlyLimit: 0, novaCost: 0 },
   { feature: "essay_grading", label: "英文作文批改", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 10, monthlyLimit: 30, novaCost: 10 },
 ];
 
@@ -55,12 +57,14 @@ export type QuotaEvaluation = {
 export function evaluateQuota(policy: FeaturePermissionPolicy, params: { isPro: boolean; used: number; monthlyUsed: number; units?: number }): QuotaEvaluation {
   const units = Math.max(1, params.units ?? 1);
   const limit = params.isPro ? policy.proDailyLimit : policy.freeDailyLimit;
+  const unlimited = limit < 0;
   const monthlyLimit = policy.monthlyLimit > 0 ? policy.monthlyLimit : limit > 0 ? limit * 30 : 0;
   const monthlyRemaining = monthlyLimit <= 0 ? Number.MAX_SAFE_INTEGER : Math.max(0, monthlyLimit - params.monthlyUsed);
-  if (!policy.enabled) return { allowed: false, limit, monthlyLimit, remaining: Math.max(0, limit - params.used), monthlyRemaining, reason: "disabled" };
+  const remaining = unlimited ? Number.MAX_SAFE_INTEGER : Math.max(0, limit - params.used);
+  if (!policy.enabled) return { allowed: false, limit, monthlyLimit, remaining, monthlyRemaining, reason: "disabled" };
   if (policy.proOnly && !params.isPro) return { allowed: false, limit, monthlyLimit, remaining: 0, monthlyRemaining, reason: "pro_only" };
-  if (limit <= 0) return { allowed: false, limit, monthlyLimit, remaining: 0, monthlyRemaining, reason: "not_in_plan" };
-  if (monthlyLimit > 0 && params.monthlyUsed + units > monthlyLimit) return { allowed: false, limit, monthlyLimit, remaining: Math.max(0, limit - params.used), monthlyRemaining, reason: "monthly_exhausted" };
-  if (params.used + units > limit) return { allowed: false, limit, monthlyLimit, remaining: Math.max(0, limit - params.used), monthlyRemaining, reason: "daily_exhausted" };
-  return { allowed: true, limit, monthlyLimit, remaining: Math.max(0, limit - params.used - units), monthlyRemaining: Math.max(0, monthlyRemaining - units), reason: "ok" };
+  if (limit === 0) return { allowed: false, limit, monthlyLimit, remaining: 0, monthlyRemaining, reason: "not_in_plan" };
+  if (monthlyLimit > 0 && params.monthlyUsed + units > monthlyLimit) return { allowed: false, limit, monthlyLimit, remaining, monthlyRemaining, reason: "monthly_exhausted" };
+  if (!unlimited && params.used + units > limit) return { allowed: false, limit, monthlyLimit, remaining, monthlyRemaining, reason: "daily_exhausted" };
+  return { allowed: true, limit, monthlyLimit, remaining: unlimited ? Number.MAX_SAFE_INTEGER : Math.max(0, limit - params.used - units), monthlyRemaining: monthlyLimit <= 0 ? Number.MAX_SAFE_INTEGER : Math.max(0, monthlyRemaining - units), reason: "ok" };
 }

@@ -11,6 +11,7 @@ const releaseMigrations = [
   "0087_quiz_history_user_fk_repair.sql",
   "0088_focus_timer_sessions.sql",
   "0089_focus_sessions_completed_at_repair.sql",
+  "0090_ai_solution_upload_quota.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

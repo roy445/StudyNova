@@ -51,7 +51,7 @@ Header: x-cron-secret: <CRON_SECRET>
 
 需要在外部排程器設定呼叫，例如 GitHub Actions、Vercel Cron、Cloud Scheduler、crontab 或 VPS systemd timer。`CRON_SECRET` 必須與外部排程器使用的 secret 相同。實際任務清單可在管理後台 Cron 分頁查看。
 
-**背景工作的必要設定：**若部署環境沒有常駐 worker（例如 Vercel serverless），請每分鐘呼叫一次 `task=queue_drain`，並傳送相同的 `x-cron-secret`。這會處理到期的 PostgreSQL queue 工作，包括延遲 PK Bot 回合、AI 背景工作與朗讀片段；只呼叫每日提醒等低頻任務，不能保證這些工作及時執行。不要把 `CRON_SECRET` 放在 URL query string 或 client bundle。
+**背景工作的必要設定：**若部署環境沒有常駐 worker（例如 Vercel serverless），請每分鐘呼叫 `GET /api/cron/queue-drain`，並傳送 `CRON_SECRET`（`x-cron-secret` header；Vercel Cron 會傳 `Authorization: Bearer ...`）。這會處理 PostgreSQL queue 工作，包括 PK Bot、AI 背景工作與 TTS；只呼叫低頻任務不能保證工作及時執行。不要把 secret 放在 URL query string 或 client bundle。完整 CosyVoice adapter、HTTPS 與 cron-job.org/Vercel Cron 步驟見 [TTS Worker 與 Cron 部署指南](./TTS_WORKER_AND_CRON_SETUP.md)。
 
 `drizzle/0086_queue_worker_leases.sql` 為 queue 加上 `started_at` lease；部署 crash recovery 程式碼前先套用此 migration，逾時且仍標記 `running` 的工作才會被安全回收。
 
@@ -65,7 +65,6 @@ Header: x-cron-secret: <CRON_SECRET>
 | `SESSION_SECRET` | HttpOnly session、簽名與部分私有資源所需的長隨機密鑰 | PowerShell RNG 指令（見下方） |
 | `APP_URL` | 公開網站 URL；AI provider referer、重設密碼與分享連結使用 | `https://studynova.example.com` |
 | `NODE_ENV` | 正式環境設為 `production` | `production` |
-| `TTS_REQUEST_TIMEOUT_MS` | 外部 TTS worker 單段請求逾時上限（5 秒至 5 分鐘；預設 120 秒） | `120000` |
 
 ### AI（Gemini-only 建議設定 1～3 組）
 
@@ -87,10 +86,23 @@ Header: x-cron-secret: <CRON_SECRET>
 
 正式環境需設定每分鐘觸發的 `queue_drain` cron，否則 PostgreSQL queue 中的 PK Bot、AI 與 TTS 工作不會及時執行。未來若部署獨立 Redis worker，需先部署實際 consumer 並確認 adapter/worker 協定後才設定 Redis。
 
+### Text-to-Speech (TTS)
+
+| 變數 | 必填性 | 說明 |
+|---|---|---|
+| `AZURE_SPEECH_KEY` | 使用 Azure Speech 時必填 | Azure Speech resource key；設在 server-side 環境變數，不得使用 `NEXT_PUBLIC_` 前綴 |
+| `AZURE_SPEECH_REGION` | 使用 Azure Speech 時必填 | Azure Speech resource 的 region slug，例如 `eastasia`；必須與 key 同一個 resource |
+| `TTS_SERVICE_URL` | 選填（自架 worker） | CosyVoice/GPT-SoVITS adapter 的 HTTPS base URL；只有不使用 Azure 時才需要 |
+| `TTS_SERVICE_TOKEN` | 選填（自架 worker） | Worker Bearer token；只供 `TTS_SERVICE_URL` 使用，必須 server-side |
+| `TTS_REQUEST_TIMEOUT_MS` | 選填 | Azure Speech 或外部 worker 每段請求 timeout；預設 `120000`，程式上限 `300000` ms |
+
+設定 Azure key/region 後，新朗讀工作會自動走 Azure Speech，無須自架 GPU worker；兩者都未設定時才回退到自架 worker。Azure Speech F0 的官方免費額度目前為每月 500,000 Neural 字元，F0 每分鐘最多 20 次請求；需在 Azure resource 中選 F0，不要切換到付費 S0。完整 Azure/worker 與 Vercel/外部 queue cron 步驟見 [TTS Worker 與 Cron 部署指南](./TTS_WORKER_AND_CRON_SETUP.md)。
+
 ### Object Storage
 
 | 變數 | 必填性 | 說明 |
 |---|---|---|
+| `BLOB_READ_WRITE_TOKEN` | AI 解題大批圖片直傳時需要 | Vercel Blob 私有儲存 token；僅 server-side 使用，勿暴露到 `NEXT_PUBLIC_*` |
 | `S3_ENDPOINT` | S3/R2/MinIO 時需要 | S3 相容 endpoint；AWS S3 可留空 |
 | `S3_REGION` | 選填 | 預設 `auto`；AWS 通常填 `ap-northeast-1` 等區域 |
 | `S3_BUCKET` | 使用 S3 時需要 | 私有 bucket 名稱 |
@@ -99,7 +111,7 @@ Header: x-cron-secret: <CRON_SECRET>
 | `S3_FORCE_PATH_STYLE` | 選填 | 預設以 `true` 或存在 endpoint 時啟用 |
 | `MAX_UPLOAD_BYTES` | 選填 | 預設 15 MiB，值為 bytes；目前範例為 `15728640` |
 
-未設定完整 S3 組合時，檔案會改存 PostgreSQL 的 `storage_objects.data` bytea 欄位。開發環境可接受；正式環境建議使用 S3、Cloudflare R2、MinIO 或其他 S3 相容服務，避免資料庫膨脹。
+AI 解題圖片／PDF 會由瀏覽器直接傳到私有 Vercel Blob，不經 Next.js/Vercel Function request body；正式環境需連接 Vercel Blob 並設定 `BLOB_READ_WRITE_TOKEN`。單批最多 30 個檔案、每檔 18 MiB；辨識會分小批呼叫 API，避免大量圖片在單一函式執行中逾時。一般伺服器端檔案上傳在未設定完整 S3 組合時仍會改存 PostgreSQL 的 `storage_objects.data` bytea 欄位；正式環境建議使用 Vercel Blob、S3、Cloudflare R2、MinIO 或其他物件儲存，避免資料庫膨脹。
 
 ### Web Push
 
@@ -122,7 +134,7 @@ Header: x-cron-secret: <CRON_SECRET>
 
 | 變數 | 必填性 | 說明 |
 |---|---|---|
-| `CRON_SECRET` | 使用外部排程時需要；正式環境建議必填 | 驗證 `/api/v1/system/cron` 的 header secret |
+| `CRON_SECRET` | 使用外部排程時需要；正式環境建議必填 | 驗證 `/api/v1/system/cron` 與 `/api/cron/queue-drain` 的 header secret |
 
 ## 四、資料庫
 
@@ -145,7 +157,7 @@ Seed 只建立平台初始資料，不會自動授予任何使用者管理員權
 
 開發／單機空資料庫可依目前 schema 執行 `pnpm exec drizzle-kit push`。**不要將通用 `drizzle-kit migrate` 當作本 repository 的 production bootstrap**：舊 SQL migrations 存在重複 numeric prefix，而 checked-in `drizzle/meta` 尚未建立可代表完整歷史的 journal；migration-only 無法由 repository 證明會重建完整 schema。
 
-對已具有 StudyNova 既有基礎 schema 的 production/staging，release pipeline 可使用下列命令套用本專案明列的增量 migrations（0083–0089）：
+對已具有 StudyNova 既有基礎 schema 的 production/staging，release pipeline 可使用下列命令套用本專案明列的增量 migrations（0083–0090）：
 
 ```bash
 DATABASE_URL="$DATABASE_URL" pnpm run db:migrate:release
@@ -153,7 +165,7 @@ DATABASE_URL="$DATABASE_URL" pnpm run db:migrate:release
 
 此 runner 使用 PostgreSQL advisory lock、逐檔交易和 SHA-256 checksum，成功項目寫入 `studynova_release_migrations`；它**不會**重建全部早期資料表。為相容舊版 `focus_sessions` 基礎 schema，runner 會先套用 0089（若缺少則新增 nullable `completed_at`），再執行會調整該欄位的 0088；因此不必手動改已發布的 0088，也不會覆寫已套用 migration checksum。首次建置或 schema 尚未盤點的環境，先在隔離 staging 依現行完整 schema 建立 baseline 並核驗後再部署；不要直接對 production 執行未知的全量 schema push。Docker runner image 會包含 `drizzle/` 與 release runner，以供獨立 release step 呼叫。
 
-首次呼叫 `/api/health` 會執行冪等 seed。Seed 使用 `platform_settings.seed.version` 管理版本，不會覆蓋學生資料或刪除生產資料。`ai_solution` 的正式 permission 也包含在 seed version 10；既有 feature row 只更新顯示名稱，不覆蓋管理員目前設定的額度、啟用狀態或 Nova cost。
+首次呼叫 `/api/health` 會執行冪等 seed。Seed 使用 `platform_settings.seed.version` 管理版本，不會覆蓋學生資料或刪除生產資料。`ai_solution` 與獨立的 `ai_solution_upload` permission 包含在 seed version 11；既有 feature row 只更新顯示名稱，不覆蓋管理員目前設定的額度、啟用狀態或 Nova cost。0090 新增圖片／PDF 上傳額度，預設免費 8 個/日、Pro 50 個/日，管理員可在「後台 → 功能權限」修改，日額度填 `-1` 表示不限。
 
 ### AI 解題 production migration 與檢查
 
@@ -164,7 +176,7 @@ DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:migrate:ai-soluti
 DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:check:ai-solution
 ```
 
-`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。此檢查和專用 migration 不會代替基礎 schema 建置；production 不可盲目執行全量 `drizzle-kit push/migrate`。已完成 schema baseline 盤點的環境，依前述 release procedure 套用 0083–0089，再執行本節的 AI solution 專用檢查／migration（若其 migration 尚未套用）。部署啟動後呼叫 `/api/health` 會觸發 seed version 10；seed 失敗時 readiness 會回 HTTP 503。
+`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。此檢查和專用 migration 不會代替基礎 schema 建置；production 不可盲目執行全量 `drizzle-kit push/migrate`。已完成 schema baseline 盤點的環境，依前述 release procedure 套用 0083–0090，再執行本節的 AI solution 專用檢查／migration（若其 migration 尚未套用）。部署啟動後呼叫 `/api/health` 會觸發 seed version 11；seed 失敗時 readiness 會回 HTTP 503。
 
 預期的成功 log 應包含 `feature_permissions` 查詢成功、`ai_solution` permission 已解析，且 `/api/v1/ai/solution/analyze` 的 external provider request 會在 quota preflight 之後出現。若 schema／連線／資料庫權限錯誤，log 會以 `[quota] database failure` 並標示 `schema_migration`、`connection`、`permission_denied` 或 `query_error`，不會偽裝成 permission 缺失。
 

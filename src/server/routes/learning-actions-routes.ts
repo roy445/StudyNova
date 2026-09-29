@@ -3,12 +3,14 @@ import { z } from "zod";
 import { db } from "@/db";
 import { answers, gradeRecords, learningPackages, notes, questions, quizAttempts, reviewItems, studyMaterials, userVocabularies, wrongQuestions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { fail, fingerprint, notFound } from "../core";
+import { fail, fingerprint, notFound, safeErrorMessage } from "../core";
 import { aiConfigured, runAiJson } from "../ai";
+import { normalizePackageOutput, packageProgress, type PackageOutput } from "../learning-package-utils";
 import { generateQuestions } from "./quiz-routes";
 
 const whySchema = z.object({ reason: z.string().max(1000), nextStep: z.string().max(1000), focus: z.string().max(240), practicePrompt: z.string().max(1000) });
 const onePageSchema = z.object({ title: z.string().max(120).default("考前一頁紙"), examMode: z.string().max(40).default("general"), examId: z.string().uuid().nullable().optional() });
+const packageStepSchema = z.enum(["notes", "key_points", "vocabulary", "quiz", "flashcards", "review"]);
 
 async function loadWrong(userId: string, id: string) {
   const row = (await db.select({ wrong: wrongQuestions, question: questions }).from(wrongQuestions).innerJoin(questions, eq(questions.id, wrongQuestions.questionId)).where(and(eq(wrongQuestions.id, id), eq(wrongQuestions.userId, userId))).limit(1))[0];
@@ -53,11 +55,14 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/learning-packages",
     auth: "user",
+    rate: { limit: 10, windowSec: 3600, key: "learning-package-create" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ materialId: z.string().uuid(), steps: z.array(z.enum(["notes", "key_points", "vocabulary", "quiz", "flashcards", "review"])).min(1).max(6) }));
       const material = (await db.select().from(studyMaterials).where(and(eq(studyMaterials.id, body.materialId), eq(studyMaterials.userId, user.userId))).limit(1))[0];
       if (!material) throw notFound("找不到教材或你沒有權限使用");
+      if (!material.content.trim()) throw fail("AI_EMPTY_RESULT", { message: "教材沒有可供整理的文字，請重新上傳或貼上課文內容。" });
+      if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
       const row = (await db.insert(learningPackages).values({ userId: user.userId, materialId: material.id, selectedSteps: body.steps, status: "queued", progress: 0 }).returning())[0];
       return { package: row };
     },
@@ -70,6 +75,16 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const row = (await db.select().from(learningPackages).where(and(eq(learningPackages.id, ctx.params.id), eq(learningPackages.userId, user.userId))).limit(1))[0];
       if (!row) throw notFound("找不到學習包");
+      if (row.status === "processing" && Date.now() - row.updatedAt.getTime() > 10 * 60_000) {
+        const errors = { ...((row.errors ?? {}) as Record<string, string>) };
+        const results = (row.results ?? {}) as Record<string, unknown>;
+        const failedStep = row.currentStep || (row.selectedSteps as string[]).find((step) => !(results[step] as Record<string, unknown> | undefined)?.completedAt) || "_worker";
+        errors[failedStep] = "上次生成工作超過 10 分鐘沒有更新，已停止等待；請重試這個步驟。";
+        const recovered = (await db.update(learningPackages).set({ status: "partial", currentStep: "", errors, updatedAt: new Date() }).where(and(eq(learningPackages.id, row.id), eq(learningPackages.status, "processing"), eq(learningPackages.updatedAt, row.updatedAt))).returning())[0];
+        if (recovered) return { package: recovered };
+        const latest = (await db.select().from(learningPackages).where(eq(learningPackages.id, row.id)).limit(1))[0];
+        return { package: latest ?? row };
+      }
       return { package: row };
     },
   }),
@@ -77,51 +92,85 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/learning-packages/:id/run",
     auth: "user",
+    rate: { limit: 30, windowSec: 3600, key: "learning-package-run" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ step: z.enum(["notes", "key_points", "vocabulary", "quiz", "flashcards", "review"]) }));
+      const body = await ctx.json(z.object({ step: packageStepSchema.optional(), all: z.boolean().optional() }).refine((value) => Boolean(value.step) || value.all === true, "請指定要重試的步驟或執行整份學習包"));
       const pkg = (await db.select().from(learningPackages).where(and(eq(learningPackages.id, ctx.params.id), eq(learningPackages.userId, user.userId))).limit(1))[0];
       if (!pkg) throw notFound("找不到學習包");
       const material = (await db.select().from(studyMaterials).where(and(eq(studyMaterials.id, pkg.materialId), eq(studyMaterials.userId, user.userId))).limit(1))[0];
       if (!material) throw notFound("找不到教材");
       if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
       const steps = pkg.selectedSteps as string[];
-      if (!steps.includes(body.step)) throw fail("REQ_VALIDATION", { message: "這個步驟未被使用者勾選" });
-      await db.update(learningPackages).set({ status: "processing", currentStep: body.step, progress: Math.max(1, Math.round((steps.indexOf(body.step) / steps.length) * 100)), updatedAt: new Date() }).where(eq(learningPackages.id, pkg.id));
+      if (body.step && !steps.includes(body.step)) throw fail("REQ_VALIDATION", { message: "這個步驟未被使用者勾選" });
+      if (!material.content.trim()) throw fail("AI_EMPTY_RESULT", { message: "教材沒有可供整理的文字，請重新上傳或貼上課文內容。" });
+      const results = { ...((pkg.results ?? {}) as Record<string, unknown>) };
+      const requestedTargets = body.all ? ["notes", "key_points", "vocabulary", "quiz", "flashcards", "review"].filter((step) => steps.includes(step)) : [body.step!];
+      const targets = requestedTargets.filter((step) => !(results[step] as Record<string, unknown> | undefined)?.completedAt);
+      if (!targets.length) return { package: pkg };
+      const pending = targets;
+      const initialProgress = packageProgress(steps, results);
+      const activeStep = pending[0];
+      if (pkg.status === "processing" && Date.now() - pkg.updatedAt.getTime() <= 10 * 60_000) return { package: pkg };
+      const started = await db.update(learningPackages).set({ status: "processing", currentStep: activeStep, progress: initialProgress, updatedAt: new Date() }).where(and(eq(learningPackages.id, pkg.id), eq(learningPackages.status, pkg.status), eq(learningPackages.updatedAt, pkg.updatedAt))).returning({ id: learningPackages.id });
+      if (!started[0]) {
+        const latest = (await db.select().from(learningPackages).where(eq(learningPackages.id, pkg.id)).limit(1))[0];
+        return { package: latest ?? pkg };
+      }
+      let currentStep = activeStep;
+      const errors = { ...((pkg.errors ?? {}) as Record<string, string>) };
+      delete errors._request;
       try {
-        const generated = await runAiJson<{ summary?: string; keyPoints?: string[]; vocabulary?: Array<{ word: string; meaning: string; partOfSpeech?: string; example?: string; exampleZh?: string }>; questions?: Array<{ stem: string; options: string[]; answer: string[]; explanation: string; type?: string }> }>({ feature: "learning_package", userId: user.userId, system: "你是 StudyNova 教材整理引擎。只能根據提供教材產生內容，不可杜撰。回傳 JSON，欄位 summary、keyPoints、vocabulary、questions；題目必須能由教材作答，單字必須確實出現在教材或摘要中。", parts: [{ kind: "text", text: `教材標題：${material.title}\n科目：${material.subject}\n內容：\n${material.content.slice(0, 16000)}` }], maxOutputTokens: 3500 }, { summary: "", keyPoints: [], vocabulary: [], questions: [] });
-        const result = generated.data;
-        const results = { ...pkg.results, [body.step]: { completedAt: new Date().toISOString() } } as Record<string, unknown>;
-        if (body.step === "notes" || body.step === "key_points") {
-          const text = body.step === "notes" ? (result.summary || result.keyPoints?.join("\n") || "") : (result.keyPoints ?? []).map((item) => `- ${item}`).join("\n");
-          const saved = await db.insert(notes).values({ userId: user.userId, title: `${material.title}・${body.step === "notes" ? "AI 筆記" : "重點"}`, subject: material.subject, body: text, tags: ["learning-package", body.step], source: "ai", materialId: material.id }).returning({ id: notes.id });
-          results[body.step] = { ...results[body.step] as object, noteId: saved[0]?.id };
-        } else if (body.step === "vocabulary" || body.step === "flashcards") {
-          const savedIds: string[] = [];
-          for (const item of (result.vocabulary ?? []).slice(0, 30)) {
-            const saved = await db.insert(userVocabularies).values({ userId: user.userId, word: item.word, normalizedWord: item.word.trim().toLowerCase(), meaning: item.meaning, partOfSpeech: item.partOfSpeech ?? "", example: item.example ?? "", exampleZh: item.exampleZh ?? "", sourceDocumentId: null }).onConflictDoUpdate({ target: [userVocabularies.userId, userVocabularies.normalizedWord], set: { meaning: item.meaning, partOfSpeech: item.partOfSpeech ?? "", example: item.example ?? "", exampleZh: item.exampleZh ?? "", updatedAt: new Date() } }).returning({ id: userVocabularies.id });
-            if (saved[0]) savedIds.push(saved[0].id);
+        const generated = await runAiJson<PackageOutput>({ feature: "learning_package", userId: user.userId, system: "你是 StudyNova 教材整理引擎。只能根據提供教材產生內容，不可杜撰。回傳 JSON，欄位 summary、keyPoints、vocabulary、questions；題目必須能由教材作答，單字必須確實出現在教材或摘要中。若某類內容無法從教材找到，請回傳空陣列，不可猜測。", parts: [{ kind: "text", text: `教材標題：${material.title}\n科目：${material.subject}\n內容：\n${material.content.slice(0, 16000)}` }], maxOutputTokens: 3500, timeoutMs: 45_000 }, { summary: "", keyPoints: [], vocabulary: [], questions: [] });
+        const result = normalizePackageOutput(generated.data);
+        for (let index = 0; index < pending.length; index += 1) {
+          const step = pending[index];
+          currentStep = step;
+          await db.update(learningPackages).set({ status: "processing", currentStep: step, progress: packageProgress(steps, results), updatedAt: new Date() }).where(eq(learningPackages.id, pkg.id));
+          let stepResult: Record<string, unknown> = {};
+          if (step === "notes" || step === "key_points") {
+            const text = step === "notes" ? (result.summary || result.keyPoints.join("\n")) : result.keyPoints.map((item) => `- ${item}`).join("\n");
+            if (!text.trim()) throw new Error(step === "notes" ? "AI 沒有產生筆記內容，請確認課文文字完整後重試。" : "AI 沒有產生重點內容，請確認課文文字完整後重試。");
+            const saved = await db.insert(notes).values({ userId: user.userId, title: `${material.title}・${step === "notes" ? "AI 筆記" : "重點"}`, subject: material.subject, body: text, tags: ["learning-package", step], source: "ai", materialId: material.id }).returning({ id: notes.id });
+            stepResult = { noteId: saved[0]?.id };
+          } else if (step === "vocabulary" || step === "flashcards") {
+            if (!result.vocabulary.length) throw new Error("AI 沒有從課文辨識出可建立的單字，請確認教材內容或改選其他學習包項目。");
+            const savedIds: string[] = [];
+            for (const item of result.vocabulary) {
+              const saved = await db.insert(userVocabularies).values({ userId: user.userId, word: item.word, normalizedWord: item.word.trim().toLowerCase(), meaning: item.meaning, partOfSpeech: item.partOfSpeech, example: item.example, exampleZh: item.exampleZh, sourceDocumentId: null }).onConflictDoUpdate({ target: [userVocabularies.userId, userVocabularies.normalizedWord], set: { meaning: item.meaning, partOfSpeech: item.partOfSpeech, example: item.example, exampleZh: item.exampleZh, updatedAt: new Date() } }).returning({ id: userVocabularies.id });
+              if (saved[0]) savedIds.push(saved[0].id);
+            }
+            stepResult = { vocabularyIds: savedIds };
+          } else if (step === "quiz") {
+            if (!result.questions.length) throw new Error("AI 沒有產生可作答的題目，請確認教材文字完整後重試。");
+            const ids: string[] = [];
+            for (const item of result.questions) {
+              const fp = fingerprint("learning-package", material.id, item.stem);
+              const saved = await db.insert(questions).values({ ownerId: user.userId, origin: "ai", targetBank: "personal", bankCategory: "learning-package", sourceLabel: material.title, subject: material.subject, topic: material.title, sourceType: "learning_package", status: "published", level: "custom", difficulty: "normal", type: item.type ?? "single", stem: item.stem, options: item.options, answer: item.answer, explanation: item.explanation, metadata: { materialId: material.id, packageId: pkg.id }, fingerprint: fp }).onConflictDoNothing().returning({ id: questions.id });
+              const existing = saved[0] ?? (await db.select({ id: questions.id }).from(questions).where(eq(questions.fingerprint, fp)).limit(1))[0];
+              if (existing) ids.push(existing.id);
+            }
+            stepResult = { questionIds: ids };
+          } else {
+            const vocabularyIds = ((results.vocabulary as { vocabularyIds?: string[] } | undefined)?.vocabularyIds ?? (results.flashcards as { vocabularyIds?: string[] } | undefined)?.vocabularyIds ?? []);
+            if (!vocabularyIds.length) throw new Error("建立複習內容前，請先完成「建立單字卡」或「建立記憶卡」。");
+            for (const contentId of vocabularyIds) await db.insert(reviewItems).values({ userId: user.userId, contentType: "vocabulary", contentId, metadata: { packageId: pkg.id, materialId: material.id } }).onConflictDoNothing();
+            stepResult = { queued: vocabularyIds.length };
           }
-          results[body.step] = { ...results[body.step] as object, vocabularyIds: savedIds };
-        } else if (body.step === "quiz") {
-          const ids: string[] = [];
-          for (const item of (result.questions ?? []).slice(0, 20)) {
-            const saved = await db.insert(questions).values({ ownerId: user.userId, origin: "ai", targetBank: "personal", bankCategory: "learning-package", sourceLabel: material.title, subject: material.subject, topic: material.title, sourceType: "learning_package", status: "published", level: "custom", difficulty: "normal", type: item.type ?? "single", stem: item.stem, options: item.options ?? [], answer: item.answer ?? [], explanation: item.explanation ?? "", metadata: { materialId: material.id, packageId: pkg.id }, fingerprint: fingerprint("learning-package", material.id, item.stem) }).onConflictDoNothing().returning({ id: questions.id });
-            if (saved[0]) ids.push(saved[0].id);
-          }
-          results[body.step] = { ...results[body.step] as object, questionIds: ids };
-        } else if (body.step === "review") {
-          const vocabularyIds = ((results.vocabulary as { vocabularyIds?: string[] } | undefined)?.vocabularyIds ?? []);
-          for (const contentId of vocabularyIds) await db.insert(reviewItems).values({ userId: user.userId, contentType: "vocabulary", contentId, metadata: { packageId: pkg.id, materialId: material.id } }).onConflictDoNothing();
-          results[body.step] = { ...results[body.step] as object, queued: vocabularyIds.length };
+          results[step] = { ...(results[step] as Record<string, unknown> | undefined), ...stepResult, completedAt: new Date().toISOString() };
+          delete errors[step];
+          const done = steps.every((item) => Boolean((results[item] as Record<string, unknown> | undefined)?.completedAt));
+          await db.update(learningPackages).set({ status: done ? "completed" : "processing", progress: packageProgress(steps, results), currentStep: done ? "" : pending[index + 1] ?? step, results, errors, completedAt: done ? new Date() : null, updatedAt: new Date() }).where(eq(learningPackages.id, pkg.id));
         }
-        const completed = steps.every((step) => step === body.step || Boolean((results[step] as Record<string, unknown> | undefined)?.completedAt));
-        const updated = (await db.update(learningPackages).set({ status: completed ? "completed" : "partial", progress: completed ? 100 : Math.min(99, Math.round((Object.keys(results).length / steps.length) * 100)), currentStep: "", results, errors: { ...(pkg.errors as Record<string, string>), [body.step]: "" }, completedAt: completed ? new Date() : null, updatedAt: new Date() }).where(eq(learningPackages.id, pkg.id)).returning())[0];
+        const completed = steps.every((step) => Boolean((results[step] as Record<string, unknown> | undefined)?.completedAt));
+        const updated = (await db.update(learningPackages).set({ status: completed ? "completed" : "partial", progress: packageProgress(steps, results), currentStep: "", results, errors, completedAt: completed ? new Date() : null, updatedAt: new Date() }).where(eq(learningPackages.id, pkg.id)).returning())[0];
         return { package: updated };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "處理失敗";
-        const updated = (await db.update(learningPackages).set({ status: "partial", currentStep: "", errors: { ...(pkg.errors as Record<string, string>), [body.step]: message }, updatedAt: new Date() }).where(eq(learningPackages.id, pkg.id)).returning())[0];
-        return { package: updated, stepFailed: body.step };
+        const message = safeErrorMessage(error);
+        for (const step of pending.slice(pending.indexOf(currentStep))) errors[step] = message;
+        const doneCount = steps.filter((step) => Boolean((results[step] as Record<string, unknown> | undefined)?.completedAt)).length;
+        const updated = (await db.update(learningPackages).set({ status: doneCount ? "partial" : "failed", progress: packageProgress(steps, results), currentStep: "", results, errors, completedAt: null, updatedAt: new Date() }).where(eq(learningPackages.id, pkg.id)).returning())[0];
+        return { package: updated, stepFailed: currentStep };
       }
     },
   }),

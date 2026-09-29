@@ -27,12 +27,13 @@ import { subjectStats, buildPlan } from "./learning-routes";
 import { embedCjkFont } from "../cjk-font";
 import { renderSvgToPng } from "../image-rendering/renderer";
 import { generateQuestions } from "./quiz-routes";
-import { putObject } from "../storage";
+import { deleteObject, putObject } from "../storage";
 import { analysisScopes, fileContexts, solutionSessions } from "@/db/schema";
 import { analyzeSolution, createFileContext } from "../unified-ai-engine";
 import { AppError } from "../errors";
 import { readObject } from "../storage";
 import { SUBJECTS } from "../subject-strategies";
+import { AI_SOLUTION_UPLOAD_FEATURE } from "../quota-policy";
 import { getAiPolicy, policyInstructions } from "../ai-policy";
 
 const MODES = {
@@ -676,6 +677,12 @@ export const routes: RouteDef[] = [
         try {
           const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
           const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
+          try {
+            await consumeFeature(user.userId, AI_SOLUTION_UPLOAD_FEATURE, 1);
+          } catch (error) {
+            await deleteObject(stored.id, user.userId, false).catch(() => undefined);
+            throw error;
+          }
           return await createFileContext({ userId: user.userId, objectId: stored.id, originalName: file.name, batch, scope, subject });
         } catch (error) {
           const code = error instanceof AppError ? error.code : "SN-SYS-9901";
@@ -686,6 +693,73 @@ export const routes: RouteDef[] = [
       const results: Array<Awaited<ReturnType<typeof processFile>>> = [];
       for (let i = 0; i < files.length; i += 3) results.push(...await Promise.all(files.slice(i, i + 3).map(processFile)));
       return { batch, results, newCount: results.filter((r) => !r.duplicate).length, duplicateCount: results.filter((r) => r.duplicate).length };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/ai/solution/upload/complete",
+    auth: "user",
+    rate: { limit: 60, windowSec: 3600, key: "ai-solution-upload" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        pathnames: z.array(z.string().trim().min(1).max(1024)).min(1).max(30),
+        batch: z.number().int().min(1).max(2_147_483_647).optional(),
+        subject: z.string().trim().max(30),
+        scope: z.object({
+          includeQuestion: z.boolean().optional(),
+          includeHandwriting: z.boolean().optional(),
+          includeNote: z.boolean().optional(),
+          highlightPriority: z.boolean().optional(),
+          questionColor: z.string().max(30).optional(),
+          sentenceColor: z.string().max(30).optional(),
+          keywordColor: z.string().max(30).optional(),
+        }).optional(),
+      }));
+      if (!SUBJECTS.includes(body.subject as (typeof SUBJECTS)[number])) throw badRequest("上傳前請先選擇科目");
+      const pathnames = [...new Set(body.pathnames)];
+      const scope = {
+        includeQuestion: body.scope?.includeQuestion ?? true,
+        includeHandwriting: body.scope?.includeHandwriting ?? true,
+        includeNote: body.scope?.includeNote ?? true,
+        highlightPriority: body.scope?.highlightPriority ?? false,
+        questionColor: body.scope?.questionColor ?? "",
+        sentenceColor: body.scope?.sentenceColor ?? "",
+        keywordColor: body.scope?.keywordColor ?? "",
+      };
+      const previous = body.batch === undefined
+        ? await db.select({ batch: fileContexts.uploadBatch }).from(fileContexts).where(eq(fileContexts.userId, user.userId)).orderBy(desc(fileContexts.uploadBatch)).limit(1)
+        : [];
+      const batch = body.batch ?? (previous[0]?.batch ?? 0) + 1;
+      const processPath = async (pathname: string) => {
+        try {
+          if (!pathname.startsWith("ai-solution/")) throw fail("PERM_FILE_DENIED");
+          const object = (await db.select().from(storageObjects).where(and(
+            eq(storageObjects.userId, user.userId),
+            eq(storageObjects.driver, "blob"),
+            eq(storageObjects.storageKey, pathname),
+          )).limit(1))[0];
+          if (!object) throw fail("FILE_UPLOAD_INCOMPLETE", { message: "雲端檔案尚未完成登記，請稍候重試。" });
+          const existing = (await db.select().from(fileContexts).where(and(
+            eq(fileContexts.userId, user.userId),
+            eq(fileContexts.objectId, object.id),
+          )).orderBy(desc(fileContexts.createdAt)).limit(1))[0];
+          if (existing) {
+            if (existing.status === "failed") return { pathname, context: null, duplicate: false, errorCode: "SN-SYS-9901", error: existing.error || "圖片辨識失敗，請重新上傳。" };
+            return { pathname, context: existing, duplicate: true };
+          }
+          const result = await createFileContext({ userId: user.userId, objectId: object.id, originalName: object.filename, batch, scope, subject: body.subject });
+          return { pathname, ...result };
+        } catch (error) {
+          const code = error instanceof AppError ? error.code : "SN-SYS-9901";
+          console.error("[ai-solution-upload-complete] file analysis failed", { pathname: pathname.slice(0, 180), code, error: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
+          return { pathname, context: null, duplicate: false, errorCode: code, error: error instanceof Error ? error.message.slice(0, 240) : "圖片分析失敗" };
+        }
+      };
+      const results: Array<Awaited<ReturnType<typeof processPath>>> = [];
+      for (let i = 0; i < pathnames.length; i += 2) results.push(...await Promise.all(pathnames.slice(i, i + 2).map(processPath)));
+      return { batch, results, newCount: results.filter((r) => r.context && !r.duplicate).length, duplicateCount: results.filter((r) => r.duplicate).length };
     },
   }),
 
@@ -706,7 +780,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ contextIds: z.array(z.string().uuid()).max(8).default([]), question: z.string().trim().max(30000).optional(), subject: z.string().trim().max(30).optional(), mode: z.enum(["tutor", "solution", "note"]).optional(), idempotencyKey: z.string().trim().min(1).max(160).optional(), scope: z.object({ includeQuestion: z.boolean().optional(), includeHandwriting: z.boolean().optional(), includeNote: z.boolean().optional(), highlightPriority: z.boolean().optional() }).optional() }).refine((value) => value.contextIds.length > 0 || Boolean(value.question?.trim()), { message: "請輸入題目或上傳圖片／檔案" }));
+      const body = await ctx.json(z.object({ contextIds: z.array(z.string().uuid()).max(30).default([]), question: z.string().trim().max(30000).optional(), subject: z.string().trim().max(30).optional(), mode: z.enum(["tutor", "solution", "note"]).optional(), idempotencyKey: z.string().trim().min(1).max(160).optional(), scope: z.object({ includeQuestion: z.boolean().optional(), includeHandwriting: z.boolean().optional(), includeNote: z.boolean().optional(), highlightPriority: z.boolean().optional() }).optional() }).refine((value) => value.contextIds.length > 0 || Boolean(value.question?.trim()), { message: "請輸入題目或上傳圖片／檔案" }));
       return analyzeSolution({ userId: user.userId, contextIds: body.contextIds, question: body.question, subject: body.subject, requestedMode: body.mode, idempotencyKey: body.idempotencyKey, scope: body.scope });
     },
   }),

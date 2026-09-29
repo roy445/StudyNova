@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Field, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { apiPost, errorMessage, useApi } from "@/lib/api";
+import { MAX_AI_SOLUTION_FILES, uploadAiSolutionFiles } from "@/lib/ai-solution-upload";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 const MODES = [
@@ -15,12 +16,10 @@ const MODES = [
 
 type AnalyzeResult = { reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean; mode?: string; segmentsUsed?: number };
 
-type UploadResult = { context: { id: string; originalName: string } | null; error?: string; errorCode?: string };
-
 export default function SolvePage() {
   const toast = useToast();
   const router = useRouter();
-  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number; used?: number; limit?: number; remaining?: number; unlimited?: boolean }> }>("/quotas");
   const [subject, setSubject] = useState("英文");
   const [mode, setMode] = useState<(typeof MODES)[number]["key"]>("tutor");
   const [question, setQuestion] = useState("");
@@ -28,8 +27,10 @@ export default function SolvePage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ value: number; label: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cost = quotas.data?.quotas.find((item) => item.feature === "ai_solution")?.novaCost ?? null;
+  const uploadQuota = quotas.data?.quotas.find((item) => item.feature === "ai_solution_upload");
 
   async function solve() {
     if (!question.trim() && !files.length) {
@@ -43,16 +44,17 @@ export default function SolvePage() {
     try {
       let contextIds: string[] = [];
       if (files.length) {
-        const form = new FormData();
-        files.slice(0, 8).forEach((file) => form.append("files", file));
-        form.append("subject", subject);
-        form.append("includeQuestion", "true");
-        form.append("includeHandwriting", "true");
-        form.append("includeNote", "true");
-        const uploaded = await apiPost<{ results: UploadResult[] }>("/ai/solution/upload", form);
+        const uploaded = await uploadAiSolutionFiles(files, {
+          subject,
+          scope: { includeQuestion: true, includeHandwriting: true, includeNote: true },
+          onProgress: setUploadProgress,
+        });
         const failed = uploaded.results.filter((item) => !item.context);
-        if (failed.length) throw new Error(failed.map((item) => `${item.error ?? "檔案分析失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；"));
         contextIds = uploaded.results.flatMap((item) => (item.context ? [item.context.id] : []));
+        if (!contextIds.length) throw new Error(failed.map((item) => `${item.error ?? "檔案分析失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；") || "沒有可供解題的已辨識檔案。");
+        if (failed.length) setError(`有 ${failed.length} 個檔案未完成：${failed.map((item) => `${item.error ?? "檔案分析失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；")}`);
+        setUploadProgress({ value: 100, label: "圖片辨識完成，正在整理解題…" });
+        await quotas.reload();
       }
       const response = await apiPost<{ result: AnalyzeResult }>("/ai/solution/analyze", {
         contextIds,
@@ -67,6 +69,7 @@ export default function SolvePage() {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+      setUploadProgress(null);
     }
   }
 
@@ -77,6 +80,7 @@ export default function SolvePage() {
           英文圖片 OCR 會在學習中心處理；這裡是跨科解題入口，國文、數學、自然、社會與其他科目都可以使用。若題目不適合圖片分析，也可以直接詢問 Novi。
         </div>
         <NovaCostNotice cost={cost} action="解題專區 AI 分析" className="mt-3" />
+        {uploadQuota && <p className="mt-2 text-xs text-muted">今日圖片／PDF：{uploadQuota.unlimited ? "不限量" : `已使用 ${uploadQuota.used ?? 0} / ${uploadQuota.limit ?? 0} 個`}</p>}
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-3">
             <Field label="科目">
@@ -87,8 +91,8 @@ export default function SolvePage() {
             <Field label="題目或補充要求" hint="可以貼上完整題目、你的作答與想先理解的地方。">
               <Textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="例如：請說明這題為什麼要使用二次公式？或貼上題目文字。" rows={7} />
             </Field>
-            <Field label="題目圖片／PDF" hint="最多 8 個檔案；請確保題目清楚、沒有重要內容被裁掉。">
-              <input ref={inputRef} type="file" accept="image/*,.pdf" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []).slice(0, 8))} className="w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2 text-xs" />
+            <Field label="題目圖片／PDF" hint={`一次最多 ${MAX_AI_SOLUTION_FILES} 個檔案；每檔上限 18 MiB。圖片會直接傳到私有雲端儲存，不經 Vercel Function。`}>
+              <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/heic,.pdf" multiple onChange={(event) => { const selected = Array.from(event.target.files ?? []); if (selected.length > MAX_AI_SOLUTION_FILES) toast.push("info", `一次最多上傳 ${MAX_AI_SOLUTION_FILES} 個檔案，已保留前 ${MAX_AI_SOLUTION_FILES} 個。`); setFiles(selected.slice(0, MAX_AI_SOLUTION_FILES)); }} className="w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2 text-xs" />
               {files.length > 0 && <p className="mt-1 text-xs text-muted">已選擇 {files.length} 個檔案：{files.map((file) => file.name).join("、")}</p>}
             </Field>
             <div className="flex flex-wrap gap-2">
@@ -96,6 +100,7 @@ export default function SolvePage() {
               <Button variant="ghost" onClick={() => { setQuestion(""); setFiles([]); setResult(null); setError(null); if (inputRef.current) inputRef.current.value = ""; }}>清除</Button>
               <Button variant="ghost" onClick={() => router.push("/ai")}>直接詢問 Novi</Button>
             </div>
+            {uploadProgress && <div className="rounded-xl border border-cyan-300/30 bg-cyan-300/5 px-3 py-2"><div className="mb-1 flex justify-between gap-2 text-xs"><span>{uploadProgress.label}</span><span>{uploadProgress.value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-black/20"><div className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-violet-400 transition-all" style={{ width: `${uploadProgress.value}%` }} /></div></div>}
             {error && <div className="rounded-xl border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-100">{error}</div>}
           </div>
           <div className="space-y-2">
@@ -124,4 +129,3 @@ export default function SolvePage() {
     </div>
   );
 }
-

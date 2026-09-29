@@ -6,6 +6,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Selec
 import { ApiRequestError, apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { ChatRichText } from "@/components/ChatRichText";
+import { MAX_AI_SOLUTION_FILES, uploadAiSolutionFiles } from "@/lib/ai-solution-upload";
 
 type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
 type Message = { id: string; conversationId?: string; role: string; content: string; attachment?: { name: string; previewUrl: string }; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
@@ -47,8 +48,9 @@ export default function AiPage() {
   const convs = useApi<{ conversations: Conversation[]; aiEnabled: boolean }>("/ai/conversations");
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
   const memory = useApi<{ memory: MemoryItem[]; memoryEnabled?: boolean }>("/ai/memory");
-  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
+  const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number; used?: number; limit?: number; remaining?: number; unlimited?: boolean }> }>("/quotas");
   const contexts = useApi<{ contexts: FileContext[] }>("/ai/solution/contexts");
+  const imageUploadQuota = quotas.data?.quotas.find((item) => item.feature === "ai_solution_upload");
   const aiContextCost = quotas.data?.quotas.find((item) => item.feature === "ai_context")?.novaCost ?? null;
   const aiPracticeCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -134,6 +136,10 @@ export default function AiPage() {
 
   async function uploadAndAnalyze(files: FileList | null) {
     if (!files?.length || uploading) return;
+    if (files.length > MAX_AI_SOLUTION_FILES) {
+      toast.push("info", `一次最多上傳 ${MAX_AI_SOLUTION_FILES} 個檔案，請分批選取。`);
+      return;
+    }
     if (!attachmentSubject) {
       toast.push("info", "請先選擇圖片科目，再加入對話");
       return;
@@ -142,20 +148,19 @@ export default function AiPage() {
     setAnalysisProgress({ value: 8, label: "準備檔案…" });
     setError(null);
     try {
-      const form = new FormData();
-      setAnalysisProgress({ value: 20, label: "上傳檔案中…" });
-      Array.from(files).slice(0, 8).forEach((file) => form.append("files", file));
-      form.append("subject", attachmentSubject);
-      Object.entries(scope).forEach(([key, value]) => form.append(key, String(value)));
-      const uploaded = await apiPost<{ results: Array<{ context: FileContext | null; duplicate: boolean; errorCode?: string; error?: string }>; newCount: number; duplicateCount: number }>("/ai/solution/upload", form);
-      setAnalysisProgress({ value: 52, label: "圖片已加入對話，請輸入你的需求…" });
+      const selected = Array.from(files);
+      const uploaded = await uploadAiSolutionFiles(selected, { subject: attachmentSubject, scope, onProgress: setAnalysisProgress });
       const failed = uploaded.results.filter((item) => !item.context);
       if (failed.length) setError(failed.map((item) => `${item.error ?? "圖片分析失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；"));
       const first = uploaded.results.find((item) => item.context);
       if (!first?.context) throw new Error(failed.length ? "圖片分析失敗，請依畫面上的錯誤代碼回報。" : "找不到上傳的圖片。");
-      setAttachment({ contextId: first.context.id, name: first.context.originalName, previewUrl: URL.createObjectURL(files[0]) });
-      toast.push("success", uploaded.duplicateCount ? "已加入對話並重用既有圖片分析" : "圖片已加入對話");
+      const firstIndex = uploaded.results.indexOf(first);
+      setAttachment({ contextId: first.context.id, name: first.context.originalName, previewUrl: URL.createObjectURL(selected[firstIndex] ?? selected[0]) });
+      toast.push("success", uploaded.results.length > 1
+        ? `已處理 ${uploaded.results.length - failed.length} 個檔案；目前對話附件會先使用第一份。`
+        : uploaded.duplicateCount ? "已加入對話並重用既有圖片分析" : "圖片已加入對話");
       await contexts.reload();
+      await quotas.reload();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -345,9 +350,9 @@ async function resolveAction(messageId: string, confirm: boolean) {
             </div>
 
             <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
-              <input ref={fileInput} type="file" accept="image/*,.pdf" multiple hidden onChange={(e) => void uploadAndAnalyze(e.target.files)} />
+              <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/heic,.pdf" multiple hidden onChange={(e) => void uploadAndAnalyze(e.target.files)} />
               {attachment && <div className="flex items-center gap-2 rounded-xl border border-[#37d3ff]/40 bg-[#37d3ff]/5 p-2"><img src={attachment.previewUrl} alt={attachment.name} className="h-14 w-14 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-xs">{attachment.name}<span className="block text-[10px] text-[#b9f2ff]">已加入對話，輸入需求後送出</span></span><button type="button" className="text-xs text-muted" onClick={() => { URL.revokeObjectURL(attachment.previewUrl); setAttachment(null); }}>移除</button></div>}
-              {analysisProgress && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 px-3 py-2"><div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-[#b9f2ff]">{analysisProgress.label}</span><span className="text-muted">{analysisProgress.value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-black/20"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all duration-500" style={{ width: `${analysisProgress.value}%` }} /></div><p className="mt-1 text-[10px] text-muted">你可以切換其他功能，分析會在背景完成；完成後回到 Novi 即可查看。</p></div>}
+              {analysisProgress && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 px-3 py-2"><div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-[#b9f2ff]">{analysisProgress.label}</span><span className="text-muted">{analysisProgress.value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-black/20"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all duration-500" style={{ width: `${analysisProgress.value}%` }} /></div><p className="mt-1 text-[10px] text-muted">圖片以私有雲端直傳，辨識期間請保持此頁開啟。</p></div>}
               {solutionResult && (
                 <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/8 px-3 py-2 text-xs leading-5">
                   <div className="mb-1 flex items-center justify-between"><span className="font-semibold text-[#7dd3fc]">共用 AI 分析 · {solutionResult.mode ?? "tutor"}{solutionResult.needsCrop ? " · 請裁切成單題" : ""}</span><button className="text-muted" onClick={() => setSolutionResult(null)}>關閉</button></div>
@@ -362,6 +367,8 @@ async function resolveAction(messageId: string, confirm: boolean) {
                 <option value="">先選科目</option>
                 {SUBJECTS.map((subject) => <option key={subject}>{subject}</option>)}
               </select>
+              <span className="text-[10px] text-muted">最多 30 個檔案／批，每檔 18 MiB</span>
+              {imageUploadQuota && <span className="text-[10px] text-muted">今日圖片：{imageUploadQuota.unlimited ? "不限量" : `${imageUploadQuota.used ?? 0}/${imageUploadQuota.limit ?? 0}`}</span>}
               <Button size="sm" variant="outline" loading={uploading} onClick={() => fileInput.current?.click()} title="加入圖片或檔案">＋</Button>
               <Input
                 value={input}

@@ -250,7 +250,7 @@ export const storageObjects = pgTable(
   {
     id: id(),
     userId: uuid("user_id").references(() => users.userId, { onDelete: "cascade" }),
-    driver: text("driver").notNull().default("db"), // db | s3
+    driver: text("driver").notNull().default("db"), // db | s3 | blob
     storageKey: text("storage_key").notNull(),
     bucket: text("bucket").notNull().default(""),
     mimeType: text("mime_type").notNull(),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AI_SOLUTION_FEATURE,
+  AI_SOLUTION_UPLOAD_FEATURE,
   classifyQuotaDatabaseError,
   evaluateQuota,
   serverDefaultForFeature,
@@ -16,6 +17,14 @@ describe("ai_solution permission and quota policy", () => {
   it("uses the safe server default when the feature row is absent", () => {
     const permission = serverDefaultForFeature(AI_SOLUTION_FEATURE);
     expect(permission).toMatchObject({ freeDailyLimit: 3, proDailyLimit: 30, enabled: true });
+  });
+
+  it("defaults the separate image upload quota and supports unlimited daily limits", () => {
+    const uploadPolicy = serverDefaultForFeature(AI_SOLUTION_UPLOAD_FEATURE)!;
+    expect(uploadPolicy).toMatchObject({ freeDailyLimit: 8, proDailyLimit: 50, novaCost: 0 });
+    const unlimited = evaluateQuota({ ...uploadPolicy, freeDailyLimit: -1 }, { isPro: false, used: 1000, monthlyUsed: 1000 });
+    expect(unlimited).toMatchObject({ allowed: true, limit: -1, reason: "ok" });
+    expect(unlimited.remaining).toBe(Number.MAX_SAFE_INTEGER);
   });
 
   it("classifies schema errors instead of treating them as a missing permission", () => {

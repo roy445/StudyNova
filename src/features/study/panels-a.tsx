@@ -8,6 +8,7 @@ import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
 type Material = { id: string; title: string; subject: string; kind: string; status: string; summary: string; content: string; tags: string[]; createdAt: string; visibility: string; shareSlug?: string | null };
+type LearningPackageView = { id: string; status: string; progress: number; currentStep: string; errors: Record<string, string>; selectedSteps: string[]; results?: Record<string, { completedAt?: string }> };
 
 export function MaterialsPanel() {
   const toast = useToast();
@@ -25,7 +26,9 @@ export function MaterialsPanel() {
   const [packageOpen, setPackageOpen] = useState(false);
   const [packageMaterial, setPackageMaterial] = useState<Material | null>(null);
   const [packageSteps, setPackageSteps] = useState<string[]>(["notes", "key_points", "vocabulary", "quiz", "flashcards", "review"]);
-  const [learningPackage, setLearningPackage] = useState<{ id: string; status: string; progress: number; currentStep: string; errors: Record<string, string>; selectedSteps: string[] } | null>(null);
+  const [learningPackage, setLearningPackage] = useState<LearningPackageView | null>(null);
+  const [packageBusy, setPackageBusy] = useState(false);
+  const [retryingPackageStep, setRetryingPackageStep] = useState("");
   const [understanding, setUnderstanding] = useState<Record<string, { document: { status: string; summary: string } | null; blocks: Array<{ id: string; blockType: string; plainText: string; headingPath: string[] }>; segments: Array<{ id: string; text: string }> }>>({});
   const [understandingBusy, setUnderstandingBusy] = useState(false);
   const PACKAGE_STEPS = [{ key: "notes", label: "建立筆記" }, { key: "key_points", label: "建立重點" }, { key: "vocabulary", label: "建立單字卡" }, { key: "quiz", label: "建立測驗" }, { key: "flashcards", label: "建立記憶卡" }, { key: "review", label: "建立複習內容" }];
@@ -37,6 +40,26 @@ export function MaterialsPanel() {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("studynova-material-highlights") ?? "{}"); } catch { return {}; }
   });
+
+  useEffect(() => {
+    if (!learningPackage?.id || !["queued", "processing"].includes(learningPackage.status)) return;
+    let active = true;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const latest = await apiGet<{ package: LearningPackageView }>(`/learning-packages/${learningPackage.id}`);
+        if (active) setLearningPackage((current) => current?.id === latest.package.id ? latest.package : current);
+      } catch {
+        // Keep polling during transient API errors; the server remains authoritative.
+      }
+      if (active) timer = window.setTimeout(poll, 1800);
+    };
+    timer = window.setTimeout(poll, 900);
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [learningPackage?.id, learningPackage?.status]);
 
   function saveReadingProgress(materialId: string, value: number) {
     const next = { ...readingProgress, [materialId]: Math.max(0, Math.min(100, Math.round(value))) };
@@ -118,34 +141,56 @@ export function MaterialsPanel() {
 
   async function startTts(m: Material) {
     try {
-      await apiPost("/tts/jobs", { materialId: m.id, provider: "cosyvoice", voice: "default", language: "zh-TW", speed: 1, idempotencyKey: `material:${m.id}:default` });
+      await apiPost("/tts/jobs", { materialId: m.id, voice: "default", language: "zh-TW", speed: 1, idempotencyKey: `material:${m.id}:default` });
       toast.push("success", "AI 朗讀已排入背景工作；完成後可從朗讀工作查看音檔");
     } catch (err) { toast.push("error", errorMessage(err)); }
   }
 
   async function startLearningPackage() {
     if (!packageMaterial || !packageSteps.length) return;
+    setPackageBusy(true);
+    let packageId = "";
     try {
-      const created = await apiPost<{ package: NonNullable<typeof learningPackage> }>("/learning-packages", { materialId: packageMaterial.id, steps: packageSteps });
+      const created = await apiPost<{ package: LearningPackageView }>("/learning-packages", { materialId: packageMaterial.id, steps: packageSteps });
       let current = created.package;
+      packageId = current.id;
       setLearningPackage(current);
-      for (const step of packageSteps) {
-        const result = await apiPost<{ package: NonNullable<typeof learningPackage> }>(`/learning-packages/${current.id}/run`, { step });
-        current = result.package;
-        setLearningPackage(current);
-        if (current.errors?.[step]) break;
+      const result = await apiPost<{ package: LearningPackageView }>(`/learning-packages/${current.id}/run`, { all: true });
+      current = result.package;
+      setLearningPackage(current);
+      if (current.status === "completed") toast.push("success", "學習包建立完成，內容已同步到筆記、單字與題庫");
+      else if (["queued", "processing"].includes(current.status)) toast.push("info", "學習包正在處理，完成度會自動更新。");
+      else toast.push("error", Object.values(current.errors ?? {})[0] || "學習包未能完整建立，請查看各步驟錯誤並重試。");
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+      if (packageId) {
+        try {
+          const latest = await apiGet<{ package: LearningPackageView }>(`/learning-packages/${packageId}`);
+          setLearningPackage(latest.package);
+        } catch {
+          setLearningPackage((current) => current ? { ...current, status: "failed", errors: { ...current.errors, _request: errorMessage(err) } } : current);
+        }
       }
-      toast.push("success", current.status === "completed" ? "學習包建立完成，內容已同步到筆記、單字與題庫" : "學習包部分完成，可重試失敗步驟");
-    } catch (err) { toast.push("error", errorMessage(err)); }
+    } finally { setPackageBusy(false); }
   }
 
   async function retryPackageStep(step: string) {
     if (!learningPackage) return;
+    setRetryingPackageStep(step);
     try {
-      const result = await apiPost<{ package: NonNullable<typeof learningPackage> }>(`/learning-packages/${learningPackage.id}/run`, { step });
+      const result = await apiPost<{ package: LearningPackageView }>(`/learning-packages/${learningPackage.id}/run`, { step });
       setLearningPackage(result.package);
-      toast.push("success", `${PACKAGE_STEPS.find((item) => item.key === step)?.label ?? step} 已重試`);
-    } catch (err) { toast.push("error", errorMessage(err)); }
+      if (["queued", "processing"].includes(result.package.status)) toast.push("info", "目前已有生成工作處理中，已同步最新進度。");
+      else if (result.package.errors?.[step]) toast.push("error", result.package.errors[step]);
+      else toast.push("success", `${PACKAGE_STEPS.find((item) => item.key === step)?.label ?? step} 已重試`);
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+      try {
+        const latest = await apiGet<{ package: LearningPackageView }>(`/learning-packages/${learningPackage.id}`);
+        setLearningPackage(latest.package);
+      } catch { /* keep the last known state */ }
+    }
+    finally { setRetryingPackageStep(""); }
   }
 
   return (
@@ -224,7 +269,36 @@ export function MaterialsPanel() {
       </Modal>
 
       <Modal open={packageOpen} onClose={() => setPackageOpen(false)} title={`✨ 一鍵變成學習包・${packageMaterial?.title ?? ""}`}>
-        {!learningPackage ? <div className="space-y-3"><p className="text-xs text-muted">請勾選要建立的內容；每個步驟都會保存到目前 StudyNova 的對應系統，失敗時可只重試單一步驟。</p><div className="grid gap-2 sm:grid-cols-2">{PACKAGE_STEPS.map((step) => <label key={step.key} className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><input type="checkbox" checked={packageSteps.includes(step.key)} onChange={(e) => setPackageSteps((current) => e.target.checked ? [...current, step.key] : current.filter((item) => item !== step.key))} className="accent-[#7c5cff]" />{step.label}</label>)}</div><Button full disabled={!packageSteps.length} onClick={startLearningPackage}>開始建立學習包</Button></div> : <div className="space-y-3"><div className="flex items-center justify-between text-xs"><span>處理進度</span><b>{learningPackage.progress}%</b></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all" style={{ width: `${learningPackage.progress}%` }} /></div><div className="space-y-2">{learningPackage.selectedSteps.map((step) => <div key={step} className="flex items-center justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><span>{PACKAGE_STEPS.find((item) => item.key === step)?.label ?? step}</span>{learningPackage.errors?.[step] ? <Button size="sm" variant="ghost" onClick={() => retryPackageStep(step)}>重試</Button> : <Badge tone={learningPackage.currentStep === step ? "cyan" : learningPackage.progress >= 100 ? "green" : "muted"}>{learningPackage.currentStep === step ? "處理中" : learningPackage.progress >= 100 ? "完成" : "已排入"}</Badge>}</div>)}</div>{learningPackage.status === "completed" && <p className="text-xs text-emerald-200">建立完成：筆記、單字、題目與複習資料已寫入你的帳號。</p>}</div>}
+        {!learningPackage ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted">勾選要建立的內容；系統會一次整理教材，再逐項保存。若失敗會顯示原因，並可單獨重試。</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PACKAGE_STEPS.map((step) => <label key={step.key} className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-xs"><input type="checkbox" checked={packageSteps.includes(step.key)} onChange={(e) => setPackageSteps((current) => e.target.checked ? [...current, step.key] : current.filter((item) => item !== step.key))} className="accent-[#7c5cff]" />{step.label}</label>)}
+            </div>
+            <Button full disabled={!packageSteps.length || packageBusy} loading={packageBusy} onClick={startLearningPackage}>開始建立學習包</Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs"><span>處理進度</span><b>{learningPackage.progress}%</b></div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all" style={{ width: `${learningPackage.progress}%` }} /></div>
+            <p className="text-xs text-muted" aria-live="polite">
+              {learningPackage.status === "queued" ? "已送出，等待生成工作開始。" : learningPackage.status === "processing" ? `正在處理：${PACKAGE_STEPS.find((item) => item.key === learningPackage.currentStep)?.label ?? "教材內容"}。` : learningPackage.status === "completed" ? "學習包建立完成。" : learningPackage.status === "failed" ? "生成失敗，請查看下方原因並重試。" : "部分步驟尚未完成，可重試失敗項目。"}
+            </p>
+            {learningPackage.errors?._request && <p className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-2 text-xs text-rose-200">{learningPackage.errors._request}</p>}
+            <div className="space-y-2">
+              {learningPackage.selectedSteps.map((step) => {
+                const error = learningPackage.errors?.[step];
+                const done = Boolean(learningPackage.results?.[step]?.completedAt);
+                const active = learningPackage.status === "processing" && learningPackage.currentStep === step;
+                return <div key={step} className="rounded-xl border border-[var(--line)] px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between gap-2"><span>{PACKAGE_STEPS.find((item) => item.key === step)?.label ?? step}</span>{error ? <Button size="sm" variant="ghost" loading={retryingPackageStep === step} disabled={Boolean(retryingPackageStep)} onClick={() => void retryPackageStep(step)}>重試</Button> : <Badge tone={active ? "cyan" : done ? "green" : "muted"}>{active ? "處理中" : done ? "完成" : learningPackage.status === "queued" ? "等待中" : "尚未完成"}</Badge>}</div>
+                  {error && <p className="mt-2 break-words text-[11px] leading-5 text-rose-200" role="alert">{error}</p>}
+                </div>;
+              })}
+            </div>
+            {learningPackage.status === "completed" && <p className="text-xs text-emerald-200">建立完成：筆記、單字、題目與複習資料已寫入你的帳號。</p>}
+          </div>
+        )}
       </Modal>
 
       <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title={detail?.title ?? ""} wide>
