@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
+import { BrowserSpeechControls } from "@/components/BrowserSpeechControls";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -137,13 +138,6 @@ export function MaterialsPanel() {
       }
       throw new Error("教材理解仍在背景處理，請稍後重新開啟");
     } catch (err) { toast.push("error", errorMessage(err)); } finally { setUnderstandingBusy(false); }
-  }
-
-  async function startTts(m: Material) {
-    try {
-      await apiPost("/tts/jobs", { materialId: m.id, voice: "default", language: "zh-TW", speed: 1, idempotencyKey: `material:${m.id}:default` });
-      toast.push("success", "AI 朗讀已排入背景工作；完成後可從朗讀工作查看音檔");
-    } catch (err) { toast.push("error", errorMessage(err)); }
   }
 
   async function startLearningPackage() {
@@ -319,7 +313,7 @@ export function MaterialsPanel() {
                 {detail.summary}
               </div>
             )}
-            <div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="ghost" onClick={() => addHighlight(detail.id)}>標註選取文字</Button><Button size="sm" variant="ghost" loading={understandingBusy} onClick={() => void understand(detail)}>內容理解</Button><Button size="sm" variant="ghost" onClick={() => void startTts(detail)}>AI 朗讀</Button><label className="flex min-w-[180px] flex-1 items-center gap-2 text-[11px] text-muted"><span>閱讀進度</span><input type="range" min="0" max="100" value={readingProgress[detail.id] ?? 0} onChange={(e) => saveReadingProgress(detail.id, Number(e.target.value))} className="min-w-0 flex-1" /></label></div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2"><Button size="sm" variant="ghost" onClick={() => addHighlight(detail.id)}>標註選取文字</Button><Button size="sm" variant="ghost" loading={understandingBusy} onClick={() => void understand(detail)}>內容理解</Button><BrowserSpeechControls key={detail.id} text={detail.content} /><label className="flex min-w-[180px] flex-1 items-center gap-2 text-[11px] text-muted"><span>閱讀進度</span><input type="range" min="0" max="100" value={readingProgress[detail.id] ?? 0} onChange={(e) => saveReadingProgress(detail.id, Number(e.target.value))} className="min-w-0 flex-1" /></label></div>
             <div className="max-h-64 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-xl bg-black/25 p-3 text-xs leading-relaxed select-text">{detail.content || "（沒有文字內容）"}</div>
             {understanding[detail.id]?.blocks?.length ? <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs">{understanding[detail.id].blocks.map((block) => <div key={block.id} className="rounded-lg bg-black/15 p-2"><Badge tone="cyan">{block.blockType}</Badge>{block.headingPath?.length ? <p className="mt-1 text-[10px] text-muted">{block.headingPath.join(" / ")}</p> : null}<p className="mt-1 whitespace-pre-wrap leading-5">{block.plainText}</p></div>)}</div> : null}
             {(highlights[detail.id] ?? []).length > 0 && <div className="glass-soft space-y-1 p-3 text-xs"><p className="font-medium">我的閱讀標註</p>{(highlights[detail.id] ?? []).map((item, index) => <p key={`${item}-${index}`} className="rounded-lg bg-yellow-300/10 p-2 text-yellow-100">{item}</p>)}</div>}
