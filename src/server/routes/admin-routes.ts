@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MAINTENANCE_CATEGORIES, normalizeMaintenanceCategory } from "@/lib/maintenance";
-import { and, asc, desc, eq, ilike, or, sql, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or, sql, gte, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
   users,
@@ -41,6 +42,7 @@ import {
   passwordResetTokens,
   studyRecords,
   platformSettings,
+  maintenanceHistory,
   challenges,
   challengeParticipants,
   achievements,
@@ -544,12 +546,39 @@ export const routes: RouteDef[] = [
         title: typeof value.title === "string" ? value.title : "系統施工中",
         description: typeof value.description === "string" ? value.description : "StudyNova 目前正在進行系統維護與更新，暫時無法使用。",
         badgeText: typeof value.badgeText === "string" ? value.badgeText : "系統維護中，請稍候",
+        reason: typeof value.reason === "string" ? value.reason : "",
         estimatedRecoveryAt: typeof value.estimatedRecoveryAt === "string" ? value.estimatedRecoveryAt : null,
         message: typeof value.message === "string" ? value.message : "請稍後再回來看看！",
         startedAt: typeof value.startedAt === "string" ? value.startedAt : null,
         updatedByName: typeof value.updatedByName === "string" ? value.updatedByName : null,
         updatedAt: row?.updatedAt?.toISOString?.() ?? null,
       };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/maintenance/history",
+    auth: "admin",
+    handler: async () => {
+      const maintenanceUpdatedBy = alias(users, "maintenance_updated_by");
+      const records = await db.select({
+        id: maintenanceHistory.id,
+        category: maintenanceHistory.category,
+        title: maintenanceHistory.title,
+        reason: maintenanceHistory.reason,
+        description: maintenanceHistory.description,
+        notice: maintenanceHistory.notice,
+        startedAt: maintenanceHistory.startedAt,
+        estimatedRecoveryAt: maintenanceHistory.estimatedRecoveryAt,
+        endedAt: maintenanceHistory.endedAt,
+        actualRecoveryAt: maintenanceHistory.actualRecoveryAt,
+        createdBy: maintenanceHistory.createdBy,
+        updatedBy: maintenanceHistory.updatedBy,
+        createdByName: users.displayName,
+        updatedByName: maintenanceUpdatedBy.displayName,
+        updatedAt: maintenanceHistory.updatedAt,
+      }).from(maintenanceHistory).leftJoin(users, eq(maintenanceHistory.createdBy, users.userId)).leftJoin(maintenanceUpdatedBy, eq(maintenanceHistory.updatedBy, maintenanceUpdatedBy.userId)).orderBy(desc(maintenanceHistory.startedAt)).limit(100);
+      return { records };
     },
   }),
   route({
@@ -566,11 +595,15 @@ export const routes: RouteDef[] = [
         title: z.string().trim().min(1).max(120).default("系統施工中"),
         description: z.string().trim().max(1000).default("StudyNova 目前正在進行系統維護與更新，暫時無法使用。"),
         badgeText: z.string().trim().max(120).default("系統維護中，請稍候"),
+        reason: z.string().trim().max(500).default(""),
         estimatedRecoveryAt: z.string().datetime().nullable().default(null),
         message: z.string().trim().max(500).default("請稍後再回來看看！"),
         announceOnEnable: z.boolean().default(false),
       }));
       const now = new Date().toISOString();
+      const nowDate = new Date(now);
+      const wasInMaintenance = current.enabled === false;
+      const isInMaintenance = body.enabled === false;
       const value = {
         ...current,
         ...body,
@@ -580,12 +613,26 @@ export const routes: RouteDef[] = [
         updatedAt: now,
       };
       await db.insert(platformSettings).values({ key: "service_control", value, updatedAt: new Date() }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } });
+      let maintenanceHistoryRecorded = true;
+      try {
+        const activeHistory = (await db.select({ id: maintenanceHistory.id }).from(maintenanceHistory).where(isNull(maintenanceHistory.endedAt)).orderBy(desc(maintenanceHistory.startedAt)).limit(1))[0];
+        if (isInMaintenance && !activeHistory) {
+          await db.insert(maintenanceHistory).values({ category: value.category as string, title: body.title, reason: body.reason, description: body.description, badgeText: body.badgeText, notice: body.message, startedAt: nowDate, estimatedRecoveryAt: body.estimatedRecoveryAt ? new Date(body.estimatedRecoveryAt) : null, createdBy: admin.userId, updatedBy: admin.userId });
+        } else if (isInMaintenance && activeHistory) {
+          await db.update(maintenanceHistory).set({ category: value.category as string, title: body.title, reason: body.reason, description: body.description, badgeText: body.badgeText, notice: body.message, estimatedRecoveryAt: body.estimatedRecoveryAt ? new Date(body.estimatedRecoveryAt) : null, updatedBy: admin.userId, updatedAt: nowDate }).where(eq(maintenanceHistory.id, activeHistory.id));
+        } else if (!isInMaintenance && wasInMaintenance && activeHistory) {
+          await db.update(maintenanceHistory).set({ endedAt: nowDate, actualRecoveryAt: nowDate, updatedBy: admin.userId, updatedAt: nowDate }).where(eq(maintenanceHistory.id, activeHistory.id));
+        }
+      } catch (error) {
+        maintenanceHistoryRecorded = false;
+        console.error("[maintenance-history] recording failed", { message: error instanceof Error ? error.message.slice(0, 240) : "unknown database error" });
+      }
       if (body.enabled && current.enabled === false && body.announceOnEnable) {
         const announcement = (await db.insert(announcements).values({ title: "StudyNova 維護完成", body: "網站維護已完成，所有主要功能現在可以正常使用。感謝你的耐心等候。", link: "/dashboard", targetFeature: "all", category: "system", announcementType: "maintenance", importance: "high", audience: "all", audienceIds: [], notify: true, push: true, showHome: true, showPwa: true, pinned: true, marquee: true, status: "published", startsAt: new Date(), createdBy: admin.userId }).returning())[0];
         if (announcement) for (const userId of await resolveAudience("all", [])) await notify({ userId, kind: "announcement", title: `📢 ${announcement.title}`, body: announcement.body, link: announcement.link, push: true, dedupeKey: `maintenance-complete:${announcement.id}:${userId}` });
       }
       await adminLog({ actorId: admin.userId, action: body.enabled ? "service.enable" : "service.disable", targetType: "platform", targetId: "service_control", after: value, ip: ctx.ip });
-      return { ...value, updatedAt: now };
+      return { ...value, updatedAt: now, maintenanceHistoryRecorded };
     },
   }),
   route({

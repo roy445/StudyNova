@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
+import { DEFAULT_VISUAL_NOTE_ICON, VISUAL_NOTE_ICONS } from "@/lib/visual-note-icons";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { WordDetailSheet } from "@/components/WordDetailSheet";
 import { MemoryCard } from "@/components/MemoryCard";
@@ -1064,7 +1065,7 @@ export function VisualNotesPanel() {
   const [title, setTitle] = useState("我的學習重點");
   const [sourceText, setSourceText] = useState("");
   const [style, setStyle] = useState<VisualNote["style"]>("cute");
-  const [icon, setIcon] = useState("✦");
+  const [icon, setIcon] = useState<string>(DEFAULT_VISUAL_NOTE_ICON);
   const [visual, setVisual] = useState<VisualNote | null>(null);
   const [artifactId, setArtifactId] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -1112,6 +1113,8 @@ export function VisualNotesPanel() {
     // Standalone SVG/Canvas output cannot assume the viewer has a CJK font installed.
     const response = await fetch("/api/fonts/cjk");
     if (!response.ok) throw new Error("CJK 字型載入失敗，無法匯出心智圖");
+    await document.fonts.load('16px "StudyNova CJK"');
+    await document.fonts.ready;
     const bytes = new Uint8Array(await response.arrayBuffer());
     let binary = "";
     const chunk = 0x8000;
@@ -1123,13 +1126,40 @@ export function VisualNotesPanel() {
     try { const text = await embeddedSvg(); if (!text) return; const blob = new Blob([text], { type: "image/svg+xml;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${title || "StudyNova-心智圖"}.svg`; link.click(); URL.revokeObjectURL(url); } catch (error) { toast.push("error", errorMessage(error)); }
   }
   async function downloadPng() {
-    try { const text = await embeddedSvg(); if (!text) return; const image = new Image(); const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml;charset=utf-8" })); image.onload = () => { const canvas = document.createElement("canvas"); canvas.width = 1400; canvas.height = 900; const context = canvas.getContext("2d"); if (!context) return; context.fillStyle = "#fffaf0"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); const link = document.createElement("a"); link.href = canvas.toDataURL("image/png"); link.download = `${title || "StudyNova-心智圖"}.png`; link.click(); }; image.src = url; } catch (error) { toast.push("error", errorMessage(error)); }
+    try {
+      const text = await embeddedSvg();
+      if (!text) return;
+      const image = new Image();
+      const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml;charset=utf-8" }));
+      image.onerror = () => { URL.revokeObjectURL(url); toast.push("error", "心智圖 SVG／CJK 字型無法 rasterize，請重新載入後再試"); };
+      image.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = 1400;
+          canvas.height = 900;
+          const context = canvas.getContext("2d");
+          if (!context) throw new Error("瀏覽器無法建立 PNG Canvas");
+          context.fillStyle = "#fffaf0";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const link = document.createElement("a");
+          link.href = canvas.toDataURL("image/png");
+          link.download = `${title || "StudyNova-心智圖"}.png`;
+          link.click();
+        } catch (error) {
+          toast.push("error", errorMessage(error));
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+      image.src = url;
+    } catch (error) { toast.push("error", errorMessage(error)); }
   }
   const colors = ["#b8e8ff", "#ffd6e7", "#d9f7be", "#ffe7a8", "#d9d0ff", "#c8f1e8", "#ffd9b8", "#cfe3ff"];
-  return <Card title="✦ 重點視覺化" subtitle="把教材變成清楚的心智圖，加入可愛色彩與手寫感，並可下載保存。">
+  return <Card title="文 重點視覺化" subtitle="把教材變成清楚的心智圖，加入可愛色彩與手寫感，並可下載保存。">
     <div className="grid gap-4 xl:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.5fr)]">
-      <div className="space-y-3"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="心智圖標題" /><Textarea value={sourceText} onChange={(event) => setSourceText(event.target.value)} placeholder="貼上課本、筆記或 AI 對話內容…" className="min-h-52" /><div className="flex flex-wrap items-center gap-2"><Select value={style} onChange={(event) => setStyle(event.target.value as VisualNote["style"])} className="!w-auto"><option value="cute">可愛色彩</option><option value="handwritten">手寫筆記</option><option value="doodle">塗鴉筆記</option><option value="sticker">貼紙卡片</option><option value="clean">清楚簡約</option></Select><div className="flex items-center gap-1 rounded-xl border border-[var(--line)] px-2 py-1"><span className="text-[11px] text-muted">圖示</span>{["✦", "🌱", "💡", "📚", "🧠", "⭐", "✏️"].map((item) => <button key={item} type="button" aria-label={`選擇${item}圖示`} onClick={() => setIcon(item)} className={`rounded-lg px-1.5 py-0.5 text-base ${icon === item ? "bg-[#ffc857]/30" : "hover:bg-white/10"}`}>{item}</button>)}</div><Button onClick={generate} loading={busy}>AI 生成心智圖</Button></div><p className="text-[11px] text-muted">AI 會整理主題、重點與子重點；文字由系統繪製，方便閱讀與匯出。</p></div>
-      <div className="min-h-[460px] overflow-auto rounded-2xl border border-[#ffc857]/30 bg-[#fffaf0] p-2 text-[#24324b]">{visual ? <><svg ref={svgRef} viewBox="0 0 1400 900" className={`min-w-[760px] w-full ${style === "handwritten" ? "[font-family:cursive]" : ""}`} role="img" aria-label="AI 生成的學習心智圖"><rect width="1400" height="900" rx="36" fill="#fffaf0" /><path d="M700 450 C520 310 420 220 300 170 M700 450 C500 450 370 450 220 450 M700 450 C520 590 420 690 300 740 M700 450 C880 310 980 220 1100 170 M700 450 C900 450 1030 450 1180 450 M700 450 C880 590 980 690 1100 740" fill="none" stroke="#9eb6c9" strokeWidth="7" strokeLinecap="round" strokeDasharray={style === "handwritten" ? "14 12" : undefined} />
+      <div className="space-y-3"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="心智圖標題" /><Textarea value={sourceText} onChange={(event) => setSourceText(event.target.value)} placeholder="貼上課本、筆記或 AI 對話內容…" className="min-h-52" /><div className="flex flex-wrap items-center gap-2"><Select value={style} onChange={(event) => setStyle(event.target.value as VisualNote["style"])} className="!w-auto"><option value="cute">可愛色彩</option><option value="handwritten">手寫筆記</option><option value="doodle">塗鴉筆記</option><option value="sticker">貼紙卡片</option><option value="clean">清楚簡約</option></Select><div className="flex items-center gap-1 rounded-xl border border-[var(--line)] px-2 py-1"><span className="text-[11px] text-muted">圖示</span>{VISUAL_NOTE_ICONS.map((item) => <button key={item} type="button" aria-label={`選擇${item}圖示`} onClick={() => setIcon(item)} className={`rounded-lg px-1.5 py-0.5 text-base ${icon === item ? "bg-[#ffc857]/30" : "hover:bg-white/10"}`}>{item}</button>)}</div><Button onClick={generate} loading={busy}>AI 生成心智圖</Button></div><p className="text-[11px] text-muted">AI 會整理主題、重點與子重點；文字由系統繪製，方便閱讀與匯出。</p></div>
+      <div className="min-h-[460px] overflow-auto rounded-2xl border border-[#ffc857]/30 bg-[#fffaf0] p-2 text-[#24324b]">{visual ? <><svg ref={svgRef} viewBox="0 0 1400 900" className="min-w-[760px] w-full" role="img" aria-label="AI 生成的學習心智圖"><rect width="1400" height="900" rx="36" fill="#fffaf0" /><path d="M700 450 C520 310 420 220 300 170 M700 450 C500 450 370 450 220 450 M700 450 C520 590 420 690 300 740 M700 450 C880 310 980 220 1100 170 M700 450 C900 450 1030 450 1180 450 M700 450 C880 590 980 690 1100 740" fill="none" stroke="#9eb6c9" strokeWidth="7" strokeLinecap="round" strokeDasharray={style === "handwritten" ? "14 12" : undefined} />
         <g><rect x="510" y="365" width="380" height="170" rx="42" fill="#ffe7a8" stroke="#e1b85d" strokeWidth="6" /><text x="700" y="420" textAnchor="middle" fontSize="34">{icon}</text><text x="700" y="465" textAnchor="middle" fontSize="30" fontWeight="800">{visual.central.slice(0, 18)}</text><text x="700" y="505" textAnchor="middle" fontSize="20" fill="#536274">學習重點</text></g>
         {visual.nodes.map((node, index) => { const positions = [[150,100],[70,385],[150,675],[1000,100],[1090,385],[1000,675]]; const [x, y] = positions[index % positions.length]; const color = node.color || colors[index % colors.length]; return <g key={`${node.title}-${index}`}><rect x={x} y={y} width="300" height="130" rx="28" fill={color} stroke="#7890a4" strokeWidth="4" /><text x={x + 150} y={y + 48} textAnchor="middle" fontSize="25" fontWeight="700">{node.title.slice(0, 14)}</text><text x={x + 150} y={y + 82} textAnchor="middle" fontSize="16" fill="#536274">{(node.summary || "重要概念").slice(0, 22)}</text>{(node.children || []).slice(0, 2).map((child, childIndex) => <text key={child.title} x={x + 18} y={y + 107 + childIndex * 17} fontSize="13" fill="#536274">• {child.title.slice(0, 25)}</text>)}</g>; })}</svg><div className="mt-2 flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" onClick={downloadSvg}>下載 SVG</Button><Button size="sm" onClick={() => void downloadPng()}>下載 PNG</Button></div></> : <div className="flex min-h-[440px] items-center justify-center text-center text-sm text-[#718096]">AI 生成後，心智圖會顯示在這裡<br />適合複習、列印或加入教材。</div>}</div>
     </div>

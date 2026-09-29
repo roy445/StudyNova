@@ -1,6 +1,7 @@
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { illustrations } from "@/db/schema";
+import { DEFAULT_VISUAL_NOTE_ICON, isVisualNoteIcon } from "@/lib/visual-note-icons";
 import { renderSvgToPng } from "./image-rendering/renderer";
 
 export type VisualStyle = "cute" | "handwritten" | "doodle" | "sticker" | "clean";
@@ -17,7 +18,7 @@ export async function chooseIllustration(input: { subject?: string; keywords?: s
   const subject = input.subject?.trim() || "其他";
   const rows = await db.select().from(illustrations).where(and(eq(illustrations.status, "ACTIVE"), or(sql`${illustrations.subjects} @> ${JSON.stringify([subject])}::jsonb`, ilike(illustrations.name, `%${subject}%`)))).orderBy(illustrations.sortOrder).limit(20);
   const fallback = rows[0] ?? (await db.select().from(illustrations).where(eq(illustrations.status, "ACTIVE")).orderBy(illustrations.sortOrder).limit(1))[0];
-  if (!fallback) return { id: null, icon: "✦", url: "" };
+  if (!fallback) return { id: null, icon: DEFAULT_VISUAL_NOTE_ICON, url: "" };
   const keywordMatch = rows.find((row) => keywords.some((keyword) => (row.keywords ?? []).some((item) => item.includes(keyword) || keyword.includes(item))));
   const selected = keywordMatch ?? fallback;
   return { id: selected.id, icon: selected.fallbackIcon, url: selected.assetUrl };
@@ -35,7 +36,7 @@ export function normalizeVisualNote(input: { title?: unknown; central?: unknown;
   return {
     title: String(input.title ?? "我的學習重點").slice(0, 100),
     central: String(input.central ?? input.title ?? "學習重點").slice(0, 100),
-    icon: String(input.icon ?? "✦").slice(0, 8),
+    icon: (() => { const candidate = String(input.icon ?? DEFAULT_VISUAL_NOTE_ICON).slice(0, 8); return isVisualNoteIcon(candidate) ? candidate : DEFAULT_VISUAL_NOTE_ICON; })(),
     nodes,
     style: input.style,
     generatedAt: new Date().toISOString(),
@@ -58,6 +59,7 @@ export function visualNoteSvg(note: VisualNote) {
 
 export async function renderVisualNote(note: VisualNote) {
   const svg = visualNoteSvg(note);
-  const rendered = await renderSvgToPng(svg);
+  const text = [note.title, note.central, note.icon, ...note.nodes.flatMap((node) => [node.title, node.summary ?? "", ...(node.children ?? []).flatMap((child) => [child.title, child.summary ?? ""])])].join("\n");
+  const rendered = await renderSvgToPng(svg, text);
   return { svg, ...rendered };
 }

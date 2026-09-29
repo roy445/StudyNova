@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { APP_VERSION } from "@/lib/app-version";
 
 export type ApiError = { code: string; message: string; hint?: string; requestId?: string; docs?: string; details?: unknown };
 
@@ -35,6 +36,27 @@ const GET_CACHE_TTL_MS = 10_000;
 const GET_CACHE = new Map<string, { expiresAt: number; value: unknown }>();
 const GET_INFLIGHT = new Map<string, Promise<unknown>>();
 
+function clientSessionKey() {
+  if (typeof window === "undefined") return "";
+  try {
+    const key = "studynova:analytics-session";
+    const existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+    const created = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem(key, created);
+    return created;
+  } catch {
+    return "";
+  }
+}
+
+function clientVersionHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "x-studynova-version": APP_VERSION };
+  const session = clientSessionKey();
+  if (session) headers["x-studynova-session"] = session;
+  return headers;
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
@@ -66,7 +88,7 @@ export async function apiGet<T>(path: string, options: { fresh?: boolean } = {})
   const inflight = fresh ? undefined : GET_INFLIGHT.get(path);
   if (inflight) return inflight as Promise<T>;
   const request = (async () => {
-    const res = await fetch(`/api/v1${path}`, { credentials: "same-origin", cache: "no-store" });
+    const res = await fetch(`/api/v1${path}`, { credentials: "same-origin", cache: "no-store", headers: clientVersionHeaders() });
     const value = await parse<T>(res);
     if (!fresh) GET_CACHE.set(path, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
     return value;
@@ -81,10 +103,12 @@ export async function apiGet<T>(path: string, options: { fresh?: boolean } = {})
 
 export async function apiSend<T>(path: string, method: "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown): Promise<T> {
   GET_CACHE.clear();
+  const headers = new Headers(clientVersionHeaders());
+  if (!(body instanceof FormData)) headers.set("content-type", "application/json");
   const res = await fetch(`/api/v1${path}`, {
     method,
     credentials: "same-origin",
-    headers: body instanceof FormData ? undefined : { "content-type": "application/json" },
+    headers,
     body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body),
   });
   return parse<T>(res);
@@ -98,9 +122,8 @@ export const apiDelete = <T,>(path: string, body?: unknown) => apiSend<T>(path, 
 export function trackAnalytics(eventName: string, data: { route?: string; durationMs?: number | null; metadata?: Record<string, string | number | boolean | null> } = {}) {
   if (typeof window === "undefined") return;
   try {
-    const key = "studynova:analytics-session";
-    const sessionKey = sessionStorage.getItem(key) ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    sessionStorage.setItem(key, sessionKey);
+    const sessionKey = clientSessionKey();
+    if (!sessionKey) return;
     void apiPost("/analytics/events", { events: [{ eventName, sessionKey, route: data.route ?? window.location.pathname, durationMs: data.durationMs ?? null, metadata: data.metadata ?? {} }] }).catch(() => undefined);
   } catch {
     /* analytics must never affect the learning experience */

@@ -8,7 +8,7 @@
 | 部分 | 說明 |
 | --- | --- |
 | `SN` | StudyNova 固定前綴 |
-| 類別 | AUTH / ACCT / REQ / PERM / QUOTA / NOVA / AI / FILE / WEEK / SOCIAL / CHAL / PK / ADMIN / RATE / SYS |
+| 類別 | AUTH / ACCT / REQ / PERM / QUOTA / NOVA / AI / FILE / WEEK / SOCIAL / CHAL / PK / ADMIN / VERSION / RATE / SYS |
 | 編號 | 4 位數字（已文件化）或 4 位十六進位（動態推導） |
 
 ### 兩種代碼
@@ -94,6 +94,14 @@
 | `SN-QUOTA-4003` | 403 | 這是 Nova Pro 專屬功能 | Nova Pro 由管理員授予，可透過「回報問題」向管理員申請。 |
 | `SN-QUOTA-4004` | 403 | 你的方案未開放此功能 | 升級 Nova Pro 即可使用。 |
 
+## VERSION｜版本相容性與功能門檻
+
+| 代碼 | HTTP | 說明 | 處理建議 |
+| --- | --- | --- | --- |
+| `SN-VER-9601` | 426 | 無法識別目前 StudyNova 版本 | 重新整理載入目前部署版本；若仍發生，清除此網站的舊快取後再試。 |
+| `SN-VER-9602` | 426 | 目前版本已停止支援 | 更新至最低支援版本或更新版本後即可繼續使用。 |
+| `SN-VER-9603` | 426 | 此功能需要更新版 StudyNova | 更新至錯誤訊息指出的功能版本後，重新使用該功能。 |
+
 ## NOVA｜Nova / XP / 商店 / 優惠碼
 
 | 代碼 | HTTP | 說明 | 處理建議 |
@@ -124,6 +132,7 @@
 | `SN-AI-6007` | 400 | 這個 AI 建議已處理過或沒有可執行動作 | 請重新整理對話後再試。 |
 | `SN-AI-6008` | 400 | 不支援的 AI 動作 | Novi 只能建立任務／筆記／測驗或修改今日計畫。 |
 | `SN-AI-6009` | 400 | 語音分析需要 AI 服務 | 請先請管理員設定 AI Provider。 |
+| `SN-AI-6019` | 410 | 伺服器音檔朗讀已停用 | 請使用教材或單字旁的裝置內建朗讀；不需要 API key，也不會上傳或保存音檔。 |
 
 ## FILE｜檔案與儲存
 

@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { APP_VERSION } from "@/lib/app-version";
 import { inferSpeechLanguage, splitSpeechText, stripPronunciationAnnotations, type BrowserSpeechLanguage } from "@/lib/browser-speech";
+import { canClientUseFeature } from "@/lib/feature-version";
+import { useApi } from "@/lib/api";
 
 type PlaybackState = "idle" | "speaking" | "paused";
 
@@ -19,6 +22,8 @@ export function BrowserSpeechControls({ text, className = "" }: { text: string; 
   const [rate, setRate] = useState(1);
   const [playback, setPlayback] = useState<PlaybackState>("idle");
   const [message, setMessage] = useState("");
+  const featureGate = useApi<{ features: Array<{ featureKey: string; featureName: string; requiredVersion: string; minimumVersion: string; enabled: boolean; releaseStatus: string; releaseDate: string | null }> }>("/feature-gates");
+  const ttsGate = featureGate.data?.features.find((item) => item.featureKey === "lesson_tts");
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const chunksRef = useRef<string[]>([]);
   const chunkIndexRef = useRef(0);
@@ -109,6 +114,8 @@ export function BrowserSpeechControls({ text, className = "" }: { text: string; 
     setPlayback("idle");
     setMessage("已停止朗讀。");
   }
+
+  if (ttsGate && !canClientUseFeature(ttsGate, APP_VERSION)) return null;
 
   return (
     <div className={`flex min-w-0 flex-wrap items-center gap-2 ${className}`}>

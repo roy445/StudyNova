@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTaipeiDate, formatTaipeiDateTime, formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { upload } from "@vercel/blob/client";
@@ -7,8 +8,8 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Selec
 import { SymbolIcon } from "@/components/Symbol";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
 
-const DEFAULT_ACTIVITY_START = new Date().toISOString().slice(0, 16);
-const DEFAULT_ACTIVITY_END = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16);
+const DEFAULT_ACTIVITY_START = formatTaipeiDateTimeInput(new Date());
+const DEFAULT_ACTIVITY_END = formatTaipeiDateTimeInput(new Date(Date.now() + 7 * 86400000));
 function formatEta(seconds: number) {
   if (!seconds || seconds < 1) return "計算中…";
   if (seconds < 60) return `約 ${seconds} 秒`;
@@ -189,7 +190,11 @@ export default function AdminOpsPage() {
   }
   async function saveAnnouncement(status: "draft" | "published") {
     try {
-      const res = await apiPost<{ notified: number; scheduled: boolean }>("/admin/announcements", { ...annForm, status, startsAt: annForm.startsAt ? new Date(annForm.startsAt).toISOString() : undefined, endsAt: annForm.endsAt ? new Date(annForm.endsAt).toISOString() : null });
+      const startsAt = annForm.startsAt ? parseTaipeiDateTimeInput(annForm.startsAt) : undefined;
+      const endsAt = annForm.endsAt ? parseTaipeiDateTimeInput(annForm.endsAt) : null;
+      if (annForm.startsAt && !startsAt || annForm.endsAt && !endsAt) { toast.push("error", "請輸入有效的台灣時間公告起訖時間"); return; }
+      if (startsAt && endsAt && Date.parse(startsAt) >= Date.parse(endsAt)) { toast.push("error", "公告結束時間必須晚於開始時間"); return; }
+      const res = await apiPost<{ notified: number; scheduled: boolean }>("/admin/announcements", { ...annForm, status, startsAt, endsAt });
       toast.push("success", status === "draft" ? "公告草稿已儲存；尚未顯示給學生" : `公告已發布，通知 ${res.notified} 位學生`);
       setAnnOpen(false);
       await anns.reload();
@@ -274,9 +279,9 @@ export default function AdminOpsPage() {
                       <td className="py-2 text-right tabular-nums">{p.avgLatencyMs}ms</td>
                       <td className="py-2 text-right tabular-nums">{p.fallbacks}</td>
                       <td className="py-2 text-[11px] text-muted">
-                        {p.lastSuccessAt && <div><span className="text-[#37d3ff]">●</span> {new Date(p.lastSuccessAt).toLocaleString("zh-TW")}</div>}
+                        {p.lastSuccessAt && <div><span className="text-[#37d3ff]">●</span> {formatTaipeiDateTime(p.lastSuccessAt)}</div>}
                         {p.lastFailureAt && <div><span className="text-rose-300">●</span> {p.lastFailureCategory}</div>}
-                        {p.cooldownUntil && <div className="text-rose-300">冷卻至 {new Date(p.cooldownUntil).toLocaleDateString("zh-TW")}</div>}
+                        {p.cooldownUntil && <div className="text-rose-300">冷卻至 {formatTaipeiDate(p.cooldownUntil)}</div>}
                       </td>
                       <td className="py-2 text-right tabular-nums">${p.estimatedCostUsd}</td>
                       <td className="py-2 text-right">
@@ -384,7 +389,7 @@ export default function AdminOpsPage() {
       {tab === "learning" && (
         <div className="space-y-4">
           <Card title="⚠️ AI 內容回報" subtitle="確認、修正、忽略都會透過 API 寫入 audit log。">
-            <div className="space-y-2">{intelligenceReports.data?.reports.map(({ report, userName, userEmail }) => <div key={report.id} className="glass-soft rounded-xl p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">{report.reason}・{report.feature}</p><Badge tone={report.status === "pending" ? "gold" : report.status === "fixed" ? "green" : "muted"}>{report.status}</Badge></div><p className="mt-1 text-xs text-muted">{userName}（{userEmail}）・{new Date(report.createdAt).toLocaleString("zh-TW")}</p><p className="mt-2 text-xs">{report.details || "使用者未補充說明"}</p><div className="mt-2 flex flex-wrap gap-1.5">{(["confirmed", "fixed", "ignored"] as const).map((status) => <Button key={status} size="sm" variant={status === "fixed" ? "gold" : "ghost"} onClick={async () => { await apiPatch(`/admin/ai/content-reports/${report.id}`, { status, adminNote: status === "fixed" ? "已人工修正" : "" }); await intelligenceReports.reload(); }}>{status === "confirmed" ? "確認問題" : status === "fixed" ? "修正完成" : "忽略"}</Button>)}</div></div>)}{!intelligenceReports.data?.reports.length && <EmptyState title="目前沒有 AI 回報" hint="使用者回報 AI 內容後會出現在這裡。" />}</div>
+            <div className="space-y-2">{intelligenceReports.data?.reports.map(({ report, userName, userEmail }) => <div key={report.id} className="glass-soft rounded-xl p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">{report.reason}・{report.feature}</p><Badge tone={report.status === "pending" ? "gold" : report.status === "fixed" ? "green" : "muted"}>{report.status}</Badge></div><p className="mt-1 text-xs text-muted">{userName}（{userEmail}）・{formatTaipeiDateTime(report.createdAt)}</p><p className="mt-2 text-xs">{report.details || "使用者未補充說明"}</p><div className="mt-2 flex flex-wrap gap-1.5">{(["confirmed", "fixed", "ignored"] as const).map((status) => <Button key={status} size="sm" variant={status === "fixed" ? "gold" : "ghost"} onClick={async () => { await apiPatch(`/admin/ai/content-reports/${report.id}`, { status, adminNote: status === "fixed" ? "已人工修正" : "" }); await intelligenceReports.reload(); }}>{status === "confirmed" ? "確認問題" : status === "fixed" ? "修正完成" : "忽略"}</Button>)}</div></div>)}{!intelligenceReports.data?.reports.length && <EmptyState title="目前沒有 AI 回報" hint="使用者回報 AI 內容後會出現在這裡。" />}</div>
           </Card>
           <Card title="🎓 考試模式規則" subtitle="學測與國中會考是獨立模式，可在後台調整。">
             <div className="space-y-2">{examPolicies.data?.policies.map((policy) => <div key={policy.id} className="glass-soft rounded-xl p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold">{policy.label} <span className="text-xs text-muted">({policy.mode})</span></p><Badge tone={policy.enabled ? "green" : "muted"}>{policy.enabled ? "啟用" : "停用"}</Badge></div><p className="mt-1 text-xs text-muted">{policy.description}</p><pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap rounded-lg bg-black/20 p-2 text-[10px]">{JSON.stringify(policy.rules, null, 2)}</pre><Button size="sm" className="mt-2" onClick={async () => { const description = window.prompt("更新模式說明", policy.description); if (description === null) return; await apiPatch(`/admin/exam-mode-policies/${policy.id}`, { description }); await examPolicies.reload(); }}>調整說明</Button></div>)}</div>
@@ -618,7 +623,7 @@ export default function AdminOpsPage() {
                   {a.goalMetric} ≥ {a.goalValue}・+{a.rewardNova} Nova / +{a.rewardXp} XP
                 </p>
                 <p className="text-[11px] text-muted">
-                  {new Date(a.startsAt).toLocaleDateString("zh-TW")} ~ {new Date(a.endsAt).toLocaleDateString("zh-TW")}・參加 {a.participants}・完成 {a.completed}
+                  {formatTaipeiDate(a.startsAt)} ~ {formatTaipeiDate(a.endsAt)}・參加 {a.participants}・完成 {a.completed}
                 </p>
                 <div className="mt-1.5 flex gap-2 text-xs">
                   <button
@@ -853,7 +858,7 @@ export default function AdminOpsPage() {
             <Field label="CTA URL"><Input value={annForm.ctaUrl} onChange={(e) => setAnnForm({ ...annForm, ctaUrl: e.target.value })} placeholder="留空則沿用跳轉頁面" /></Field>
           </div>
           <div className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3 text-xs leading-5 text-muted">排程說明：開始時間前不會顯示公告，也不會發送通知；留空代表立即發布。結束時間後公告會自動隱藏。Web Push／Email 會在開始時間到達時送出。</div>
-          <div className="grid gap-3 sm:grid-cols-2"><Field label="開始時間" hint="留空＝立即發布"><Input type="datetime-local" value={annForm.startsAt} onChange={(e) => setAnnForm({ ...annForm, startsAt: e.target.value })} /></Field><Field label="結束時間" hint="留空＝不自動結束"><Input type="datetime-local" value={annForm.endsAt} onChange={(e) => setAnnForm({ ...annForm, endsAt: e.target.value })} /></Field></div>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="開始時間（台灣）" hint="留空＝立即發布"><Input type="datetime-local" value={annForm.startsAt} onChange={(e) => setAnnForm({ ...annForm, startsAt: e.target.value })} /></Field><Field label="結束時間（台灣）" hint="留空＝不自動結束"><Input type="datetime-local" value={annForm.endsAt} onChange={(e) => setAnnForm({ ...annForm, endsAt: e.target.value })} /></Field></div>
           <Field label="對象">
             <Select value={annForm.audience} onChange={(e) => setAnnForm({ ...annForm, audience: e.target.value })}>
               <option value="all">全體學生</option>
@@ -937,10 +942,10 @@ export default function AdminOpsPage() {
             </div>
             <div className="mt-3 flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs"><span className="text-muted">建立後仍可在活動題庫追加或刪除。</span><button type="button" className="text-[#37d3ff] underline" onClick={() => setActForm({ ...actForm, questionSources: ["activity", "general_bank", "imported_files", "weekly_exams"] })}>全選來源</button></div>
           </div>
-          <Field label="開始">
+          <Field label="開始（台灣）">
             <Input type="datetime-local" value={actForm.startsAt} onChange={(e) => setActForm({ ...actForm, startsAt: e.target.value })} />
           </Field>
-          <Field label="結束">
+          <Field label="結束（台灣）">
             <Input type="datetime-local" value={actForm.endsAt} onChange={(e) => setActForm({ ...actForm, endsAt: e.target.value })} />
           </Field>
           <label className="flex items-center gap-2 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 px-3 py-2 text-xs sm:col-span-2"><input type="checkbox" checked={actForm.notifyOnStart} onChange={(e) => setActForm({ ...actForm, notifyOnStart: e.target.checked })} className="accent-[#37d3ff]" />活動開始時發送站內通知與 Web Push（排程會依開始時間執行）</label>
@@ -950,10 +955,14 @@ export default function AdminOpsPage() {
           className="mt-3"
           onClick={async () => {
             try {
+              const startsAt = parseTaipeiDateTimeInput(actForm.startsAt);
+              const endsAt = parseTaipeiDateTimeInput(actForm.endsAt);
+              if (!startsAt || !endsAt) { toast.push("error", "請輸入有效的台灣時間活動起訖時間"); return; }
+              if (Date.parse(startsAt) >= Date.parse(endsAt)) { toast.push("error", "活動結束時間必須晚於開始時間"); return; }
               await apiPost("/admin/activities", {
                 ...actForm,
-                startsAt: new Date(actForm.startsAt).toISOString(),
-                endsAt: new Date(actForm.endsAt).toISOString(),
+                startsAt,
+                endsAt,
               });
               toast.push("success", "活動已建立");
               setActOpen(false);

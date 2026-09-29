@@ -416,6 +416,7 @@ export const contentReadingSegments = pgTable(
   (t) => [uniqueIndex("content_reading_segment_order_uq").on(t.documentId, t.orderIndex), index("content_reading_segment_doc_idx").on(t.documentId, t.orderIndex)],
 );
 
+/** Legacy server-generated audio rows; browser speech no longer creates or processes these jobs. */
 export const ttsJobs = pgTable(
   "tts_jobs",
   {
@@ -1646,9 +1647,17 @@ export const referralEvents = pgTable("referral_events", {
   id: id(), referralId: uuid("referral_id").notNull().references(() => referrals.id, { onDelete: "cascade" }), eventType: text("event_type").notNull(), occurredAt: created(), metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
 }, (t) => [uniqueIndex("referral_event_uq").on(t.referralId, t.eventType)]);
 export const softwareReleases = pgTable("software_releases", {
-  id: id(), version: text("version").notNull(), previousVersion: text("previous_version").notNull().default(""), releaseType: text("release_type").notNull().default("PATCH"), title: text("title").notNull(), subtitle: text("subtitle").notNull().default(""), description: text("description").notNull().default(""), releaseNotes: text("release_notes").notNull().default(""),
-  newFeatures: jsonb("new_features").$type<string[]>().notNull().default([]), improvements: jsonb("improvements").$type<string[]>().notNull().default([]), bugFixes: jsonb("bug_fixes").$type<string[]>().notNull().default([]), breakingChanges: jsonb("breaking_changes").$type<string[]>().notNull().default([]), migrationRequired: boolean("migration_required").notNull().default(false), minimumSupportedVersion: text("minimum_supported_version").notNull().default("1.0.0"), releasedAt: timestamp("released_at", { withTimezone: true }), createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }), status: text("status").notNull().default("DRAFT"), createdAt: created(), updatedAt: updated(),
-}, (t) => [uniqueIndex("software_release_version_uq").on(t.version), index("software_release_status_idx").on(t.status, t.releasedAt)]);
+  id: id(), version: text("version").notNull(), versionCode: integer("version_code").notNull().default(sql`nextval('software_release_version_code_seq')`), previousVersion: text("previous_version").notNull().default(""), releaseType: text("release_type").notNull().default("PATCH"), title: text("title").notNull(), subtitle: text("subtitle").notNull().default(""), description: text("description").notNull().default(""), releaseNotes: text("release_notes").notNull().default(""),
+  newFeatures: jsonb("new_features").$type<string[]>().notNull().default([]), improvements: jsonb("improvements").$type<string[]>().notNull().default([]), bugFixes: jsonb("bug_fixes").$type<string[]>().notNull().default([]), breakingChanges: jsonb("breaking_changes").$type<string[]>().notNull().default([]), migrationRequired: boolean("migration_required").notNull().default(false), migrationStatus: text("migration_status").notNull().default("NOT_REQUIRED"), migrationStartedAt: timestamp("migration_started_at", { withTimezone: true }), migrationCompletedAt: timestamp("migration_completed_at", { withTimezone: true }), migrationErrorLog: text("migration_error_log").notNull().default(""), migrationUpdatedBy: uuid("migration_updated_by").references(() => users.userId, { onDelete: "set null" }), minimumSupportedVersion: text("minimum_supported_version").notNull().default("1.0.0"), releasedAt: timestamp("released_at", { withTimezone: true }), publishedBy: uuid("published_by").references(() => users.userId, { onDelete: "set null" }), scheduledAt: timestamp("scheduled_at", { withTimezone: true }), archivedAt: timestamp("archived_at", { withTimezone: true }), createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }), status: text("status").notNull().default("DRAFT"), createdAt: created(), updatedAt: updated(),
+}, (t) => [uniqueIndex("software_release_version_uq").on(t.version), uniqueIndex("software_release_version_code_uq").on(t.versionCode), index("software_release_status_idx").on(t.status, t.releasedAt), index("software_release_schedule_idx").on(t.status, t.scheduledAt)]);
+
+export const clientVersionSessions = pgTable("client_version_sessions", {
+  id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), sessionHash: text("session_hash").notNull(), appVersion: text("app_version").notNull(), firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(), lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("client_version_session_uq").on(t.userId, t.sessionHash), index("client_version_sessions_version_seen_idx").on(t.appVersion, t.lastSeenAt)]);
+
+export const featureVersionGates = pgTable("feature_version_gates", {
+  id: id(), featureKey: text("feature_key").notNull(), featureName: text("feature_name").notNull(), requiredVersion: text("required_version").notNull().default("1.0.0"), minimumVersion: text("minimum_version").notNull().default("1.0.0"), enabled: boolean("enabled").notNull().default(true), releaseStatus: text("release_status").notNull().default("DRAFT"), releaseDate: timestamp("release_date", { withTimezone: true }), updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }), createdAt: created(), updatedAt: updated(),
+}, (t) => [uniqueIndex("feature_version_gate_key_uq").on(t.featureKey), index("feature_version_gate_status_idx").on(t.releaseStatus, t.enabled)]);
 
 /* --------------------------------------------------- NOTIFY / ECONOMY */
 
@@ -2464,6 +2473,28 @@ export const platformSettings = pgTable("platform_settings", {
   value: jsonb("value").$type<Record<string, unknown>>().notNull().default({}),
   updatedAt: updated(),
 });
+
+export const maintenanceHistory = pgTable(
+  "maintenance_history",
+  {
+    id: id(),
+    category: text("category").notNull().default("maintenance"),
+    title: text("title").notNull(),
+    reason: text("reason").notNull().default(""),
+    description: text("description").notNull().default(""),
+    badgeText: text("badge_text").notNull().default(""),
+    notice: text("notice").notNull().default(""),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    estimatedRecoveryAt: timestamp("estimated_recovery_at", { withTimezone: true }),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    actualRecoveryAt: timestamp("actual_recovery_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("maintenance_history_started_idx").on(t.startedAt.desc()), index("maintenance_history_open_idx").on(t.endedAt).where(sql`${t.endedAt} IS NULL`)],
+);
 
 /* ------------------------------------------------------ SUPPORT / FAQ */
 

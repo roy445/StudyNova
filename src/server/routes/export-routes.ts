@@ -72,7 +72,39 @@ async function loadRows(kind: Kind, userId: string, from?: string, to?: string) 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) { const lines: string[] = []; let current = ""; for (const char of text) { const next = current + char; if (current && font.widthOfTextAtSize(next, size) > maxWidth) { lines.push(current); current = char; } else current = next; } if (current) lines.push(current); return lines.length ? lines : [""]; }
 function drawLine(page: PDFPage, font: PDFFont, text: string, x: number, y: number, size: number, maxWidth: number, color = rgb(0.13, 0.16, 0.22)) { for (const line of wrapText(text, font, size, maxWidth)) { page.drawText(line, { x, y, size, font, color }); y -= size + 4; } return y; }
 async function embedCjkFont(pdf: PDFDocument) { return (await import("../cjk-font")).embedCjkFont(pdf); }
-async function renderPdf(rows: Array<Record<string, unknown>>, title: string) { const pdf = await PDFDocument.create(); const font = await embedCjkFont(pdf); const bold = font; let page = pdf.addPage([595, 842]); let y = 795; const margin = 42; const width = 511; const newPage = () => { page = pdf.addPage([595, 842]); y = 795; page.drawText("StudyNova 單字書／學習資料", { x: margin, y, size: 9, font: bold, color: rgb(0.25, 0.38, 0.5) }); y -= 28; }; page.drawText(title, { x: margin, y, size: 20, font: bold, color: rgb(0.08, 0.24, 0.4) }); y -= 28; page.drawText(`共 ${rows.length} 筆　・　產生日期 ${new Date().toLocaleDateString("zh-TW")}`, { x: margin, y, size: 9, font, color: rgb(0.35, 0.4, 0.46) }); y -= 28; for (let index = 0; index < rows.length; index += 1) { const lines = readableRow(rows[index], index); const needed = lines.length * 16 + 26; if (y < 60 + needed) newPage(); page.drawRectangle({ x: margin - 8, y: y - needed + 8, width, height: needed, color: rgb(index % 2 ? 0.97 : 0.94, index % 2 ? 0.98 : 0.96, 1), borderColor: rgb(0.78, 0.84, 0.9), borderWidth: 0.6 }); let lineY = y - 2; lines.forEach((line, lineIndex) => { lineY = drawLine(page, font, line, margin, lineY, lineIndex === 0 ? 13 : 9.5, width - 16, lineIndex === 0 ? rgb(0.05, 0.22, 0.38) : rgb(0.18, 0.22, 0.28)); }); y -= needed + 10; } return Buffer.from(await pdf.save()); }
+async function renderPdf(rows: Array<Record<string, unknown>>, title: string) {
+  const { assertCjkGlyphCoverage, embedCjkFont } = await import("../cjk-font");
+  const rowLines = rows.flatMap((row, index) => readableRow(row, index));
+  const dateLabel = new Date().toLocaleDateString("zh-TW");
+  assertCjkGlyphCoverage([title, "StudyNova 單字書／學習資料", `共 ${rows.length} 筆　・　產生日期 ${dateLabel}`, ...rowLines].join("\n"), "PDF 匯出");
+  const pdf = await PDFDocument.create();
+  const font = await embedCjkFont(pdf);
+  const bold = font;
+  let page = pdf.addPage([595, 842]);
+  let y = 795;
+  const margin = 42;
+  const width = 511;
+  const newPage = () => {
+    page = pdf.addPage([595, 842]);
+    y = 795;
+    page.drawText("StudyNova 單字書／學習資料", { x: margin, y, size: 9, font: bold, color: rgb(0.25, 0.38, 0.5) });
+    y -= 28;
+  };
+  page.drawText(title, { x: margin, y, size: 20, font: bold, color: rgb(0.08, 0.24, 0.4) });
+  y -= 28;
+  page.drawText(`共 ${rows.length} 筆　・　產生日期 ${dateLabel}`, { x: margin, y, size: 9, font, color: rgb(0.35, 0.4, 0.46) });
+  y -= 28;
+  for (let index = 0; index < rows.length; index += 1) {
+    const lines = readableRow(rows[index], index);
+    const needed = lines.length * 16 + 26;
+    if (y < 60 + needed) newPage();
+    page.drawRectangle({ x: margin - 8, y: y - needed + 8, width, height: needed, color: rgb(index % 2 ? 0.97 : 0.94, index % 2 ? 0.98 : 0.96, 1), borderColor: rgb(0.78, 0.84, 0.9), borderWidth: 0.6 });
+    let lineY = y - 2;
+    lines.forEach((line, lineIndex) => { lineY = drawLine(page, font, line, margin, lineY, lineIndex === 0 ? 13 : 9.5, width - 16, lineIndex === 0 ? rgb(0.05, 0.22, 0.38) : rgb(0.18, 0.22, 0.28)); });
+    y -= needed + 10;
+  }
+  return Buffer.from(await pdf.save());
+}
 async function renderDocx(rows: Array<Record<string, unknown>>, title: string) { const children = [new Paragraph({ children: [new TextRun({ text: title, bold: true, size: 30 })] }), ...rows.flatMap((row, index) => readableRow(row, index).map((line, lineIndex) => new Paragraph({ children: [new TextRun({ text: line, bold: lineIndex === 0, size: lineIndex === 0 ? 24 : 20 })] })))]; return Packer.toBuffer(new Document({ sections: [{ children }] })); }
 async function renderXlsx(rows: Array<Record<string, unknown>>, title: string) { const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet(title.slice(0, 28)); const vocabulary = rows.length > 0 && rows.every(isVocabularyRow); const output = vocabulary ? rows.map((row, index) => ({ 項次: index + 1, 單字: wordValue(row, "word", ""), 詞性: wordValue(row, "partOfSpeech", ""), 音標: wordValue(row, "phonetic", ""), 中文意思: wordValue(row, "meaning", ""), 英文例句: wordValue(row, "example", ""), 例句翻譯: wordValue(row, "exampleZh", "") })) : rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !["id", "userId", "analysis"].includes(key)))); const keys = Array.from(new Set(output.flatMap((row) => Object.keys(row)))); sheet.addRow(keys); output.forEach((row) => sheet.addRow(keys.map((key) => typeof row[key] === "object" ? JSON.stringify(row[key]) : row[key]))); sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } }; sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF245A78" } }; sheet.columns.forEach((column) => { column.width = 22; }); return Buffer.from(await workbook.xlsx.writeBuffer()); }
 async function renderBinary(rows: Array<Record<string, unknown>>, format: Exclude<Format, "json" | "csv" | "txt" | "md" | "zip">, title: string) { if (format === "pdf") return renderPdf(rows, title); if (format === "docx") return renderDocx(rows, title); return renderXlsx(rows, title); }

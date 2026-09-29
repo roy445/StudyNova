@@ -19,6 +19,13 @@ const taipeiDateTimeInputFormatter = new Intl.DateTimeFormat("en-CA", {
   hourCycle: "h23",
 });
 
+const taipeiDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Taipei",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 function dateParts(formatter: Intl.DateTimeFormat, date: Date) {
   return Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
 }
@@ -30,6 +37,14 @@ export function formatTaipeiDateTime(value: string | Date | null | undefined): s
 
   const parts = dateParts(taipeiDateTimeFormatter, date);
   return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export function formatTaipeiDate(value: string | Date | null | undefined): string {
+  if (value == null || value === "") return "尚無時間資料";
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "時間資料無效";
+  const parts = dateParts(taipeiDateFormatter, date);
+  return `${parts.year}/${parts.month}/${parts.day}`;
 }
 
 /** Convert an absolute timestamp to a datetime-local value in Taiwan time. */

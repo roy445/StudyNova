@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTaipeiDateTime } from "@/lib/date-time";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Skeleton, useToast } from "@/components/ui";
@@ -94,8 +95,8 @@ export default function AdminChallengesPage() {
             <div key={challenge.id} className="glass-soft flex flex-wrap items-center justify-between gap-3 p-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{challenge.title}</p>
-                <p className="text-xs text-muted">{challenge.kind}・發起人 {challenge.creatorName}・{challenge.participants} 位參與・建立於 {new Date(challenge.createdAt).toLocaleString("zh-TW")}</p>
-                <p className="mt-1 text-xs text-muted">截止：{new Date(challenge.expiresAt).toLocaleString("zh-TW")}</p>
+                <p className="text-xs text-muted">{challenge.kind}・發起人 {challenge.creatorName}・{challenge.participants} 位參與・建立於 {formatTaipeiDateTime(challenge.createdAt)}</p>
+                <p className="mt-1 text-xs text-muted">截止：{formatTaipeiDateTime(challenge.expiresAt)}</p>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge tone={challenge.status === "open" ? "green" : challenge.status === "paused" ? "gold" : "muted"}>{challenge.status === "open" ? "開放中" : challenge.status === "paused" ? "已暫停" : "已關閉"}</Badge>

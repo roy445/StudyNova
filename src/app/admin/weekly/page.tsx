@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTaipeiDateTime, formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
 import { useEffect, useMemo, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
@@ -322,7 +323,7 @@ export default function AdminWeeklyPage() {
                         <span className="text-xs text-muted">信心 {(d.confidence * 100).toFixed(0)}%</span>
                         {d.confidence < 0.6 && <Badge tone="rose">! AI 不確定，請人工確認</Badge>}
                       </div>
-                      <span className="text-[11px] text-muted">{new Date(d.createdAt).toLocaleString("zh-TW")}</span>
+                      <span className="text-[11px] text-muted">{formatTaipeiDateTime(d.createdAt)}</span>
                     </div>
                     <pre className="mt-2 max-h-64 overflow-auto scroll-thin whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[10px]">{JSON.stringify(d.payload, null, 2)}</pre>
                     <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -593,14 +594,17 @@ export default function AdminWeeklyPage() {
                     size="sm"
                     variant="gold"
                     onClick={async () => {
-                      const from = prompt("重新開放起始時間（YYYY-MM-DDTHH:mm）", new Date().toISOString().slice(0, 16));
+                      const from = prompt("重新開放起始時間（台灣時間 YYYY-MM-DDTHH:mm）", formatTaipeiDateTimeInput(new Date()));
                       if (!from) return;
-                      const until = prompt("結束時間（YYYY-MM-DDTHH:mm）", new Date(Date.now() + 86400000).toISOString().slice(0, 16));
+                      const until = prompt("結束時間（台灣時間 YYYY-MM-DDTHH:mm）", formatTaipeiDateTimeInput(new Date(Date.now() + 86400000)));
                       if (!until) return;
+                      const openFrom = parseTaipeiDateTimeInput(from);
+                      const openUntil = parseTaipeiDateTimeInput(until);
+                      if (!openFrom || !openUntil || Date.parse(openFrom) >= Date.parse(openUntil)) { toast.push("error", "請輸入有效的台灣時間，且結束時間必須晚於開始時間"); return; }
                       try {
                         await apiPost(`/admin/weekly/${detail.week.id}/reopen`, {
-                          openFrom: new Date(from).toISOString(),
-                          openUntil: new Date(until).toISOString(),
+                          openFrom,
+                          openUntil,
                           novaCost: detail.week.novaCost,
                           proOnly: detail.week.proOnly,
                         });

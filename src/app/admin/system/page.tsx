@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiPatch, apiPost, apiPut, errorMessage, useApi } from "@/lib/api";
-import { formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
+import {formatTaipeiDateTime, formatTaipeiDateTimeInput, parseTaipeiDateTimeInput} from "@/lib/date-time";
+import { maintenanceCategoryLabel } from "@/lib/maintenance";
+import { MaintenanceCountdown } from "@/components/MaintenanceCountdown";
 
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
-type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
+type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; reason: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 type MaintenanceAction = "start" | "restore";
 const EXPORT_DATASETS = [["vocabulary", "我的單字"], ["notes", "我的筆記"], ["wrong", "錯題本"], ["studyMaterials", "學習資料"], ["plans", "學習計畫"], ["studyRecords", "學習紀錄"], ["focus", "專注紀錄"], ["tasks", "任務紀錄"], ["dailyTasks", "每日任務"], ["achievements", "成就徽章"], ["nova", "Nova 交易"], ["xp", "XP 紀錄"]] as const;
 const EXPORT_FORMATS = [["pdf", "PDF 單字書"], ["docx", "Word 單字書"], ["xlsx", "Excel 單字表"], ["csv", "CSV 表格"], ["json", "JSON"], ["txt", "純文字"], ["md", "Markdown"], ["zip", "ZIP 完整資料"]] as const;
@@ -15,7 +17,7 @@ export default function AdminSystemPage() {
   const toast = useToast();
   const [tab, setTab] = useState("tests");
   const health = useApi<{ services: Array<{ name: string; status: string; detail: string }>; checkedAt: string }>("/admin/system/health");
-  const cjk = useApi<{ healthy: boolean; valid: boolean; family: string; bytes: number; glyphs: number; missingGlyphs: string[]; pdf: { embedded: boolean; bytes: number; error?: string }; image: { rendered: boolean; bytes: number; error?: string }; svg: { embedded: boolean; bytes: number; error?: string } }>("/admin/system/cjk-font-health");
+  const cjk = useApi<{ healthy: boolean; valid: boolean; family: string; bytes: number; glyphs: number; missingGlyphs: string[]; pdf: { embedded: boolean; bytes: number; error?: string }; image: { rendered: boolean; glyphRasterVerified: boolean; distinctGlyphRasterChannels: number; bytes: number; error?: string }; svg: { embedded: boolean; bytes: number; error?: string } }>("/admin/system/cjk-font-health");
   const cron = useApi<{ tasks: Array<{ task: string; label: string; schedule: string }>; jobs: Array<{ id: string; name: string; status: string; lastError: string; createdAt: string }>; adapter: string; health: { status: string; detail: string; pending: number }; secretConfigured: boolean }>("/admin/cron");
   const settings = useApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>("/admin/settings");
   const gradeWindow = (settings.data?.settings.find((s) => s.key === "grade_input_window")?.value ?? {}) as { enabled?: boolean; startsAt?: string; endsAt?: string };
@@ -24,8 +26,10 @@ export default function AdminSystemPage() {
   const exportConfig = (settings.data?.settings.find((s) => s.key === "learning_exports")?.value ?? {}) as { enabled?: boolean; proOnly?: boolean; minimumNova?: number; freeUntil?: string; allowedKinds?: string[]; allowedFormats?: string[]; freeFormats?: string[]; costs?: Record<string, number> };
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
   const service = useApi<ServiceControl>("/admin/service-control");
+  const maintenanceHistory = useApi<{ records: Array<{ id: string; category: string; title: string; reason: string; description: string; startedAt: string; estimatedRecoveryAt: string | null; endedAt: string | null; actualRecoveryAt: string | null; createdByName: string | null; createdBy: string | null; updatedByName: string | null; updatedBy: string | null; updatedAt: string }> }>("/admin/maintenance/history");
   const [maintenanceAction, setMaintenanceAction] = useState<MaintenanceAction | null>(null);
-  const [maintenanceForm, setMaintenanceForm] = useState({ category: "maintenance" as ServiceControl["category"], title: "系統施工中", description: "StudyNova 目前正在進行系統維護，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "維護完成後會自動通知。" });
+  const [maintenancePreviewOpen, setMaintenancePreviewOpen] = useState(false);
+  const [maintenanceForm, setMaintenanceForm] = useState({ category: "maintenance" as ServiceControl["category"], title: "系統施工中", reason: "", description: "StudyNova 目前正在進行系統維護，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "維護完成後會自動通知。" });
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [summary, setSummary] = useState<{ total: number; pass: number; fail: number; skip: number; durationMs: number } | null>(null);
   const [running, setRunning] = useState(false);
@@ -35,6 +39,7 @@ export default function AdminSystemPage() {
     const timer = window.setTimeout(() => setMaintenanceForm({
       category: service.data?.category ?? "maintenance",
       title: service.data?.title ?? "",
+      reason: service.data?.reason ?? "",
       description: service.data?.description ?? "",
       badgeText: service.data?.badgeText ?? "",
       estimatedRecoveryAt: formatTaipeiDateTimeInput(service.data?.estimatedRecoveryAt),
@@ -55,15 +60,17 @@ export default function AdminSystemPage() {
       return;
     }
     try {
-      await apiPatch("/admin/service-control", {
+      const serviceResult = await apiPatch<{ maintenanceHistoryRecorded?: boolean }>("/admin/service-control", {
         enabled: maintenanceAction === "restore",
         ...maintenanceForm,
         estimatedRecoveryAt,
         announceOnEnable: maintenanceAction === "restore",
       });
-      toast.push("success", maintenanceAction === "start" ? "已依照設定開啟維護模式" : "已依照設定恢復網站並發送維護完成通知");
+      const resultText = maintenanceAction === "start" ? "已依照設定開啟維護模式" : "已依照設定恢復網站並發送維護完成通知";
+      toast.push("success", `${resultText}${serviceResult.maintenanceHistoryRecorded === false ? "；維護歷史尚未寫入，請先套用 migration 0092。" : ""}`);
       setMaintenanceAction(null);
       await service.reload();
+      await maintenanceHistory.reload();
     } catch (err) {
       toast.push("error", errorMessage(err));
     }
@@ -86,8 +93,20 @@ export default function AdminSystemPage() {
           <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] p-4"><p className="text-xs font-semibold uppercase tracking-wider text-amber-200">網站維護</p><p className="mt-2 text-sm font-semibold">開始維護模式</p><p className="mt-1 text-xs leading-5 text-muted">設定維護標題、使用者提示、預計恢復時間與維護期間顯示內容。</p><Button className="mt-3" variant="gold" onClick={() => setMaintenanceAction("start")}>設定並開始維護</Button></div>
           <div className="rounded-2xl border border-emerald-300/25 bg-emerald-300/[0.06] p-4"><p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">服務恢復</p><p className="mt-2 text-sm font-semibold">恢復網站並通知</p><p className="mt-1 text-xs leading-5 text-muted">設定恢復後的公告內容，確認後才會解除維護並發送站內通知與推播。</p><Button className="mt-3" variant="outline" onClick={() => setMaintenanceAction("restore")}>設定並恢復網站</Button></div>
         </div>
-        {service.data && <div className="mt-3 grid gap-1 rounded-xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs text-muted sm:grid-cols-3"><span>全站總開關：<b className={service.data.enabled ? "text-emerald-200" : "text-amber-200"}>{service.data.enabled ? "正常運作" : "維護中"}</b></span><span>預計恢復：{service.data.estimatedRecoveryAt ? new Date(service.data.estimatedRecoveryAt).toLocaleString("zh-TW") : "未設定"}</span><span>最後修改：{service.data.updatedByName ?? "—"}</span></div>}
+        {service.data && <div className="mt-3 grid gap-1 rounded-xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs text-muted sm:grid-cols-3"><span>全站總開關：<b className={service.data.enabled ? "text-emerald-200" : "text-amber-200"}>{service.data.enabled ? "正常運作" : "維護中"}</b></span><span>預計恢復：{service.data.estimatedRecoveryAt ? formatTaipeiDateTime(service.data.estimatedRecoveryAt) : "未設定"}</span><span>最後修改：{service.data.updatedByName ?? "—"} · {service.data.updatedAt ? formatTaipeiDateTime(service.data.updatedAt) : "時間未提供"}</span></div>}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs"><span className="text-muted">目前運作資訊：</span>{health.data?.services.slice(0, 5).map((item) => <Badge key={item.name} tone={item.status === "healthy" ? "green" : item.status === "warning" ? "gold" : "rose"}>{item.name} · {item.status}</Badge>)}<Button size="sm" variant="ghost" onClick={() => { setTab("health"); void health.reload(); }}>查看完整健康檢查</Button></div>
+      </Card>
+      <Card title="維護公告歷史" subtitle="保存每次維護開始、公告原因、預計恢復及實際恢復時間。" action={<Button size="sm" variant="ghost" onClick={maintenanceHistory.reload}>重新整理</Button>}>
+        <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+          {maintenanceHistory.data?.records.map((record) => <article key={record.id} className="rounded-xl border border-[var(--line)] bg-white/[0.025] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><Badge tone={record.endedAt ? "muted" : "gold"}>{record.endedAt ? "已結束" : "進行中"}</Badge><Badge tone="cyan">{maintenanceCategoryLabel(record.category)}</Badge><strong className="text-sm">{record.title}</strong></div><span className="text-xs text-muted">開始：{formatTaipeiDateTime(record.startedAt)}</span></div>
+            {record.reason && <p className="mt-2 text-sm">原因：{record.reason}</p>}
+            <p className="mt-1 whitespace-pre-line text-xs leading-5 text-muted">{record.description}</p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"><span>預計恢復：{record.estimatedRecoveryAt ? formatTaipeiDateTime(record.estimatedRecoveryAt) : "未設定"}</span><span>實際恢復：{record.actualRecoveryAt ? formatTaipeiDateTime(record.actualRecoveryAt) : "尚未恢復"}</span><span>建立者：{record.createdByName ?? record.createdBy ?? "—"}</span><span>最後修改：{record.updatedByName ?? record.updatedBy ?? "—"} · {formatTaipeiDateTime(record.updatedAt)}</span></div>
+          </article>)}
+          {!maintenanceHistory.loading && !maintenanceHistory.data?.records.length && <EmptyState icon="◷" title="尚無維護歷史" hint="每次開始或結束維護後，系統會自動在這裡留下紀錄。" />}
+          {maintenanceHistory.error && <ErrorState message={errorMessage(maintenanceHistory.error)} />}
+        </div>
       </Card>
       <Tabs
         tabs={[
@@ -157,7 +176,7 @@ export default function AdminSystemPage() {
       )}
 
       {tab === "health" && (
-        <Card title="● 系統健康" subtitle={health.data ? `檢查於 ${new Date(health.data.checkedAt).toLocaleString("zh-TW")}` : ""} action={<Button size="sm" variant="ghost" onClick={health.reload}>重新檢查</Button>}>
+        <Card title="● 系統健康" subtitle={health.data ? `檢查於 ${formatTaipeiDateTime(health.data.checkedAt)}` : ""} action={<Button size="sm" variant="ghost" onClick={health.reload}>重新檢查</Button>}>
           {health.loading && <Skeleton lines={5} />}
           {health.error && <ErrorState message={health.error} onRetry={health.reload} />}
           <div className="grid gap-2 sm:grid-cols-2">
@@ -182,10 +201,12 @@ export default function AdminSystemPage() {
             <div className="grid gap-2 sm:grid-cols-3">
               <Stat label="字型檔" value={cjk.data.valid ? "PASS" : "FAIL"} tone={cjk.data.valid ? "cyan" : "gold"} />
               <Stat label="PDF 嵌入" value={cjk.data.pdf.embedded ? "PASS" : "FAIL"} tone={cjk.data.pdf.embedded ? "cyan" : "gold"} />
-              <Stat label="Image / SVG" value={cjk.data.image.rendered && cjk.data.svg.embedded ? "PASS" : "FAIL"} tone={cjk.data.image.rendered && cjk.data.svg.embedded ? "cyan" : "gold"} />
+              <Stat label="PNG 中文字形 Raster" value={cjk.data.image.rendered && cjk.data.image.glyphRasterVerified ? "PASS" : "FAIL"} tone={cjk.data.image.rendered && cjk.data.image.glyphRasterVerified ? "cyan" : "gold"} />
+              <Stat label="SVG 字型嵌入" value={cjk.data.svg.embedded ? "PASS" : "FAIL"} tone={cjk.data.svg.embedded ? "cyan" : "gold"} />
             </div>
             <div className="rounded-xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs leading-6">
               <p><b>Family：</b>{cjk.data.family}・<b>Glyphs：</b>{cjk.data.glyphs}・<b>大小：</b>{Math.round(cjk.data.bytes / 1024 / 1024)} MB</p>
+              <p><b>Raster glyph 像素差異：</b>{cjk.data.image.distinctGlyphRasterChannels.toLocaleString()} channels（「國」「文」須為不同字形）</p>
               <p><b>測試文字：</b>這是一段繁體中文測試文字。國文、英文、數學、自然、社會、AI 學習助手、錯題本、智慧複習、線上 PK、回報專員 StudyNova</p>
               {cjk.data.missingGlyphs.length > 0 && <p className="text-rose-200"><b>Missing glyph：</b>{cjk.data.missingGlyphs.join("、")}</p>}
               {cjk.data.pdf.error && <p className="text-rose-200"><b>PDF：</b>{cjk.data.pdf.error}</p>}
@@ -201,11 +222,11 @@ export default function AdminSystemPage() {
           {settings.loading && <Skeleton lines={3} />}
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="目前狀態"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="grade-window-enabled" type="checkbox" defaultChecked={gradeWindow.enabled !== false} className="accent-[#7c5cff]" /> 開放成績輸入</label></Field>
-            <Field label="開始時間"><Input id="grade-window-start" type="datetime-local" defaultValue={gradeWindow.startsAt ? new Date(gradeWindow.startsAt).toISOString().slice(0, 16) : ""} /></Field>
-            <Field label="結束時間"><Input id="grade-window-end" type="datetime-local" defaultValue={gradeWindow.endsAt ? new Date(gradeWindow.endsAt).toISOString().slice(0, 16) : ""} /></Field>
+            <Field label="開始時間（台灣）"><Input id="grade-window-start" type="datetime-local" defaultValue={formatTaipeiDateTimeInput(gradeWindow.startsAt)} /></Field>
+            <Field label="結束時間（台灣）"><Input id="grade-window-end" type="datetime-local" defaultValue={formatTaipeiDateTimeInput(gradeWindow.endsAt)} /></Field>
           </div>
-          <Button className="mt-3" onClick={async () => { const enabled = (document.getElementById("grade-window-enabled") as HTMLInputElement).checked; const startsAt = (document.getElementById("grade-window-start") as HTMLInputElement).value; const endsAt = (document.getElementById("grade-window-end") as HTMLInputElement).value; if (startsAt && endsAt && new Date(startsAt) >= new Date(endsAt)) return toast.push("error", "結束時間必須晚於開始時間"); try { await apiPut("/admin/settings/grade_input_window", { value: { enabled, startsAt: startsAt ? new Date(startsAt).toISOString() : "", endsAt: endsAt ? new Date(endsAt).toISOString() : "" } }); toast.push("success", "成績輸入時段已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存成績設定</Button>
-          <div className="mt-6 border-t border-[var(--line)] pt-4"><p className="mb-3 text-sm font-semibold">⌁ 使用者端段考日期輸入</p><div className="grid gap-3 sm:grid-cols-3"><Field label="目前狀態"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="exam-date-window-enabled" type="checkbox" defaultChecked={examDateWindow.enabled !== false} className="accent-[#7c5cff]" /> 開放段考日期輸入</label></Field><Field label="開始時間"><Input id="exam-date-window-start" type="datetime-local" defaultValue={examDateWindow.startsAt ? new Date(examDateWindow.startsAt).toISOString().slice(0, 16) : ""} /></Field><Field label="結束時間"><Input id="exam-date-window-end" type="datetime-local" defaultValue={examDateWindow.endsAt ? new Date(examDateWindow.endsAt).toISOString().slice(0, 16) : ""} /></Field></div><Button className="mt-3" onClick={async () => { const enabled = (document.getElementById("exam-date-window-enabled") as HTMLInputElement).checked; const startsAt = (document.getElementById("exam-date-window-start") as HTMLInputElement).value; const endsAt = (document.getElementById("exam-date-window-end") as HTMLInputElement).value; if (startsAt && endsAt && new Date(startsAt) >= new Date(endsAt)) return toast.push("error", "結束時間必須晚於開始時間"); try { await apiPut("/admin/settings/exam_date_input_window", { value: { enabled, startsAt: startsAt ? new Date(startsAt).toISOString() : "", endsAt: endsAt ? new Date(endsAt).toISOString() : "" } }); toast.push("success", "段考日期輸入時段已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存段考日期設定</Button></div>
+          <Button className="mt-3" onClick={async () => { const enabled = (document.getElementById("grade-window-enabled") as HTMLInputElement).checked; const startsAt = (document.getElementById("grade-window-start") as HTMLInputElement).value; const endsAt = (document.getElementById("grade-window-end") as HTMLInputElement).value; const startsAtUtc = parseTaipeiDateTimeInput(startsAt); const endsAtUtc = parseTaipeiDateTimeInput(endsAt); if (startsAt && !startsAtUtc || endsAt && !endsAtUtc) return toast.push("error", "請輸入有效的台灣時間"); if (startsAtUtc && endsAtUtc && Date.parse(startsAtUtc) >= Date.parse(endsAtUtc)) return toast.push("error", "結束時間必須晚於開始時間"); try { await apiPut("/admin/settings/grade_input_window", { value: { enabled, startsAt: startsAtUtc ?? "", endsAt: endsAtUtc ?? "" } }); toast.push("success", "成績輸入時段已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存成績設定</Button>
+          <div className="mt-6 border-t border-[var(--line)] pt-4"><p className="mb-3 text-sm font-semibold">⌁ 使用者端段考日期輸入</p><div className="grid gap-3 sm:grid-cols-3"><Field label="目前狀態"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="exam-date-window-enabled" type="checkbox" defaultChecked={examDateWindow.enabled !== false} className="accent-[#7c5cff]" /> 開放段考日期輸入</label></Field><Field label="開始時間（台灣）"><Input id="exam-date-window-start" type="datetime-local" defaultValue={formatTaipeiDateTimeInput(examDateWindow.startsAt)} /></Field><Field label="結束時間（台灣）"><Input id="exam-date-window-end" type="datetime-local" defaultValue={formatTaipeiDateTimeInput(examDateWindow.endsAt)} /></Field></div><Button className="mt-3" onClick={async () => { const enabled = (document.getElementById("exam-date-window-enabled") as HTMLInputElement).checked; const startsAt = (document.getElementById("exam-date-window-start") as HTMLInputElement).value; const endsAt = (document.getElementById("exam-date-window-end") as HTMLInputElement).value; const startsAtUtc = parseTaipeiDateTimeInput(startsAt); const endsAtUtc = parseTaipeiDateTimeInput(endsAt); if (startsAt && !startsAtUtc || endsAt && !endsAtUtc) return toast.push("error", "請輸入有效的台灣時間"); if (startsAtUtc && endsAtUtc && Date.parse(startsAtUtc) >= Date.parse(endsAtUtc)) return toast.push("error", "結束時間必須晚於開始時間"); try { await apiPut("/admin/settings/exam_date_input_window", { value: { enabled, startsAt: startsAtUtc ?? "", endsAt: endsAtUtc ?? "" } }); toast.push("success", "段考日期輸入時段已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存段考日期設定</Button></div>
           <div className="mt-6 border-t border-[var(--line)] pt-4">
             <p className="mb-3 text-sm font-semibold">⌁ 首頁考試／學測倒數</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -219,10 +240,10 @@ export default function AdminSystemPage() {
           </div>
           <div className="mt-6 border-t border-[var(--line)] pt-4">
             <p className="mb-3 text-sm font-semibold">↥ 匯出資料、格式與 Nova 政策</p>
-            <div className="grid gap-3 sm:grid-cols-2"><Field label="匯出功能"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-enabled" type="checkbox" defaultChecked={exportConfig.enabled !== false} className="accent-[#7c5cff]" /> 開放匯出</label></Field><Field label="會員限制"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-pro-only" type="checkbox" defaultChecked={exportConfig.proOnly === true} className="accent-[#7c5cff]" /> 僅限 PRO</label></Field><Field label="最低 Nova（保留設定）"><Input id="export-min-nova" type="number" min={0} defaultValue={String(exportConfig.minimumNova ?? 0)} /></Field><Field label="限時免費截止（留空代表不限期）"><Input id="export-free-until" type="datetime-local" defaultValue={exportConfig.freeUntil ? exportConfig.freeUntil.slice(0, 16) : ""} /></Field></div>
+            <div className="grid gap-3 sm:grid-cols-2"><Field label="匯出功能"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-enabled" type="checkbox" defaultChecked={exportConfig.enabled !== false} className="accent-[#7c5cff]" /> 開放匯出</label></Field><Field label="會員限制"><label className="flex h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm"><input id="export-pro-only" type="checkbox" defaultChecked={exportConfig.proOnly === true} className="accent-[#7c5cff]" /> 僅限 PRO</label></Field><Field label="最低 Nova（保留設定）"><Input id="export-min-nova" type="number" min={0} defaultValue={String(exportConfig.minimumNova ?? 0)} /></Field><Field label="限時免費截止（台灣時間，留空代表不限期）"><Input id="export-free-until" type="datetime-local" defaultValue={formatTaipeiDateTimeInput(exportConfig.freeUntil)} /></Field></div>
             <p className="mt-4 text-xs font-semibold text-muted">允許匯出的資料類型</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{EXPORT_DATASETS.map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm"><input id={`export-kind-${key}`} type="checkbox" defaultChecked={exportConfig.allowedKinds?.includes(key) ?? true} className="accent-[#7c5cff]" />{label}</label>)}</div>
             <p className="mt-4 text-xs font-semibold text-muted">允許格式、每次扣點與限時免費</p><div className="mt-2 space-y-2">{EXPORT_FORMATS.map(([key, label]) => <div key={key} className="grid items-center gap-2 rounded-xl border border-[var(--line)] p-2 sm:grid-cols-[1fr_110px_auto]"><label className="flex items-center gap-2 text-sm"><input id={`export-format-${key}`} type="checkbox" defaultChecked={exportConfig.allowedFormats?.includes(key) ?? true} className="accent-[#7c5cff]" />{label}</label><Input id={`export-cost-${key}`} type="number" min={0} step={1} defaultValue={String(exportConfig.costs?.[key] ?? ({ pdf: 800, docx: 600, xlsx: 500, csv: 200, json: 100, txt: 100, md: 100, zip: 1000 }[key] ?? 0))} /><label className="flex items-center gap-2 text-xs text-[#ffd98a]"><input id={`export-free-${key}`} type="checkbox" defaultChecked={exportConfig.freeFormats?.includes(key) ?? false} className="accent-[#ffc857]" />限時免費</label></div>)}</div>
-            <Button className="mt-3" onClick={async () => { const allowedKinds = EXPORT_DATASETS.filter(([key]) => (document.getElementById(`export-kind-${key}`) as HTMLInputElement).checked).map(([key]) => key); const allowedFormats = EXPORT_FORMATS.filter(([key]) => (document.getElementById(`export-format-${key}`) as HTMLInputElement).checked).map(([key]) => key); const freeFormats = EXPORT_FORMATS.filter(([key]) => (document.getElementById(`export-free-${key}`) as HTMLInputElement).checked).map(([key]) => key); const costs = Object.fromEntries(EXPORT_FORMATS.map(([key]) => [key, Number((document.getElementById(`export-cost-${key}`) as HTMLInputElement).value)])); const freeUntil = (document.getElementById("export-free-until") as HTMLInputElement).value; try { await apiPut("/admin/settings/learning_exports", { value: { enabled: (document.getElementById("export-enabled") as HTMLInputElement).checked, proOnly: (document.getElementById("export-pro-only") as HTMLInputElement).checked, minimumNova: Number((document.getElementById("export-min-nova") as HTMLInputElement).value), freeUntil: freeUntil ? new Date(freeUntil).toISOString() : null, allowedKinds, allowedFormats, freeFormats, costs } }); toast.push("success", "匯出資料、格式與收費政策已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存匯出政策</Button>
+            <Button className="mt-3" onClick={async () => { const allowedKinds = EXPORT_DATASETS.filter(([key]) => (document.getElementById(`export-kind-${key}`) as HTMLInputElement).checked).map(([key]) => key); const allowedFormats = EXPORT_FORMATS.filter(([key]) => (document.getElementById(`export-format-${key}`) as HTMLInputElement).checked).map(([key]) => key); const freeFormats = EXPORT_FORMATS.filter(([key]) => (document.getElementById(`export-free-${key}`) as HTMLInputElement).checked).map(([key]) => key); const costs = Object.fromEntries(EXPORT_FORMATS.map(([key]) => [key, Number((document.getElementById(`export-cost-${key}`) as HTMLInputElement).value)])); const freeUntil = (document.getElementById("export-free-until") as HTMLInputElement).value; const freeUntilUtc = parseTaipeiDateTimeInput(freeUntil); if (freeUntil && !freeUntilUtc) { toast.push("error", "請輸入有效的台灣時間"); return; } try { await apiPut("/admin/settings/learning_exports", { value: { enabled: (document.getElementById("export-enabled") as HTMLInputElement).checked, proOnly: (document.getElementById("export-pro-only") as HTMLInputElement).checked, minimumNova: Number((document.getElementById("export-min-nova") as HTMLInputElement).value), freeUntil: freeUntilUtc, allowedKinds, allowedFormats, freeFormats, costs } }); toast.push("success", "匯出資料、格式與收費政策已更新"); await settings.reload(); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存匯出政策</Button>
           </div>
         </Card>
       )}
@@ -299,7 +320,7 @@ export default function AdminSystemPage() {
               <div key={l.id} className="glass-soft px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <Badge tone={l.level === "error" ? "rose" : "muted"}>{l.level}</Badge>
-                  <span className="text-muted">{new Date(l.createdAt).toLocaleString("zh-TW")}</span>
+                  <span className="text-muted">{formatTaipeiDateTime(l.createdAt)}</span>
                 </div>
                 <p className="mt-0.5">
                   <span className="text-muted">{l.scope}</span>｜{l.message}
@@ -314,10 +335,22 @@ export default function AdminSystemPage() {
         <div className="space-y-3">
           <p className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs leading-5 text-muted">{maintenanceAction === "start" ? "儲存後會立即暫停學生端主要 API。請先確認所有文字、時間與通知內容。" : "儲存後會立即解除維護模式，並依照下方內容建立維護完成公告及通知。"}</p>
           <div className="grid gap-3 sm:grid-cols-2"><Field label="公告類型"><Select value={maintenanceForm.category} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, category: e.target.value as ServiceControl["category"] })}><option value="maintenance">系統維護</option><option value="repair">系統修復</option><option value="major_release">重大版本更新</option></Select></Field><Field label="頁面標題" required><Input value={maintenanceForm.title} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, title: e.target.value })} /></Field><Field label="徽章文字" required><Input value={maintenanceForm.badgeText} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, badgeText: e.target.value })} /></Field></div>
+          <Field label="維護原因" hint="例如：資料庫升級、系統修復或重大版本上線"><Input value={maintenanceForm.reason} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, reason: e.target.value })} /></Field>
           <Field label={maintenanceAction === "start" ? "維護說明" : "恢復後公告內容"} required><Textarea value={maintenanceForm.description} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, description: e.target.value })} className="!min-h-[100px]" /></Field>
           <Field label="使用者提示／通知訊息" required><Textarea value={maintenanceForm.message} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, message: e.target.value })} className="!min-h-[80px]" /></Field>
           <Field label="預計恢復時間（台灣時間）" hint="倒數與頁面顯示都使用這個時間；不需在說明文字重複輸入"><Input type="datetime-local" value={maintenanceForm.estimatedRecoveryAt} onChange={(e) => setMaintenanceForm({ ...maintenanceForm, estimatedRecoveryAt: e.target.value })} /></Field>
-          <Button full onClick={saveMaintenance}>{maintenanceAction === "start" ? "確認設定並開始維護" : "確認設定並恢復網站、發送通知"}</Button>
+          <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={() => setMaintenancePreviewOpen(true)}>預覽維護頁（不儲存）</Button><Button onClick={saveMaintenance}>{maintenanceAction === "start" ? "確認設定並開始維護" : "確認設定並恢復網站、發送通知"}</Button></div>
+        </div>
+      </Modal>
+      <Modal open={maintenancePreviewOpen} onClose={() => setMaintenancePreviewOpen(false)} title="維護頁預覽（尚未儲存）" wide>
+        <div className="mx-auto max-h-[65vh] max-w-3xl overflow-y-auto rounded-2xl border border-amber-200/20 bg-[#060915] p-5 text-center text-white sm:p-8">
+          <p className="text-xs font-black uppercase tracking-[.2em] text-amber-200">StudyNova · {maintenanceCategoryLabel(maintenanceForm.category)} · {maintenanceForm.badgeText}</p>
+          <h2 className="mt-3 text-2xl font-black">{maintenanceForm.title || "StudyNova 正在進行系統維護"}</h2>
+          {maintenanceForm.reason && <p className="mt-2 text-sm font-semibold text-amber-100">維護原因：{maintenanceForm.reason}</p>}
+          <p className="mx-auto mt-3 max-w-xl whitespace-pre-line text-sm leading-7 text-slate-300">{maintenanceForm.description}</p>
+          <p className="mx-auto mt-4 max-w-xl rounded-xl border border-amber-200/15 bg-amber-300/[0.07] p-3 text-sm text-amber-50">{maintenanceForm.message}</p>
+          {parseTaipeiDateTimeInput(maintenanceForm.estimatedRecoveryAt) && <><p className="mt-4 text-xs text-amber-200">預計恢復時間（台灣時間）：{formatTaipeiDateTime(parseTaipeiDateTimeInput(maintenanceForm.estimatedRecoveryAt)!)}</p><MaintenanceCountdown targetAt={parseTaipeiDateTimeInput(maintenanceForm.estimatedRecoveryAt)} /></>}
+          <p className="mt-5 text-xs text-cyan-100/70">你的帳號與學習資料會保留。</p>
         </div>
       </Modal>
     </div>

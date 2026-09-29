@@ -20,38 +20,14 @@
 - `share_copies` 提供「加入學習庫」與「複製成筆記參考」的可追蹤 reference。
 - payload 上限 50 KB；AI artifact 用 `artifactId` 關聯，不在 public payload 內暴露 private object key。
 
-### 3. 教材理解、閱讀進度、高亮與 AI 朗讀
+### 3. 教材理解、閱讀進度、高亮與裝置朗讀
 
 - `POST /materials/:id/understand` 以 background job 產生 `content_understanding_documents`、語意 `blocks` 與可朗讀 `segments`。
 - `PATCH /materials/:id/reading-progress` 將 page/block/percent 寫入 `study_material_reading_progress`。
 - `POST /materials/:id/highlights` 將選取文字寫入 `study_material_highlights`；前端仍保留 local optimistic cache。
-- `POST /tts/jobs` 建立可重試的 `tts_jobs` / `tts_segments`，輸出檔案寫入既有 object storage。
-- TTS 只呼叫獨立 worker，不在 Next.js 內載入模型。支援 `provider=cosyvoice` 或 `provider=gpt-sovits`。
-
-TTS worker contract：
-
-```http
-POST ${TTS_SERVICE_URL}/v1/tts
-Authorization: Bearer <TTS_SERVICE_TOKEN> # optional
-Content-Type: application/json
-
-{
-  "text": "需要朗讀的段落",
-  "language": "zh-TW",
-  "voice": "default",
-  "speed": 1,
-  "provider": "cosyvoice"
-}
-```
-
-```json
-{
-  "audioBase64": "...",
-  "mimeType": "audio/wav",
-  "durationMs": 1234,
-  "filename": "optional.wav"
-}
-```
+- 朗讀使用瀏覽器／裝置內建 `SpeechSynthesis`，教材與單字的文字只在目前裝置播放。
+- 不需 Azure key、TTS worker、背景排程或音檔 object storage；朗讀音訊不會上傳或保存。
+- 舊 `/tts/jobs` API 已停用並回傳 `SN-AI-6019`；既有 `tts_jobs` 資料表僅為歷史相容保留，不會建立新的音檔工作。
 
 ### 4. Online PK Bot
 
@@ -83,7 +59,7 @@ Content-Type: application/json
 
 ## Worker / Cron
 
-此 repository 目前沒有 BullMQ Worker consumer，因此即使環境有 `REDIS_URL`，queue 仍安全地寫入 PostgreSQL；不支援設定 `STUDYNOVA_BULLMQ_WORKER=1` 把工作送入無 consumer 的 Redis。部署必須以外部排程器每分鐘呼叫受 `CRON_SECRET` 保護的 `/system/cron?task=queue_drain`，否則 `ai_background_batch`、`tts_job` 與 `pk_bot_turn` 會停留在 queued。若未來要使用 BullMQ，必須先加入並驗證真正的 worker 進程與 health heartbeat。
+此 repository 目前沒有 BullMQ Worker consumer，因此即使環境有 `REDIS_URL`，queue 仍安全地寫入 PostgreSQL；不支援設定 `STUDYNOVA_BULLMQ_WORKER=1` 把工作送入無 consumer 的 Redis。部署必須以外部排程器每分鐘呼叫受 `CRON_SECRET` 保護的 `/system/cron?task=queue_drain`，否則 `ai_background_batch` 與 `pk_bot_turn` 會停留在 queued。舊 `tts_job` 若仍在 queue 中，drain 只會標示取消，不會產生音檔。若未來要使用 BullMQ，必須先加入並驗證真正的 worker 進程與 health heartbeat。
 
 ## 驗證結果
 

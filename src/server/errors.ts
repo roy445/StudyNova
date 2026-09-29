@@ -24,6 +24,7 @@ export type ErrorCategory =
   | "CHAL"
   | "PK"
   | "ADMIN"
+  | "VERSION"
   | "RATE"
   | "NF"
   | "CONF"
@@ -122,6 +123,7 @@ export const ERROR_CATALOG = {
   AI_MATERIAL_WRITE_FAILED: def("SN-AI-6017", 503, "AI", "AI 教材儲存失敗", "請附上錯誤代碼與追蹤編號回報，管理員可依 stage 檢查 study_materials 資料表。"),
   AI_ACTION_DIAGNOSTIC: def("SN-AI-6018", 500, "AI", "AI 動作執行失敗", "請附上 action、stage、錯誤代碼與追蹤編號，系統已記錄完整診斷資訊。"),
   AI_VOICE_REQUIRED: def("SN-AI-6009", 400, "AI", "語音分析需要 AI 服務", "請先請管理員確認 AI 服務設定。"),
+  TTS_BROWSER_SPEECH_ONLY: def("SN-AI-6019", 410, "AI", "伺服器音檔朗讀已停用", "請使用教材或單字旁的裝置內建朗讀；不需要 API key，也不會上傳或保存音檔。"),
 
   /* ---------------------------------------------------------- FILE 7xxx */
   FILE_EMPTY: def("SN-FILE-7001", 400, "FILE", "檔案是空的", "請重新選擇檔案。"),
@@ -184,6 +186,11 @@ export const ERROR_CATALOG = {
   ADMIN_TEXTBOOK_STORAGE_ERROR: def("SN-ADMIN-9512", 502, "ADMIN", "教材檔案儲存失敗", "請重新上傳檔案；若持續發生，請提供錯誤代碼與追蹤編號。"),
   ADMIN_TEXTBOOK_PERMISSION: def("SN-ADMIN-9513", 403, "ADMIN", "沒有管理教材的權限", "請使用管理員帳號重新登入。"),
   ADMIN_TEXTBOOK_PROCESSING_ERROR: def("SN-ADMIN-9514", 500, "ADMIN", "教材處理失敗", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號。"),
+
+  /* ------------------------------------------------------- VERSION 96xx */
+  APP_VERSION_REQUIRED: def("SN-VER-9601", 426, "VERSION", "無法識別目前 StudyNova 版本", "請重新整理以載入目前版本；若仍發生，請清除此網站的舊快取後再試。"),
+  APP_VERSION_UPDATE_REQUIRED: def("SN-VER-9602", 426, "VERSION", "目前版本已停止支援，請先更新 StudyNova", "重新載入頁面並套用最新版後即可繼續使用。"),
+  FEATURE_VERSION_REQUIRED: def("SN-VER-9603", 426, "VERSION", "此功能需要更新版 StudyNova", "請先更新應用程式至支援版本，再重新使用此功能。"),
 
   /* ---------------------------------------------------------- RATE 97xx */
   RATE_LIMITED: def("SN-RATE-9701", 429, "RATE", "操作太頻繁，請稍後再試", "為了保護系統，短時間內的重複請求會被暫時限制。"),

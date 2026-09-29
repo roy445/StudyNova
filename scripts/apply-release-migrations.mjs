@@ -12,6 +12,8 @@ const releaseMigrations = [
   "0088_focus_timer_sessions.sql",
   "0089_focus_sessions_completed_at_repair.sql",
   "0090_ai_solution_upload_quota.sql",
+  "0091_version_center_feature_gates.sql",
+  "0092_maintenance_announcement_history.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

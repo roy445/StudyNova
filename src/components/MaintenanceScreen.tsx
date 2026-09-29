@@ -38,6 +38,7 @@ export function MaintenanceScreen({ state }: { state: MaintenanceState }) {
 
           <p className="mt-5 text-[11px] font-black uppercase tracking-[0.3em] text-amber-200/90 sm:text-xs">StudyNova · {maintenanceCategoryLabel(state.category)} · {state.badgeText}</p>
           <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-4xl">{state.title || "StudyNova 正在進行系統維護"}</h1>
+          {state.reason && <p className="mt-3 text-sm font-semibold text-amber-100">維護原因：{state.reason}</p>}
           <p className="mx-auto mt-4 max-w-xl whitespace-pre-line text-sm leading-7 text-slate-300 sm:text-base">{state.description || "我們正在進行系統維護與更新。"}</p>
 
           {state.notice && <p className="mx-auto mt-5 max-w-xl rounded-2xl border border-amber-200/15 bg-amber-300/[0.07] px-4 py-3 text-sm leading-6 text-amber-50">{state.notice}</p>}

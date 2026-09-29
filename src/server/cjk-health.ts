@@ -5,7 +5,7 @@ import { cjkTestText, embedCjkFont, validateCjkFont, withCjkSvgFont } from "./cj
 export async function runCjkHealth() {
   const base = validateCjkFont();
   let pdf: { bytes: number; embedded: boolean; error?: string } = { bytes: 0, embedded: false };
-  let image: { bytes: number; rendered: boolean; error?: string } = { bytes: 0, rendered: false };
+  let image: { bytes: number; rendered: boolean; glyphRasterVerified: boolean; distinctGlyphRasterChannels: number; error?: string } = { bytes: 0, rendered: false, glyphRasterVerified: false, distinctGlyphRasterChannels: 0 };
   let svg: { bytes: number; embedded: boolean; error?: string } = { bytes: 0, embedded: false };
   try {
     const document = await PDFDocument.create();
@@ -21,7 +21,17 @@ export async function runCjkHealth() {
   try {
     const raw = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="220"><rect width="1200" height="220" fill="white"/><text x="30" y="120" font-size="32">${cjkTestText()}</text></svg>`;
     const rendered = await sharp(Buffer.from(withCjkSvgFont(raw))).png().toBuffer();
-    image = { bytes: rendered.length, rendered: rendered.length > 1000 };
+    const renderGlyph = async (glyph: string) => {
+      const sample = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" fill="white"/><text x="20" y="120" font-size="96">${glyph}</text></svg>`;
+      return sharp(Buffer.from(withCjkSvgFont(sample))).greyscale().raw().toBuffer();
+    };
+    const [firstGlyph, secondGlyph] = await Promise.all([renderGlyph("國"), renderGlyph("文")]);
+    let distinctGlyphRasterChannels = 0;
+    for (let index = 0; index < Math.min(firstGlyph.length, secondGlyph.length); index += 1) {
+      if (firstGlyph[index] !== secondGlyph[index]) distinctGlyphRasterChannels += 1;
+    }
+    const glyphRasterVerified = distinctGlyphRasterChannels > 0;
+    image = { bytes: rendered.length, rendered: rendered.length > 1000, glyphRasterVerified, distinctGlyphRasterChannels };
   } catch (error) {
     image.error = error instanceof Error ? error.message : String(error);
   }
@@ -31,5 +41,5 @@ export async function runCjkHealth() {
   } catch (error) {
     svg.error = error instanceof Error ? error.message : String(error);
   }
-  return { ...base, pdf, image, svg, healthy: base.valid && pdf.embedded && image.rendered && svg.embedded };
+  return { ...base, pdf, image, svg, healthy: base.valid && pdf.embedded && image.rendered && image.glyphRasterVerified && svg.embedded };
 }

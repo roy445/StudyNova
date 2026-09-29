@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatTaipeiDateTime, formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
+import { formatTaipeiDate, formatTaipeiDateTime, formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
 
 describe("formatTaipeiDateTime", () => {
   it("formats timestamps in Asia/Taipei with seconds", () => {
     expect(formatTaipeiDateTime("2026-09-29T00:00:00.000Z")).toBe("2026/09/29 08:00:00");
+    expect(formatTaipeiDate("2026-09-28T16:00:00.000Z")).toBe("2026/09/29");
   });
 
   it("handles missing or invalid values safely", () => {

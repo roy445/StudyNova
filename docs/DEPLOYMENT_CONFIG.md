@@ -51,7 +51,7 @@ Header: x-cron-secret: <CRON_SECRET>
 
 需要在外部排程器設定呼叫，例如 GitHub Actions、Vercel Cron、Cloud Scheduler、crontab 或 VPS systemd timer。`CRON_SECRET` 必須與外部排程器使用的 secret 相同。實際任務清單可在管理後台 Cron 分頁查看。
 
-**背景工作的必要設定：**若部署環境沒有常駐 worker（例如 Vercel serverless），請每分鐘呼叫 `GET /api/cron/queue-drain`，並傳送 `CRON_SECRET`（`x-cron-secret` header；Vercel Cron 會傳 `Authorization: Bearer ...`）。這會處理 PostgreSQL queue 工作，包括 PK Bot、AI 背景工作與 TTS；只呼叫低頻任務不能保證工作及時執行。不要把 secret 放在 URL query string 或 client bundle。完整 CosyVoice adapter、HTTPS 與 cron-job.org/Vercel Cron 步驟見 [TTS Worker 與 Cron 部署指南](./TTS_WORKER_AND_CRON_SETUP.md)。
+**背景工作的必要設定：**若部署環境沒有常駐 worker（例如 Vercel serverless），請每分鐘呼叫 `GET /api/cron/queue-drain`，並傳送 `CRON_SECRET`（`x-cron-secret` header；Vercel Cron 會傳 `Authorization: Bearer ...`）。這會處理 PostgreSQL queue 工作，包括 PK Bot、AI 背景工作與排程發布；只呼叫低頻任務不能保證工作及時執行。不要把 secret 放在 URL query string 或 client bundle。瀏覽器朗讀不使用 queue，說明見 [裝置內建朗讀](./BROWSER_SPEECH.md)。
 
 `drizzle/0086_queue_worker_leases.sql` 為 queue 加上 `started_at` lease；部署 crash recovery 程式碼前先套用此 migration，逾時且仍標記 `running` 的工作才會被安全回收。
 
@@ -84,19 +84,11 @@ Header: x-cron-secret: <CRON_SECRET>
 |---|---|---|
 | `REDIS_URL` | 不需要 | 本版本背景工作使用 PostgreSQL `job_queue`；設定此變數不會啟用 Redis/BullMQ consumer |
 
-正式環境需設定每分鐘觸發的 `queue_drain` cron，否則 PostgreSQL queue 中的 PK Bot、AI 與 TTS 工作不會及時執行。未來若部署獨立 Redis worker，需先部署實際 consumer 並確認 adapter/worker 協定後才設定 Redis。
+正式環境需設定每分鐘觸發的 `queue_drain` cron，否則 PostgreSQL queue 中的 PK Bot、AI 與排程發布工作不會及時執行。瀏覽器朗讀不需要背景工作。未來若部署獨立 Redis worker，需先部署實際 consumer 並確認 adapter/worker 協定後才設定 Redis。
 
 ### Text-to-Speech (TTS)
 
-| 變數 | 必填性 | 說明 |
-|---|---|---|
-| `AZURE_SPEECH_KEY` | 使用 Azure Speech 時必填 | Azure Speech resource key；設在 server-side 環境變數，不得使用 `NEXT_PUBLIC_` 前綴 |
-| `AZURE_SPEECH_REGION` | 使用 Azure Speech 時必填 | Azure Speech resource 的 region slug，例如 `eastasia`；必須與 key 同一個 resource |
-| `TTS_SERVICE_URL` | 選填（自架 worker） | CosyVoice/GPT-SoVITS adapter 的 HTTPS base URL；只有不使用 Azure 時才需要 |
-| `TTS_SERVICE_TOKEN` | 選填（自架 worker） | Worker Bearer token；只供 `TTS_SERVICE_URL` 使用，必須 server-side |
-| `TTS_REQUEST_TIMEOUT_MS` | 選填 | Azure Speech 或外部 worker 每段請求 timeout；預設 `120000`，程式上限 `300000` ms |
-
-設定 Azure key/region 後，新朗讀工作會自動走 Azure Speech，無須自架 GPU worker；兩者都未設定時才回退到自架 worker。Azure Speech F0 的官方免費額度目前為每月 500,000 Neural 字元，F0 每分鐘最多 20 次請求；需在 Azure resource 中選 F0，不要切換到付費 S0。完整 Azure/worker 與 Vercel/外部 queue cron 步驟見 [TTS Worker 與 Cron 部署指南](./TTS_WORKER_AND_CRON_SETUP.md)。
+StudyNova 使用瀏覽器／裝置內建語音合成。無需 `AZURE_SPEECH_KEY`、`TTS_SERVICE_URL`、worker、排程或 object storage；使用者按下朗讀時，文字留在裝置上播放，不會上傳或保存生成音檔。瀏覽器可用語言與聲線取決於使用者裝置，設定方式見 [裝置內建朗讀](./BROWSER_SPEECH.md)。舊伺服器音檔工作 API 已停用。
 
 ### Object Storage
 

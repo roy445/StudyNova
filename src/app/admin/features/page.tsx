@@ -6,7 +6,7 @@ import { apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { formatTaipeiDateTime, formatTaipeiDateTimeInput, parseTaipeiDateTimeInput } from "@/lib/date-time";
 
 type Feature = { id: string; feature: string; label: string; category?: string; enabled: boolean; proOnly: boolean; freeDailyLimit: number; proDailyLimit: number; monthlyLimit: number; novaCost: number };
-type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
+type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; reason: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 const CATEGORY: Record<string, string[]> = {
   AI: ["ai", "novi", "solution", "ocr", "quiz"],
   學習: ["word", "vocabulary", "study", "wrong", "sentence", "material", "plan"],
@@ -26,10 +26,10 @@ export default function AdminFeaturesPage() {
   const [category, setCategory] = useState("全部");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
-  const [maintenanceDraft, setMaintenanceDraft] = useState({ category: "maintenance" as ServiceControl["category"], title: "系統施工中", description: "StudyNova 目前正在進行系統維護與更新，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "請稍後再回來看看！" });
+  const [maintenanceDraft, setMaintenanceDraft] = useState({ category: "maintenance" as ServiceControl["category"], title: "系統施工中", reason: "", description: "StudyNova 目前正在進行系統維護與更新，暫時無法使用。", badgeText: "系統維護中，請稍候", estimatedRecoveryAt: "", message: "請稍後再回來看看！" });
   useEffect(() => {
     if (!service.data) return;
-    const timer = window.setTimeout(() => setMaintenanceDraft({ category: service.data!.category ?? "maintenance", title: service.data!.title, description: service.data!.description, badgeText: service.data!.badgeText, estimatedRecoveryAt: formatTaipeiDateTimeInput(service.data!.estimatedRecoveryAt), message: service.data!.message }), 0);
+    const timer = window.setTimeout(() => setMaintenanceDraft({ category: service.data!.category ?? "maintenance", title: service.data!.title, reason: service.data!.reason ?? "", description: service.data!.description, badgeText: service.data!.badgeText, estimatedRecoveryAt: formatTaipeiDateTimeInput(service.data!.estimatedRecoveryAt), message: service.data!.message }), 0);
     return () => window.clearTimeout(timer);
   }, [service.data]);
   const features = useMemo(() => (state.data?.features ?? []).filter((feature) => (category === "全部" || categoryOf(feature.feature) === category) && `${feature.feature} ${feature.label}`.toLowerCase().includes(query.toLowerCase())), [category, query, state.data]);
@@ -57,9 +57,10 @@ export default function AdminFeaturesPage() {
     }
     setBusy(true);
     try {
-      await apiPatch("/admin/service-control", { enabled, ...maintenanceDraft, estimatedRecoveryAt, announceOnEnable: enabled });
+      const serviceResult = await apiPatch<{ maintenanceHistoryRecorded?: boolean }>("/admin/service-control", { enabled, ...maintenanceDraft, estimatedRecoveryAt, announceOnEnable: enabled });
       await service.reload();
-      toast.push("success", enabled ? "全站服務已恢復" : "已開始全站施工");
+      const resultText = enabled ? "全站服務已恢復" : "已開始全站施工";
+      toast.push("success", `${resultText}${serviceResult.maintenanceHistoryRecorded === false ? "；維護歷史尚未寫入，請先套用 migration 0092。" : ""}`);
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
   return <div className="space-y-4">
@@ -71,7 +72,7 @@ export default function AdminFeaturesPage() {
         <Field label="施工標題"><Input value={maintenanceDraft.title} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, title: event.target.value }))} /></Field>
         <Field label="封條文字"><Input value={maintenanceDraft.badgeText} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, badgeText: event.target.value }))} /></Field>
         <Field label="預計恢復時間（台灣時間）" hint="倒數與頁面顯示都使用此欄位；不需在說明文字重複輸入時間"><Input type="datetime-local" value={maintenanceDraft.estimatedRecoveryAt} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, estimatedRecoveryAt: event.target.value }))} /></Field>
-        <Field label="自訂通知內容"><Input value={maintenanceDraft.message} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, message: event.target.value }))} /></Field>
+        <Field label="維護原因"><Input value={maintenanceDraft.reason} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, reason: event.target.value }))} /></Field><Field label="自訂通知內容"><Input value={maintenanceDraft.message} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, message: event.target.value }))} /></Field>
       </div>
       <Field label="施工說明"><Textarea value={maintenanceDraft.description} onChange={(event) => setMaintenanceDraft((draft) => ({ ...draft, description: event.target.value }))} className="mt-1" /></Field>
       {service.data && <div className="mt-4 grid gap-1 rounded-2xl border border-[var(--line)] bg-white/[0.03] p-3 text-xs text-muted sm:grid-cols-2"><span>開始時間：{service.data.startedAt ? formatTaipeiDateTime(service.data.startedAt) : "尚未施工"}</span><span>預計恢復（台灣時間）：{service.data.estimatedRecoveryAt ? formatTaipeiDateTime(service.data.estimatedRecoveryAt) : "未設定"}</span><span>最後修改管理員：{service.data.updatedByName ?? "—"}</span><span>最後修改時間：{service.data.updatedAt ? formatTaipeiDateTime(service.data.updatedAt) : "—"}</span></div>}

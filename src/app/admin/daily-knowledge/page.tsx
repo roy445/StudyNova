@@ -1,4 +1,5 @@
 "use client";
+import { formatTaipeiDateTimeInput } from "@/lib/date-time";
 import { useState } from "react";
 import { apiDelete, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Skeleton, Textarea, useToast } from "@/components/ui";
@@ -9,7 +10,7 @@ const subjects = ["國文", "英文", "數學", "自然", "歷史", "地理", "�
 export default function AdminDailyKnowledgePage() {
   const toast = useToast();
   const list = useApi<{ items: Item[]; subjects: string[] }>("/admin/daily-knowledge");
-  const [subject, setSubject] = useState("隨機"); const [date, setDate] = useState(new Date().toISOString().slice(0, 10)); const [selected, setSelected] = useState<Item | null>(null); const [busy, setBusy] = useState(false); const [immediateDisplay, setImmediateDisplay] = useState(false);
+  const [subject, setSubject] = useState("隨機"); const [date, setDate] = useState(formatTaipeiDateTimeInput(new Date()).slice(0, 10)); const [selected, setSelected] = useState<Item | null>(null); const [busy, setBusy] = useState(false); const [immediateDisplay, setImmediateDisplay] = useState(false);
   async function generate(days = 1) { setBusy(true); try { const result = await apiPost<{ generated: number }>("/admin/daily-knowledge/generate", { subject, date, days, immediateDisplay }); await list.reload(); toast.push("success", `已生成 ${result.generated} 天每日知識，指定日期到達前不會顯示`); } catch (err) { toast.push("error", errorMessage(err)); } finally { setBusy(false); } }
   async function save(status?: Item["status"]) { if (!selected) return; try { const result = await apiPatch<{ item: Item }>(`/admin/daily-knowledge/${selected.id}`, { title: selected.title, content: selected.content, detail: selected.detail, subject: selected.subject, topic: selected.topic, source: selected.source, sourceUrl: selected.sourceUrl, coreConcept: selected.coreConcept, scheduledDate: selected.scheduledDate, immediateDisplay: selected.immediateDisplay, status }); setSelected(result.item); await list.reload(); toast.push("success", status === "published" ? "每日知識已發布" : "內容已儲存"); } catch (err) { toast.push("error", errorMessage(err)); } }
   async function verify() { if (!selected) return; try { const result = await apiPost<{ item: Item }>(`/admin/daily-knowledge/${selected.id}/verify`); setSelected(result.item); await list.reload(); toast.push("success", result.item.status === "approved" ? "來源驗證通過" : "來源仍未完成驗證"); } catch (err) { toast.push("error", errorMessage(err)); } }

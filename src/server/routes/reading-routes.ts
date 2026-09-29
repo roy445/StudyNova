@@ -1,12 +1,11 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { contentReadingSegments, contentUnderstandingBlocks, contentUnderstandingDocuments, studyMaterialHighlights, studyMaterialReadingProgress, studyMaterials, ttsJobs, ttsSegments } from "@/db/schema";
+import { contentReadingSegments, contentUnderstandingBlocks, contentUnderstandingDocuments, studyMaterialHighlights, studyMaterialReadingProgress, studyMaterials } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { badRequest, conflict, fail, forbidden, notFound } from "../core";
+import { fail, forbidden, notFound } from "../core";
 import { createAiBackgroundJob, getAiBackgroundProgress } from "../ai-background";
 import { queue } from "../queue";
-import { createTtsSegmentsFromDocument, defaultTtsProvider, ttsConfigured, ttsJobView } from "../tts";
 
 async function ownMaterial(materialId: string, userId: string) {
   const material = (await db.select().from(studyMaterials).where(eq(studyMaterials.id, materialId)).limit(1))[0];
@@ -69,38 +68,6 @@ export const routes: RouteDef[] = [
       return { highlight: row[0] };
     },
   }),
-  route({
-    method: "POST", path: "/tts/jobs", auth: "user", rate: { limit: 20, windowSec: 3600, key: "tts-jobs" },
-    handler: async (ctx) => {
-      const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ materialId: z.string().uuid().optional(), documentId: z.string().uuid().optional(), text: z.string().trim().max(60_000).optional(), provider: z.enum(["azure", "cosyvoice", "gpt-sovits"]).optional(), voice: z.string().max(80).default("default"), language: z.string().max(20).default("zh-TW"), speed: z.number().min(0.5).max(2).default(1), idempotencyKey: z.string().trim().min(1).max(240) }));
-      const provider = body.provider ?? defaultTtsProvider();
-      if (!ttsConfigured(provider)) {
-        throw badRequest(provider === "azure"
-          ? "請在部署環境設定 Azure Speech 的 AZURE_SPEECH_KEY 和 AZURE_SPEECH_REGION。"
-          : "請先部署獨立的 CosyVoice／GPT-SoVITS Worker，並設定 TTS_SERVICE_URL。");
-      }
-      let documentId = body.documentId;
-      if (body.materialId) {
-        await ownMaterial(body.materialId, user.userId);
-        if (!documentId) documentId = (await db.select({ id: contentUnderstandingDocuments.id }).from(contentUnderstandingDocuments).where(and(eq(contentUnderstandingDocuments.materialId, body.materialId), eq(contentUnderstandingDocuments.userId, user.userId), eq(contentUnderstandingDocuments.status, "ready"))).orderBy(desc(contentUnderstandingDocuments.createdAt)).limit(1))[0]?.id;
-      }
-      if (!documentId && !body.text) throw badRequest("請提供教材理解版本或要朗讀的文字。");
-      if (documentId) {
-        const doc = (await db.select().from(contentUnderstandingDocuments).where(and(eq(contentUnderstandingDocuments.id, documentId), eq(contentUnderstandingDocuments.userId, user.userId), eq(contentUnderstandingDocuments.status, "ready"))).limit(1))[0];
-        if (!doc) throw notFound("找不到已完成的教材理解版本");
-      }
-      const idempotencyKey = `${body.idempotencyKey.slice(0, 220)}:${provider}`;
-      const existing = (await db.select().from(ttsJobs).where(and(eq(ttsJobs.userId, user.userId), eq(ttsJobs.idempotencyKey, idempotencyKey))).limit(1))[0];
-      if (existing) return { job: await ttsJobView(existing.id, user.userId) };
-      const inserted = (await db.insert(ttsJobs).values({ userId: user.userId, materialId: body.materialId ?? null, documentId: documentId ?? null, provider, voice: body.voice, language: body.language, speed: body.speed, idempotencyKey }).returning())[0];
-      if (!inserted) throw conflict("無法建立朗讀工作");
-      if (documentId) await createTtsSegmentsFromDocument(inserted.id, documentId);
-      else await db.insert(ttsSegments).values({ jobId: inserted.id, segmentIndex: 0, text: body.text!, status: "queued" });
-      await queue().enqueue({ name: "tts_job", payload: { jobId: inserted.id }, uniqueKey: `tts:${inserted.id}`, runAt: new Date() });
-      void queue().drain(1);
-      return { job: await ttsJobView(inserted.id, user.userId) };
-    },
-  }),
-  route({ method: "GET", path: "/tts/jobs/:id", auth: "user", handler: async (ctx) => { const view = await ttsJobView(ctx.params.id, ctx.requireUser().userId); if (!view) throw notFound("找不到朗讀工作"); return view; } }),
+  route({ method: "POST", path: "/tts/jobs", auth: "user", featureGate: "lesson_tts", handler: async () => { throw fail("TTS_BROWSER_SPEECH_ONLY"); } }),
+  route({ method: "GET", path: "/tts/jobs/:id", auth: "user", featureGate: "lesson_tts", handler: async () => { throw fail("TTS_BROWSER_SPEECH_ONLY"); } }),
 ];

@@ -23,6 +23,7 @@ import {
   fileContexts,
   dailyKnowledgeItems,
   pkBotJobs,
+  ttsJobs,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
@@ -31,9 +32,9 @@ import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core
 import { analyzeQuestionWithAi } from "./question-analysis";
 import { checkDisplayName } from "./name-moderation";
 import { processAiBackgroundBatch } from "./ai-background";
-import { processTtsJob } from "./tts";
 import { processPkBotJob } from "./pk-bot-engine";
 import { DAILY_KNOWLEDGE_SUBJECTS, generateDailyKnowledge, fingerprint } from "./daily-knowledge";
+import { publishScheduledRelease } from "./release-publisher";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -55,7 +56,8 @@ export type JobName =
   | "tts_job"
   | "pk_bot_turn"
   | "data_retention"
-  | "name_moderation_scan";
+  | "name_moderation_scan"
+  | "release_publish";
 
 
 export type JobPayload = Record<string, unknown>;
@@ -71,6 +73,13 @@ export interface QueueAdapter {
 /* ------------------------------------------------------- job handlers */
 
 const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
+  async release_publish(payload) {
+    const releaseId = typeof payload.releaseId === "string" ? payload.releaseId : "";
+    const scheduledAt = typeof payload.scheduledAt === "string" ? payload.scheduledAt : "";
+    if (!releaseId || !scheduledAt) throw new Error("release_publish job requires releaseId and scheduledAt");
+    return publishScheduledRelease(releaseId, scheduledAt);
+  },
+
   async daily_tasks_refresh() {
     const rows = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
     for (const r of rows) await ensureDailyTasks(r.userId);
@@ -372,9 +381,9 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
 
   async tts_job(payload) {
     const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
-    if (!jobId) throw new Error("缺少 TTS 工作 ID");
-    const job = await processTtsJob(jobId);
-    return `TTS 工作 ${job.id} 已完成`;
+    if (!jobId) throw new Error("缺少舊版朗讀工作 ID");
+    await db.update(ttsJobs).set({ status: "cancelled", errorCode: "TTS_BROWSER_SPEECH_ONLY", errorMessage: "伺服器音檔朗讀已停用，請改用裝置內建朗讀。", updatedAt: new Date() }).where(and(eq(ttsJobs.id, jobId), sql`${ttsJobs.status} in ('queued', 'processing')`));
+    return `舊版朗讀工作 ${jobId} 已停用，未產生音檔`;
   },
 
   async pk_bot_turn(payload) {
@@ -548,7 +557,7 @@ export function queue(): QueueAdapter {
 }
 
 export const CRON_TASKS: Array<{ task: CronTask; label: string; schedule: string }> = [
-  { task: "queue_drain", label: "背景工作佇列（AI／朗讀／PK Bot）", schedule: "每分鐘" },
+  { task: "queue_drain", label: "背景工作佇列（AI／朗讀／PK Bot／版本排程）", schedule: "每分鐘" },
   { task: "daily_tasks_refresh", label: "重建每日任務", schedule: "每日 00:05" },
   { task: "daily_knowledge_refresh", label: "每日知識生成與驗證", schedule: "每日 00:10" },
   { task: "review_reminder", label: "錯題複習提醒", schedule: "每日 19:00" },

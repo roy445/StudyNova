@@ -21,6 +21,7 @@ export function MaintenanceNotice({ state }: { state: MaintenanceState }) {
           <div className="mx-auto grid h-20 w-20 place-items-center rounded-full border border-amber-300/35 bg-amber-300/10 text-5xl" aria-hidden="true">⚠</div>
           <p className="mt-4 text-xs font-black uppercase tracking-[.25em] text-amber-200">{maintenanceCategoryLabel(state.category)} · {state.badgeText}</p>
           <h1 className="mt-2 text-2xl font-black text-white">{state.title || "StudyNova 正在進行系統維護"}</h1>
+          {state.reason && <p className="mt-3 text-sm font-semibold text-amber-100">維護原因：{state.reason}</p>}
           <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-300">{state.description || "我們正在進行系統更新與維護。"}</p>
           {state.notice && <p className="mt-4 rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-amber-50">{state.notice}</p>}
           {state.estimatedRecoveryAt && <p className="mt-4 text-xs text-slate-400">預計恢復時間（台灣時間）：<strong className="text-amber-100">{formatTaipeiDateTime(state.estimatedRecoveryAt)}</strong></p>}

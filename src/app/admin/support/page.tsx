@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTaipeiDateTime } from "@/lib/date-time";
 import { useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
@@ -72,8 +73,8 @@ export default function AdminSupportPage() {
         {communication.loading && <Skeleton lines={3} />}
         {communication.error && <ErrorState message={communication.error} onRetry={communication.reload} />}
         <div className="grid gap-3 lg:grid-cols-2">
-          <div className="space-y-2"><p className="text-sm font-semibold">產生的連結（{communication.data?.links.length ?? 0}）</p>{communication.data?.links.map((item) => <details key={String(item.id)} className="glass-soft rounded-xl p-3 text-xs"><summary className="cursor-pointer"><span className="font-semibold">{String(item.kind)}</span>・{String(item.recipient || "未指定收件人")}・{new Date(String(item.createdAt)).toLocaleString("zh-TW")}</summary><pre className="mt-2 whitespace-pre-wrap break-all leading-5 text-muted">{JSON.stringify(item, null, 2)}</pre></details>)}</div>
-          <div className="space-y-2"><p className="text-sm font-semibold">郵件訊息（{communication.data?.emails.length ?? 0}）</p>{communication.data?.emails.map((item) => <details key={String(item.id)} className="glass-soft rounded-xl p-3 text-xs"><summary className="cursor-pointer"><span className="font-semibold">{String(item.status)}</span>・{String(item.recipient)}・{String(item.subject)}・{new Date(String(item.createdAt)).toLocaleString("zh-TW")}</summary><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all leading-5 text-muted">{JSON.stringify(item, null, 2)}</pre></details>)}</div>
+          <div className="space-y-2"><p className="text-sm font-semibold">產生的連結（{communication.data?.links.length ?? 0}）</p>{communication.data?.links.map((item) => <details key={String(item.id)} className="glass-soft rounded-xl p-3 text-xs"><summary className="cursor-pointer"><span className="font-semibold">{String(item.kind)}</span>・{String(item.recipient || "未指定收件人")}・{formatTaipeiDateTime(String(item.createdAt))}</summary><pre className="mt-2 whitespace-pre-wrap break-all leading-5 text-muted">{JSON.stringify(item, null, 2)}</pre></details>)}</div>
+          <div className="space-y-2"><p className="text-sm font-semibold">郵件訊息（{communication.data?.emails.length ?? 0}）</p>{communication.data?.emails.map((item) => <details key={String(item.id)} className="glass-soft rounded-xl p-3 text-xs"><summary className="cursor-pointer"><span className="font-semibold">{String(item.status)}</span>・{String(item.recipient)}・{String(item.subject)}・{formatTaipeiDateTime(String(item.createdAt))}</summary><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all leading-5 text-muted">{JSON.stringify(item, null, 2)}</pre></details>)}</div>
         </div>
       </Card>
       <Card title="🔐 產生密碼重設連結" subtitle="輸入使用者提出的 Email 與原因，產生一次性限時連結，再由你自行寄出。">
@@ -90,7 +91,7 @@ export default function AdminSupportPage() {
           }}>產生連結</Button>
         </div>
         {resetResult && <div className="mt-3 space-y-2 rounded-xl border border-[#ffc857]/30 bg-[#ffc857]/5 p-3 text-xs">
-          <p className="text-[#ffd98a]">有效期限：{new Date(resetResult.expiresAt).toLocaleString("zh-TW")}</p>
+          <p className="text-[#ffd98a]">有效期限：{formatTaipeiDateTime(resetResult.expiresAt)}</p>
           <Input readOnly value={resetResult.link} />
           <div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.link)}>複製連結</Button><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(resetResult.customerMessage)}>複製客服文字</Button></div>
           <pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-2 leading-relaxed text-muted">{resetResult.customerMessage}</pre>
@@ -106,7 +107,7 @@ export default function AdminSupportPage() {
         </div>
         <Field label="發放／封鎖原因"><Input value={linkForm.reason} onChange={(e) => setLinkForm({ ...linkForm, reason: e.target.value })} placeholder="例如：完成學習活動獎勵、申訴審核通過" /></Field>
         <Button className="mt-3" onClick={async () => { try { const result = await apiPost<{ link: string; code?: string; label: string; expiresAt?: string | null; customerMessage: string }>("/admin/action-links", { kind: linkForm.kind, email: linkForm.email || undefined, value: Number(linkForm.value), expiresMinutes: Number(linkForm.expiresMinutes), reason: linkForm.reason || undefined, baseUrl: window.location.origin }); setLinkResult(result); toast.push("success", `已產生${result.label}與客服文字`); } catch (err) { toast.push("error", errorMessage(err)); } }}>產生分類連結</Button>
-        {linkResult && <div className="mt-3 space-y-2 rounded-xl border border-[#7dd3fc]/30 bg-[#7dd3fc]/5 p-3"><p className="text-sm font-semibold text-[#b8edff]">{linkResult.label}</p><Input readOnly value={linkResult.link} /><div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.link)}>複製連結</Button>{linkResult.code && <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.code ?? "")}>複製兌換碼</Button>}<Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.customerMessage)}>複製客服文字</Button></div>{linkResult.expiresAt && <p className="text-xs text-muted">有效期限：{new Date(linkResult.expiresAt).toLocaleString("zh-TW")}</p>}<pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-3 text-xs leading-6 text-muted">{linkResult.customerMessage}</pre></div>}
+        {linkResult && <div className="mt-3 space-y-2 rounded-xl border border-[#7dd3fc]/30 bg-[#7dd3fc]/5 p-3"><p className="text-sm font-semibold text-[#b8edff]">{linkResult.label}</p><Input readOnly value={linkResult.link} /><div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.link)}>複製連結</Button>{linkResult.code && <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.code ?? "")}>複製兌換碼</Button>}<Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.customerMessage)}>複製客服文字</Button></div>{linkResult.expiresAt && <p className="text-xs text-muted">有效期限：{formatTaipeiDateTime(linkResult.expiresAt)}</p>}<pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-3 text-xs leading-6 text-muted">{linkResult.customerMessage}</pre></div>}
       </Card>
 
       <Card title="✉ StudyNova 帳號通知信" subtitle="使用統一品牌排版寄送重啟、密碼重設、Pro 或獎勵連結。需先設定 Gmail SMTP 與 16 位應用程式密碼才會實際寄出。">
@@ -125,7 +126,7 @@ export default function AdminSupportPage() {
         {appeals.loading && <Skeleton lines={3} />}
         {!appeals.loading && !appeals.data?.appeals.length && <EmptyState icon="⚖" title="目前沒有申訴案件" />}
         <div className="space-y-2">
-          {appeals.data?.appeals.map((a) => <div key={a.id} className="glass-soft flex flex-wrap items-center justify-between gap-2 p-3"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-[#7dd3fc]">{a.ticketNo}</span><Badge tone={a.status === "approved" ? "green" : a.status === "rejected" ? "rose" : "gold"}>{a.status}</Badge></div><p className="mt-1 text-sm">{a.user?.displayName ?? "未知帳號"}・{a.contactEmail}</p><p className="text-[11px] text-muted">{new Date(a.createdAt).toLocaleString("zh-TW")}・原因：{a.blockedReason}</p></div><Button size="sm" variant="ghost" onClick={() => { setActiveAppeal(a); setAppealNote(a.adminNote); }}>查看與審核</Button></div>)}
+          {appeals.data?.appeals.map((a) => <div key={a.id} className="glass-soft flex flex-wrap items-center justify-between gap-2 p-3"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-[#7dd3fc]">{a.ticketNo}</span><Badge tone={a.status === "approved" ? "green" : a.status === "rejected" ? "rose" : "gold"}>{a.status}</Badge></div><p className="mt-1 text-sm">{a.user?.displayName ?? "未知帳號"}・{a.contactEmail}</p><p className="text-[11px] text-muted">{formatTaipeiDateTime(a.createdAt)}・原因：{a.blockedReason}</p></div><Button size="sm" variant="ghost" onClick={() => { setActiveAppeal(a); setAppealNote(a.adminNote); }}>查看與審核</Button></div>)}
         </div>
       </Card>
 
@@ -170,7 +171,7 @@ export default function AdminSupportPage() {
               <p className="mt-1 text-sm font-medium">{i.title}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-muted">{i.description}</p>
               <p className="mt-1 text-[11px] text-muted">
-                {i.reporter ? `${i.reporter}（${i.reporterNovaId}）` : i.contactEmail || "匿名"}・{new Date(i.createdAt).toLocaleString("zh-TW")}
+                {i.reporter ? `${i.reporter}（${i.reporterNovaId}）` : i.contactEmail || "匿名"}・{formatTaipeiDateTime(i.createdAt)}
               </p>
               <Button
                 size="sm"
@@ -202,7 +203,7 @@ export default function AdminSupportPage() {
                 <p className="truncate">頁面：{active.pageUrl || "—"}</p>
                 <p className="truncate">UA：{active.userAgent || "—"}</p>
                 <p>聯絡：{active.contactEmail || active.reporterNovaId || "—"}</p>
-                <p>建立：{new Date(active.createdAt).toLocaleString("zh-TW")}</p>
+                <p>建立：{formatTaipeiDateTime(active.createdAt)}</p>
               </div>
               {active.attachmentUrl && (
                 // eslint-disable-next-line @next/next/no-img-element

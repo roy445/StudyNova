@@ -4,7 +4,10 @@ import type { AuthUser } from "./auth";
 import { clientIp, getSession, rateLimit, requireAdmin, requireUser } from "./auth";
 import { AppError, fail, newRequestId, safeErrorMessage } from "./core";
 import { db } from "@/db";
-import { legalConsents, legalDocuments, platformSettings, systemLogs, users } from "@/db/schema";
+import { featureVersionGates, legalConsents, legalDocuments, platformSettings, softwareReleases, systemLogs, users } from "@/db/schema";
+import { APP_VERSION } from "@/lib/app-version";
+import { compareSemVer, isValidSemVer } from "@/lib/semver";
+import { featureKeyForApiPath, isFeatureGateLive } from "@/lib/feature-version";
 import { classifyAuditPath, writeAudit } from "./audit";
 import { ensureIdentityGroupSchema } from "./db-compat";
 import { classifyDatabaseError, extractDatabaseDiagnostics } from "./db-diagnostics";
@@ -27,6 +30,7 @@ export type RouteDef = {
   method: Method;
   path: string;
   auth?: AuthMode;
+  featureGate?: string;
   rate?: { limit: number; windowSec: number; key?: string };
   handler: (ctx: Ctx) => Promise<unknown>;
 };
@@ -140,6 +144,26 @@ async function hasCurrentUsageConsent(userId: string) {
 }
 
 const lastSeenMemory = new Map<string, number>();
+let minimumVersionCache: { value: string; expiresAt: number } | null = null;
+const featureVersionCache = new Map<string, { value: { featureName: string; requiredVersion: string; minimumVersion: string; enabled: boolean; releaseStatus: string; releaseDate: Date | null } | null; expiresAt: number }>();
+
+async function minimumSupportedVersion() {
+  if (minimumVersionCache && minimumVersionCache.expiresAt > Date.now()) return minimumVersionCache.value;
+  const rows = await db.select({ version: softwareReleases.version, minimum: softwareReleases.minimumSupportedVersion }).from(softwareReleases).where(eq(softwareReleases.status, "PUBLISHED"));
+  const latest = rows.filter((row) => isValidSemVer(row.version)).sort((a, b) => compareSemVer(b.version, a.version))[0];
+  const value = latest && isValidSemVer(latest.minimum) ? latest.minimum : "1.0.0";
+  minimumVersionCache = { value, expiresAt: Date.now() + 5_000 };
+  return value;
+}
+
+async function featureVersionGate(featureKey: string) {
+  const cached = featureVersionCache.get(featureKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const row = (await db.select({ featureName: featureVersionGates.featureName, requiredVersion: featureVersionGates.requiredVersion, minimumVersion: featureVersionGates.minimumVersion, enabled: featureVersionGates.enabled, releaseStatus: featureVersionGates.releaseStatus, releaseDate: featureVersionGates.releaseDate }).from(featureVersionGates).where(eq(featureVersionGates.featureKey, featureKey)).limit(1))[0] ?? null;
+  featureVersionCache.set(featureKey, { value: row, expiresAt: Date.now() + 5_000 });
+  return row;
+}
+
 async function touchLastSeen(userId: string) {
   const now = Date.now();
   if ((lastSeenMemory.get(userId) ?? 0) > now - 10 * 60_000) return;
@@ -171,6 +195,29 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     else if (def.auth === "user") user = await requireUser();
     else if (def.auth === "optional") user = (await getSession())?.user ?? null;
     if (user) void touchLastSeen(user.userId);
+
+    const versionExempt = def.path.startsWith("/auth") || def.path.startsWith("/releases") || def.path.startsWith("/admin/releases") || def.path.startsWith("/support") || def.path === "/health" || def.path === "/system/cron";
+    if (user && !versionExempt) {
+      const minimum = await minimumSupportedVersion();
+      if (compareSemVer(minimum, "1.0.0") > 0) {
+        const current = req.headers.get("x-studynova-version") ?? "";
+        if (!isValidSemVer(current)) throw fail("APP_VERSION_REQUIRED", { details: { minimumSupportedVersion: minimum } });
+        if (compareSemVer(current, minimum) < 0) throw fail("APP_VERSION_UPDATE_REQUIRED", { details: { currentVersion: current, minimumSupportedVersion: minimum } });
+      }
+    }
+
+    const enforcedFeatureKey = def.featureGate ?? featureKeyForApiPath(def.path);
+    if (user && enforcedFeatureKey) {
+      const gate = await featureVersionGate(enforcedFeatureKey);
+      const now = new Date();
+      if (gate) {
+        if (!isFeatureGateLive(gate, now)) throw fail("QUOTA_FEATURE_DISABLED", { message: `${gate.featureName} 尚未發布、已封存或目前已停用。`, details: { featureKey: enforcedFeatureKey } });
+        const current = req.headers.get("x-studynova-version") ?? "";
+        if (!isValidSemVer(current)) throw fail("APP_VERSION_REQUIRED", { details: { featureKey: enforcedFeatureKey, requiredVersion: gate.requiredVersion } });
+        const requiredVersion = compareSemVer(gate.requiredVersion, gate.minimumVersion) >= 0 ? gate.requiredVersion : gate.minimumVersion;
+        if (compareSemVer(current, requiredVersion) < 0) throw fail("FEATURE_VERSION_REQUIRED", { message: `${gate.featureName} 需要 StudyNova v${requiredVersion} 或更新版本。`, details: { featureKey: enforcedFeatureKey, featureName: gate.featureName, currentVersion: current, requiredVersion } });
+      }
+    }
 
     if (def.auth !== "admin" && !def.path.startsWith("/auth") && def.path !== "/health" && def.path !== "/system/cron") {
       const control = await serviceControl();

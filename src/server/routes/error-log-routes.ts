@@ -3,7 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { db } from "@/db";
 import { systemLogs } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { embedCjkFont } from "../cjk-font";
+import { assertCjkGlyphCoverage, embedCjkFont } from "../cjk-font";
 
 function buildConditions(ctx: Parameters<NonNullable<RouteDef["handler"]>>[0]) {
   const level = ctx.query.get("level") ?? "error";
@@ -51,7 +51,9 @@ export const routes: RouteDef[] = [
       let y = 808;
       const add = (text: string, size = 9, color = rgb(0.12, 0.12, 0.16)) => {
         if (y < 45) { page = pdf.addPage([595, 842]); y = 808; }
-        page.drawText(text.slice(0, 125), { x: 34, y, size, font, color });
+        const visibleText = text.slice(0, 125);
+        assertCjkGlyphCoverage(visibleText, "錯誤報告 PDF");
+        page.drawText(visibleText, { x: 34, y, size, font, color });
         y -= size >= 14 ? 24 : 14;
       };
       add("StudyNova Error Log Report", 16, rgb(0.1, 0.35, 0.5));
