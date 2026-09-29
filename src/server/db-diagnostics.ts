@@ -23,16 +23,23 @@ export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics 
   const visited = new Set<unknown>();
   for (let depth = 0; depth < 6 && isRecord(current) && !visited.has(current); depth += 1) {
     visited.add(current);
-    const rawCode = current.code;
+    const record = current as Record<string, unknown>;
+    const rawCode = record.code;
     if (typeof rawCode === "string" && SQLSTATE.test(rawCode)) {
       const diagnostics: DatabaseDiagnostics = { code: rawCode };
-      for (const key of ["schema", "table", "column", "constraint"] as const) {
-        const value = current[key];
+      const aliases = {
+        schema: ["schema", "schema_name"],
+        table: ["table", "table_name"],
+        column: ["column", "column_name"],
+        constraint: ["constraint", "constraint_name"],
+      } as const;
+      for (const key of Object.keys(aliases) as (keyof typeof aliases)[]) {
+        const value = aliases[key].map((alias) => record[alias]).find((candidate) => typeof candidate === "string");
         if (typeof value === "string" && /^[a-zA-Z0-9_]{1,128}$/.test(value)) diagnostics[key] = value;
       }
       return diagnostics;
     }
-    current = current.cause ?? current.originalError ?? current.original ?? current.driverError;
+    current = record.cause ?? record.originalError ?? record.original ?? record.driverError;
   }
   return null;
 }

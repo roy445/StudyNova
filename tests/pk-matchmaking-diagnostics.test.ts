@@ -38,6 +38,15 @@ describe("PK matchmaking production schema contract", () => {
     expect(classifyDatabaseError(error)).toBe("schema");
   });
 
+  it("maps Postgres.js snake_case undefined-column diagnostics", () => {
+    const error = Object.assign(new Error("column does not exist"), {
+      cause: Object.assign(new Error("driver error"), {
+        code: "42703", schema_name: "public", table_name: "pk_bot_profiles", column_name: "enabled",
+      }),
+    });
+    expect(extractDatabaseDiagnostics(error)).toEqual({ code: "42703", schema: "public", table: "pk_bot_profiles", column: "enabled" });
+  });
+
   it("recognizes temporary database connectivity failures", () => {
     const error = Object.assign(new Error("connection lost"), { code: "08006" });
     expect(classifyDatabaseError(error)).toBe("unavailable");

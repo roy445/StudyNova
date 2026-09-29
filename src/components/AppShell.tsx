@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -588,7 +589,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
                 >
                   {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
-                  <span className={isPk ? "pk-nav-icon" : item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>
+                  <span className={isPk ? "pk-nav-icon" : item.special ? "exam-nav-icon" : ""}>{isPk ? <Image src="/brand/pk-nav-icon.webp" alt="" width={24} height={24} sizes="24px" priority className="h-6 w-6 rounded-lg object-cover ring-1 ring-white/20" /> : <SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" />}</span>
                   <span className="max-w-full truncate">{item.label}</span>
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
                 </Link>
