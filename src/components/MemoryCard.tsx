@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, Progress } from "@/components/ui";
+import { inferSpeechLanguage } from "@/lib/browser-speech";
 
 export type MemoryCardWord = {
   id: string;
@@ -35,10 +36,10 @@ function readFavorites(storageKey: string) {
 }
 
 function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+  if (typeof window === "undefined" || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined" || !text.trim()) return false;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
+  const utterance = new SpeechSynthesisUtterance(text.trim());
+  utterance.lang = inferSpeechLanguage(text);
   utterance.rate = 0.88;
   utterance.pitch = 1;
   window.speechSynthesis.speak(utterance);
