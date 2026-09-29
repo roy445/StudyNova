@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/ai", label: "AI", icon: "nova" },
   { href: "/solve", label: "解題專區", icon: "nova" },
-  { href: "/online-pk", label: "線上 PK", icon: "challenge", special: true },
+  { href: "/online-pk", label: "線上 PK", icon: "duel", special: true },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
@@ -74,7 +74,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/export", label: "資料匯出", icon: "archive" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
-  { href: "/online-pk", label: "線上 PK", icon: "challenge" },
+  { href: "/online-pk", label: "線上 PK", icon: "duel" },
   { href: "/report", label: "學習報告", icon: "report" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
@@ -559,7 +559,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           </div>
         </header>
 
-        <main className="app-main mx-auto max-w-6xl px-3 py-4 sm:px-5 sm:py-6">
+        <main className="app-main mx-auto w-full min-w-0 max-w-6xl px-3 py-4 sm:px-5 sm:py-6">
           {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => { const isRelease = /新版本|版本更新|更新完成/.test(notice.title); return <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p><p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{isRelease ? <button type="button" onClick={() => { setReleaseActionStarted(false); setReleaseDetailsOpen(true); }} className="mt-2 text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</button> : notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>; })}</section>}
           {FEATURE_GUIDANCE[featureKey] && <div className="mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
           {children}

@@ -121,7 +121,7 @@ export const routes: RouteDef[] = [
       const errors = { ...((pkg.errors ?? {}) as Record<string, string>) };
       delete errors._request;
       try {
-        const generated = await runAiJson<PackageOutput>({ feature: "learning_package", userId: user.userId, system: "你是 StudyNova 教材整理引擎。只能根據提供教材產生內容，不可杜撰。回傳 JSON，欄位 summary、keyPoints、vocabulary、questions；題目必須能由教材作答，單字必須確實出現在教材或摘要中。若某類內容無法從教材找到，請回傳空陣列，不可猜測。", parts: [{ kind: "text", text: `教材標題：${material.title}\n科目：${material.subject}\n內容：\n${material.content.slice(0, 16000)}` }], maxOutputTokens: 3500, timeoutMs: 45_000 }, { summary: "", keyPoints: [], vocabulary: [], questions: [] });
+        const generated = await runAiJson<PackageOutput>({ feature: "learning_package", userId: user.userId, system: "你是 StudyNova 教材整理引擎。只能根據提供教材產生內容，不可杜撰。只回傳 JSON，欄位固定為 summary、keyPoints、vocabulary、questions。為避免輸出截斷：summary 不超過 250 字、keyPoints 最多 8 項、vocabulary 最多 12 項、questions 最多 5 題；每項內容精簡但可直接使用。題目必須能由教材作答，單字必須確實出現在教材或摘要中。若某類內容無法從教材找到，請回傳空陣列，不可猜測。", parts: [{ kind: "text", text: `教材標題：${material.title}\n科目：${material.subject}\n內容：\n${material.content.slice(0, 16000)}` }], maxOutputTokens: 3500, timeoutMs: 45_000 }, { summary: "", keyPoints: [], vocabulary: [], questions: [] });
         const result = normalizePackageOutput(generated.data);
         for (let index = 0; index < pending.length; index += 1) {
           const step = pending[index];
@@ -152,7 +152,19 @@ export const routes: RouteDef[] = [
             }
             stepResult = { questionIds: ids };
           } else {
-            const vocabularyIds = ((results.vocabulary as { vocabularyIds?: string[] } | undefined)?.vocabularyIds ?? (results.flashcards as { vocabularyIds?: string[] } | undefined)?.vocabularyIds ?? []);
+            let vocabularyIds = ((results.vocabulary as { vocabularyIds?: string[] } | undefined)?.vocabularyIds ?? (results.flashcards as { vocabularyIds?: string[] } | undefined)?.vocabularyIds ?? []);
+            if (!vocabularyIds.length && result.vocabulary.length) {
+              const addedIds: string[] = [];
+              for (const item of result.vocabulary) {
+                const word = item.word.trim();
+                if (!word) continue;
+                const normalizedWord = word.toLowerCase();
+                const saved = await db.insert(userVocabularies).values({ userId: user.userId, word, normalizedWord, meaning: item.meaning, partOfSpeech: item.partOfSpeech, example: item.example, exampleZh: item.exampleZh, sourceDocumentId: null }).onConflictDoUpdate({ target: [userVocabularies.userId, userVocabularies.normalizedWord], set: { meaning: item.meaning, partOfSpeech: item.partOfSpeech, example: item.example, exampleZh: item.exampleZh, updatedAt: new Date() } }).returning({ id: userVocabularies.id });
+                if (saved[0]?.id) addedIds.push(saved[0].id);
+              }
+              vocabularyIds = addedIds;
+              if (addedIds.length) results.vocabulary = { vocabularyIds: addedIds };
+            }
             if (!vocabularyIds.length) throw new Error("建立複習內容前，請先完成「建立單字卡」或「建立記憶卡」。");
             for (const contentId of vocabularyIds) await db.insert(reviewItems).values({ userId: user.userId, contentType: "vocabulary", contentId, metadata: { packageId: pkg.id, materialId: material.id } }).onConflictDoNothing();
             stepResult = { queued: vocabularyIds.length };

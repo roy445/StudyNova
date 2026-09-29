@@ -74,7 +74,7 @@ export default function SolvePage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <Card title="✦ 解題專區" subtitle="支援各科目題目。你可以輸入文字或上傳題目圖片，讓 Novi 陪你一步一步理解。">
         <div className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-3 text-xs leading-5 text-cyan-50">
           英文圖片 OCR 會在學習中心處理；這裡是跨科解題入口，國文、數學、自然、社會與其他科目都可以使用。若題目不適合圖片分析，也可以直接詢問 Novi。
@@ -93,7 +93,7 @@ export default function SolvePage() {
             </Field>
             <Field label="題目圖片／PDF" hint={`一次最多 ${MAX_AI_SOLUTION_FILES} 個檔案；每檔上限 18 MiB。圖片會直接傳到私有雲端儲存，不經 Vercel Function。`}>
               <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/heic,.pdf" multiple onChange={(event) => { const selected = Array.from(event.target.files ?? []); if (selected.length > MAX_AI_SOLUTION_FILES) toast.push("info", `一次最多上傳 ${MAX_AI_SOLUTION_FILES} 個檔案，已保留前 ${MAX_AI_SOLUTION_FILES} 個。`); setFiles(selected.slice(0, MAX_AI_SOLUTION_FILES)); }} className="w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2 text-xs" />
-              {files.length > 0 && <p className="mt-1 text-xs text-muted">已選擇 {files.length} 個檔案：{files.map((file) => file.name).join("、")}</p>}
+              {files.length > 0 && <p className="mt-1 break-words text-xs text-muted [overflow-wrap:anywhere]">已選擇 {files.length} 個檔案：{files.map((file) => file.name).join("、")}</p>}
             </Field>
             <div className="flex flex-wrap gap-2">
               <Button loading={busy} onClick={solve}>開始解題</Button>
@@ -118,8 +118,8 @@ export default function SolvePage() {
       {busy && <Card title="Novi 正在分析"><Skeleton lines={5} /></Card>}
       {result && !busy && (
         <Card title="解題結果" subtitle={result.needsCrop ? "偵測到多題內容，建議裁切成單題後再分析。" : `已使用 ${result.segmentsUsed ?? 0} 個圖片內容區塊。`}>
-          <div className="space-y-4 text-sm leading-7">
-            {result.reply && <div className="whitespace-pre-wrap rounded-xl bg-white/[0.03] p-3">{result.reply}</div>}
+          <div className="min-w-0 space-y-4 text-sm leading-7 [overflow-wrap:anywhere]">
+            {result.reply && <div className="break-words whitespace-pre-wrap rounded-xl bg-white/[0.03] p-3">{result.reply}</div>}
             {result.hint && <section><h2 className="font-semibold text-cyan-200">提示</h2><p className="whitespace-pre-wrap text-muted">{result.hint}</p></section>}
             {result.steps?.length ? <section><h2 className="font-semibold text-cyan-200">解題步驟</h2><ol className="mt-1 list-decimal space-y-1 pl-5">{result.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol></section> : null}
             {result.answer && <section className="rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-3"><h2 className="font-semibold text-emerald-200">答案</h2><p className="whitespace-pre-wrap">{result.answer}</p></section>}

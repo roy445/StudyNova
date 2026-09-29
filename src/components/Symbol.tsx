@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type SymbolName = "home" | "study" | "nova" | "challenge" | "profile" | "grades" | "weekly" | "report" | "admin" | "search" | "bell" | "settings" | "pen" | "camera" | "question" | "book" | "shop" | "badge" | "audio" | "math" | "science" | "social" | "spark" | "archive";
+export type SymbolName = "home" | "study" | "nova" | "challenge" | "duel" | "profile" | "grades" | "weekly" | "report" | "admin" | "search" | "bell" | "settings" | "pen" | "camera" | "question" | "book" | "shop" | "badge" | "audio" | "math" | "science" | "social" | "spark" | "archive";
 
 type Props = SVGProps<SVGSVGElement> & { name: SymbolName; size?: number; active?: boolean };
 
@@ -9,6 +9,7 @@ const paths: Record<SymbolName, string> = {
   study: "M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM4 5.5v16M8 7h8M8 11h8",
   nova: "M12 2 14.5 9.5 22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2Z",
   challenge: "M5 4h14v16H5zM8 8h8M8 12h5M8 16h8",
+  duel: "M4 4l6 6m-4-6 4 4m-3 6-3 3m10-13 6-6m-4 4-2-2m5 8 3 3m-6-6-6 6m5-3 3 3m-3-7-6 6m8-1 3 3",
   profile: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0",
   grades: "M4 19V5m0 14h16M8 16l3-4 3 2 5-7",
   weekly: "M6 3v3M18 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1ZM8 12h3M8 16h6",

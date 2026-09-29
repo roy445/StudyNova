@@ -58,7 +58,7 @@ function InlineText({ value }: { value: string }) {
 
 export function ChatRichText({ content, className = "" }: { content: string; className?: string }) {
   const lines = content.replace(/\\r\\n/g, "\n").split("\n");
-  return <div className={`whitespace-pre-wrap break-words ${className}`}>{lines.map((line, index) => {
+  return <div className={`min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${className}`}>{lines.map((line, index) => {
     const match = line.match(/^(\s*)([-*]|\d+[.)])\s+(.*)$/);
     const text = match ? match[3] : line;
     const boldParts = text.split(/(\*\*[^*]+\*\*)/g);

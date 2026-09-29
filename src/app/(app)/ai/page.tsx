@@ -189,7 +189,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
       <Card
         title="對話"
         action={
@@ -242,7 +242,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
         </Button>
       </Card>
 
-      <Card className="flex min-h-[70dvh] flex-col">
+      <Card className="flex min-w-0 min-h-[70dvh] flex-col">
         {!activeId ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
             <NoviAvatar size={100} state="idle" />
@@ -308,11 +308,11 @@ async function resolveAction(messageId: string, confirm: boolean) {
             </div>
             <div className="mb-3 rounded-xl border border-[#7c5cff]/25 bg-[#7c5cff]/8 px-3 py-2 text-xs leading-5 text-muted"><span className="font-semibold text-[#c4b5fd]">{activeMode.label}的用途：</span> {activeMode.description}</div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto scroll-thin pr-1">
+            <div className="min-w-0 flex-1 space-y-3 overflow-y-auto scroll-thin pr-1">
               {loadingMsg && <Skeleton lines={4} />}
               {messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[88%] rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "border-transparent bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : m.importance === "critical" ? "border-rose-300/60 bg-rose-400/15 text-rose-50 shadow-[0_0_24px_rgba(251,113,133,0.14)]" : m.importance === "important" ? "border-amber-300/50 bg-amber-400/12 text-amber-50" : "glass-soft border-transparent"}`}>
+                  <div className={`min-w-0 max-w-[88%] rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed [overflow-wrap:anywhere] ${m.role === "user" ? "border-transparent bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : m.importance === "critical" ? "border-rose-300/60 bg-rose-400/15 text-rose-50 shadow-[0_0_24px_rgba(251,113,133,0.14)]" : m.importance === "important" ? "border-amber-300/50 bg-amber-400/12 text-amber-50" : "glass-soft border-transparent"}`}>
                     {m.attachment && <img src={m.attachment.previewUrl} alt={m.attachment.name} className="mb-2 max-h-64 max-w-full rounded-xl object-contain" />}
                     {m.role !== "user" && m.importance && m.importance !== "normal" && <p className={`mb-1 text-[10px] font-bold tracking-wide ${m.importance === "critical" ? "text-rose-200" : "text-amber-200"}`}>{m.importance === "critical" ? "⚠ 關鍵提醒" : "✦ 學習重點"}</p>}
                     <ChatRichText content={m.content} />
@@ -322,7 +322,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
                         {m.action.type === "create_note" && <p className="mt-0.5 text-[11px] text-amber-100/80">AI 建立筆記需要有效的 Nova Pro 資格，系統會在執行時再次驗證。</p>}
                         {m.action.type === "create_quiz" && <NovaCostNotice cost={aiPracticeCost} action="Novi 建立測驗" className="mt-2" />}
                         {m.action.preview && <p className="mt-0.5 text-muted">{m.action.preview}</p>}
-                        <pre className="mt-1 max-h-28 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[10px]">{JSON.stringify(m.action.payload ?? {}, null, 2)}</pre>
+                        <pre className="mt-1 min-w-0 max-w-full max-h-28 overflow-x-auto overflow-y-auto scroll-thin break-all whitespace-pre-wrap rounded-lg bg-black/30 p-2 text-[10px]">{JSON.stringify(m.action.payload ?? {}, null, 2)}</pre>
                         {m.actionStatus === "pending" ? (
                           <div className="mt-2 flex gap-1.5">
                             <Button size="sm" onClick={() => resolveAction(m.id, true)}>
@@ -362,14 +362,13 @@ async function resolveAction(messageId: string, confirm: boolean) {
                 </div>
               )}
               <NovaCostNotice cost={aiContextCost} action="Novi 回覆" />
-              <div className="flex items-end gap-2">
-              <select value={attachmentSubject} onChange={(e) => setAttachmentSubject(e.target.value)} className="h-10 rounded-xl border border-[var(--line)] bg-black/20 px-2 text-xs" aria-label="附件科目">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <select value={attachmentSubject} onChange={(e) => setAttachmentSubject(e.target.value)} className="h-10 min-w-0 w-full rounded-xl border border-[var(--line)] bg-black/20 px-2 text-xs" aria-label="附件科目">
                 <option value="">先選科目</option>
                 {SUBJECTS.map((subject) => <option key={subject}>{subject}</option>)}
               </select>
-              <span className="text-[10px] text-muted">最多 30 個檔案／批，每檔 18 MiB</span>
-              {imageUploadQuota && <span className="text-[10px] text-muted">今日圖片：{imageUploadQuota.unlimited ? "不限量" : `${imageUploadQuota.used ?? 0}/${imageUploadQuota.limit ?? 0}`}</span>}
-              <Button size="sm" variant="outline" loading={uploading} onClick={() => fileInput.current?.click()} title="加入圖片或檔案">＋</Button>
+              <Button className="shrink-0" size="sm" variant="outline" loading={uploading} onClick={() => fileInput.current?.click()} title="加入圖片或檔案">＋</Button>
+              <div className="col-span-2 flex min-w-0 flex-wrap gap-x-2 text-[10px] text-muted"><span>最多 30 個檔案／批，每檔 18 MiB</span>{imageUploadQuota && <span>今日圖片：{imageUploadQuota.unlimited ? "不限量" : `${imageUploadQuota.used ?? 0}/${imageUploadQuota.limit ?? 0}`}</span>}</div>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -381,8 +380,9 @@ async function resolveAction(messageId: string, confirm: boolean) {
                 }}
                 placeholder="問 Novi 任何學習問題…"
                 disabled={sending}
+                className="min-w-0 w-full"
               />
-              <Button loading={sending} onClick={send} disabled={!input.trim() && !attachment}>
+              <Button className="shrink-0" loading={sending} onClick={send} disabled={!input.trim() && !attachment}>
                 送出
               </Button>
               </div>

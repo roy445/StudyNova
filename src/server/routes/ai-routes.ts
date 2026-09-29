@@ -447,8 +447,12 @@ export const routes: RouteDef[] = [
         if (folderPolicy?.enabled === false) throw fail("AI_ACTION_UNSUPPORTED", { message: "管理員目前停用 AI 建立資料夾功能。" });
         if (folderPolicy?.proOnly && !(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "AI 建立資料夾目前為 Nova Pro 專屬功能。" });
         const parsed = z.object({ name: z.string().min(1).max(80), vocabularyIds: z.array(z.string().uuid()).max(500).default([]) }).parse(payload);
-        const folder = (await db.insert(vocabularyFolders).values({ userId: user.userId, name: parsed.name.trim() }).returning())[0];
-        result = { folder, added: 0, preview: `已建立「${folder.name}」資料夾，接著可從我的單字批次加入內容。` };
+        const name = parsed.name.trim();
+        if (!name) throw fail("REQ_VALIDATION", { message: "資料夾名稱不可空白。" });
+        const created = await db.insert(vocabularyFolders).values({ userId: user.userId, name }).onConflictDoNothing({ target: [vocabularyFolders.userId, vocabularyFolders.name] }).returning();
+        const folder = created[0] ?? (await db.select().from(vocabularyFolders).where(and(eq(vocabularyFolders.userId, user.userId), eq(vocabularyFolders.name, name))).limit(1))[0];
+        if (!folder) throw fail("SYS_DB_UNAVAILABLE", { message: "無法建立或讀取單字資料夾，請稍後重試。", details: { stage: "ai_action.vocabulary_folder_upsert", table: "vocabulary_folders" } });
+        result = { folder, added: 0, alreadyExisted: !created[0], preview: created[0] ? `已建立「${folder.name}」資料夾，接著可從我的單字批次加入內容。` : `已存在「${folder.name}」資料夾，已為你開啟。` };
       } else if (action.type === "create_quiz") {
         const parsed = z
           .object({
