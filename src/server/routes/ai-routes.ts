@@ -267,12 +267,12 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000), contextId: z.string().uuid().optional() }));
+      const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000), contextId: z.string().uuid().optional(), featureKey: z.enum(["ai_context", "learning_ai_chat", "learning_ai_question_generation"]).default("ai_context") }));
       const conv = (await db.select().from(aiConversations).where(eq(aiConversations.id, ctx.params.id)).limit(1))[0];
       if (!conv) throw notFound("找不到對話");
       if (conv.userId !== user.userId) throw forbidden();
       if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
-      await consumeFeature(user.userId, "ai_context");
+      await consumeFeature(user.userId, body.featureKey);
 
       await db.insert(aiMessages).values({ conversationId: conv.id, role: "user", content: body.content });
         // 先取最新 16 筆，再恢復成時間順序；不能用 asc + limit，否則長聊天室會一直把最早的舊對話送給 AI。
