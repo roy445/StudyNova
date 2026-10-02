@@ -14,6 +14,7 @@ export type ShellUser = {
   userId: string;
   novaId: string;
   displayName: string;
+  avatarSeed?: string;
   role: string;
   isPro: boolean;
 };
