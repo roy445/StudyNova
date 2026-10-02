@@ -15,6 +15,7 @@ const releaseMigrations = [
   "0091_version_center_feature_gates.sql",
   "0092_maintenance_announcement_history.sql",
   "0093_chemistry_mvp.sql",
+  "0094_learning_feature_permissions.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
