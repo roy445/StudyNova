@@ -1419,8 +1419,10 @@ export const routes: RouteDef[] = [
       // Repair legacy imports on read as well as via the explicit reconcile
       // action. The old importer stored exclusive-bank questions without a
       // bank_id, which made the UI report zero even though the rows existed.
-      await db.execute(sql`UPDATE questions q SET bank_id = qb.id, status = 'published', updated_at = now() FROM question_banks qb WHERE q.bank_id IS NULL AND q.origin = 'bank' AND q.target_bank = 'exclusive' AND q.created_at >= qb.created_at AND qb.bank_kind = 'exclusive' AND qb.name = 'PK題庫'`);
-      const rows = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id})::int` }).from(questionBanks).where(and(subject ? eq(questionBanks.subject, subject) : sql`true`, status ? eq(questionBanks.status, status) : sql`true`)).orderBy(desc(questionBanks.updatedAt));
+      // Match the historical PK labels too; some imports predate the bank
+      // creation timestamp and therefore cannot safely use created_at alone.
+      await db.execute(sql`UPDATE questions q SET bank_id = qb.id, status = 'published', updated_at = now() FROM question_banks qb WHERE q.bank_id IS NULL AND qb.bank_kind = 'exclusive' AND qb.name = 'PK題庫' AND (q.target_bank = 'exclusive' OR q.source_label = 'PK題庫' OR q.bank_category = 'PK題庫')`);
+      const rows = await db.select({ bank: questionBanks, questionCount: sql<number>`(select count(*) from ${questions} where ${questions.bankId} = ${questionBanks.id} and ${questions.status} <> 'draft')::int` }).from(questionBanks).where(and(subject ? eq(questionBanks.subject, subject) : sql`true`, status ? eq(questionBanks.status, status) : sql`true`)).orderBy(desc(questionBanks.updatedAt));
       return { banks: rows };
     },
   }),
@@ -1456,10 +1458,13 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const bank = (await db.select().from(questionBanks).where(eq(questionBanks.id, ctx.params.id)).limit(1))[0];
       if (!bank) throw notFound("找不到題庫");
-      // Legacy PK imports may have the questions but no bank_id. Restrict the
-      // repair to questions created after this bank, so other banks are not
-      // silently claimed. The admin explicitly triggers this operation.
-      const candidates = await db.select({ id: questions.id }).from(questions).where(and(sql`${questions.bankId} is null`, or(eq(questions.origin, "bank"), eq(questions.origin, "admin")), gte(questions.createdAt, bank.createdAt)));
+      // Legacy PK imports may have the questions but no bank_id. For the
+      // explicitly named PK bank, historical labels are stronger than the
+      // creation timestamp and prevent the old 0-question display.
+      const isPkBank = bank.bankKind === "exclusive" && bank.name === "PK題庫";
+      const candidates = await db.select({ id: questions.id }).from(questions).where(isPkBank
+        ? and(sql`${questions.bankId} is null`, or(eq(questions.targetBank, "exclusive"), eq(questions.sourceLabel, "PK題庫"), eq(questions.bankCategory, "PK題庫")))
+        : and(sql`${questions.bankId} is null`, or(eq(questions.origin, "bank"), eq(questions.origin, "admin")), gte(questions.createdAt, bank.createdAt)));
       if (candidates.length) await db.update(questions).set({ bankId: bank.id, status: "published", updatedAt: new Date() }).where(inArray(questions.id, candidates.map((row) => row.id)));
       await db.update(questionBanks).set({ status: "published", updatedAt: new Date() }).where(eq(questionBanks.id, bank.id));
       const count = (await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, bank.id), sql`${questions.status} <> 'draft'`)))[0]?.count ?? 0;

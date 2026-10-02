@@ -33,6 +33,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/reference-materials", label: "AI 參考資料", icon: "admin" },
       { href: "/admin/daily-knowledge", label: "每日知識", icon: "study" },
       { href: "/admin/content", label: "Content Studio", icon: "study" },
+      { href: "/admin/chemistry", label: "🧪 化學教學管理", icon: "study" },
       { href: "/admin/customization", label: "客製化風格中心", icon: "spark" },
     ],
   },

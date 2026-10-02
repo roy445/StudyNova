@@ -3461,3 +3461,46 @@ export const customizationVersions = pgTable(
   },
   (t) => [uniqueIndex("customization_version_no_uq").on(t.categoryId, t.versionNo), index("customization_version_category_idx").on(t.categoryId, t.versionNo)],
 );
+
+
+/* ----------------------------------------------------- SUBJECT LEARNING / CHEMISTRY MVP */
+
+export const chemistryTopics = pgTable("chemistry_topics", {
+  id: id(), subject: text("subject").notNull().default("CHEMISTRY"), slug: text("slug").notNull(), title: text("title").notNull(), description: text("description").notNull().default(""), sortOrder: integer("sort_order").notNull().default(0), status: text("status").notNull().default("published"), createdAt: created(), updatedAt: updated(),
+}, (t) => [uniqueIndex("chemistry_topics_slug_uq").on(t.subject, t.slug), index("chemistry_topics_status_idx").on(t.subject, t.status, t.sortOrder)]);
+
+export const chemistryConcepts = pgTable("chemistry_concepts", {
+  id: id(), topicId: uuid("topic_id").notNull().references(() => chemistryTopics.id, { onDelete: "cascade" }), subject: text("subject").notNull().default("CHEMISTRY"), slug: text("slug").notNull(), title: text("title").notNull(), description: text("description").notNull().default(""), level: integer("level").notNull().default(1), masteryThreshold: integer("mastery_threshold").notNull().default(70), sortOrder: integer("sort_order").notNull().default(0), status: text("status").notNull().default("published"), metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}), createdAt: created(), updatedAt: updated(),
+}, (t) => [uniqueIndex("chemistry_concepts_slug_uq").on(t.subject, t.slug), index("chemistry_concepts_topic_idx").on(t.topicId, t.sortOrder)]);
+
+export const chemistryPrerequisites = pgTable("chemistry_prerequisites", {
+  id: id(), prerequisiteConceptId: uuid("prerequisite_concept_id").notNull().references(() => chemistryConcepts.id, { onDelete: "cascade" }), conceptId: uuid("concept_id").notNull().references(() => chemistryConcepts.id, { onDelete: "cascade" }), weight: real("weight").notNull().default(1), createdAt: created(),
+}, (t) => [uniqueIndex("chemistry_prerequisites_uq").on(t.prerequisiteConceptId, t.conceptId), index("chemistry_prerequisites_concept_idx").on(t.conceptId)]);
+
+export const chemistryLessons = pgTable("chemistry_lessons", {
+  id: id(), conceptId: uuid("concept_id").notNull().references(() => chemistryConcepts.id, { onDelete: "cascade" }), title: text("title").notNull(), subtitle: text("subtitle").notNull().default(""), level: integer("level").notNull().default(0), estimatedMinutes: integer("estimated_minutes").notNull().default(5), sortOrder: integer("sort_order").notNull().default(0), status: text("status").notNull().default("published"), createdAt: created(), updatedAt: updated(),
+}, (t) => [index("chemistry_lessons_concept_idx").on(t.conceptId, t.level, t.sortOrder)]);
+
+export const chemistryLessonSteps = pgTable("chemistry_lesson_steps", {
+  id: id(), lessonId: uuid("lesson_id").notNull().references(() => chemistryLessons.id, { onDelete: "cascade" }), stepType: text("step_type").notNull().default("explain"), title: text("title").notNull(), body: text("body").notNull(), orderIndex: integer("order_index").notNull().default(0), source: jsonb("source").$type<Record<string, string> | null>(), createdAt: created(),
+}, (t) => [uniqueIndex("chemistry_lesson_steps_order_uq").on(t.lessonId, t.orderIndex)]);
+
+export const chemistryMastery = pgTable("chemistry_mastery", {
+  id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), conceptId: uuid("concept_id").notNull().references(() => chemistryConcepts.id, { onDelete: "cascade" }), score: real("score").notNull().default(0), confidence: real("confidence").notNull().default(0), attempts: integer("attempts").notNull().default(0), correctCount: integer("correct_count").notNull().default(0), hintCount: integer("hint_count").notNull().default(0), consecutiveCorrect: integer("consecutive_correct").notNull().default(0), lastPracticedAt: timestamp("last_practiced_at", { withTimezone: true }), updatedAt: updated(),
+}, (t) => [uniqueIndex("chemistry_mastery_user_concept_uq").on(t.userId, t.conceptId), index("chemistry_mastery_user_idx").on(t.userId, t.score)]);
+
+export const chemistryDiagnosticAttempts = pgTable("chemistry_diagnostic_attempts", {
+  id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), status: text("status").notNull().default("started"), questionIds: jsonb("question_ids").$type<string[]>().notNull().default([]), answers: jsonb("answers").$type<Record<string, string[]>>().notNull().default({}), result: jsonb("result").$type<Record<string, unknown> | null>(), startedAt: created(), completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => [index("chemistry_diagnostic_user_idx").on(t.userId, t.startedAt)]);
+
+export const chemistryQuestionLinks = pgTable("chemistry_question_links", {
+  id: id(), questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }), conceptId: uuid("concept_id").notNull().references(() => chemistryConcepts.id, { onDelete: "cascade" }), questionStage: text("question_stage").notNull().default("practice"), errorType: text("error_type").notNull().default(""), createdAt: created(),
+}, (t) => [uniqueIndex("chemistry_question_links_uq").on(t.questionId, t.conceptId), index("chemistry_question_links_concept_idx").on(t.conceptId, t.questionStage)]);
+
+export const chemistryLessonProgress = pgTable("chemistry_lesson_progress", {
+  id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), lessonId: uuid("lesson_id").notNull().references(() => chemistryLessons.id, { onDelete: "cascade" }), completedSteps: integer("completed_steps").notNull().default(0), completed: boolean("completed").notNull().default(false), lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }).notNull().defaultNow(), completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => [uniqueIndex("chemistry_lesson_progress_uq").on(t.userId, t.lessonId), index("chemistry_lesson_progress_user_idx").on(t.userId, t.lastViewedAt)]);
+
+export const chemistryFormulas = pgTable("chemistry_formulas", {
+  id: id(), conceptId: uuid("concept_id").notNull().references(() => chemistryConcepts.id, { onDelete: "cascade" }), title: text("title").notNull(), expression: text("expression").notNull(), variables: jsonb("variables").$type<Array<{ symbol: string; meaning: string; unit: string }>>().notNull().default([]), usage: text("usage").notNull().default(""), commonMistakes: text("common_mistakes").notNull().default(""), example: text("example").notNull().default(""), status: text("status").notNull().default("published"), createdAt: created(),
+}, (t) => [index("chemistry_formulas_concept_idx").on(t.conceptId)]);

@@ -34,6 +34,7 @@ type NavItem = { href: string; label: string; icon: SymbolName; special?: boolea
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
+  { href: "/chemistry", label: "化學學習", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/ai", label: "AI", icon: "nova" },
   { href: "/solve", label: "解題專區", icon: "nova" },
@@ -71,6 +72,7 @@ const NOVI_MODES = [
 const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "Dashboard", icon: "home" },
   { href: "/study", label: "學習中心", icon: "study" },
+  { href: "/chemistry", label: "化學學習", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/solve", label: "解題專區", icon: "nova" },
@@ -84,7 +86,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/updates", label: "版本更新", icon: "admin" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
-  const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/exam-hubs": "study", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/updates": "updates", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
+  const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/chemistry": "chemistry", "/exam-hubs": "study", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/updates": "updates", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
 const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   dashboard: { title: "首頁使用提醒", text: "今日建議僅供參考，可依時間與狀態自由選擇，不需要全部完成。" },
   ai: { title: "Novi AI 使用提醒", text: "切換模式後請查看用途說明；涉及成績、錯題、計畫或寫入資料時，請先確認授權與動作預覽。" },
@@ -93,6 +95,7 @@ const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   export: { title: "資料匯出使用提醒", text: "只會匯出你的資料。請先查看樣本預覽，正式下載前會兩次確認並扣除對應 Nova。" },
   essay: { title: "作文批改使用提醒", text: "AI 建議僅供學習參考，請自行檢查文意、引用與老師要求後再提交。" },
   study: { title: "學習中心使用提醒", text: "複習與專注紀錄可依你的節奏調整；儲存前請確認日期、範圍與內容。" },
+  chemistry: { title: "化學學習使用提醒", text: "能力地圖只顯示真實診斷與練習資料；尚未學習的概念不會被填入假分數。" },
   weekly: { title: "每週小考使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
   challenge: { title: "挑戰功能使用提醒", text: "請確認挑戰對象、題目與截止時間；不要分享帳號、密碼或個人敏感資料。" },
   "online-pk": { title: "線上 PK 使用提醒", text: "每題答案、計時與分數都由伺服器驗證；斷線可在短時間內重連，請不要分享私人房間密碼。" },
@@ -109,6 +112,7 @@ const FEATURE_STEPS: Record<string, string[]> = {
   export: ["選擇要匯出的資料範圍與格式。", "查看樣本與檔案大小估算。", "確認扣除 Nova 後再下載，匯出紀錄會保留。"],
   essay: ["貼上或上傳英文作文，確認題目與字數。", "等待 OCR 與批改完成，查看錯誤分類及修改建議。", "自行複核文意與老師要求，不要直接照抄 AI 結果。"],
   study: ["StudyNova 主要提供英文教材、OCR、測驗、錯題與單字學習。", "圖片 OCR 每次使用前都會提醒：目前只支援英文科目；其他科目請到解題專區或直接詢問 Novi。", "AI 轉成筆記、題目或單字前，先查看辨識內容。"],
+  chemistry: ["先完成能力診斷，系統才會建立你的真實化學能力地圖。", "依照前置概念逐步進入教學與練習；完成課程會保存進度。", "答題與錯題會更新掌握度，AI 教學只根據已知的化學知識圖譜回答。"],
   weekly: ["開始前查看範圍、時間與答題規則。", "每題作答後確認選項，提交前再檢查一次。", "完成後查看分數、錯題與獎勵紀錄。"],
   challenge: ["選擇娛樂模式或 Nova Stake 模式，確認籌碼與負債規則。", "開始後依速度與正確率作答；已出現的題目與選項不會重複。", "完成後查看比分、錯題數與獎勵結算。"],
   "online-pk": ["先選快速配對、邀請好友或建立自訂房間。", "開始後依照每題倒數作答；答案與計分由伺服器驗證。", "結算後可把錯題加入複習或單字資料夾。"],
