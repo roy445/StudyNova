@@ -1,0 +1,14 @@
+import Link from "next/link";
+import { Badge, Card } from "@/components/ui";
+import { learningSubjects } from "@/content/learning/ch1";
+
+export default function LearningHomePage() {
+  return <div className="space-y-6 pb-24">
+    <header className="relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-[radial-gradient(circle_at_80%_20%,rgba(56,189,248,.22),transparent_35%),linear-gradient(135deg,rgba(15,23,42,.96),rgba(30,41,59,.88))] p-6 sm:p-8">
+      <div className="relative z-10 max-w-2xl"><p className="text-xs font-semibold uppercase tracking-[.25em] text-cyan-200">StudyNova Learning</p><h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">📚 線上學習</h1><p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">選擇一個學習科目，沿著課程、互動教學、練習與回饋，一步一步真正建立理解。</p></div><div className="pointer-events-none absolute -right-10 -top-12 text-[12rem] opacity-10">✦</div>
+    </header>
+    <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-xl font-bold">選擇學習科目</h2><p className="mt-1 text-xs text-muted">已完成的科目會顯示可進入的課程；其他科目會明確標示開發狀態。</p></div><Badge tone="cyan">多科目架構</Badge></div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{learningSubjects.map((subject) => subject.status === "PUBLISHED" ? <Link key={subject.slug} href={`/learning/${subject.slug}`} className="group"><Card className="h-full transition duration-200 group-hover:-translate-y-1 group-hover:border-cyan-300/40"><div className="flex items-start justify-between gap-3"><span className="text-4xl">{subject.icon}</span><Badge tone="cyan">{subject.statusLabel}</Badge></div><h3 className="mt-5 text-lg font-bold">{subject.title}</h3><p className="mt-2 text-sm leading-6 text-muted">{subject.subtitle}</p><div className="mt-5 text-sm font-semibold text-cyan-200">開始學習 <span className="transition group-hover:ml-1">→</span></div></Card></Link> : <Card key={subject.slug} className="h-full opacity-80"><div className="flex items-start justify-between gap-3"><span className="text-4xl grayscale">{subject.icon}</span><Badge tone="gold">{subject.statusLabel}</Badge></div><h3 className="mt-5 text-lg font-bold">{subject.title}</h3><p className="mt-2 text-sm leading-6 text-muted">{subject.subtitle}</p><div className="mt-5 rounded-xl border border-amber-200/15 bg-amber-200/5 p-3 text-xs leading-5 text-amber-100">🚧 這個科目正在開發中<br />StudyNova 正在準備完整的互動式課程。</div></Card>)}</div>
+    </section>
+  </div>;
+}

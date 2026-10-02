@@ -1,16 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
-import { UserAvatar } from "./UserAvatar";
 import { SymbolIcon, type SymbolName } from "./Symbol";
 import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
 import { apiGet, apiPatch, apiPost, errorMessage, trackAnalytics, useApi } from "@/lib/api";
-import { APP_VERSION } from "@/lib/app-version";
-import { canClientUseFeature } from "@/lib/feature-version";
 import { MaintenanceNotice } from "@/components/MaintenanceNotice";
 import type { MaintenanceState } from "@/server/maintenance";
 
@@ -18,7 +14,6 @@ export type ShellUser = {
   userId: string;
   novaId: string;
   displayName: string;
-  avatarSeed?: string;
   role: string;
   isPro: boolean;
 };
@@ -33,12 +28,12 @@ function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
 type NavItem = { href: string; label: string; icon: SymbolName; special?: boolean; closeAt?: string | null };
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
+  { href: "/learning", label: "線上學習", icon: "book" },
   { href: "/study", label: "學習", icon: "study" },
-  { href: "/chemistry", label: "化學學習", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/ai", label: "AI", icon: "nova" },
   { href: "/solve", label: "解題專區", icon: "nova" },
-  { href: "/online-pk", label: "線上 PK", icon: "duel", special: true },
+  { href: "/online-pk", label: "線上 PK", icon: "challenge", special: true },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
@@ -46,20 +41,31 @@ const NAV: NavItem[] = [
   { href: "/profile", label: "我的", icon: "profile" },
 ];
 
-  const PAGE_PROMPTS: Record<string, string> = {
-  "/dashboard": "首頁：今日摘要、任務與學習入口。",
-  "/study": "學習中心：教材、單字、錯題與專注紀錄。",
-  "/weekly": "每週小考、題目與解析。",
-  "/challenge": "好友挑戰與活動入口。",
-  "/online-pk": "真人配對、Bot 練習、好友房間與自我挑戰。",
-  "/grades": "成績紀錄、趨勢與目標。",
-  "/ai": "輸入問題或上傳內容開始 AI 分析。",
-  "/solve": "輸入題目文字或上傳題目圖片。",
-  "/profile": "帳號、學習設定與會員資訊。",
+const PAGE_PROMPTS: Record<string, string> = {
+  "/dashboard": "如果今天不知道要做什麼，不妨參考看看：單字、小知識或讀書計畫都可以，照你的步調就好。",
+  "/learning": "可以先選擇學習科目，再沿著課程地圖一步一步學習。高中化學 CH1 已經開放互動課程。",
+  "/study": "需要我陪你複習錯題、練單字，或安排一段專注時間嗎？",
+  "/weekly": "這裡可以查看每週小考、單字與解析；要不要先看看本週重點？",
+  "/challenge": "想和好友比一場嗎？可以選每日單字或已開放的每週小考。",
+  "/online-pk": "準備好和真實對手比速度與正確率了嗎？答案由伺服器驗證，放心專注在下一題。",
+  "/grades": "我可以幫你看成績趨勢，找出下一個最值得補強的科目。",
+  "/ai": "把題目或不懂的地方交給我，我可以用更有趣的方式拆解。",
+  "/solve": "其他科目的題目也可以帶到解題專區，我會陪你一步一步看。",
+  "/profile": "要調整 Novi、學習設定或查看 PRO 身分嗎？我可以陪你一起設定。",
 };
 
+const ENCOURAGEMENTS: Array<{ text: string; state: NoviState }> = [
+  { text: "慢慢來也沒關係，今天完成一小步，就是在變強。", state: "cheer" },
+  { text: "你不需要一次做到完美，只要比昨天多理解一點。", state: "happy" },
+  { text: "把現在的專注留給眼前這一題，答案會一步一步清楚。", state: "thinking" },
+  { text: "每一次回想，都是在替記憶鋪一條更穩的路。", state: "remind" },
+  { text: "相信累積的力量，你正在成為更好的自己。", state: "success" },
+  { text: "千里之行，始於足下。先完成眼前這一步，Novi 陪你一起走。", state: "cheer" },
+  { text: "學而不思則罔，思而不學則殆。今天也留一點時間動手練習吧。", state: "remind" },
+];
+
 const NOVI_MODES = [
-  { key: "teacher", label: "學習教練", description: "規劃學習順序並拆解觀念。" },
+  { key: "teacher", label: "學習教練", description: "陪你規劃學習、拆解觀念，讓今天先完成一小步。" },
   { key: "solve", label: "解題模式", description: "一步一步分析題目，不直接跳到答案。" },
   { key: "hint", label: "提示模式", description: "只給剛剛好的提示，保留你自己思考的空間。" },
   { key: "exam", label: "考試模式", description: "用考試節奏練習，先作答再看解析。" },
@@ -71,8 +77,8 @@ const NOVI_MODES = [
 
 const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "Dashboard", icon: "home" },
+  { href: "/learning", label: "線上學習", icon: "book" },
   { href: "/study", label: "學習中心", icon: "study" },
-  { href: "/chemistry", label: "化學學習", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/solve", label: "解題專區", icon: "nova" },
@@ -81,13 +87,13 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/export", label: "資料匯出", icon: "archive" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
-  { href: "/online-pk", label: "線上 PK", icon: "duel" },
+  { href: "/online-pk", label: "線上 PK", icon: "challenge" },
   { href: "/report", label: "學習報告", icon: "report" },
-  { href: "/updates", label: "版本更新", icon: "admin" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
-  const FEATURE_BY_PATH: Record<string, string> = { "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/chemistry": "chemistry", "/exam-hubs": "study", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/updates": "updates", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
+  const FEATURE_BY_PATH: Record<string, string> = { "/learning": "learning", "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
 const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
+  learning: { title: "線上學習使用提醒", text: "課程內容依正式教材建立；尚未完成的科目與互動模型會明確顯示開發中，不使用假功能。" },
   dashboard: { title: "首頁使用提醒", text: "今日建議僅供參考，可依時間與狀態自由選擇，不需要全部完成。" },
   ai: { title: "Novi AI 使用提醒", text: "切換模式後請查看用途說明；涉及成績、錯題、計畫或寫入資料時，請先確認授權與動作預覽。" },
   solve: { title: "解題專區使用提醒", text: "解題專區開放各科目；可以貼上文字或上傳題目圖片。AI 解析是學習輔助，請先理解步驟再確認答案。" },
@@ -95,7 +101,6 @@ const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   export: { title: "資料匯出使用提醒", text: "只會匯出你的資料。請先查看樣本預覽，正式下載前會兩次確認並扣除對應 Nova。" },
   essay: { title: "作文批改使用提醒", text: "AI 建議僅供學習參考，請自行檢查文意、引用與老師要求後再提交。" },
   study: { title: "學習中心使用提醒", text: "複習與專注紀錄可依你的節奏調整；儲存前請確認日期、範圍與內容。" },
-  chemistry: { title: "化學學習使用提醒", text: "能力地圖只顯示真實診斷與練習資料；尚未學習的概念不會被填入假分數。" },
   weekly: { title: "每週小考使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
   challenge: { title: "挑戰功能使用提醒", text: "請確認挑戰對象、題目與截止時間；不要分享帳號、密碼或個人敏感資料。" },
   "online-pk": { title: "線上 PK 使用提醒", text: "每題答案、計時與分數都由伺服器驗證；斷線可在短時間內重連，請不要分享私人房間密碼。" },
@@ -112,7 +117,6 @@ const FEATURE_STEPS: Record<string, string[]> = {
   export: ["選擇要匯出的資料範圍與格式。", "查看樣本與檔案大小估算。", "確認扣除 Nova 後再下載，匯出紀錄會保留。"],
   essay: ["貼上或上傳英文作文，確認題目與字數。", "等待 OCR 與批改完成，查看錯誤分類及修改建議。", "自行複核文意與老師要求，不要直接照抄 AI 結果。"],
   study: ["StudyNova 主要提供英文教材、OCR、測驗、錯題與單字學習。", "圖片 OCR 每次使用前都會提醒：目前只支援英文科目；其他科目請到解題專區或直接詢問 Novi。", "AI 轉成筆記、題目或單字前，先查看辨識內容。"],
-  chemistry: ["先完成能力診斷，系統才會建立你的真實化學能力地圖。", "依照前置概念逐步進入教學與練習；完成課程會保存進度。", "答題與錯題會更新掌握度，AI 教學只根據已知的化學知識圖譜回答。"],
   weekly: ["開始前查看範圍、時間與答題規則。", "每題作答後確認選項，提交前再檢查一次。", "完成後查看分數、錯題與獎勵紀錄。"],
   challenge: ["選擇娛樂模式或 Nova Stake 模式，確認籌碼與負債規則。", "開始後依速度與正確率作答；已出現的題目與選項不會重複。", "完成後查看比分、錯題數與獎勵結算。"],
   "online-pk": ["先選快速配對、邀請好友或建立自訂房間。", "開始後依照每題倒數作答；答案與計分由伺服器驗證。", "結算後可把錯題加入複習或單字資料夾。"],
@@ -124,11 +128,13 @@ const FEATURE_STEPS: Record<string, string[]> = {
 
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.APP_VERSION ?? "1.1.0";
+
 export function AppShell({ user, children, maintenance }: { user: ShellUser; children: React.ReactNode; maintenance?: MaintenanceState | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const featureKey = Object.entries(FEATURE_BY_PATH).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "all";
-  const pagePrompt = Object.entries(PAGE_PROMPTS).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "選擇一項功能，或在下方輸入問題。";
+  const pagePrompt = Object.entries(PAGE_PROMPTS).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "需要我協助你完成目前這一步嗎？";
   const toast = useToast();
   const [noviOpen, setNoviOpen] = useState(false);
   const [noviMinimized, setNoviMinimized] = useState(false);
@@ -140,11 +146,12 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const [noviState, setNoviState] = useState<NoviState>("idle");
   const [advice, setAdvice] = useState<string>("");
   const [adviceLoading, setAdviceLoading] = useState(false);
+  const [encouragement, setEncouragement] = useState<{ text: string; state: NoviState } | null>(null);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [updateApplying, setUpdateApplying] = useState(false);
   const [updateComplete, setUpdateComplete] = useState(false);
-  const [releaseNoticeDismissed, setReleaseNoticeDismissed] = useState(false);
+  const [releaseNoticeDismissed, setReleaseNoticeDismissed] = useState(() => typeof window !== "undefined" && sessionStorage.getItem("sn-update-complete") === "1");
   const [usageGuideOpen, setUsageGuideOpen] = useState(false);
   const [inAppBrowser] = useState(() => typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|Line\/|Twitter|MicroMessenger|; wv\)|WebView/i.test(navigator.userAgent || ""));
   const [androidDevice] = useState(() => typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || ""));
@@ -198,30 +205,15 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     "/dashboard",
   );
   const pwaAnnouncements = useApi<{ announcements: Array<{ id: string; title: string; body: string; ctaLabel: string; ctaUrl: string; importance: string; pinned: boolean }> }>("/pwa/announcements");
-  const releaseInfo = useApi<{ currentVersion: string; latestVersion: string; minimumSupportedVersion: string; updateAvailable: boolean; forceUpdate: boolean; release: { title: string; subtitle: string; releaseNotes: string; newFeatures: string[]; improvements: string[]; bugFixes: string[] } | null }>(`/releases/latest?currentVersion=${encodeURIComponent(APP_VERSION)}`);
-  const releaseFeatureGates = useApi<{ features: Array<{ featureKey: string; enabled: boolean; releaseStatus: string; releaseDate: string | null; requiredVersion: string; minimumVersion: string }> }>("/feature-gates");
-
+  const releaseInfo = useApi<{ currentVersion: string; latestVersion: string; updateAvailable: boolean; release: { title: string; subtitle: string; releaseNotes: string; newFeatures: string[]; improvements: string[]; bugFixes: string[] } | null }>(`/releases/latest?currentVersion=${encodeURIComponent(APP_VERSION)}`);
   const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
-  const isReleaseGateVisible = (href: string) => {
-    const routeFeature = Object.entries(FEATURE_BY_PATH).find(([basePath]) => href === basePath || href.startsWith(`${basePath}/`))?.[1];
-    const gate = routeFeature ? releaseFeatureGates.data?.features.find((item) => item.featureKey === routeFeature) : undefined;
-    return !gate || canClientUseFeature(gate, APP_VERSION);
-  };
-  const currentFeatureGate = releaseFeatureGates.data?.features.find((item) => item.featureKey === featureKey);
-  const currentFeatureLocked = Boolean(currentFeatureGate && !canClientUseFeature(currentFeatureGate, APP_VERSION));
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
   }, []);
-
-  const dismissReleaseNotice = useCallback(() => {
-    const latestVersion = releaseInfo.data?.latestVersion;
-    if (latestVersion && typeof window !== "undefined") localStorage.setItem(`studynova:release-dismissed:${latestVersion}`, "1");
-    setReleaseNoticeDismissed(true);
-  }, [releaseInfo.data?.latestVersion]);
 
   useEffect(() => {
     let registration: ServiceWorkerRegistration | undefined;
@@ -238,7 +230,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     };
     navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`, { updateViaCache: "none" }).then((value) => {
+      navigator.serviceWorker.register("/sw.js").then((value) => {
         registration = value;
         const inspect = () => { if (value.waiting && navigator.serviceWorker.controller) setUpdateReady(value); };
         inspect();
@@ -280,6 +272,30 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     return () => window.clearTimeout(timer);
   }, [usageRules, markUsageRulesRead]);
 
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = (delay: number) => {
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        const next = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+        setEncouragement(next);
+        setNoviState(next.state);
+        timer = setTimeout(() => {
+          if (cancelled) return;
+          setEncouragement(null);
+          setNoviState("idle");
+          schedule(45_000 + Math.random() * 75_000);
+        }, 9_000);
+      }, delay);
+    };
+    schedule(25_000 + Math.random() * 45_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
+
   const touchNovi = useCallback(() => {
     setNoviMinimized(false);
     setNoviOpen(true);
@@ -291,7 +307,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       setNoviMinimized(true);
     }, 90_000);
     return () => window.clearTimeout(timer);
-  }, [noviOpen, quickChatReply, advice]);
+  }, [noviOpen, quickChatReply, advice, encouragement]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
@@ -439,7 +455,6 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const pwaNotice = pwaAnnouncements.data?.announcements.find((item) => item.pinned) ?? null;
   const isReleaseNotice = Boolean(pwaNotice && /新版本|版本更新|更新完成/.test(pwaNotice.title));
   const isLatestVersion = Boolean(releaseInfo.data && (!releaseInfo.data.updateAvailable || releaseInfo.data.currentVersion === releaseInfo.data.latestVersion));
-  const releaseNoticeHidden = releaseNoticeDismissed || isLatestVersion || (typeof window !== "undefined" && Boolean(releaseInfo.data?.latestVersion && localStorage.getItem(`studynova:release-dismissed:${releaseInfo.data.latestVersion}`) === "1"));
 
   const kindLabel = useMemo(
     () => ({ material: "教材", note: "筆記", quiz: "測驗", question: "題目", activity: "活動" }) as Record<string, string>,
@@ -450,19 +465,19 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     <div className="min-h-dvh lg:flex">
       {usageRules?.required && usageRules.document && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#060915]/95 p-3 backdrop-blur-md sm:p-5"><div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-[#37d3ff]/30 bg-[#0b1226] shadow-[0_0_60px_rgba(55,211,255,.18)] sm:max-h-[calc(100dvh-2.5rem)]"><div className="shrink-0 border-b border-white/10 p-5 pb-4"><p className="text-xs tracking-widest text-[#37d3ff]">StudyNova 使用規章 · v{usageRules.document.version}</p><h2 className="mt-2 text-xl font-bold sm:text-2xl">{usageRules.document.title}</h2><p className="mt-1 text-xs leading-5 text-muted">請在上方內容區滑動閱讀至最底部，閱讀完成後即可勾選同意。</p></div><div ref={usageRulesRef} onScroll={markUsageRulesRead} tabIndex={0} className="min-h-[220px] flex-1 touch-pan-y overflow-y-auto overscroll-contain whitespace-pre-wrap px-5 py-4 text-sm leading-8 text-slate-200 outline-none sm:px-7 sm:text-base">{usageRules.document.body}</div><div className="shrink-0 border-t border-white/10 bg-[#0b1226] p-5 pt-4"><label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><input type="checkbox" disabled={!usageRulesRead} checked={usageRulesAccepted} onChange={(event) => setUsageRulesAccepted(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#7c5cff]" /><span>{usageRulesRead ? "我已完整閱讀並同意遵守 StudyNova 使用規章" : "請先將上方規章滑動閱讀到底部"}</span></label><Button full className="mt-4" disabled={!usageRulesRead || !usageRulesAccepted} onClick={async () => { await apiPost("/auth/usage-rules/consent", { version: usageRules.document?.version, readComplete: usageRulesRead, accepted: usageRulesAccepted }); setUsageRules({ ...usageRules, required: false }); window.location.reload(); }}>開始使用 StudyNova</Button></div></div></div>}
       {maintenance?.enabled && <MaintenanceNotice state={maintenance} />}
-      {releaseInfo.data?.updateAvailable && !releaseNoticeHidden && !releaseDetailsOpen && !releaseInfo.data.forceUpdate && !pwaNotice && <div className="fixed inset-x-3 top-3 z-[99] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#ffc857]/45 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_30px_rgba(255,200,87,.2)] backdrop-blur-xl"><div className="min-w-0"><strong className="text-[#ffe7ad]">🎉 新版本已上線</strong><p className="mt-0.5 text-xs text-muted">StudyNova v{releaseInfo.data.latestVersion} · {releaseInfo.data.release?.subtitle || "點擊查看完整更新內容。"}</p></div><Button size="sm" variant="gold" onClick={() => { setReleaseActionStarted(false); setReleaseDetailsOpen(true); }}>查看詳情</Button></div>}
-      {updateReady && !updateApplying && !releaseNoticeHidden && <div className="fixed inset-x-3 top-3 z-[100] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#37d3ff]/40 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_28px_rgba(55,211,255,0.2)] backdrop-blur-xl"><span><strong className="text-[#b9f2ff]">StudyNova 有新版本了</strong><span className="ml-2 text-xs text-muted">你的資料不會被清除</span></span><Button size="sm" onClick={() => { dismissReleaseNotice(); setUpdateApplying(true); setUpdateReady(null); sessionStorage.setItem("sn-update-complete", "1"); updateReady.waiting?.postMessage({ type: "SKIP_WAITING" }); window.setTimeout(() => window.location.reload(), 3500); }}>立即更新</Button></div>}
-      {(releaseDetailsOpen || Boolean(releaseInfo.data?.forceUpdate)) && releaseInfo.data?.release && <div className="fixed inset-0 z-[115] grid place-items-center bg-[#060915]/85 p-4 backdrop-blur-md"><div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-[#ffc857]/40 bg-[#0b1226] p-6 shadow-[0_0_55px_rgba(255,200,87,.2)]"><div className="text-center"><p className="text-4xl" aria-hidden="true">🎉🎊🎉</p><h2 className="mt-2 text-2xl font-bold text-[#ffe7ad]">{releaseInfo.data.forceUpdate ? "請更新後繼續使用" : "新版本上線啦！！"}</h2><p className="mt-1 text-sm text-muted">StudyNova v{releaseInfo.data.latestVersion} · {releaseInfo.data.release.title}</p><Link href="/updates" className="mt-2 inline-block text-xs text-[#ffc857] underline">查看所有版本紀錄</Link><p className="mt-3 text-left text-sm leading-6 text-slate-200">{releaseInfo.data.forceUpdate ? `此版本已停止支援。請更新至 v${releaseInfo.data.minimumSupportedVersion} 或更新版本後繼續使用 StudyNova。你的登入與學習資料會保留。` : "這次更新不只是外觀調整，也包含學習流程、資料可靠性、PWA 體驗與管理功能的改善。你可以向下滑動查看完整更新內容，再決定是否立即套用。"}</p></div><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"><p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-200">{releaseInfo.data.release.releaseNotes || releaseInfo.data.release.subtitle}</p>{releaseInfo.data.release.newFeatures.length > 0 && <div className="mt-4"><p className="font-semibold text-[#b9f2ff]">✨ 新功能</p><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">{releaseInfo.data.release.newFeatures.map((item) => <li key={item}>{item}</li>)}</ul></div>}{releaseInfo.data.release.improvements.length > 0 && <div className="mt-4"><p className="font-semibold text-[#b9f2ff]">🛠️ 改善內容</p><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">{releaseInfo.data.release.improvements.map((item) => <li key={item}>{item}</li>)}</ul></div>}</div><div className="mt-6 flex shrink-0 flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row-reverse"><Button full disabled={isLatestVersion || releaseActionStarted} variant={isLatestVersion || releaseActionStarted ? "ghost" : undefined} onClick={() => { if (isLatestVersion) return; dismissReleaseNotice(); setReleaseActionStarted(true); setReleaseDetailsOpen(false); if (updateReady?.waiting) { setUpdateApplying(true); setUpdateReady(null); sessionStorage.setItem("sn-update-complete", "1"); updateReady.waiting.postMessage({ type: "SKIP_WAITING" }); window.setTimeout(() => window.location.reload(), 3500); } else { sessionStorage.setItem("sn-update-complete", "1"); window.location.reload(); } }}>{isLatestVersion ? "已是最新版" : releaseActionStarted ? "更新中…" : "立即更新"}</Button>{!releaseInfo.data.forceUpdate && <Button full variant="outline" onClick={() => setReleaseDetailsOpen(false)}>稍後再說</Button>}</div></div></div>}
+      {releaseInfo.data?.updateAvailable && !releaseDetailsOpen && <div className="fixed inset-x-3 top-3 z-[99] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#ffc857]/45 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_30px_rgba(255,200,87,.2)] backdrop-blur-xl"><div className="min-w-0"><strong className="text-[#ffe7ad]">🎉🎊 新版本上線啦！！</strong><p className="mt-0.5 text-xs text-muted">StudyNova v{releaseInfo.data.latestVersion} 已準備完成，點擊查看更新內容。</p></div><Button size="sm" variant="gold" onClick={() => { setReleaseActionStarted(false); setReleaseDetailsOpen(true); }}>查看詳情</Button></div>}
+      {updateReady && !updateApplying && <div className="fixed inset-x-3 top-3 z-[100] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#37d3ff]/40 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_28px_rgba(55,211,255,0.2)] backdrop-blur-xl"><span><strong className="text-[#b9f2ff]">StudyNova 有新版本了</strong><span className="ml-2 text-xs text-muted">你的資料不會被清除</span></span><Button size="sm" onClick={() => { setUpdateApplying(true); setUpdateReady(null); sessionStorage.setItem("sn-update-complete", "1"); updateReady.waiting?.postMessage({ type: "SKIP_WAITING" }); window.setTimeout(() => window.location.reload(), 3500); }}>立即更新</Button></div>}
+      {releaseDetailsOpen && releaseInfo.data?.release && <div className="fixed inset-0 z-[115] grid place-items-center bg-[#060915]/85 p-4 backdrop-blur-md"><div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-[#ffc857]/40 bg-[#0b1226] p-6 shadow-[0_0_55px_rgba(255,200,87,.2)]"><div className="text-center"><p className="text-4xl" aria-hidden="true">🎉🎊🎉</p><h2 className="mt-2 text-2xl font-bold text-[#ffe7ad]">新版本上線啦！！</h2><p className="mt-1 text-sm text-muted">StudyNova v{releaseInfo.data.latestVersion} · {releaseInfo.data.release.title}</p><p className="mt-3 text-left text-sm leading-6 text-slate-200">這次更新不只是外觀調整，也包含學習流程、資料可靠性、PWA 體驗與管理功能的改善。你可以向下滑動查看完整更新內容，再決定是否立即套用。</p></div><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"><p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-200">{releaseInfo.data.release.releaseNotes || releaseInfo.data.release.subtitle}</p>{releaseInfo.data.release.newFeatures.length > 0 && <div className="mt-4"><p className="font-semibold text-[#b9f2ff]">✨ 新功能</p><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">{releaseInfo.data.release.newFeatures.map((item) => <li key={item}>{item}</li>)}</ul></div>}{releaseInfo.data.release.improvements.length > 0 && <div className="mt-4"><p className="font-semibold text-[#b9f2ff]">🛠️ 改善內容</p><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">{releaseInfo.data.release.improvements.map((item) => <li key={item}>{item}</li>)}</ul></div>}</div><div className="mt-6 flex shrink-0 flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row-reverse"><Button full disabled={isLatestVersion || releaseActionStarted} variant={isLatestVersion || releaseActionStarted ? "ghost" : undefined} onClick={() => { if (isLatestVersion) return; setReleaseActionStarted(true); setReleaseDetailsOpen(false); if (updateReady?.waiting) { setUpdateApplying(true); setUpdateReady(null); sessionStorage.setItem("sn-update-complete", "1"); updateReady.waiting.postMessage({ type: "SKIP_WAITING" }); window.setTimeout(() => window.location.reload(), 3500); } else { sessionStorage.setItem("sn-update-complete", "1"); window.location.reload(); } }}>{isLatestVersion ? "已是最新版" : releaseActionStarted ? "更新中…" : "立即更新"}</Button><Button full variant="outline" onClick={() => setReleaseDetailsOpen(false)}>稍後再說</Button></div></div></div>}
       {updateApplying && <div className="fixed inset-0 z-[110] grid place-items-center bg-[#060915]/90 p-6 backdrop-blur-md"><div className="rounded-3xl border border-[#37d3ff]/30 bg-[#0b1226] px-8 py-7 text-center shadow-[0_0_60px_rgba(55,211,255,.2)]"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#37d3ff]/25 border-t-[#37d3ff]" /><p className="mt-4 font-bold text-white">正在套用 StudyNova 更新</p><p className="mt-1 text-xs text-muted">請稍候，登入狀態與學習資料會保留。</p></div></div>}
-      {updateComplete && <div className="fixed inset-x-3 top-3 z-[105] mx-auto max-w-xl rounded-2xl border border-emerald-300/30 bg-[#0b1226]/95 p-5 shadow-[0_0_35px_rgba(52,211,153,.16)] backdrop-blur-xl"><p className="font-bold text-emerald-200">✅ 更新完成</p><p className="mt-1 text-sm text-slate-200">StudyNova v{releaseInfo.data?.currentVersion || APP_VERSION} 已更新，這次包含：</p><ul className="mt-2 list-disc pl-5 text-xs leading-6 text-muted">{(releaseInfo.data?.release?.newFeatures ?? []).slice(0, 5).map((item) => <li key={item}>{item}</li>)}{(releaseInfo.data?.release?.improvements ?? []).slice(0, 3).map((item) => <li key={item}>{item}</li>)}</ul><p className="mt-3 text-xs leading-5 text-emerald-100/80">謝謝你使用 StudyNova！如果遇到問題，請提供錯誤代碼、Request ID 與發生時間給客服，我們會協助你處理。💛</p><button type="button" onClick={() => { setUpdateComplete(false); setReleaseNoticeDismissed(true); }} className="mt-3 text-xs text-emerald-200 underline">關閉更新摘要</button></div>}
-      {pwaNotice && !releaseNoticeHidden && <div className={`${isReleaseNotice ? "fixed inset-x-3 top-3 z-[99]" : "fixed inset-x-3 bottom-3 z-[90]"} mx-auto max-w-xl rounded-2xl border border-[#ffc857]/45 bg-[#0b1226]/95 p-4 text-sm shadow-[0_0_30px_rgba(255,200,87,.2)] backdrop-blur-xl`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-bold text-[#ffe7ad]">{isReleaseNotice ? "🎉 " : "📢 "}{pwaNotice.title}</p><p className="mt-1 text-xs leading-5 text-slate-200">{pwaNotice.body}</p></div>{isReleaseNotice ? <button type="button" className="shrink-0 pt-1 text-xs font-semibold text-[#ffc857] underline underline-offset-4" onClick={() => { setReleaseActionStarted(false); setReleaseDetailsOpen(true); }}>立即更新</button> : pwaNotice.ctaUrl ? <Link href={pwaNotice.ctaUrl} className="shrink-0 pt-1 text-xs text-[#ffc857] underline underline-offset-4">{pwaNotice.ctaLabel || "查看詳情"}</Link> : null}</div></div>}
+      {updateComplete && !releaseNoticeDismissed && <div className="fixed inset-x-3 top-3 z-[105] mx-auto max-w-xl rounded-2xl border border-emerald-300/30 bg-[#0b1226]/95 p-5 shadow-[0_0_35px_rgba(52,211,153,.16)] backdrop-blur-xl"><p className="font-bold text-emerald-200">更新完成</p><p className="mt-1 text-sm text-slate-200">StudyNova 已更新，這次包含：</p><ul className="mt-2 list-disc pl-5 text-xs leading-6 text-muted"><li>每日知識內容與來源驗證改善</li><li>維護資訊提示不再阻擋網站使用</li><li>記憶卡背景與互動效果更流暢</li></ul><button type="button" onClick={() => { setUpdateComplete(false); setReleaseNoticeDismissed(true); }} className="mt-3 text-xs text-emerald-200 underline">關閉更新摘要</button></div>}
+      {pwaNotice && !releaseNoticeDismissed && <div className="fixed inset-x-3 bottom-3 z-[90] mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-[#ffc857]/35 bg-[#0b1226]/95 px-4 py-3 text-sm shadow-[0_0_24px_rgba(255,200,87,0.14)] backdrop-blur-xl"><div className="min-w-0"><p className="truncate font-semibold text-[#ffe7ad]">{pwaNotice.title}</p><p className="mt-0.5 line-clamp-2 text-xs text-muted">{pwaNotice.body}</p></div>{isReleaseNotice ? <button type="button" className="shrink-0 text-xs font-semibold text-[#ffc857] underline" onClick={() => { setReleaseActionStarted(false); setReleaseDetailsOpen(true); }}>{pwaNotice.ctaLabel || "查看詳情"}</button> : pwaNotice.ctaUrl ? <Link href={pwaNotice.ctaUrl} className="shrink-0 text-xs text-[#ffc857] underline">{pwaNotice.ctaLabel || "查看詳情"}</Link> : null}</div>}
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-[var(--line)] bg-black/20 px-3 py-4 lg:flex">
         <Link href="/dashboard" className="focus-ring mb-4 rounded-xl px-2 py-1">
           <Wordmark size={42} />
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
-          {(examHubs.data?.hubs.length ? [...SIDE_NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : SIDE_NAV).filter((item) => isReleaseGateVisible(item.href)).map((item) => {
+          {(examHubs.data?.hubs.length ? [...SIDE_NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
@@ -528,7 +543,9 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                 aria-haspopup="menu"
                 className={`focus-ring flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-xs transition hover:bg-white/5 ${user.isPro ? "pro-frame" : "border-[var(--line)]"}`}
               >
-                <UserAvatar userId={user.userId} avatarSeed={user.avatarSeed} displayName={user.displayName} size={24} className={user.isPro ? "border border-amber-200/80" : "border border-cyan-200/40"} />
+                <span className={`grid h-6 w-6 place-items-center rounded-full border text-[11px] font-bold text-white shadow-sm ${user.isPro ? "border-amber-200/80 bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "border-cyan-200/40 bg-gradient-to-br from-[#7c5cff] to-[#20c5e8]"}`}>
+                  {user.displayName.slice(0, 1)}
+                </span>
                 <span className={`hidden max-w-[90px] truncate sm:inline ${user.isPro ? "pro-name font-semibold" : ""}`}>{user.displayName}</span>
                 <span className="text-[10px] text-muted" aria-hidden="true">⌄</span>
               </button>
@@ -581,10 +598,10 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           </div>
         </header>
 
-        <main className="app-main mx-auto w-full min-w-0 max-w-6xl px-3 py-4 sm:px-5 sm:py-6">
+        <main className="app-main mx-auto max-w-6xl px-3 py-4 sm:px-5 sm:py-6">
           {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => { const isRelease = /新版本|版本更新|更新完成/.test(notice.title); return <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p><p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{isRelease ? <button type="button" onClick={() => { setReleaseActionStarted(false); setReleaseDetailsOpen(true); }} className="mt-2 text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</button> : notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>; })}</section>}
           {FEATURE_GUIDANCE[featureKey] && <div className="mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
-          {currentFeatureLocked ? <div className="mx-auto max-w-xl rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] p-6 text-center"><p className="text-lg font-bold text-amber-100">此功能尚未開放或目前版本不支援</p><p className="mt-2 text-sm leading-6 text-muted">請更新 StudyNova 至支援此功能的版本，或稍後再試。你的學習資料不受影響。</p><Link href="/updates" className="mt-4 inline-block text-sm font-semibold text-[#ffc857] underline">查看版本更新</Link></div> : children}
+          {children}
           <footer aria-label="網站資訊" className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
             <Link href="/faq" className="underline">常見問題</Link>
             <Link href="/support" className="underline">回報問題</Link>
@@ -598,7 +615,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       {/* Mobile bottom nav */}
       <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
-          {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : NAV).filter((item) => isReleaseGateVisible(item.href)).map((item) => {
+          {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/online-pk";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
@@ -610,7 +627,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
                 >
                   {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
-                  <span className={isPk ? "pk-nav-icon" : item.special ? "exam-nav-icon" : ""}>{isPk ? <Image src="/brand/pk-nav-icon.webp" alt="" width={24} height={24} sizes="24px" priority className="h-6 w-6 rounded-lg object-cover ring-1 ring-white/20" /> : <SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" />}</span>
+                  <span className={isPk ? "pk-nav-icon" : item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>
                   <span className="max-w-full truncate">{item.label}</span>
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
                 </Link>
@@ -622,6 +639,12 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
 
       {/* Novi dock */}
       <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5">
+        {!noviOpen && encouragement && (
+          <button type="button" onClick={() => setNoviOpen(true)} className="glass anim-pop max-w-[min(82vw,300px)] p-3 text-left text-xs leading-relaxed text-[#e8edff] shadow-[0_0_28px_rgba(55,211,255,0.18)]">
+            <span className="mb-1 block text-[10px] font-semibold tracking-wider text-[#37d3ff]">Novi 給你的話</span>
+            {encouragement.text}
+          </button>
+        )}
         {noviOpen && (
           <div className="glass novi-mobile-panel anim-pop w-[min(92vw,340px)] p-3">
             <div className="flex items-start gap-2">
@@ -629,7 +652,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Novi 小助理</p>
                 <p className="text-[11px] text-muted">Lv.{level}・你的專屬 AI 學習夥伴</p>
-                <p className="mt-1 text-[11px] text-[#7dd3fc]">{pagePrompt}</p>
+                {!encouragement && <p className="mt-1 text-[11px] text-[#7dd3fc]">{pagePrompt}</p>}
               </div>
               <button onClick={() => setNoviOpen(false)} aria-label="收起 Novi" className="focus-ring rounded-lg px-1.5 text-muted hover:bg-white/10">
                 ✕
@@ -650,7 +673,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
               </div>
             </div>
             <div className="mt-2 max-h-40 overflow-y-auto scroll-thin rounded-xl bg-black/25 p-2.5 text-xs leading-relaxed">
-              {adviceLoading ? <Skeleton lines={2} /> : advice || pagePrompt || summary.data?.greeting || "請輸入問題，或選擇下方功能。"}
+              {adviceLoading ? <Skeleton lines={2} /> : encouragement?.text || advice || pagePrompt || summary.data?.greeting || "點下方按鈕，我來告訴你今天該做什麼。"}
             </div>
             <div role="menu" aria-label="Novi 快速功能" className="mt-2 grid grid-cols-2 gap-1.5">
               <Button size="sm" variant="ghost" onClick={() => askQuick("today_advice")}>
@@ -696,8 +719,8 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
               >
                 －
               </button>
-              <button onClick={() => { touchNovi(); setQuickChatReply((current) => current || "請在下方輸入問題，也可以使用今日建議、弱點分析或最近錯題功能。"); }} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
-                <NoviAvatar size={58} state={noviOpen ? "happy" : "idle"} level={level} />
+              <button onClick={() => { touchNovi(); setQuickChatReply((current) => current || "嗨！點下面的輸入框就能直接和我聊天。你不一定要完美，我們先完成下一步。\n\n我會固定在右下角，方便你隨時找到我。 "); }} className="focus-ring rounded-full" aria-label="開啟 Novi 小助理">
+                <NoviAvatar size={58} state={encouragement?.state ?? (noviOpen ? "happy" : "idle")} level={level} />
               </button>
             </>
           )}
