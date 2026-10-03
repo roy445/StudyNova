@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "exam_hub_usage_logs" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "hub_id" uuid NOT NULL REFERENCES "exam_hubs"("id") ON DELETE CASCADE,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "action" text NOT NULL DEFAULT 'started',
   "session_id" text NOT NULL DEFAULT '',
   "started_at" timestamptz NOT NULL DEFAULT now(),
