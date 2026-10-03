@@ -24,6 +24,8 @@ export type ErrorCategory =
   | "CHAL"
   | "PK"
   | "ADMIN"
+  | "NOTIF"
+  | "LEARN"
   | "VERSION"
   | "RATE"
   | "NF"
@@ -59,6 +61,9 @@ export const ERROR_CATALOG = {
   AUTH_USAGE_RULES_REQUIRED: def("SN-AUTH-1012", 403, "AUTH", "請先閱讀並同意最新使用規章", "完成閱讀與同意後即可繼續使用 StudyNova。"),
   AUTH_TERMS_UPDATE_REQUIRED: def("SN-AUTH-1013", 409, "AUTH", "條款版本已更新", "請重新載入最新條款並完成同意。"),
   AUTH_REGISTRATION_CLOSED: def("SN-AUTH-1014", 403, "AUTH", "目前暫停新會員註冊", "StudyNova 暫時沒有開放新的會員註冊，請稍後再回來看看。"),
+  AUTH_REGISTRATION_INVALID_TERMS: def("SN-AUTH-1015", 400, "AUTH", "註冊條款確認資料無效", "請重新閱讀目前版本的註冊條款並勾選同意後再送出。"),
+  AUTH_REGISTRATION_NAME_INVALID: def("SN-AUTH-1016", 400, "AUTH", "顯示名稱不符合規範", "請移除不雅文字、聯絡方式或過長內容後再試。"),
+  AUTH_REGISTRATION_CREATE_FAILED: def("SN-AUTH-1017", 500, "AUTH", "建立帳號失敗", "請稍後再試；若重試仍失敗，請提供錯誤代碼與追蹤編號。"),
 
   /* ---------------------------------------------------------- ACCT 12xx */
   ACCT_NOT_FOUND: def("SN-ACCT-1201", 404, "ACCT", "找不到這個 NOVA ID", "請確認 NOVA ID 是否輸入正確（格式：NV-XXXX-XXXX）。"),
@@ -125,6 +130,15 @@ export const ERROR_CATALOG = {
   AI_VOICE_REQUIRED: def("SN-AI-6009", 400, "AI", "語音分析需要 AI 服務", "請先請管理員確認 AI 服務設定。"),
   TTS_BROWSER_SPEECH_ONLY: def("SN-AI-6019", 410, "AI", "伺服器音檔朗讀已停用", "請使用教材或單字旁的裝置內建朗讀；不需要 API key，也不會上傳或保存音檔。"),
 
+  /* -------------------------------------------------------- LEARN 61xx */
+  LEARN_SUBJECT_NOT_FOUND: def("SN-LEARN-6101", 404, "LEARN", "找不到學習科目", "請從學習專區重新選擇目前已開放的科目。"),
+  LEARN_CHAPTER_NOT_FOUND: def("SN-LEARN-6102", 404, "LEARN", "找不到學習章節", "章節可能尚未發布或網址已過期，請返回課程總覽。"),
+  LEARN_LESSON_NOT_FOUND: def("SN-LEARN-6103", 404, "LEARN", "找不到學習小節", "請返回章節頁重新選擇小節。"),
+  LEARN_CONTENT_UNAVAILABLE: def("SN-LEARN-6104", 503, "LEARN", "學習內容暫時無法載入", "請重新整理；若持續發生，請提供課程路徑與錯誤代碼。"),
+  LEARN_AI_CONTEXT_INVALID: def("SN-LEARN-6105", 400, "LEARN", "學習 AI 內容範圍無效", "請重新從目前小節開啟 AI 問答，不要使用過期的課程頁面。"),
+  LEARN_COMPLETION_SAVE_FAILED: def("SN-LEARN-6106", 503, "LEARN", "學習完成記號儲存失敗", "請重新點擊完成按鈕；若持續發生，請提供錯誤代碼與追蹤編號。"),
+  LEARN_PDF_GENERATION_FAILED: def("SN-LEARN-6107", 502, "LEARN", "章節重點 PDF 產生失敗", "請稍後重新產生，並確認瀏覽器允許下載或列印。"),
+
   /* ---------------------------------------------------------- FILE 7xxx */
   FILE_EMPTY: def("SN-FILE-7001", 400, "FILE", "檔案是空的", "請重新選擇檔案。"),
   FILE_TOO_LARGE: def("SN-FILE-7002", 400, "FILE", "檔案太大", "請壓縮後再上傳，單檔上限預設為 50MB。"),
@@ -186,6 +200,11 @@ export const ERROR_CATALOG = {
   ADMIN_TEXTBOOK_STORAGE_ERROR: def("SN-ADMIN-9512", 502, "ADMIN", "教材檔案儲存失敗", "請重新上傳檔案；若持續發生，請提供錯誤代碼與追蹤編號。"),
   ADMIN_TEXTBOOK_PERMISSION: def("SN-ADMIN-9513", 403, "ADMIN", "沒有管理教材的權限", "請使用管理員帳號重新登入。"),
   ADMIN_TEXTBOOK_PROCESSING_ERROR: def("SN-ADMIN-9514", 500, "ADMIN", "教材處理失敗", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號。"),
+
+  /* ------------------------------------------------------- NOTIF 98xx */
+  NOTIF_CREATE_FAILED: def("SN-NOTIF-9801", 503, "NOTIF", "站內通知建立失敗", "主要操作已完成，但通知未建立；請稍後查看通知中心。"),
+  NOTIF_RECIPIENT_NOT_FOUND: def("SN-NOTIF-9802", 404, "NOTIF", "找不到通知接收者", "請確認接收者帳號仍為啟用狀態。"),
+  NOTIF_DELIVERY_FAILED: def("SN-NOTIF-9803", 502, "NOTIF", "通知傳送失敗", "站內通知可能稍後重試；請提供錯誤代碼與追蹤編號。"),
 
   /* ------------------------------------------------------- VERSION 96xx */
   APP_VERSION_REQUIRED: def("SN-VER-9601", 426, "VERSION", "無法識別目前 StudyNova 版本", "請重新整理以載入目前版本；若仍發生，請清除此網站的舊快取後再試。"),

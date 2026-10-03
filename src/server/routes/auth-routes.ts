@@ -20,7 +20,7 @@ import {
 } from "../core";
 import { createSession, destroySession, getSession, isAdminRole, SESSION_COOKIE } from "../auth";
 import { ensureDailyTasks, ensureUserEconomy, allFeatureStates, novaBalance } from "../economy";
-import { notify } from "../notify";
+import { notify, resolveAudience } from "../notify";
 import { sendPasswordResetEmail } from "../email";
 import { checkDisplayName } from "../name-moderation";
 import { getRegistrationControl } from "../registration";
@@ -110,6 +110,17 @@ export const routes: RouteDef[] = [
         link: "/onboarding",
         dedupeKey: `welcome:${user.userId}`,
       });
+      const adminIds = await resolveAudience("admin", []);
+      const adminNotifications = await Promise.allSettled(adminIds.map((adminId) => notify({
+        userId: adminId,
+        kind: "account",
+        title: "👤 新會員註冊",
+        body: `${user.displayName}（${user.novaId}）剛完成註冊，請查看會員資料。`,
+        link: `/admin/users/${user.userId}`,
+        dedupeKey: `admin-new-user:${user.userId}:${adminId}`,
+      })));
+      const failedAdminNotifications = adminNotifications.filter((result) => result.status === "rejected");
+      if (failedAdminNotifications.length) console.error("[registration] admin notification failed", { userId: user.userId, failed: failedAdminNotifications.length });
       await createSession(user.userId, { ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
       return { userId: user.userId, novaId: user.novaId, displayName: user.displayName, role: user.role, onboarded: false };
     },

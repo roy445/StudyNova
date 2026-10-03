@@ -73,6 +73,12 @@ function StudyInner() {
 
   return (
     <div className="space-y-4">
+      <Link href="/learning" className="learning-hero-link group block overflow-hidden rounded-[2rem] border-2 border-cyan-300/45 bg-[radial-gradient(circle_at_85%_15%,rgba(55,211,255,.35),transparent_34%),radial-gradient(circle_at_8%_100%,rgba(124,92,255,.3),transparent_42%),linear-gradient(135deg,rgba(8,28,58,.98),rgba(32,25,78,.94))] p-6 shadow-[0_0_34px_rgba(55,211,255,.2)] transition hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-[0_0_48px_rgba(55,211,255,.34)] sm:p-8">
+        <div className="flex min-h-44 items-center justify-between gap-6 sm:min-h-56">
+          <div className="relative z-10 max-w-2xl"><div className="mb-3 flex flex-wrap items-center gap-2"><Badge tone="cyan">StudyNova Learning</Badge><Badge tone="gold">推薦入口</Badge></div><h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl">📚 線上學習</h1><p className="mt-4 max-w-xl text-sm leading-7 text-slate-200 sm:text-base">進入互動課程、詳細知識、比較表、AI 問答與隨堂練習。從這裡開始你的完整學習路線。</p><span className="mt-6 inline-flex items-center rounded-xl bg-gradient-to-r from-cyan-300 to-violet-400 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_22px_rgba(55,211,255,.45)]">立即開始線上學習 <span className="ml-2 transition group-hover:translate-x-1">→</span></span></div>
+          <div className="hidden select-none text-[9rem] opacity-25 drop-shadow-[0_0_30px_rgba(55,211,255,.9)] sm:block">✦</div>
+        </div>
+      </Link>
       <header className="space-y-1">
         <h1 className="text-xl font-bold sm:text-2xl">學習專區</h1>
         <p className="text-xs text-muted sm:text-sm">線上課程、教材、OCR、測驗、錯題、單字、句子、錄音與專注計時，全部在同一個地方。</p>
