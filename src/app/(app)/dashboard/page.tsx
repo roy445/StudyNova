@@ -63,7 +63,6 @@ export default function DashboardPage() {
   const alerts = useApi<{ alerts: Array<{ id: string; title: string; body: string; evidence: Record<string, unknown> }>; enabled: boolean }>("/ai/alerts");
   const patterns = useApi<{ patterns: Array<{ subject: string; reason: string; count: number; questionCount: number; evidence: string }>; enoughData: boolean }>("/learning/error-patterns");
   const examPolicies = useApi<{ policies: Array<{ id: string; schoolName: string; educationLevel: string; grade: number; term: string; examName: string; examDate: string }> }>("/exam-date-policies");
-  const [claiming, setClaiming] = useState<string | null>(null);
   const [appealExam, setAppealExam] = useState<Dashboard["upcomingExams"][number] | null>(null);
   const [appealDate, setAppealDate] = useState("");
   const [appealReason, setAppealReason] = useState("");
@@ -79,18 +78,6 @@ export default function DashboardPage() {
     } catch (err) { toast.push("error", err instanceof Error ? err.message : "申請失敗"); } finally { setAppealSending(false); }
   }
 
-  async function claim(taskId: string) {
-    setClaiming(taskId);
-    try {
-      const res = await apiPost<{ reward: { nova: number; xp: number; doubled: boolean } }>(`/tasks/daily/${taskId}/claim`);
-      toast.push("success", `獲得 ${res.reward.nova} Nova + ${res.reward.xp} XP${res.reward.doubled ? "（Nova Pro 雙倍）" : ""}`);
-      await reload();
-    } catch (err) {
-      toast.push("error", err instanceof Error ? err.message : "領取失敗");
-    } finally {
-      setClaiming(null);
-    }
-  }
 
   if (loading) {
     return (
@@ -106,7 +93,6 @@ export default function DashboardPage() {
   }
   if (error || !data) return <ErrorState message={error ?? "載入失敗"} onRetry={reload} />;
 
-  const goalPct = Math.min(100, Math.round((data.minutes / (data.goal || 1)) * 100));
 
   return (
     <div className="space-y-4">
@@ -122,8 +108,8 @@ export default function DashboardPage() {
 
       <Card className="!overflow-hidden !p-0 border-cyan-300/30 bg-[radial-gradient(circle_at_90%_15%,rgba(55,211,255,.24),transparent_32%),linear-gradient(115deg,rgba(20,25,65,.96),rgba(7,22,42,.96))]">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-          <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-200">Today’s first step</p><h2 className="mt-1 text-2xl font-black text-white">今天先完成一個學習行動</h2><p className="mt-1 text-sm text-muted">Novi 已依照你的進度準備好入口，不需要在功能之間迷路。</p></div>
-          <div className="flex flex-wrap gap-2"><Link href="/study?tab=plan"><Button>開始今日計畫</Button></Link><Link href="/learning"><Button variant="ghost">進入線上課程</Button></Link></div>
+          <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-200">Today’s first step</p><h2 className="mt-1 text-2xl font-black text-white">現在選擇你想做的事</h2><p className="mt-1 text-sm text-muted">從學習中心、錯題、單字或線上課程開始，依你的需要選擇。</p></div>
+          <div className="flex flex-wrap gap-2"><Link href="/study"><Button>開始自由學習</Button></Link><Link href="/learning"><Button variant="ghost">進入線上課程</Button></Link></div>
         </div>
       </Card>
 
@@ -138,7 +124,7 @@ export default function DashboardPage() {
               {data.isPro && <Badge tone="gold">Nova Pro</Badge>}
               {!data.aiEnabled && <Badge tone="muted">AI 未設定</Badge>}
             </div>
-            <p className="mt-1 text-sm leading-relaxed text-muted">{data.greeting}</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">可從學習中心、錯題複習、單字或線上課程選擇下一步。</p>
             {data.countdowns?.some((countdown) => countdown.daysLeft < 5) && <p className="mt-2 rounded-lg bg-rose-400/10 px-2 py-1 text-xs font-semibold text-rose-200">距離重要考試不到 5 天，今天請優先完成複習任務。</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href="/study?tab=plan">
@@ -155,7 +141,7 @@ export default function DashboardPage() {
       </Card>
 
       {adaptive.data && (
-        <Card title="🧭 Novi 的下一步建議" subtitle="依照你的實際複習、錯題與知識點狀態動態安排，不是固定模板。">
+        <Card title="🧭 Novi 的下一步建議" subtitle="依照你的實際複習、錯題與知識點狀態整理，僅供參考。">
           <div className="mb-3 grid grid-cols-3 gap-2 text-center text-xs">
             <div className="glass-soft rounded-xl p-2"><p className="text-muted">到期複習</p><p className="mt-1 text-lg font-bold text-[#7dd3fc]">{adaptive.data.metrics.reviewsDue}</p></div>
             <div className="glass-soft rounded-xl p-2"><p className="text-muted">近 30 天活動</p><p className="mt-1 text-lg font-bold text-violet-200">{adaptive.data.metrics.activeDays30d} 天</p></div>
@@ -168,33 +154,18 @@ export default function DashboardPage() {
                 <div className="min-w-0"><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs leading-5 text-muted">{item.reason}</p></div>
               </div>
             ))}
-            {!adaptive.data.recommendations.length && <p className="text-sm text-muted">目前沒有急迫項目，維持今天的學習節奏就很棒了 ✨</p>}
+            {!adaptive.data.recommendations.length && <p className="text-sm text-muted">目前沒有需要優先處理的項目。</p>}
           </div>
         </Card>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="今日學習" value={`${data.minutes} 分`} hint={`目標 ${data.goal} 分（${goalPct}%）`} tone="cyan" />
+        <Stat label="今日學習" value={`${data.minutes} 分`} hint="本日累積時間" tone="cyan" />
         <Stat label="連續學習" value={`${data.streak} 天`} hint="每天完成任一學習即可累積" tone="violet" />
         <Stat label="Nova 點數" value={data.nova} hint="可用於 Novi 商店" tone="gold" />
         <Stat label="Novi 等級" value={`Lv.${data.novi?.level ?? 1}`} hint={`${data.novi?.xp ?? 0} XP`} />
       </div>
-
-      <Card title="今日目標進度" subtitle={`專注 ${data.focusMinutes} 分鐘・待複習錯題 ${data.dueWrong} 題・今日單字 ${data.wordsDue} 個`}>
-        <Progress value={data.minutes} max={data.goal} tone={goalPct >= 100 ? "green" : "violet"} />
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <Link href="/study?tab=focus" className="glass-soft focus-ring flex items-center justify-between px-3 py-2 text-sm hover:bg-white/5">
-            <span>⏱️ 專注計時器</span> <span className="text-muted">開始</span>
-          </Link>
-          <Link href="/study?tab=wrong" className="glass-soft focus-ring flex items-center justify-between px-3 py-2 text-sm hover:bg-white/5">
-            <span>🎯 錯題複習</span> <span className="text-muted">{data.dueWrong} 題</span>
-          </Link>
-          <Link href="/study?tab=words" className="glass-soft focus-ring flex items-center justify-between px-3 py-2 text-sm hover:bg-white/5">
-            <span>🔤 今日單字</span> <span className="text-muted">{data.wordsDue} 個</span>
-          </Link>
-        </div>
-      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <WordsPanel />
@@ -220,37 +191,6 @@ export default function DashboardPage() {
         <div className="space-y-2">{alerts.data?.alerts.slice(0, 3).map((alert) => <div key={alert.id} className="glass-soft rounded-xl p-3"><p className="text-sm font-semibold">{alert.title}</p><p className="mt-1 text-xs leading-5 text-muted">{alert.body}</p></div>)}{alerts.data?.enabled !== false && !alerts.data?.alerts.length && <p className="text-sm text-muted">目前沒有需要打擾你的提醒，維持自己的節奏就好。</p>}</div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="✓ 今天不知道做什麼？不妨參考看看" subtitle="挑一件適合現在狀態的事就好，不必追求一次完成全部">
-          <div className="space-y-2">
-            {data.tasks.map((t) => {
-              const done = t.progress >= t.target;
-              return (
-                <div key={t.id} className="glass-soft px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm">{t.title}</p>
-                    {t.claimedAt ? (
-                      <Badge tone="green">已領取</Badge>
-                    ) : done ? (
-                      <Button size="sm" variant="gold" loading={claiming === t.id} onClick={() => claim(t.id)}>
-                        領取 +{t.rewardNova}
-                      </Button>
-                    ) : (
-                      <span className="shrink-0 text-xs tabular-nums text-muted">
-                        {t.progress}/{t.target}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1.5">
-                    <Progress value={Math.min(t.progress, t.target)} max={t.target} tone={done ? "green" : "cyan"} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      </div>
-
       {data.countdowns?.length > 0 && (
         <section className="grid gap-3 sm:grid-cols-2" aria-label="重要倒數">
           {data.countdowns.map((countdown) => (
@@ -259,7 +199,7 @@ export default function DashboardPage() {
               <p className="mt-1 text-sm text-muted">{countdown.name}</p>
               <div className="mt-1 flex items-end gap-2"><strong className={`text-5xl font-black tabular-nums ${countdown.urgent ? "text-[#ffd1da]" : "text-white"}`}>{countdown.daysLeft}</strong><span className="pb-1 text-lg text-muted">天</span></div>
               <p className="mt-1 text-xs text-muted">日期：{countdown.date}</p>
-              {countdown.urgent && <p className="mt-3 text-xs font-semibold text-[#ffd1da]">每天都要記得讀書，現在開始準備還來得及。</p>}
+              {countdown.urgent && <p className="mt-3 text-xs font-semibold text-[#ffd1da]">這是依照你設定的考試日期顯示的提醒。</p>}
             </div>
           ))}
         </section>
@@ -280,7 +220,7 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <EmptyState icon="⌁" title="尚未設定考試" hint="到成績頁新增段考或模擬考，AI 會自動調整讀書計畫。" action={<Link href="/grades"><Button size="sm" variant="ghost">新增考試</Button></Link>} />
+            <EmptyState icon="⌁" title="尚未設定考試" hint="到成績頁新增段考或模擬考，可以查看成績與學習紀錄。" action={<Link href="/grades"><Button size="sm" variant="ghost">新增考試</Button></Link>} />
           )}
         </Card>
 
