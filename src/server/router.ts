@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import type { AuthUser } from "./auth";
 import { clientIp, getSession, rateLimit, requireAdmin, requireUser } from "./auth";
 import { AppError, fail, newRequestId, safeErrorMessage } from "./core";
@@ -309,7 +310,15 @@ async function logApiPerformance(meta: { userId: string | null; route: string; m
 
 async function logSystemError(scope: string, message: string, meta: Record<string, unknown>, userId: string | null = null) {
   try {
-    await db.insert(systemLogs).values({ userId, level: "error", scope, message: message.slice(0, 500), meta });
+    const code = typeof meta.code === "string" ? meta.code : "SN-SYS-9901";
+    const route = typeof meta.route === "string" ? meta.route : scope;
+    const fingerprint = createHash("sha256").update(`${code}|${route}|${scope}|${message.slice(0, 500)}`).digest("hex").slice(0, 48);
+    const existing = (await db.select({ id: systemLogs.id, occurrenceCount: systemLogs.occurrenceCount }).from(systemLogs).where(and(eq(systemLogs.level, "error"), eq(systemLogs.fingerprint, fingerprint), isNull(systemLogs.resolvedAt))).orderBy(sql`${systemLogs.lastSeenAt} desc`).limit(1))[0];
+    if (existing) {
+      await db.update(systemLogs).set({ occurrenceCount: existing.occurrenceCount + 1, lastSeenAt: new Date(), meta: { ...meta, fingerprint, occurrenceCount: existing.occurrenceCount + 1 } }).where(eq(systemLogs.id, existing.id));
+      return;
+    }
+    await db.insert(systemLogs).values({ userId, level: "error", scope, message: message.slice(0, 500), meta: { ...meta, fingerprint, occurrenceCount: 1 }, fingerprint, occurrenceCount: 1, firstSeenAt: new Date(), lastSeenAt: new Date() });
   } catch {
     /* logging must never break the response */
   }

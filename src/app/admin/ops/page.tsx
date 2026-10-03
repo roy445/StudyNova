@@ -76,10 +76,10 @@ type Provider = {
   outputRatePerMillion: number;
 };
 
-export default function AdminOpsPage() {
+export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
   const toast = useToast();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState(() => searchParams.get("tab") || "ai");
+  const [tab, setTab] = useState(() => searchParams.get("tab") || initialTab);
   const [bankFilters, setBankFilters] = useState({ q: "", subject: "", bankCategory: "", type: "", difficulty: "", level: "", origin: "", bankId: "" });
   const [bankPage, setBankPage] = useState(1);
   const changeBankFilters = (patch: Partial<typeof bankFilters>) => {
@@ -979,6 +979,7 @@ export default function AdminOpsPage() {
   );
 }
 
+export default AdminOpsPage;
 
 type EssayServiceValue = { status: "ENABLED" | "PAUSED" | "DISABLED"; proOnly: boolean; novaCost: number; dailyLimit: number; monthlyLimit: number; maintenanceNotice: string; showScores: boolean };
 

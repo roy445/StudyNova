@@ -2340,9 +2340,29 @@ export const systemLogs = pgTable(
     scope: text("scope").notNull().default("app"),
     message: text("message").notNull(),
     meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
+    fingerprint: text("fingerprint").notNull().default(""),
+    occurrenceCount: integer("occurrence_count").notNull().default(1),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: created(),
   },
-  (t) => [index("system_logs_idx").on(t.createdAt), index("system_logs_user_idx").on(t.userId, t.createdAt)],
+  (t) => [index("system_logs_idx").on(t.createdAt), index("system_logs_user_idx").on(t.userId, t.createdAt), index("system_logs_fingerprint_idx").on(t.fingerprint, t.lastSeenAt)],
+);
+
+export const errorDebugRuns = pgTable(
+  "error_debug_runs",
+  {
+    id: id(),
+    systemLogId: uuid("system_log_id").notNull().references(() => systemLogs.id, { onDelete: "cascade" }),
+    adminId: uuid("admin_id").references(() => users.userId, { onDelete: "set null" }),
+    runType: text("run_type").notNull().default("diagnose"), // diagnose | validation
+    status: text("status").notNull().default("completed"), // running | completed | failed | passed | regressed
+    result: jsonb("result").$type<Record<string, unknown>>().notNull().default({}),
+    note: text("note").notNull().default(""),
+    createdAt: created(),
+  },
+  (t) => [index("error_debug_runs_log_idx").on(t.systemLogId, t.createdAt), index("error_debug_runs_status_idx").on(t.status, t.createdAt)],
 );
 
 export const jobQueue = pgTable(

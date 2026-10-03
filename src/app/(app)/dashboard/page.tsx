@@ -120,6 +120,13 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <Card className="!overflow-hidden !p-0 border-cyan-300/30 bg-[radial-gradient(circle_at_90%_15%,rgba(55,211,255,.24),transparent_32%),linear-gradient(115deg,rgba(20,25,65,.96),rgba(7,22,42,.96))]">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-200">Today’s first step</p><h2 className="mt-1 text-2xl font-black text-white">今天先完成一個學習行動</h2><p className="mt-1 text-sm text-muted">Novi 已依照你的進度準備好入口，不需要在功能之間迷路。</p></div>
+          <div className="flex flex-wrap gap-2"><Link href="/study?tab=plan"><Button>開始今日計畫</Button></Link><Link href="/learning"><Button variant="ghost">進入線上課程</Button></Link></div>
+        </div>
+      </Card>
+
       {/* Novi greeting */}
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-col gap-3 bg-gradient-to-r from-[#7c5cff]/20 via-transparent to-[#37d3ff]/10 p-4 sm:flex-row sm:items-center sm:p-5">

@@ -1,7 +1,8 @@
 import { and, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
+import { z } from "zod";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { db } from "@/db";
-import { systemLogs } from "@/db/schema";
+import { errorDebugRuns, systemLogs } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { assertCjkGlyphCoverage, embedCjkFont } from "../cjk-font";
 import { runAiJson } from "../ai";
@@ -108,9 +109,38 @@ export const routes: RouteDef[] = [
         repairPrompt: `請分析 ${errorCode}（requestId: ${requestId}）並提出最小修復方案。`,
         safeToRetry: true,
       });
-      const result = { ...data, errorCode, requestId, sourceLogId: log.id, aiLatencyMs: aiMeta.latencyMs ?? null, generatedAt: new Date().toISOString() };
+      const result = { ...data, errorCode, requestId, sourceLogId: log.id, occurrenceCount: log.occurrenceCount, aiLatencyMs: aiMeta.latencyMs ?? null, generatedAt: new Date().toISOString() };
+      await db.insert(errorDebugRuns).values({ systemLogId: log.id, adminId: admin.userId, runType: "diagnose", status: "completed", result });
       await db.insert(systemLogs).values({ userId: admin.userId, level: "error", scope: "auto-debug", message: `自動除錯完成：${errorCode}`, meta: { sourceLogId: log.id, errorCode, requestId, result } });
       return result;
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/error-logs/:id/debug-history",
+    auth: "admin",
+    handler: async (ctx) => ({ runs: await db.select().from(errorDebugRuns).where(eq(errorDebugRuns.systemLogId, ctx.params.id)).orderBy(desc(errorDebugRuns.createdAt)).limit(50) }),
+  }),
+  route({
+    method: "POST",
+    path: "/admin/error-logs/:id/validate-fix",
+    auth: "admin",
+    rate: { limit: 30, windowSec: 3600, key: "admin-validate-fix" },
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ note: z.string().trim().max(1000).optional() }));
+      const log = (await db.select().from(systemLogs).where(eq(systemLogs.id, ctx.params.id)).limit(1))[0];
+      if (!log) throw notFound("找不到指定錯誤日誌");
+      const previous = (await db.select().from(errorDebugRuns).where(and(eq(errorDebugRuns.systemLogId, log.id), eq(errorDebugRuns.runType, "validation"))).orderBy(desc(errorDebugRuns.createdAt)).limit(1))[0];
+      const diagnosis = (await db.select().from(errorDebugRuns).where(and(eq(errorDebugRuns.systemLogId, log.id), eq(errorDebugRuns.runType, "diagnose"))).orderBy(desc(errorDebugRuns.createdAt)).limit(1))[0];
+      const previousCount = Number((previous?.result as Record<string, unknown> | undefined)?.occurrenceCount ?? (diagnosis?.result as Record<string, unknown> | undefined)?.occurrenceCount ?? log.occurrenceCount);
+      const currentCount = log.occurrenceCount;
+      const passed = currentCount <= previousCount;
+      const status = passed ? "passed" : "regressed";
+      const result = { occurrenceCount: currentCount, previousValidatedCount: previousCount, status, checkedAt: new Date().toISOString(), errorCode: String((log.meta as Record<string, unknown>).code ?? "SN-SYS-9901"), requestId: String((log.meta as Record<string, unknown>).requestId ?? "未提供") };
+      await db.insert(errorDebugRuns).values({ systemLogId: log.id, adminId: admin.userId, runType: "validation", status, result, note: body.note ?? "" });
+      if (passed) await db.update(systemLogs).set({ resolvedAt: new Date() }).where(eq(systemLogs.id, log.id));
+      return { ...result, sourceLogId: log.id, message: passed ? "驗證通過：目前沒有新增同類錯誤。" : "驗證未通過：同類錯誤發生次數仍在增加。" };
     },
   }),
 ];
