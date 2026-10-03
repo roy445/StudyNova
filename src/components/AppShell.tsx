@@ -29,12 +29,11 @@ function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
 type NavItem = { href: string; label: string; icon: SymbolName; special?: boolean; closeAt?: string | null };
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
-  { href: "/learning", label: "線上學習", icon: "book" },
-  { href: "/study", label: "學習", icon: "study" },
+  { href: "/study", label: "學習專區", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/ai", label: "AI", icon: "nova" },
   { href: "/solve", label: "解題專區", icon: "nova" },
-  { href: "/online-pk", label: "線上 PK", icon: "challenge", special: true },
+  { href: "/online-pk", label: "線上 PK", icon: "duel", special: true },
   { href: "/essay", label: "作文批改", icon: "pen" },
   { href: "/compress", label: "壓縮", icon: "archive" },
   { href: "/export", label: "匯出", icon: "archive" },
@@ -78,7 +77,6 @@ const NOVI_MODES = [
 
 const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "Dashboard", icon: "home" },
-  { href: "/learning", label: "線上學習", icon: "book" },
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/study/wrong", label: "錯題複習", icon: "challenge" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
@@ -88,7 +86,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/export", label: "資料匯出", icon: "archive" },
   { href: "/grades", label: "成績分析", icon: "grades" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
-  { href: "/online-pk", label: "線上 PK", icon: "challenge" },
+  { href: "/online-pk", label: "線上 PK", icon: "duel" },
   { href: "/report", label: "學習報告", icon: "report" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];

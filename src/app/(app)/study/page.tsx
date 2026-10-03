@@ -1,15 +1,18 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Badge, Button, Card, EmptyState, Select, Skeleton, Tabs, useToast } from "@/components/ui";
 import { apiPost, useApi } from "@/lib/api";
 import { MaterialsPanel, NotesPanel, OcrPanel } from "@/features/study/panels-a";
 import { QuizPanel, WrongPanel } from "@/features/study/panels-b";
 import { FocusPanel, MyVocabularyPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, VisualNotesPanel, WordLibraryPanel, WordsPanel } from "@/features/study/panels-c";
+import { learningSubjects } from "@/content/learning/ch1";
 
 const TABS = [
   { key: "timeline", label: "我的學習足跡", icon: "◷" },
+  { key: "online-courses", label: "線上課程", icon: "▱" },
   { key: "one-page", label: "考前一頁紙", icon: "▤" },
   { key: "materials", label: "教材", icon: "▦" },
   { key: "ocr", label: "圖片 OCR", icon: "▧" },
@@ -71,14 +74,15 @@ function StudyInner() {
   return (
     <div className="space-y-4">
       <header className="space-y-1">
-        <h1 className="text-xl font-bold sm:text-2xl">學習中心</h1>
-        <p className="text-xs text-muted sm:text-sm">教材、OCR、測驗、錯題、單字、句子、錄音與專注計時，全部在同一個地方。</p>
+        <h1 className="text-xl font-bold sm:text-2xl">學習專區</h1>
+        <p className="text-xs text-muted sm:text-sm">線上課程、教材、OCR、測驗、錯題、單字、句子、錄音與專注計時，全部在同一個地方。</p>
       </header>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       <div ref={contentRef} className={`scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))] ${tab === "words" || tab === "word-library" || tab === "my-vocabulary" || tab === "visual-notes" ? "study-vocabulary-fullbleed" : ""}`}>
         {tab === "timeline" && <TimelinePanel />}
+        {tab === "online-courses" && <OnlineCoursesPanel />}
         {tab === "one-page" && <OnePagePanel />}
         {tab === "materials" && <MaterialsPanel />}
         {tab === "ocr" && <OcrPanel />}
@@ -96,6 +100,17 @@ function StudyInner() {
       </div>
     </div>
   );
+}
+
+function OnlineCoursesPanel() {
+  return <Card title="📚 線上課程" subtitle="從學習專區直接進入互動教材、詳細知識、AI 問答與課後練習。">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {learningSubjects.map((subject) => subject.status === "PUBLISHED" ? <Link key={subject.slug} href={`/learning/${subject.slug}`} className="group rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.04] p-4 transition hover:-translate-y-0.5 hover:border-cyan-300/50">
+        <div className="flex items-start justify-between gap-3"><span className="text-3xl">{subject.icon}</span><Badge tone="cyan">{subject.statusLabel}</Badge></div>
+        <h3 className="mt-3 font-bold">{subject.title}</h3><p className="mt-1 text-xs leading-5 text-muted">{subject.subtitle}</p><p className="mt-3 text-xs font-semibold text-cyan-200">開始課程 →</p>
+      </Link> : <div key={subject.slug} className="rounded-2xl border border-[var(--line)] p-4 opacity-70"><span className="text-3xl grayscale">{subject.icon}</span><h3 className="mt-3 font-bold">{subject.title}</h3><p className="mt-1 text-xs text-muted">{subject.statusLabel}</p></div>)}
+    </div>
+  </Card>;
 }
 
 export default function StudyPage() {
