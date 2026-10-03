@@ -293,7 +293,7 @@ export function Modal({ open, onClose, title, children, wide = false, fullScreen
   );
 }
 
-export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; label: string; icon?: ReactNode }>; active: string; onChange: (key: string) => void }) {
+export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; label: string; icon?: ReactNode; featured?: boolean }>; active: string; onChange: (key: string) => void }) {
   return (
     <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
       {tabs.map((t) => (
@@ -301,7 +301,7 @@ export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; la
           key={t.key}
           onClick={() => onChange(t.key)}
           className={`focus-ring shrink-0 rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm ${
-            active === t.key ? "bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white shadow-lg" : "border border-[var(--line)] bg-white/5 text-muted hover:text-[var(--text)]"
+            active === t.key ? "bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white shadow-lg" : t.featured ? "border border-cyan-300/70 bg-gradient-to-r from-cyan-300/20 via-violet-400/20 to-amber-300/15 text-cyan-50 shadow-[0_0_18px_rgba(55,211,255,.32)] animate-pulse" : "border border-[var(--line)] bg-white/5 text-muted hover:text-[var(--text)]"
           }`}
         >
           {t.icon && <span className="mr-1">{t.icon}</span>}

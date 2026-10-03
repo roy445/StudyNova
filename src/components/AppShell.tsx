@@ -478,16 +478,18 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
           {(examHubs.data?.hubs.length ? [...SIDE_NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isPk = item.href === "/online-pk";
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+                className={`focus-ring flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${isPk ? "pk-side-nav" : ""} ${
                   active ? "bg-gradient-to-r from-[#7c5cff]/30 to-[#37d3ff]/10 text-[var(--text)] shadow-inner" : "text-muted hover:bg-white/5 hover:text-[var(--text)]"
                 }`}
               >
-                <SymbolIcon name={item.icon} size={19} active={active} />
+                {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-side-icon" /> : <SymbolIcon name={item.icon} size={19} active={active} />}
                 <span className="truncate">{item.label}</span>
+                {isPk && <span className="pk-beta-badge">BETA</span>}
               </Link>
             );
           })}
@@ -626,8 +628,9 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
                 >
                   {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
-                  <span className={isPk ? "pk-nav-icon" : item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>
+                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
                   <span className="max-w-full truncate">{item.label}</span>
+                  {isPk && <span className="pk-beta-badge pk-beta-mobile">BETA</span>}
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
                 </Link>
               </li>

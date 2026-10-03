@@ -12,7 +12,7 @@ import { learningSubjects } from "@/content/learning/ch1";
 
 const TABS = [
   { key: "timeline", label: "我的學習足跡", icon: "◷" },
-  { key: "online-courses", label: "線上課程", icon: "▱" },
+  { key: "online-courses", label: "線上學習", icon: "📚", featured: true },
   { key: "one-page", label: "考前一頁紙", icon: "▤" },
   { key: "materials", label: "教材", icon: "▦" },
   { key: "ocr", label: "圖片 OCR", icon: "▧" },
@@ -103,7 +103,7 @@ function StudyInner() {
 }
 
 function OnlineCoursesPanel() {
-  return <Card title="📚 線上課程" subtitle="從學習專區直接進入互動教材、詳細知識、AI 問答與課後練習。">
+  return <Card title="📚 線上學習" subtitle="從學習專區直接進入互動教材、詳細知識、AI 問答與課後練習。">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {learningSubjects.map((subject) => subject.status === "PUBLISHED" ? <Link key={subject.slug} href={`/learning/${subject.slug}`} className="group rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.04] p-4 transition hover:-translate-y-0.5 hover:border-cyan-300/50">
         <div className="flex items-start justify-between gap-3"><span className="text-3xl">{subject.icon}</span><Badge tone="cyan">{subject.statusLabel}</Badge></div>
