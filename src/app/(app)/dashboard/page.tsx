@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const radar = useApi<{ metrics: Array<{ key: string; label: string; value: number; evidence: string }>; weakest: { label: string; value: number; evidence: string } | null }>("/learning/radar");
   const alerts = useApi<{ alerts: Array<{ id: string; title: string; body: string; evidence: Record<string, unknown> }>; enabled: boolean }>("/ai/alerts");
   const patterns = useApi<{ patterns: Array<{ subject: string; reason: string; count: number; questionCount: number; evidence: string }>; enoughData: boolean }>("/learning/error-patterns");
+  const examHubs = useApi<{ hubs: Array<{ id: string; name: string; examNumber: string; closeAt: string | null }> }>("/exam-hubs/available");
   const examPolicies = useApi<{ policies: Array<{ id: string; schoolName: string; educationLevel: string; grade: number; term: string; examName: string; examDate: string }> }>("/exam-date-policies");
   const [appealExam, setAppealExam] = useState<Dashboard["upcomingExams"][number] | null>(null);
   const [appealDate, setAppealDate] = useState("");
@@ -105,6 +106,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {examHubs.data?.hubs.length ? <Link href={`/exam-hubs/${examHubs.data.hubs[0].id}`} className="group block overflow-hidden rounded-[2rem] border-2 border-[#ffc857]/70 bg-[radial-gradient(circle_at_88%_15%,rgba(255,200,87,.34),transparent_34%),linear-gradient(135deg,rgba(52,27,72,.98),rgba(8,28,58,.98))] p-5 shadow-[0_0_38px_rgba(255,200,87,.2)] transition hover:-translate-y-0.5 hover:shadow-[0_0_55px_rgba(255,200,87,.32)] sm:p-7"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><Badge tone="gold">限時段考考題專區</Badge><Badge tone="rose">現在開放</Badge></div><h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">{examHubs.data.hubs[0].name}</h2><p className="mt-1 text-sm text-slate-200">{examHubs.data.hubs[0].examNumber}・直接開始計時作答，完成後保存成績與使用紀錄。</p></div><span className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#ffc857] to-[#ff9f43] px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_24px_rgba(255,200,87,.42)]">快速進入 →</span></div></Link> : null}
 
       <Card className="!overflow-hidden !p-0 border-cyan-300/30 bg-[radial-gradient(circle_at_90%_15%,rgba(55,211,255,.24),transparent_32%),linear-gradient(115deg,rgba(20,25,65,.96),rgba(7,22,42,.96))]">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">

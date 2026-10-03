@@ -17,6 +17,7 @@ const releaseMigrations = [
   "0093_chemistry_mvp.sql",
   "0094_learning_feature_permissions.sql",
   "0095_error_debug_history.sql",
+  "0096_exam_hub_usage_logs.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

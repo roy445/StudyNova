@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, inArray, isNull, lte, or, gt } from "drizzle-orm";
 import { z } from "zod";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { db } from "@/db";
-import { announcements, examHubAttempts, examHubs, examHubWordProgress, examHubWords, userSettings, questionBanks, questionBankMemberships, questionSources, questions, studyMaterials, studyMaterialPages, examHubMaterialImports, examQuestionGenerationJobs, examQuestionGenerationItems } from "@/db/schema";
+import { announcements, examHubAttempts, examHubs, examHubWordProgress, examHubWords, userSettings, questionBanks, questionBankMemberships, questionSources, questions, studyMaterials, studyMaterialPages, examHubMaterialImports, examQuestionGenerationJobs, examQuestionGenerationItems, examHubUsageLogs, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 import { createAiBackgroundJob } from "../ai-background";
@@ -39,6 +39,14 @@ export const routes: RouteDef[] = [
     const user = ctx.requireUser(); const result = await matchingUserHubs(user.userId);
     return { hubs: result.hubs, profileComplete: Boolean(result.settings?.schoolLevel && result.settings.schoolName && result.settings.grade), needsProfile: !result.settings?.schoolName };
   }}),
+  route({ method: "POST", path: "/exam-hubs/:id/timed-start", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const hub = (await matchingUserHubs(user.userId)).hubs.find((item) => item.id === ctx.params.id);
+    if (!hub || !hub.questionBankId) throw notFound("找不到目前開放的限時段考題庫");
+    const sessionId = randomUUID();
+    const row = (await db.insert(examHubUsageLogs).values({ hubId: hub.id, userId: user.userId, action: "started", sessionId, startedAt: new Date(), metadata: { mode: "timed_questions" } }).returning())[0];
+    return { sessionId, startedAt: row.startedAt, hubId: hub.id, timeLimitSeconds: Math.max(300, Number((hub.formalScope as Record<string, unknown>)?.timeLimitSeconds ?? 1800)) };
+  }}),
   route({ method: "GET", path: "/exam-hubs/:id", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser(); const result = await matchingUserHubs(user.userId); const hub = result.hubs.find((item) => item.id === ctx.params.id);
     if (!hub) throw notFound("找不到目前開放的段考專區");
@@ -72,7 +80,31 @@ export const routes: RouteDef[] = [
     const hub = (await matchingUserHubs(user.userId)).hubs.find((item) => item.id === ctx.params.id);
     if (!hub || !hub.questionBankId) throw notFound("找不到目前開放的段考題庫");
     const rows = await db.select({ question: questions }).from(questionBankMemberships).innerJoin(questionBanks, eq(questionBankMemberships.bankId, questionBanks.id)).innerJoin(questions, eq(questionBankMemberships.questionId, questions.id)).where(and(eq(questionBankMemberships.bankId, hub.questionBankId), eq(questionBanks.scope, `exam:${hub.id}`), eq(questionBanks.status, "published"), eq(questions.status, "published"))).orderBy(asc(questions.createdAt));
-    return { scope: `exam:${hub.id}`, questions: rows.map((row) => row.question) };
+    return { scope: `exam:${hub.id}`, questions: rows.map(({ question }) => ({ id: question.id, subject: question.subject, topic: question.topic, chapter: question.chapter, unit: question.unit, type: question.type, stem: question.stem, options: question.options, points: question.points, estimatedSeconds: question.estimatedSeconds })) };
+  }}),
+  route({ method: "POST", path: "/exam-hubs/:id/timed-attempt", auth: "user", handler: async (ctx) => {
+    const user = ctx.requireUser();
+    const body = await ctx.json(z.object({ sessionId: z.string().uuid(), answers: z.record(z.string(), z.string()), durationSeconds: z.number().int().min(0).max(86400) }));
+    const hub = (await matchingUserHubs(user.userId)).hubs.find((item) => item.id === ctx.params.id);
+    if (!hub || !hub.questionBankId) throw notFound("找不到目前開放的限時段考題庫");
+    const rows = await db.select({ question: questions }).from(questionBankMemberships).innerJoin(questionBanks, eq(questionBankMemberships.bankId, questionBanks.id)).innerJoin(questions, eq(questionBankMemberships.questionId, questions.id)).where(and(eq(questionBankMemberships.bankId, hub.questionBankId), eq(questionBanks.scope, `exam:${hub.id}`), eq(questionBanks.status, "published"), eq(questions.status, "published"))).orderBy(asc(questions.createdAt));
+    let score = 0;
+    for (const { question } of rows) {
+      const expected = question.answer.map((value) => String(value).trim().toLocaleLowerCase());
+      const actual = String(body.answers[question.id] ?? "").trim().toLocaleLowerCase();
+      if (actual && expected.includes(actual)) score += question.points || 1;
+    }
+    const total = rows.reduce((sum, { question }) => sum + (question.points || 1), 0);
+    const completedAt = new Date();
+    const session = (await db.select().from(examHubUsageLogs).where(and(eq(examHubUsageLogs.sessionId, body.sessionId), eq(examHubUsageLogs.hubId, hub.id), eq(examHubUsageLogs.userId, user.userId))).limit(1))[0];
+    if (session) await db.update(examHubUsageLogs).set({ action: "completed", completedAt, durationSeconds: body.durationSeconds, score, total, metadata: { mode: "timed_questions", answered: Object.keys(body.answers).length } }).where(eq(examHubUsageLogs.id, session.id));
+    else await db.insert(examHubUsageLogs).values({ hubId: hub.id, userId: user.userId, action: "completed", sessionId: body.sessionId, startedAt: new Date(completedAt.getTime() - body.durationSeconds * 1000), completedAt, durationSeconds: body.durationSeconds, score, total, metadata: { mode: "timed_questions", answered: Object.keys(body.answers).length } });
+    return { score, total, percentage: total ? Math.round((score / total) * 100) : 0, completedAt };
+  }}),
+  route({ method: "GET", path: "/admin/exam-hubs/:id/usage", auth: "admin", handler: async (ctx) => {
+    const rows = await db.select({ id: examHubUsageLogs.id, userId: examHubUsageLogs.userId, displayName: users.displayName, novaId: users.novaId, action: examHubUsageLogs.action, sessionId: examHubUsageLogs.sessionId, startedAt: examHubUsageLogs.startedAt, completedAt: examHubUsageLogs.completedAt, durationSeconds: examHubUsageLogs.durationSeconds, score: examHubUsageLogs.score, total: examHubUsageLogs.total }).from(examHubUsageLogs).innerJoin(users, eq(examHubUsageLogs.userId, users.userId)).where(eq(examHubUsageLogs.hubId, ctx.params.id)).orderBy(desc(examHubUsageLogs.startedAt)).limit(500);
+    const completed = rows.filter((row) => row.action === "completed");
+    return { summary: { totalSessions: rows.length, completedSessions: completed.length, uniqueUsers: new Set(rows.map((row) => row.userId)).size, averageDurationSeconds: completed.length ? Math.round(completed.reduce((sum, row) => sum + row.durationSeconds, 0) / completed.length) : 0, averageScore: completed.length ? Math.round(completed.reduce((sum, row) => sum + (row.total ? (row.score ?? 0) / row.total * 100 : 0), 0) / completed.length) : 0 }, rows };
   }}),
   route({ method: "GET", path: "/admin/exam-hubs", auth: "admin", handler: async () => ({ hubs: await db.select().from(examHubs).orderBy(desc(examHubs.createdAt)) }) }),
   route({ method: "POST", path: "/admin/exam-hubs", auth: "admin", handler: async (ctx) => { const admin = ctx.requireUser(); const body = await ctx.json(z.object({ name: z.string().min(1).max(120), educationLevel: z.enum(["junior", "senior"]), schoolName: z.string().max(120).default(""), grade: z.number().int().min(1).max(3), examNumber: z.string().min(1).max(40), targetScore: z.number().int().min(0).max(100).default(60), openAt: z.string().datetime().nullable().optional(), closeAt: z.string().datetime().nullable().optional(), status: z.enum(["draft", "published", "closed"]).default("draft"), announcement: z.string().max(2000).default(""), showMarquee: z.boolean().default(false) })); const row = (await db.insert(examHubs).values({ ...body, openAt: body.openAt ? new Date(body.openAt) : null, closeAt: body.closeAt ? new Date(body.closeAt) : null, createdBy: admin.userId }).returning())[0]; if (body.showMarquee) await db.insert(announcements).values({ title: "📢 段考專區已開放", body: body.announcement || `${body.name} 已開放，現在可以開始複習英文單字。`, audience: "all", audienceIds: [], pinned: false, marquee: true, notify: true, push: false, sortOrder: 0, startsAt: body.openAt ? new Date(body.openAt) : new Date(), endsAt: body.closeAt ? new Date(body.closeAt) : null, createdBy: admin.userId, link: `/exam-hubs/${row.id}`, targetFeature: "dashboard" }).catch(() => undefined); return { hub: row }; } }),

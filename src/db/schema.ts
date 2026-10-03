@@ -3359,6 +3359,25 @@ export const examHubAttempts = pgTable(
   (t) => [index("exam_hub_attempts_user_idx").on(t.userId, t.createdAt), index("exam_hub_attempts_hub_idx").on(t.hubId, t.createdAt)],
 );
 
+export const examHubUsageLogs = pgTable(
+  "exam_hub_usage_logs",
+  {
+    id: id(),
+    hubId: uuid("hub_id").notNull().references(() => examHubs.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    action: text("action").notNull().default("started"),
+    sessionId: text("session_id").notNull().default(""),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    durationSeconds: integer("duration_seconds").notNull().default(0),
+    score: integer("score"),
+    total: integer("total"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [index("exam_hub_usage_hub_time_idx").on(t.hubId, t.createdAt), index("exam_hub_usage_user_time_idx").on(t.userId, t.createdAt)],
+);
+
 export const examQuestionGenerationJobs = pgTable(
   "exam_question_generation_jobs",
   {

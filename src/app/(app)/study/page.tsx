@@ -58,6 +58,7 @@ function OnePagePanel() {
 
 function StudyInner() {
   const params = useSearchParams();
+  const examHubs = useApi<{ hubs: Array<{ id: string; name: string; examNumber: string; closeAt: string | null }> }>("/exam-hubs/available");
   const [tab, setTab] = useState(params.get("tab") === "plan" ? "timeline" : (params.get("tab") ?? "timeline"));
   const contentRef = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
@@ -83,6 +84,8 @@ function StudyInner() {
         <h1 className="text-xl font-bold sm:text-2xl">學習專區</h1>
         <p className="text-xs text-muted sm:text-sm">線上課程、教材、OCR、測驗、錯題、單字、句子、錄音與專注計時，全部在同一個地方。</p>
       </header>
+
+      {examHubs.data?.hubs.length ? <Link href={`/exam-hubs/${examHubs.data.hubs[0].id}`} className="group block overflow-hidden rounded-[1.75rem] border-2 border-[#ffc857]/65 bg-[radial-gradient(circle_at_85%_15%,rgba(255,200,87,.3),transparent_35%),linear-gradient(135deg,rgba(52,27,72,.98),rgba(8,28,58,.98))] p-5 shadow-[0_0_32px_rgba(255,200,87,.17)] transition hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(255,200,87,.3)]"><div className="flex flex-wrap items-center justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><Badge tone="gold">限時段考考題專區</Badge><Badge tone="rose">現在開放</Badge></div><h2 className="mt-2 text-xl font-black text-white sm:text-2xl">{examHubs.data.hubs[0].name}</h2><p className="mt-1 text-sm text-slate-200">{examHubs.data.hubs[0].examNumber}・計時作答、完成後留下個人紀錄。</p></div><span className="rounded-xl bg-[#ffc857] px-4 py-2.5 text-sm font-black text-slate-950">立即作答 →</span></div></Link> : null}
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
