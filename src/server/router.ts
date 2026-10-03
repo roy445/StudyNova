@@ -278,9 +278,7 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
         const audit = classifyAuditPath(def.path);
         await writeAudit({ userId: user.userId, eventType: audit.eventType, module: audit.module, action: audit.action, resourceId: params.id, outcome: "failure", errorCategory: err.code, ip, userAgent: req.headers.get("user-agent") ?? "", metadata: { status: err.status, httpStatus: err.status, route: def.path, method: def.method, errorCode: err.code } });
       }
-      if (err.status >= 500) {
-        await logSystemError(`api:${def.method} ${def.path}`, err.message, { ip, code: err.code, requestId: err.requestId, route: def.path, method: def.method, stage: "route_handler" }, user?.userId ?? null);
-      }
+      await logSystemError(`api:${def.method} ${def.path}`, err.message, { ip, code: err.code, hint: err.hint, requestId: err.requestId, route: def.path, method: def.method, stage: "route_handler", details: err.details ?? null }, user?.userId ?? null);
       return errorResponse(err);
     }
     const requestId = newRequestId();
