@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS "tester_decision_links" (
   "target_email" text NOT NULL,
   "expires_at" timestamptz NOT NULL,
   "used_at" timestamptz,
-  "created_by" uuid REFERENCES "users"("user_id") ON DELETE SET NULL,
+  "created_by" uuid REFERENCES "users"("id") ON DELETE SET NULL,
   "reason" text NOT NULL DEFAULT '',
   "created_at" timestamptz NOT NULL DEFAULT now()
 );
