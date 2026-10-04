@@ -49,6 +49,7 @@ import {
   accountAppeals,
   sessions,
   linkGenerationLogs,
+  testerDecisionLinks,
   emailMessageLogs,
   customizationCategories,
   customizationVersions,
@@ -239,8 +240,22 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ kind: z.enum(["password_reset", "appeal", "reactivate", "pro_reward", "nova_reward"]), email: z.string().email().optional(), value: z.number().int().min(1).max(3650).optional(), expiresMinutes: z.number().int().min(10).max(10080).default(60), reason: z.string().max(300).optional(), baseUrl: z.string().url().optional() }));
+      const body = await ctx.json(z.object({ kind: z.enum(["password_reset", "appeal", "reactivate", "pro_reward", "nova_reward", "tester_approved", "tester_rejected"]), email: z.string().email().optional(), value: z.number().int().min(1).max(3650).optional(), expiresMinutes: z.number().int().min(10).max(10080).default(60), reason: z.string().max(300).optional(), baseUrl: z.string().url().optional() }));
       const origin = body.baseUrl ?? new URL(ctx.req.url).origin;
+      if (body.kind === "tester_approved" || body.kind === "tester_rejected") {
+        if (!body.email) throw badRequest("測試員資格連結需要申請者 Email");
+        const token = randomToken(32);
+        const expiresAt = new Date(Date.now() + body.expiresMinutes * 60_000);
+        const decision = body.kind === "tester_approved" ? "approved" : "rejected";
+        await db.insert(testerDecisionLinks).values({ tokenHash: sha256(token), decision, targetEmail: body.email.toLowerCase().trim(), expiresAt, createdBy: admin.userId, reason: body.reason ?? "測試員申請審核" });
+        const link = `${origin}/tester/decision?token=${encodeURIComponent(token)}`;
+        const customerMessage = decision === "approved"
+          ? `您好！\n\n恭喜你通過 StudyNova 測試員志願者徵選！\n\n請點擊以下連結，依照頁面提示重新登入一次，即可取得測試員資格：\n${link}\n\n取得資格後，你可以進入測試員專屬後台、體驗 Beta 功能並回報心得。\n\n如有任何問題，歡迎聯絡 StudyNova 客服團隊。\n\nStudyNova 客服團隊`
+          : `您好！\n\n感謝你申請 StudyNova 測試員。這次申請目前未能通過，仍非常感謝你願意支持與提供時間。\n\n未來有新的測試活動，我們會再開放申請；如有疑問，歡迎聯絡 StudyNova 客服團隊。\n\nStudyNova 客服團隊`;
+        await recordGeneratedLink({ actorId: admin.userId, kind: body.kind, targetType: "tester_application", recipient: body.email, url: link, expiresAt, reason: body.reason ?? "測試員申請審核", metadata: { decision } });
+        await adminLog({ actorId: admin.userId, action: `action-link.${body.kind}`, targetType: "tester_application", reason: body.reason ?? "測試員申請審核", after: { targetEmail: body.email, decision, expiresAt }, ip: ctx.ip });
+        return { kind: body.kind, link, expiresAt: expiresAt.toISOString(), label: decision === "approved" ? "測試員通過連結" : "測試員不通過通知連結", customerMessage };
+      }
       if (body.kind === "password_reset") {
         if (!body.email) throw badRequest("密碼重設連結需要使用者 Email");
         const target = (await db.select({ userId: users.userId, displayName: users.displayName, email: users.email }).from(users).where(eq(users.email, body.email.toLowerCase().trim())).limit(1))[0];

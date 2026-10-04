@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { and, asc, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { featurePermissions, issueReports, testerFeedbackComments, testerFeedbackNotificationPreferences, testerFeedbackPosts, users } from "@/db/schema";
+import { featurePermissions, issueReports, testerDecisionLinks, testerFeedbackComments, testerFeedbackNotificationPreferences, testerFeedbackPosts, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { forbidden, notFound, toCsv } from "../core";
+import { forbidden, notFound, randomToken, sha256, toCsv } from "../core";
 import { isTesterUser, testerFeatures, testerMembers, TESTER_GROUP_NAME } from "../tester";
 import { notify } from "../notify";
 import { sendAccountEmail, systemAnnouncementEmailTemplate } from "../email";
@@ -93,6 +93,45 @@ async function testerAnalytics(days: number) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "POST",
+    path: "/tester/applications",
+    auth: "none",
+    rate: { limit: 3, windowSec: 3600, key: "tester-application" },
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({ name: z.string().trim().min(2).max(80), email: z.string().email().max(180), ageRange: z.string().max(40), device: z.string().max(40), motivation: z.string().trim().min(10).max(2000), experience: z.string().trim().min(10).max(2000), availability: z.string().max(40) }));
+      const ticketNo = `SN-TEST-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${randomToken(3).toUpperCase()}`;
+      const rows = await db.insert(issueReports).values({ ticketNo, userId: ctx.user?.userId ?? null, contactEmail: body.email.toLowerCase(), category: "tester", severity: "normal", title: `測試員志願者申請｜${body.name}`, description: [`姓名／暱稱：${body.name}`, `目前身分：${body.ageRange}`, `主要裝置：${body.device}`, `每週投入：${body.availability}`, `申請動機：${body.motivation}`, `測試經驗：${body.experience}`].join("\n\n"), pageUrl: "/tester/apply", userAgent: (ctx.req.headers.get("user-agent") ?? "").slice(0, 300), appVersion: process.env.APP_VERSION || "1.1.0" }).returning({ id: issueReports.id, ticketNo: issueReports.ticketNo });
+      const admins = await db.select({ userId: users.userId }).from(users).where(or(eq(users.role, "admin"), eq(users.role, "owner")));
+      await Promise.all(admins.map((admin) => notify({ userId: admin.userId, kind: "support", title: `🧪 新測試員申請 ${ticketNo}`, body: `${body.name} 已提交測試員志願者申請，請於 7 天內審核。`, link: "/admin/support?category=tester", push: true, dedupeKey: `tester-application:${rows[0].id}:${admin.userId}` })));
+      return { ticketNo: rows[0].ticketNo };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/tester/decision/:token",
+    auth: "none",
+    handler: async (ctx) => {
+      const row = (await db.select({ decision: testerDecisionLinks.decision, targetEmail: testerDecisionLinks.targetEmail, expiresAt: testerDecisionLinks.expiresAt, usedAt: testerDecisionLinks.usedAt }).from(testerDecisionLinks).where(eq(testerDecisionLinks.tokenHash, sha256(ctx.params.token))).limit(1))[0];
+      if (!row || row.expiresAt < new Date()) throw notFound("此測試員連結不存在或已過期");
+      return { decision: row.decision, targetEmail: row.targetEmail, expiresAt: row.expiresAt.toISOString(), used: Boolean(row.usedAt) };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/tester/decision/:token/activate",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const row = (await db.select().from(testerDecisionLinks).where(eq(testerDecisionLinks.tokenHash, sha256(ctx.params.token))).limit(1))[0];
+      if (!row || row.expiresAt < new Date()) throw notFound("此測試員連結不存在或已過期");
+      if (row.usedAt) throw forbidden("此測試員連結已使用");
+      if (user.email.toLowerCase() !== row.targetEmail.toLowerCase()) throw forbidden("請使用申請時填寫的 Email 登入");
+      if (row.decision === "approved") await db.update(users).set({ role: "tester", updatedAt: new Date() }).where(eq(users.userId, user.userId));
+      await db.update(testerDecisionLinks).set({ usedAt: new Date() }).where(eq(testerDecisionLinks.id, row.id));
+      return { decision: row.decision, activated: row.decision === "approved" };
+    },
+  }),
   route({
     method: "GET",
     path: "/tester/overview",

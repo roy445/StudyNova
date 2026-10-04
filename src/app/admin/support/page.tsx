@@ -101,8 +101,8 @@ export default function AdminSupportPage() {
 
       <Card title="🔗 管理員連結中心" subtitle="集中產生各類可複製連結：密碼重設、帳號申訴、重新啟動、Pro 與 Nova 獎勵。">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="連結分類"><Select value={linkForm.kind} onChange={(e) => setLinkForm({ ...linkForm, kind: e.target.value })}><option value="password_reset">密碼重設</option><option value="appeal">帳號申訴</option><option value="reactivate">帳號重新啟動</option><option value="pro_reward">Pro 資格</option><option value="nova_reward">Nova 獎勵</option></Select></Field>
-          {linkForm.kind === "password_reset" && <Field label="使用者 Email"><Input type="email" value={linkForm.email} onChange={(e) => setLinkForm({ ...linkForm, email: e.target.value })} placeholder="student@example.com" /></Field>}
+          <Field label="連結分類"><Select value={linkForm.kind} onChange={(e) => setLinkForm({ ...linkForm, kind: e.target.value })}><option value="password_reset">密碼重設</option><option value="appeal">帳號申訴</option><option value="reactivate">帳號重新啟動</option><option value="pro_reward">Pro 資格</option><option value="nova_reward">Nova 獎勵</option><option value="tester_approved">測試員通過</option><option value="tester_rejected">測試員不通過</option></Select></Field>
+          {(linkForm.kind === "password_reset" || linkForm.kind === "tester_approved" || linkForm.kind === "tester_rejected") && <Field label={linkForm.kind.startsWith("tester_") ? "申請者 Email" : "使用者 Email"}><Input type="email" value={linkForm.email} onChange={(e) => setLinkForm({ ...linkForm, email: e.target.value })} placeholder="applicant@example.com" /></Field>}
           {(linkForm.kind === "pro_reward" || linkForm.kind === "nova_reward") && <Field label={linkForm.kind === "pro_reward" ? "Pro 天數" : "Nova 數量"}><Input type="number" min={1} value={linkForm.value} onChange={(e) => setLinkForm({ ...linkForm, value: e.target.value })} /></Field>}
           <Field label="有效時間（分鐘）"><Input type="number" min={10} value={linkForm.expiresMinutes} onChange={(e) => setLinkForm({ ...linkForm, expiresMinutes: e.target.value })} /></Field>
         </div>

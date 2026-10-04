@@ -3609,3 +3609,20 @@ export const testerFeedbackNotificationPreferences = pgTable("tester_feedback_no
   emailEnabled: boolean("email_enabled").notNull().default(false),
   updatedAt: updated(),
 });
+
+
+export const testerDecisionLinks = pgTable(
+  "tester_decision_links",
+  {
+    id: id(),
+    tokenHash: text("token_hash").notNull(),
+    decision: text("decision").notNull(), // approved | rejected
+    targetEmail: text("target_email").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    reason: text("reason").notNull().default(""),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("tester_decision_token_uq").on(t.tokenHash), index("tester_decision_expiry_idx").on(t.expiresAt), index("tester_decision_email_idx").on(t.targetEmail)],
+);
