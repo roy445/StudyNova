@@ -24,6 +24,13 @@ export async function ensureTesterGroup(createdBy: string) {
   }
 }
 
+export async function enrollTesterUser(userId: string) {
+  const group = await ensureTesterGroup(userId);
+  if (!group) return false;
+  await db.insert(identityGroupMembers).values({ identityGroupId: group.id, userId, addedBy: userId }).onConflictDoNothing();
+  return true;
+}
+
 export async function isTesterUser(userId: string) {
   const rows = await db.select({ id: identityGroupMembers.userId })
     .from(identityGroupMembers)

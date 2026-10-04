@@ -25,6 +25,7 @@ import { sendPasswordResetEmail } from "../email";
 import { checkDisplayName } from "../name-moderation";
 import { getRegistrationControl } from "../registration";
 import { deleteObject, objectOwner, putObject, readObject } from "@/server/storage";
+import { enrollTesterUser } from "../tester";
 
 const emailSchema = z.string().email("Email 格式不正確").max(180);
 const passwordSchema = z.string().min(8, "密碼至少 8 個字元").max(128);
@@ -71,6 +72,7 @@ export const routes: RouteDef[] = [
           termsVersion: z.string().min(1).max(40),
           termsReadComplete: z.literal(true),
           termsAccepted: z.literal(true),
+          testerSignup: z.boolean().default(false),
         }),
       );
       const registration = await getRegistrationControl();
@@ -100,6 +102,7 @@ export const routes: RouteDef[] = [
 
       const user = inserted[0];
       await db.insert(userSettings).values({ userId: user.userId }).onConflictDoNothing();
+      const tester = body.testerSignup ? await enrollTesterUser(user.userId) : false;
       await ensureUserEconomy(user.userId);
       await ensureDailyTasks(user.userId);
       await notify({
@@ -122,7 +125,7 @@ export const routes: RouteDef[] = [
       const failedAdminNotifications = adminNotifications.filter((result) => result.status === "rejected");
       if (failedAdminNotifications.length) console.error("[registration] admin notification failed", { userId: user.userId, failed: failedAdminNotifications.length });
       await createSession(user.userId, { ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
-      return { userId: user.userId, novaId: user.novaId, displayName: user.displayName, role: user.role, onboarded: false };
+      return { userId: user.userId, novaId: user.novaId, displayName: user.displayName, role: user.role, tester, onboarded: false };
     },
   }),
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Wordmark, StarField, NoviAvatar } from "@/components/brand";
 import { Button, Field, Input, useToast } from "@/components/ui";
@@ -11,6 +11,8 @@ type RegistrationControl = { enabled: boolean; reason: string; reopeningAt: stri
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const testerSignup = searchParams.get("tester") === "1";
   const toast = useToast();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -18,7 +20,7 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [created, setCreated] = useState<{ novaId: string; displayName: string } | null>(null);
+  const [created, setCreated] = useState<{ novaId: string; displayName: string; tester?: boolean } | null>(null);
   const [qr, setQr] = useState<{ svg: string; link: string } | null>(null);
   const [terms, setTerms] = useState<{ version: string; title: string; body: string } | null>(null);
   const [termsReadComplete, setTermsReadComplete] = useState(false);
@@ -56,7 +58,7 @@ export default function RegisterPage() {
     }
     setPending(true);
     try {
-      const res = await apiPost<{ novaId: string; displayName: string }>("/auth/register", { email, password, displayName, termsVersion: terms.version, termsReadComplete, termsAccepted });
+      const res = await apiPost<{ novaId: string; displayName: string; tester?: boolean }>("/auth/register", { email, password, displayName, termsVersion: terms.version, termsReadComplete, termsAccepted, testerSignup });
       setCreated(res);
       trackAnalytics("register_success", { route: "/register" });
       toast.push("success", "已建立 StudyNova 帳號");
@@ -85,7 +87,7 @@ export default function RegisterPage() {
             <NoviAvatar size={92} state="cheer" />
           </div>
           <h1 className="mt-3 text-xl font-bold">歡迎加入 StudyNova</h1>
-          <p className="mt-1 text-sm text-muted">{created.displayName}，你的專屬身分已建立</p>
+          <p className="mt-1 text-sm text-muted">{created.displayName}，{created.tester ? "你的測試員身分與帳號已建立" : "你的專屬身分已建立"}</p>
 
           <div className="mt-4 rounded-2xl border border-[#37d3ff]/40 bg-[#37d3ff]/10 px-4 py-3">
             <p className="text-[11px] tracking-widest text-muted">你的 NOVA ID</p>
@@ -124,7 +126,7 @@ export default function RegisterPage() {
             </Button>
           </div>
 
-          <Button full size="lg" className="mt-3" onClick={() => router.replace("/onboarding")}>
+          <Button full size="lg" className="mt-3" onClick={() => router.replace(created.tester ? "/tester" : "/onboarding")}>
             下一步：設定學習目標 →
           </Button>
         </div>
@@ -139,6 +141,7 @@ export default function RegisterPage() {
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
           <Wordmark size={44} />
           <p className="text-xs text-muted">建立帳號後系統會自動產生你的 NOVA ID（不需要 Email 驗證）</p>
+          {testerSignup && <div className="mt-2 rounded-xl border border-violet-300/30 bg-violet-300/10 px-3 py-2 text-left text-xs leading-5 text-violet-100"><strong>測試員註冊注意事項</strong><br />註冊完成後會自動加入測試員 Beta 身分組；請先閱讀指南、不要上傳含個資的測試圖片，並使用回報中心或心得看板回報問題。</div>}
         </div>
 
         <form onSubmit={submit} onFocus={() => { if (!registerStartedRef.current) { registerStartedRef.current = true; trackAnalytics("register_started", { route: "/register" }); } }} className="space-y-3">

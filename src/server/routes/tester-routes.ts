@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { featurePermissions, identityGroupMembers, identityGroups, issueReports, testerFeedbackComments, testerFeedbackNotificationPreferences, testerFeedbackPosts, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
@@ -54,6 +54,44 @@ async function sendFeedbackAlerts(input: { recipientIds: string[]; excludeUserId
   await Promise.all(emailUsers.map((user) => sendAccountEmail(user.email, systemAnnouncementEmailTemplate({ displayName: user.displayName, title: input.title, body: input.body, link: `${input.baseUrl}/tester`, category: "測試員 Beta 回饋" }), { kind: "tester_feedback", displayName: user.displayName, metadata: { postId: input.postId } })));
 }
 
+async function testerAnalytics(groupId: string, days: number) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const members = await testerMembers(groupId);
+  const memberIds = new Set(members.map((member) => member.userId));
+  const [reportTotal, postTotal, commentTotal, reports, posts, comments] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` }).from(issueReports).where(eq(issueReports.category, "tester")),
+    db.select({ count: sql<number>`count(*)::int` }).from(testerFeedbackPosts),
+    db.select({ count: sql<number>`count(*)::int` }).from(testerFeedbackComments),
+    db.select({ userId: issueReports.userId, createdAt: issueReports.createdAt }).from(issueReports).where(and(eq(issueReports.category, "tester"), gte(issueReports.createdAt, since))),
+    db.select({ userId: testerFeedbackPosts.authorId, createdAt: testerFeedbackPosts.createdAt }).from(testerFeedbackPosts).where(gte(testerFeedbackPosts.createdAt, since)),
+    db.select({ userId: testerFeedbackComments.authorId, createdAt: testerFeedbackComments.createdAt }).from(testerFeedbackComments).where(gte(testerFeedbackComments.createdAt, since)),
+  ]);
+  const events = [
+    ...reports.map((event) => ({ userId: event.userId, createdAt: event.createdAt, kind: "report" as const })),
+    ...posts.map((event) => ({ userId: event.userId, createdAt: event.createdAt, kind: "post" as const })),
+    ...comments.map((event) => ({ userId: event.userId, createdAt: event.createdAt, kind: "comment" as const })),
+  ];
+  const dailyMap = new Map<string, { reports: number; posts: number; comments: number; activeIds: Set<string> }>();
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = new Date(Date.now() - offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    dailyMap.set(date, { reports: 0, posts: 0, comments: 0, activeIds: new Set() });
+  }
+  const userMap = new Map(members.map((member) => [member.userId, { userId: member.userId, displayName: member.displayName, novaId: member.novaId, reports: 0, posts: 0, comments: 0, lastActiveAt: null as Date | null }]));
+  for (const event of events) {
+    if (!event.userId || !memberIds.has(event.userId)) continue;
+    const date = new Date(event.createdAt).toISOString().slice(0, 10);
+    const daily = dailyMap.get(date);
+    if (daily) { daily[`${event.kind}s` as "reports" | "posts" | "comments"] += 1; daily.activeIds.add(event.userId); }
+    const user = userMap.get(event.userId);
+    if (user) { user[event.kind === "report" ? "reports" : event.kind === "post" ? "posts" : "comments"] += 1; if (!user.lastActiveAt || new Date(event.createdAt) > user.lastActiveAt) user.lastActiveAt = new Date(event.createdAt); }
+  }
+  const daily = [...dailyMap.entries()].map(([date, value]) => ({ date, reports: value.reports, posts: value.posts, comments: value.comments, activeUsers: value.activeIds.size }));
+  const active7 = new Set(events.filter((event) => event.userId && memberIds.has(event.userId) && new Date(event.createdAt) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).map((event) => event.userId)).size;
+  const active30 = new Set(events.filter((event) => event.userId && memberIds.has(event.userId) && new Date(event.createdAt) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map((event) => event.userId)).size;
+  const topUsers = [...userMap.values()].map((user) => ({ ...user, total: user.reports + user.posts + user.comments })).filter((user) => user.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
+  return { days, range: { start: since, end: new Date() }, kpis: { members: members.length, totalReports: reportTotal[0]?.count ?? 0, totalPosts: postTotal[0]?.count ?? 0, totalComments: commentTotal[0]?.count ?? 0, active7, active30 }, daily, topUsers };
+}
+
 export const routes: RouteDef[] = [
   route({
     method: "GET",
@@ -89,6 +127,18 @@ export const routes: RouteDef[] = [
         testerEnabled: featurePermissions.testerEnabled,
         testerDescription: featurePermissions.testerDescription,
       }).from(featurePermissions).orderBy(featurePermissions.category, featurePermissions.label) };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/testers/analytics",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const group = await ensureTesterGroup(admin.userId);
+      if (!group) throw notFound("無法建立測試員身分組");
+      const days = Math.min(90, Math.max(7, Number(ctx.query.get("days") ?? 30) || 30));
+      return testerAnalytics(group.id, days);
     },
   }),
   route({
