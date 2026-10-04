@@ -4,6 +4,11 @@ import { db } from "@/db";
 let identitySchemaPromise: Promise<void> | null = null;
 let identitySchemaRetryAfter = 0;
 
+export async function ensureIdentityGroupMemberColumns() {
+  await db.execute(sql`ALTER TABLE "identity_group_members" ADD COLUMN IF NOT EXISTS "added_by" uuid`);
+  await db.execute(sql`ALTER TABLE "identity_group_members" ADD COLUMN IF NOT EXISTS "joined_at" timestamptz NOT NULL DEFAULT now()`);
+}
+
 /**
  * The app is deployed on platforms where a Git push does not necessarily run
  * Drizzle migrations. This idempotent preflight keeps the additive identity

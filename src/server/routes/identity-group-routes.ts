@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { identityGroups, identityGroupMembers, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, notFound } from "../core";
+import { ensureIdentityGroupMemberColumns } from "../db-compat";
 
 const groupInput = z.object({
   name: z.string().trim().min(1).max(80),
@@ -86,6 +87,7 @@ export const routes: RouteDef[] = [
       console.info("[StudyNova][identity-group-members]", JSON.stringify({ requestId: ctx.req.headers.get("x-request-id") ?? null, groupId: ctx.params.id, requestedUserCount: body.userIds.length }));
       const group = (await db.select({ id: identityGroups.id }).from(identityGroups).where(eq(identityGroups.id, ctx.params.id)).limit(1))[0];
       if (!group) throw notFound("找不到身分組");
+      await ensureIdentityGroupMemberColumns();
       const valid = body.userIds.length ? await db.select({ userId: users.userId }).from(users).where(inArray(users.userId, body.userIds)) : [];
       const validIds = valid.map((row) => row.userId);
       await db.transaction(async (tx) => {

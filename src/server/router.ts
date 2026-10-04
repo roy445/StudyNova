@@ -10,7 +10,7 @@ import { APP_VERSION } from "@/lib/app-version";
 import { compareSemVer, isValidSemVer } from "@/lib/semver";
 import { featureKeyForApiPath, isFeatureGateLive } from "@/lib/feature-version";
 import { classifyAuditPath, writeAudit } from "./audit";
-import { ensureIdentityGroupSchema } from "./db-compat";
+import { ensureIdentityGroupMemberColumns, ensureIdentityGroupSchema } from "./db-compat";
 import { classifyDatabaseError, extractDatabaseDiagnostics } from "./db-diagnostics";
 import { requireTesterBeta } from "./tester";
 
@@ -185,6 +185,11 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     await ensureIdentityGroupSchema();
   } catch (error) {
     console.error("[StudyNova][db-preflight] identity group schema unavailable", error);
+  }
+  try {
+    await ensureIdentityGroupMemberColumns();
+  } catch (error) {
+    console.error("[StudyNova][db-preflight] identity group member columns unavailable", error);
   }
   const routes = await loadRoutes();
   const url = new URL(req.url);

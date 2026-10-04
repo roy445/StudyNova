@@ -37,6 +37,15 @@ export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics 
         const value = aliases[key].map((alias) => record[alias]).find((candidate) => typeof candidate === "string");
         if (typeof value === "string" && /^[a-zA-Z0-9_]{1,128}$/.test(value)) diagnostics[key] = value;
       }
+      const message = typeof record.message === "string" ? record.message : "";
+      if (!diagnostics.column) {
+        const column = /column "([a-zA-Z0-9_]{1,128})" does not exist/i.exec(message)?.[1];
+        if (column) diagnostics.column = column;
+      }
+      if (!diagnostics.table) {
+        const relation = /relation "([a-zA-Z0-9_]{1,128})" does not exist/i.exec(message)?.[1];
+        if (relation) diagnostics.table = relation;
+      }
       return diagnostics;
     }
     current = record.cause ?? record.originalError ?? record.original ?? record.driverError;
