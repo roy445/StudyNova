@@ -23,6 +23,7 @@ const releaseMigrations = [
   "0099_tester_beta_controls.sql",
   "0100_tester_feedback_board.sql",
   "0101_tester_feedback_notifications.sql",
+  "0102_identity_group_member_columns.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

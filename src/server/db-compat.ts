@@ -35,6 +35,8 @@ export function ensureIdentityGroupSchema() {
       );
       CREATE INDEX IF NOT EXISTS "identity_group_members_user_idx" ON "identity_group_members" ("user_id");
       CREATE INDEX IF NOT EXISTS "identity_group_members_group_idx" ON "identity_group_members" ("identity_group_id");
+      ALTER TABLE "identity_group_members" ADD COLUMN IF NOT EXISTS "added_by" uuid;
+      ALTER TABLE "identity_group_members" ADD COLUMN IF NOT EXISTS "joined_at" timestamptz NOT NULL DEFAULT now();
       ALTER TABLE "weekly_exam_weeks" ADD COLUMN IF NOT EXISTS "allowed_identity_group_ids" jsonb NOT NULL DEFAULT '[]'::jsonb;
       ALTER TABLE "exam_hubs" ADD COLUMN IF NOT EXISTS "target_score" integer NOT NULL DEFAULT 60;
       ALTER TABLE "exam_hubs" ADD COLUMN IF NOT EXISTS "formal_scope" jsonb NOT NULL DEFAULT '{"educationLevel":"","schoolName":"","grade":1,"subject":"","examNumber":"","chapters":[],"units":[],"vocabularyRange":[],"questionTypes":[],"difficulty":"normal"}'::jsonb;

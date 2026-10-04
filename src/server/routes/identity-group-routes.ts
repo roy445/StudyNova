@@ -74,8 +74,10 @@ export const routes: RouteDef[] = [
       if (!group) throw notFound("找不到身分組");
       const valid = body.userIds.length ? await db.select({ userId: users.userId }).from(users).where(inArray(users.userId, body.userIds)) : [];
       const validIds = valid.map((row) => row.userId);
-      await db.delete(identityGroupMembers).where(eq(identityGroupMembers.identityGroupId, group.id));
-      if (validIds.length) await db.insert(identityGroupMembers).values(validIds.map((userId) => ({ identityGroupId: group.id, userId, addedBy: admin.userId })));
+      await db.transaction(async (tx) => {
+        await tx.delete(identityGroupMembers).where(eq(identityGroupMembers.identityGroupId, group.id));
+        if (validIds.length) await tx.insert(identityGroupMembers).values(validIds.map((userId) => ({ identityGroupId: group.id, userId, addedBy: admin.userId })));
+      });
       return { memberCount: validIds.length };
     },
   }),
