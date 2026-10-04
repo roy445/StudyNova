@@ -92,7 +92,9 @@ export const routes: RouteDef[] = [
       const validIds = valid.map((row) => row.userId);
       await db.transaction(async (tx) => {
         await tx.delete(identityGroupMembers).where(eq(identityGroupMembers.identityGroupId, group.id));
-        if (validIds.length) await tx.insert(identityGroupMembers).values(validIds.map((userId) => ({ identityGroupId: group.id, userId, addedBy: admin.userId })));
+        // Keep the write compatible with older production tables that do not yet
+        // have the optional added_by audit column. joined_at has a database default.
+        if (validIds.length) await tx.insert(identityGroupMembers).values(validIds.map((userId) => ({ identityGroupId: group.id, userId })));
       });
       return { memberCount: validIds.length };
     },
