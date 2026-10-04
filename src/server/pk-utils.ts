@@ -1,6 +1,7 @@
 import { fingerprint } from "./core";
 
 export type PkQuestionBlueprint = {
+  sourceQuestionId?: string;
   type: string;
   stem: string;
   options: string[];

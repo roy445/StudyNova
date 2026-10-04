@@ -246,6 +246,16 @@ async function buildLearningExport(userId: string, kind: ExportKind) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/learning/center-control",
+    auth: "user",
+    handler: async () => {
+      const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "learning_center_control")).limit(1))[0];
+      const value = (row?.value ?? {}) as Record<string, unknown>;
+      return { status: value.status === "repairing" || value.status === "disabled" ? value.status : "enabled", message: typeof value.message === "string" ? value.message : "學習中心目前正常運作。", updatedAt: row?.updatedAt?.toISOString?.() ?? null };
+    },
+  }),
   /* ----------------------------------------------- intelligent review */
   route({
     method: "GET",

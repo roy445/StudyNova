@@ -9,6 +9,7 @@ import { createAiBackgroundJob } from "../ai-background";
 import { queue } from "../queue";
 import { putObject } from "../storage";
 import { extractText } from "./content-routes";
+import { recordQuestionAnswer, recordQuestionAppearance } from "../question-stats";
 
 function openWindow() {
   const now = new Date();
@@ -45,6 +46,8 @@ export const routes: RouteDef[] = [
     if (!hub || !hub.questionBankId) throw notFound("找不到目前開放的限時段考題庫");
     const sessionId = randomUUID();
     const row = (await db.insert(examHubUsageLogs).values({ hubId: hub.id, userId: user.userId, action: "started", sessionId, startedAt: new Date(), metadata: { mode: "timed_questions" } }).returning())[0];
+    const questionRows = await db.select({ id: questions.id }).from(questionBankMemberships).where(eq(questionBankMemberships.bankId, hub.questionBankId));
+    for (const question of questionRows) await recordQuestionAppearance(question.id);
     return { sessionId, startedAt: row.startedAt, hubId: hub.id, timeLimitSeconds: Math.max(300, Number((hub.formalScope as Record<string, unknown>)?.timeLimitSeconds ?? 1800)) };
   }}),
   route({ method: "GET", path: "/exam-hubs/:id", auth: "user", handler: async (ctx) => {
@@ -92,7 +95,9 @@ export const routes: RouteDef[] = [
     for (const { question } of rows) {
       const expected = question.answer.map((value) => String(value).trim().toLocaleLowerCase());
       const actual = String(body.answers[question.id] ?? "").trim().toLocaleLowerCase();
-      if (actual && expected.includes(actual)) score += question.points || 1;
+      const correct = Boolean(actual && expected.includes(actual));
+      if (correct) score += question.points || 1;
+      await recordQuestionAnswer(question.id, correct, 0);
     }
     const total = rows.reduce((sum, { question }) => sum + (question.points || 1), 0);
     const completedAt = new Date();

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   dailyWords,
@@ -22,6 +22,8 @@ import {
   pkRooms,
   pkTeams,
   questions,
+  questionBanks,
+  questionBankMemberships,
   studyMaterials,
   userVocabularies,
   users,
@@ -40,6 +42,7 @@ import { calculatePkScore, calculateRanks, matchPlayerCount, normalizePkText, pk
 import { publishPkEvent, sseResponse } from "../pk-realtime";
 import { scheduleBotJobsForMatch } from "../pk-bot-engine";
 import { queue } from "../queue";
+import { recordQuestionAnswer, recordQuestionAppearance } from "../question-stats";
 
 const matchMode = z.enum(["1v1", "2v2", "3v3", "多人"]);
 const teamMode = z.enum(["solo", "team"]);
@@ -62,6 +65,9 @@ type MatchInput = {
   showRanking: boolean;
   rewardNova: number;
   rewardXp: number;
+  sourceType?: "bank" | "vocabulary" | "material";
+  sourceId?: string | null;
+  questionBankId?: string | null;
 };
 
 type PkQuestionRow = typeof pkMatchQuestions.$inferSelect;
@@ -112,28 +118,58 @@ async function recentQuestionFingerprints(tx: any, subject: string) {
   return new Set(rows.map((row: { fingerprint: string }) => row.fingerprint));
 }
 
-async function generateMatchQuestions(tx: any, matchId: string, input: MatchInput) {
+async function generateMatchQuestions(tx: any, matchId: string, input: MatchInput, ownerId: string) {
   const fingerprints = await recentQuestionFingerprints(tx, input.subject);
-  const usedOptions = new Set<string>();
-  const blueprints: PkQuestionBlueprint[] = [];
+  const sourceType = input.sourceType ?? "bank";
+  const sourceId = input.sourceId ?? null;
+  const questionBankId = input.questionBankId ?? null;
+  const blueprints: Array<PkQuestionBlueprint & { sourceQuestionId?: string }> = [];
   const level = input.gradeLevel === "SENIOR_HIGH" ? "senior" : "junior";
-  const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(eq(questions.level, level), eq(questions.difficulty, input.difficulty), eq(questions.status, "published"), eq(questions.availableForPk, true))).orderBy(sql`random()`).limit(Math.min(1000, input.questionCount * 12));
-  for (const current of sourceRows) {
-    if (blueprints.length >= input.questionCount) break;
-    const answer = String(current.answer[0] ?? "").trim();
-    const options = normalizedOptions(current.options.map(String));
-    if (!current.stem.trim() || !answer || options.length < 2 || !options.some((option) => normalizePkText(option) === normalizePkText(answer))) continue;
-    const question: PkQuestionBlueprint = { type: current.type, stem: current.stem, options, answer, explanation: current.explanation, sourceLabel: current.sourceLabel, unit: current.unit || input.unit, subject: current.subject };
-    const fp = pkQuestionFingerprint(question);
-    if (fingerprints.has(fp)) continue;
-    blueprints.push(question);
-    options.forEach((option) => usedOptions.add(normalizePkText(option)));
+
+  if (sourceType === "vocabulary") {
+    const vocabRows = sourceId
+      ? await tx.select({ id: userVocabularies.id, word: userVocabularies.word, meaning: userVocabularies.meaning, example: userVocabularies.example }).from(userVocabularies).innerJoin(vocabularyFolderItems, eq(vocabularyFolderItems.vocabularyId, userVocabularies.id)).where(and(eq(userVocabularies.userId, ownerId), eq(vocabularyFolderItems.folderId, sourceId))).orderBy(sql`random()`).limit(200)
+      : await tx.select({ id: userVocabularies.id, word: userVocabularies.word, meaning: userVocabularies.meaning, example: userVocabularies.example }).from(userVocabularies).where(eq(userVocabularies.userId, ownerId)).orderBy(sql`random()`).limit(200);
+    for (let i = 0; i < vocabRows.length && blueprints.length < input.questionCount; i += 1) {
+      const current = vocabRows[i];
+      const distractors = vocabRows.filter((item: any) => item.id !== current.id).map((item: any) => String(item.meaning || "")).filter(Boolean).slice(0, 3);
+      const options = [...new Set([String(current.meaning || ""), ...distractors])];
+      if (!current.word || !current.meaning || options.length < 2) continue;
+      const question = { type: "single", stem: `「${current.word}」的中文意思最接近下列何者？`, options, answer: String(current.meaning), explanation: current.example ? `可搭配例句：${current.example}` : `「${current.word}」的常用意思是「${current.meaning}」。`, sourceLabel: sourceId ? "我的單字資料夾" : "我的單字", unit: "個人單字", subject: "英文" };
+      const fp = pkQuestionFingerprint(question);
+      if (!fingerprints.has(fp)) blueprints.push({ ...question });
+    }
+  } else if (sourceType === "material" && sourceId) {
+    const material = (await tx.select({ title: studyMaterials.title, content: studyMaterials.content, subject: studyMaterials.subject }).from(studyMaterials).where(and(eq(studyMaterials.id, sourceId), eq(studyMaterials.userId, ownerId))).limit(1))[0];
+    if (material) {
+      const chunks = String(material.content || "").split(/\n{2,}|(?<=[。！？.!?])\s+/).map((item: string) => item.trim()).filter((item: string) => item.length >= 12).slice(0, 200);
+      for (let i = 0; i < chunks.length && blueprints.length < input.questionCount; i += 1) {
+        const current = chunks[i];
+        const options = [current, ...chunks.filter((_: string, index: number) => index !== i).slice(0, 3)];
+        if (options.length < 2) continue;
+        const question = { type: "single", stem: `教材「${material.title}」內容辨識：下列哪一段出現在本次教材內容中？`, options, answer: current, explanation: `正確答案取自你選擇的教材「${material.title}」原文。`, sourceLabel: material.title, unit: "我的教材", subject: material.subject || "其他" };
+        const fp = pkQuestionFingerprint(question);
+        if (!fingerprints.has(fp)) blueprints.push({ ...question });
+      }
+    }
+  } else {
+    const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(questionBankId ? or(eq(questions.bankId, questionBankId), sql`exists (select 1 from question_bank_memberships qbm where qbm.question_id = ${questions.id} and qbm.bank_id = ${questionBankId})`) : sql`true`, eq(questions.level, level), eq(questions.difficulty, input.difficulty), eq(questions.status, "published"), eq(questions.availableForPk, true))).orderBy(sql`random()`).limit(Math.min(1000, input.questionCount * 12));
+    for (const current of sourceRows) {
+      if (blueprints.length >= input.questionCount) break;
+      const answer = String(current.answer[0] ?? "").trim();
+      const options = normalizedOptions(current.options.map(String));
+      if (!current.stem.trim() || !answer || options.length < 2 || !options.some((option) => normalizePkText(option) === normalizePkText(answer))) continue;
+      const question: PkQuestionBlueprint = { sourceQuestionId: current.id, type: current.type, stem: current.stem, options, answer, explanation: current.explanation, sourceLabel: current.sourceLabel, unit: current.unit || input.unit, subject: current.subject };
+      const fp = pkQuestionFingerprint(question);
+      if (fingerprints.has(fp)) continue;
+      blueprints.push(question);
+    }
   }
 
-  if (blueprints.length < input.questionCount) throw fail("PK_BANK_EMPTY", { details: { available: blueprints.length, requested: input.questionCount, subject: input.subject } });
-  await tx.insert(pkMatchQuestions).values(blueprints.map((question, orderIndex) => ({ matchId, orderIndex, type: question.type, stem: question.stem, canonicalOptions: question.options, canonicalAnswer: question.answer, explanation: question.explanation ?? "", sourceLabel: question.sourceLabel ?? "", unit: question.unit ?? input.unit, fingerprint: pkQuestionFingerprint(question) })));
+  if (blueprints.length < input.questionCount) throw fail("PK_BANK_EMPTY", { details: { available: blueprints.length, requested: input.questionCount, sourceType: input.sourceType } });
+  await tx.insert(pkMatchQuestions).values(blueprints.map((question, orderIndex) => ({ matchId, sourceQuestionId: question.sourceQuestionId ?? null, orderIndex, type: question.type, stem: question.stem, canonicalOptions: question.options, canonicalAnswer: question.answer, explanation: question.explanation ?? "", sourceLabel: question.sourceLabel ?? "", unit: question.unit ?? input.unit, fingerprint: pkQuestionFingerprint(question) })));
+  for (const question of blueprints) if (question.sourceQuestionId) await recordQuestionAppearance(question.sourceQuestionId);
 }
-
 async function questionOrders(tx: any, matchId: string, userId: string) {
   const rows = await tx.select({ id: pkMatchQuestions.id }).from(pkMatchQuestions).where(eq(pkMatchQuestions.matchId, matchId)).orderBy(asc(pkMatchQuestions.orderIndex));
   const result: Record<string, string[]> = {};
@@ -178,7 +214,7 @@ async function createMatch(ownerId: string, input: MatchInput, roomInput?: { nam
   const result = await db.transaction(async (tx) => {
     const matchRows = await tx.insert(pkMatches).values({ ownerId, status: roomInput ? "waiting" : "matching", mode: input.mode, teamMode: input.teamMode, questionBankId: null, sourceType: "canonical_questions", sourceId: null, subject: "全站題目", grade: input.gradeLevel, unit: input.unit, difficulty: input.difficulty, questionCount: input.questionCount, questionTimeSec: input.questionTimeSec, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, rewardNova: input.rewardNova, rewardXp: input.rewardXp }).returning();
     const match = matchRows[0];
-    await generateMatchQuestions(tx, match.id, input);
+    await generateMatchQuestions(tx, match.id, input, ownerId);
     let room = null;
     if (roomInput) {
       const roomRows = await tx.insert(pkRooms).values({ matchId: match.id, roomCode: joinCode(), shareToken: randomToken(12), name: roomInput.name, visibility: roomInput.visibility, passwordHash: roomInput.password ? sha256(roomInput.password) : "", maxPlayers: roomInput.maxPlayers, mode: input.mode, teamMode: roomInput.roomMode, allowLateJoin: input.allowLateJoin, allowSpectators: input.allowSpectators, showRanking: input.showRanking, hostId: ownerId }).returning();
@@ -303,6 +339,19 @@ async function matchPayload(matchId: string, userId: string) {
 
 export const routes: RouteDef[] = [
   route({
+    method: "GET",
+    path: "/pk/sources",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const banks = await db.select({ id: questionBanks.id, name: questionBanks.name, subject: questionBanks.subject, grade: questionBanks.grade, level: questionBanks.educationLevel, scope: questionBanks.scope, questionCount: sql<number>`count(${questions.id})::int` }).from(questionBanks).leftJoin(questions, eq(questions.bankId, questionBanks.id)).where(and(eq(questionBanks.status, "published"), or(eq(questionBanks.visibility, "public"), eq(questionBanks.createdBy, user.userId)))).groupBy(questionBanks.id).orderBy(desc(questionBanks.updatedAt)).limit(100);
+      const folders = await db.select({ id: vocabularyFolders.id, name: vocabularyFolders.name, questionCount: sql<number>`count(${vocabularyFolderItems.vocabularyId})::int` }).from(vocabularyFolders).leftJoin(vocabularyFolderItems, eq(vocabularyFolderItems.folderId, vocabularyFolders.id)).where(eq(vocabularyFolders.userId, user.userId)).groupBy(vocabularyFolders.id).orderBy(desc(vocabularyFolders.updatedAt));
+      const vocabularyCount = await db.select({ count: sql<number>`count(*)::int` }).from(userVocabularies).where(eq(userVocabularies.userId, user.userId));
+      const materials = await db.select({ id: studyMaterials.id, title: studyMaterials.title, subject: studyMaterials.subject, contentLength: sql<number>`length(${studyMaterials.content})::int` }).from(studyMaterials).where(and(eq(studyMaterials.userId, user.userId), eq(studyMaterials.status, "ready"))).orderBy(desc(studyMaterials.updatedAt)).limit(100);
+      return { banks, vocabulary: { id: "all", name: "我的全部單字", questionCount: Number(vocabularyCount[0]?.count ?? 0) }, folders, materials };
+    },
+  }),
+  route({
     method: "POST",
     path: "/pk/self-test",
     auth: "user",
@@ -425,9 +474,9 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const config = await getPkConfig();
       settingsError(config, "customRoomEnabled");
-      const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]) }));
+      const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]), sourceType: z.enum(["bank", "vocabulary", "material"]).default("bank"), sourceId: z.string().uuid().nullable().optional(), questionBankId: z.string().uuid().nullable().optional() }));
       if (body.visibility === "private" && !body.password) throw badRequest("私人房間請設定房間密碼，或使用分享連結邀請");
-      const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
+      const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp, sourceType: body.sourceType, sourceId: body.sourceId ?? null, questionBankId: body.questionBankId ?? null }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
       return { match: result.match, room: result.room, shareUrl: `/online-pk?room=${result.room?.shareToken ?? ""}` };
     },
   }),
@@ -549,6 +598,7 @@ export const routes: RouteDef[] = [
       const result = calculatePkScore({ correct: isCorrect, elapsedMs: serverElapsedMs, comboBefore: access.player.combo, questionTimeSec: access.match.questionTimeSec });
       const answerRows = await db.insert(pkPlayerAnswers).values({ matchId: ctx.params.id, playerId: access.player.id, questionId: question.id, userId: user.userId, selectedOption: body.selectedOption, responseMs: serverElapsedMs, isCorrect, scoreAwarded: result.points, comboAfter: result.combo, idempotencyKey: body.idempotencyKey }).onConflictDoNothing().returning();
       if (!answerRows[0]) return { accepted: false, replay: true, isCorrect: false, scoreAwarded: 0, combo: access.player.combo, score: access.player.score };
+      if (question.sourceQuestionId) await recordQuestionAnswer(question.sourceQuestionId, isCorrect, serverElapsedMs);
       const nextQuestionStartedAt = new Date();
       const updated = (await db.update(pkMatchPlayers).set({ score: sql`${pkMatchPlayers.score} + ${result.points}`, combo: result.combo, maxCombo: sql`greatest(${pkMatchPlayers.maxCombo}, ${result.combo})`, correctCount: sql`${pkMatchPlayers.correctCount} + ${isCorrect ? 1 : 0}`, answeredCount: sql`${pkMatchPlayers.answeredCount} + 1`, totalResponseMs: sql`${pkMatchPlayers.totalResponseMs} + ${serverElapsedMs}`, fastestResponseMs: access.player.fastestResponseMs === null ? serverElapsedMs : sql`least(${pkMatchPlayers.fastestResponseMs}, ${serverElapsedMs})`, lastHeartbeatAt: nextQuestionStartedAt, currentQuestionStartedAt: nextQuestionStartedAt }).where(and(eq(pkMatchPlayers.matchId, ctx.params.id), eq(pkMatchPlayers.userId, user.userId))).returning())[0];
       if (!updated) throw conflict("玩家狀態已改變，請重新連線");

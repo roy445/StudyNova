@@ -535,6 +535,30 @@ export const routes: RouteDef[] = [
   /* ------------------------------------------------ feature control */
   route({
     method: "GET",
+    path: "/admin/learning-center-control",
+    auth: "admin",
+    handler: async () => {
+      const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "learning_center_control")).limit(1))[0];
+      const value = (row?.value ?? {}) as Record<string, unknown>;
+      return { status: value.status === "repairing" || value.status === "disabled" ? value.status : "enabled", message: typeof value.message === "string" ? value.message : "學習中心目前正常運作。", updatedAt: row?.updatedAt?.toISOString?.() ?? null };
+    },
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/learning-center-control",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ action: z.enum(["open", "repair", "close"]), message: z.string().trim().max(500).default("") }));
+      const status = body.action === "open" ? "enabled" : body.action === "repair" ? "repairing" : "disabled";
+      const value = { status, message: body.message || (status === "repairing" ? "學習中心正在修復，修復期間暫停使用。" : status === "disabled" ? "學習中心目前已關閉。" : "學習中心目前正常運作。"), updatedBy: admin.userId, updatedAt: new Date().toISOString() };
+      await db.insert(platformSettings).values({ key: "learning_center_control", value, updatedAt: new Date() }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } });
+      await adminLog({ actorId: admin.userId, action: `learning_center.${status}`, targetType: "platform", targetId: "learning_center_control", after: value, ip: ctx.ip });
+      return value;
+    },
+  }),
+  route({
+    method: "GET",
     path: "/admin/service-control",
     auth: "admin",
     handler: async () => {

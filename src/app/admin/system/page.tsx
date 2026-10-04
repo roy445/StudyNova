@@ -10,6 +10,7 @@ import { MaintenanceCountdown } from "@/components/MaintenanceCountdown";
 type TestResult = { name: string; group: string; status: "PASS" | "FAIL" | "SKIP"; durationMs: number; detail: string };
 type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "major_release"; title: string; reason: string; description: string; badgeText: string; estimatedRecoveryAt: string | null; message: string; startedAt: string | null; updatedByName: string | null; updatedAt: string | null };
 type MaintenanceAction = "start" | "restore";
+type LearningCenterControl = { status: "enabled" | "repairing" | "disabled"; message: string; updatedAt: string | null };
 const EXPORT_DATASETS = [["vocabulary", "我的單字"], ["notes", "我的筆記"], ["wrong", "錯題本"], ["studyMaterials", "學習資料"], ["plans", "學習計畫"], ["studyRecords", "學習紀錄"], ["focus", "專注紀錄"], ["tasks", "任務紀錄"], ["dailyTasks", "每日任務"], ["achievements", "成就徽章"], ["nova", "Nova 交易"], ["xp", "XP 紀錄"]] as const;
 const EXPORT_FORMATS = [["pdf", "PDF 單字書"], ["docx", "Word 單字書"], ["xlsx", "Excel 單字表"], ["csv", "CSV 表格"], ["json", "JSON"], ["txt", "純文字"], ["md", "Markdown"], ["zip", "ZIP 完整資料"]] as const;
 
@@ -26,6 +27,7 @@ export default function AdminSystemPage() {
   const exportConfig = (settings.data?.settings.find((s) => s.key === "learning_exports")?.value ?? {}) as { enabled?: boolean; proOnly?: boolean; minimumNova?: number; freeUntil?: string; allowedKinds?: string[]; allowedFormats?: string[]; freeFormats?: string[]; costs?: Record<string, number> };
   const logs = useApi<{ logs: Array<{ id: string; level: string; scope: string; message: string; createdAt: string }> }>("/admin/logs?kind=system");
   const service = useApi<ServiceControl>("/admin/service-control");
+  const learningCenter = useApi<LearningCenterControl>("/admin/learning-center-control");
   const maintenanceHistory = useApi<{ records: Array<{ id: string; category: string; title: string; reason: string; description: string; startedAt: string; estimatedRecoveryAt: string | null; endedAt: string | null; actualRecoveryAt: string | null; createdByName: string | null; createdBy: string | null; updatedByName: string | null; updatedBy: string | null; updatedAt: string }> }>("/admin/maintenance/history");
   const [maintenanceAction, setMaintenanceAction] = useState<MaintenanceAction | null>(null);
   const [maintenancePreviewOpen, setMaintenancePreviewOpen] = useState(false);
@@ -33,6 +35,14 @@ export default function AdminSystemPage() {
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [summary, setSummary] = useState<{ total: number; pass: number; fail: number; skip: number; durationMs: number } | null>(null);
   const [running, setRunning] = useState(false);
+
+  async function setLearningCenter(action: "open" | "repair" | "close") {
+    try {
+      await apiPatch<LearningCenterControl>("/admin/learning-center-control", { action, message: action === "repair" ? "學習中心正在修復，修復期間暫停使用。" : "" });
+      await learningCenter.reload();
+      toast.push("success", action === "open" ? "學習中心已開啟" : action === "repair" ? "學習中心已進入修復模式" : "學習中心已關閉");
+    } catch (err) { toast.push("error", errorMessage(err)); }
+  }
 
   useEffect(() => {
     if (!service.data) return;
@@ -88,6 +98,10 @@ export default function AdminSystemPage() {
 
   return (
     <div className="space-y-4">
+      <Card title="🔐 學習中心功能總控台" subtitle="一鍵開啟、修復或關閉；修復與關閉期間使用者不能進入學習中心。" action={<Badge tone={learningCenter.data?.status === "enabled" ? "green" : learningCenter.data?.status === "repairing" ? "gold" : "rose"}>{learningCenter.data?.status === "enabled" ? "運作中" : learningCenter.data?.status === "repairing" ? "修復中" : "已關閉"}</Badge>}>
+        <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => void setLearningCenter("open")} disabled={learningCenter.data?.status === "enabled"}>一鍵開啟</Button><Button size="sm" variant="gold" onClick={() => void setLearningCenter("repair")} disabled={learningCenter.data?.status === "repairing"}>進入修復</Button><Button size="sm" variant="ghost" onClick={() => void setLearningCenter("close")} disabled={learningCenter.data?.status === "disabled"}>關閉學習中心</Button></div>
+        <p className="mt-3 text-xs leading-5 text-muted">{learningCenter.data?.message ?? "載入中…"}</p>
+      </Card>
       <Card title="⚡ 維護快捷中心" subtitle={service.data?.enabled === false ? "目前網站維護中；任何變更都必須先完成詳細設定。" : "目前網站正常運作；開始或結束維護前會先顯示完整設定確認。"} action={<Button size="sm" variant="ghost" onClick={service.reload}>重新整理</Button>}>
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] p-4"><p className="text-xs font-semibold uppercase tracking-wider text-amber-200">網站維護</p><p className="mt-2 text-sm font-semibold">開始維護模式</p><p className="mt-1 text-xs leading-5 text-muted">設定維護標題、使用者提示、預計恢復時間與維護期間顯示內容。</p><Button className="mt-3" variant="gold" onClick={() => setMaintenanceAction("start")}>設定並開始維護</Button></div>

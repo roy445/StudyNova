@@ -32,6 +32,7 @@ import {
   shareAnalytics,
   shareCopies,
   aiArtifacts,
+  studyMaterials,
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, forbidden, fingerprint, joinCode, notFound, slugToken, todayStr, addDaysStr } from "../core";
@@ -320,7 +321,8 @@ export const routes: RouteDef[] = [
           difficulty: z.enum(["easy", "normal", "hard"]).default("normal"),
           challengeMode: z.enum(["choice", "listening", "handwriting", "confusable", "part_of_speech", "meaning", "semantic_image"]).default("choice"),
           timeMode: z.enum(["standard", "sprint"]).default("standard"),
-          source: z.enum(["catalog", "mine", "vocabulary"]).default("catalog"),
+          source: z.enum(["catalog", "mine", "vocabulary", "material"]).default("catalog"),
+          sourceId: z.string().uuid().nullable().optional(),
           competitionMode: z.enum(["entertainment", "stake"]).default("entertainment"),
           stakeNova: z.number().int().min(0).max(100000).default(0),
         }),
@@ -340,6 +342,17 @@ export const routes: RouteDef[] = [
       let challengeItems: Array<Record<string, unknown>> = [];
       if (body.kind === "word") {
         const count = Math.max(5, Math.min(200, body.questionCount));
+        if (body.source === "material") {
+          if (!body.sourceId) throw badRequest("請選擇教材");
+          const material = (await db.select({ title: studyMaterials.title, content: studyMaterials.content }).from(studyMaterials).where(and(eq(studyMaterials.id, body.sourceId), eq(studyMaterials.userId, user.userId))).limit(1))[0];
+          if (!material) throw forbidden("這份教材不屬於你");
+          const chunks = material.content.split(/\n{2,}|(?<=[。！？.!?])\s+/).map((item) => item.trim()).filter((item) => item.length >= 12).slice(0, 200);
+          for (let i = 0; i < Math.min(count, chunks.length); i += 1) {
+            const current = chunks[i];
+            const options = [current, ...chunks.filter((_, index) => index !== i).slice(0, 3)];
+            challengeItems.push({ id: `${body.sourceId}-${i}`, word: `教材內容 ${i + 1}`, meaning: current, example: current, direction: "en2zh", challengeMode: "choice", timeMode: body.timeMode, sentence: current, options: options.sort(() => Math.random() - 0.5), answer: current, answerLabel: current, sourceLabel: material.title });
+          }
+        } else {
         if (body.source === "vocabulary") {
           const setting = await vocabularyChallengeSetting();
           if (!setting.manualOpen && setting.totalWords < setting.minimumWords) throw badRequest(`字詞百科題庫尚未開放，目前 ${setting.totalWords}/${setting.minimumWords} 個單字`);
@@ -374,8 +387,9 @@ export const routes: RouteDef[] = [
             challengeItems.push({ ...group[0], direction, challengeMode: body.challengeMode, timeMode: body.timeMode, sentence: group[0].example, options: [...options].sort(() => Math.random() - 0.5), answer, answerLabel });
           }
         }
+        }
         if (challengeItems.length < 5) throw fail("CHAL_BANK_EMPTY");
-      }
+        }
       const rows = await db
         .insert(challenges)
         .values({

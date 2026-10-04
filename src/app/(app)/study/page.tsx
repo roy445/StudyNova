@@ -58,6 +58,7 @@ function OnePagePanel() {
 
 function StudyInner() {
   const params = useSearchParams();
+  const centerControl = useApi<{ status: "enabled" | "repairing" | "disabled"; message: string }>("/learning/center-control");
   const examHubs = useApi<{ hubs: Array<{ id: string; name: string; examNumber: string; closeAt: string | null }> }>("/exam-hubs/available");
   const [tab, setTab] = useState(params.get("tab") === "plan" ? "timeline" : (params.get("tab") ?? "timeline"));
   const contentRef = useRef<HTMLDivElement>(null);
@@ -71,6 +72,8 @@ function StudyInner() {
     const frame = window.requestAnimationFrame(() => contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     return () => window.cancelAnimationFrame(frame);
   }, [tab]);
+
+  if (centerControl.data && centerControl.data.status !== "enabled") return <Card title={centerControl.data.status === "repairing" ? "🛠️ 學習中心修復中" : "🔒 學習中心目前關閉"} subtitle="為避免資料在維護期間不完整，暫時不能使用學習中心功能。"><div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] p-5 text-sm leading-7 text-amber-50">{centerControl.data.message}<br />請稍後再回來查看。</div></Card>;
 
   return (
     <div className="space-y-4">

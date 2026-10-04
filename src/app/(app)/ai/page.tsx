@@ -8,7 +8,7 @@ import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { ChatRichText } from "@/components/ChatRichText";
 import { MAX_AI_SOLUTION_FILES, uploadAiSolutionFiles } from "@/lib/ai-solution-upload";
 
-type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string };
+type Conversation = { id: string; title: string; mode: string; archived: boolean; allowContext: string[]; contextMaterialId: string | null; updatedAt: string; contextIds?: string[]; attachments?: Array<{ id: string; originalName: string; status: string; uploadBatch: number }> };
 type Message = { id: string; conversationId?: string; role: string; content: string; attachment?: { name: string; previewUrl: string }; importance?: "normal" | "important" | "critical" | string; action: { type: string; preview?: string; payload?: Record<string, unknown> } | null; actionStatus: string; createdAt: string };
 type FileContext = { id: string; originalName: string; status: string; detected: Array<{ kind: string; text: string; confidence: number }>; error: string; uploadBatch: number };
 type MemoryItem = { id: string; key: string; value: string; scope?: string; confidence?: number; consentStatus?: string; updatedAt?: string };
@@ -67,6 +67,7 @@ export default function AiPage() {
   const [uploading, setUploading] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState<{ value: number; label: string } | null>(null);
   const [attachment, setAttachment] = useState<{ contextId: string; name: string; previewUrl: string } | null>(null);
+  const [attachments, setAttachments] = useState<Array<{ contextId: string; name: string; previewUrl?: string; status?: string }>>([]);
   const [attachmentSubject, setAttachmentSubject] = useState("");
   const [solutionResult, setSolutionResult] = useState<{ reply?: string; hint?: string; steps?: string[]; answer?: string; needsCrop?: boolean; mode?: string } | null>(null);
   const [scope, setScope] = useState({ includeQuestion: true, includeHandwriting: true, includeNote: true, highlightPriority: false });
@@ -85,6 +86,7 @@ export default function AiPage() {
         setLoadingMsg(false);
         setConv(res.conversation);
         setMessages(res.messages);
+        setAttachments((res.conversation.attachments ?? []).map((item) => ({ contextId: item.id, name: item.originalName, status: item.status })));
       })
       .catch((err) => {
         if (requestId === conversationLoadRef.current) setError(errorMessage(err));
@@ -111,18 +113,19 @@ export default function AiPage() {
   }
 
   async function send() {
-    if (!activeId || (!input.trim() && !attachment)) return;
+    if (!activeId || (!input.trim() && !attachments.length)) return;
     const content = input.trim();
     if (!confirmNovaSpend("Novi 回覆", aiContextCost)) return;
     setInput("");
     const sentAttachment = attachment;
+    const sentAttachments = attachments;
     setAttachment(null);
     setSending(true);
     setNoviState("thinking");
     setError(null);
     setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content: content || "請分析這張圖片。", attachment: sentAttachment ?? undefined, action: null, actionStatus: "none", createdAt: new Date().toISOString() }]);
     try {
-      const res = await apiPost<{ message: Message }>(`/ai/conversations/${activeId}/messages`, { content: content || "請分析這張圖片。", contextId: sentAttachment?.contextId });
+      const res = await apiPost<{ message: Message }>(`/ai/conversations/${activeId}/messages`, { content: content || "請分析這張圖片。", contextIds: sentAttachments.map((item) => item.contextId), contextId: sentAttachment?.contextId });
       setMessages((m) => [...m, res.message]);
       setNoviState("happy");
       await convs.reload();
@@ -152,10 +155,12 @@ export default function AiPage() {
       const uploaded = await uploadAiSolutionFiles(selected, { subject: attachmentSubject, scope, onProgress: setAnalysisProgress });
       const failed = uploaded.results.filter((item) => !item.context);
       if (failed.length) setError(failed.map((item) => `${item.error ?? "圖片分析失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；"));
-      const first = uploaded.results.find((item) => item.context);
+      const successful = uploaded.results.map((item, index) => ({ item, index })).filter(({ item }) => item.context);
+      const first = successful[0]?.item;
       if (!first?.context) throw new Error(failed.length ? "圖片分析失敗，請依畫面上的錯誤代碼回報。" : "找不到上傳的圖片。");
-      const firstIndex = uploaded.results.indexOf(first);
-      setAttachment({ contextId: first.context.id, name: first.context.originalName, previewUrl: URL.createObjectURL(selected[firstIndex] ?? selected[0]) });
+      const nextAttachments = successful.map(({ item, index }) => ({ contextId: item.context!.id, name: item.context!.originalName, previewUrl: URL.createObjectURL(selected[index] ?? selected[0]) }));
+      setAttachments((current) => [...current.filter((old) => !nextAttachments.some((next) => next.contextId === old.contextId)), ...nextAttachments]);
+      setAttachment(nextAttachments[0]);
       toast.push("success", uploaded.results.length > 1
         ? `已處理 ${uploaded.results.length - failed.length} 個檔案；目前對話附件會先使用第一份。`
         : uploaded.duplicateCount ? "已加入對話並重用既有圖片分析" : "圖片已加入對話");
@@ -351,7 +356,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
 
             <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
               <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/heic,.pdf" multiple hidden onChange={(e) => void uploadAndAnalyze(e.target.files)} />
-              {attachment && <div className="flex items-center gap-2 rounded-xl border border-[#37d3ff]/40 bg-[#37d3ff]/5 p-2"><img src={attachment.previewUrl} alt={attachment.name} className="h-14 w-14 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-xs">{attachment.name}<span className="block text-[10px] text-[#b9f2ff]">已加入對話，輸入需求後送出</span></span><button type="button" className="text-xs text-muted" onClick={() => { URL.revokeObjectURL(attachment.previewUrl); setAttachment(null); }}>移除</button></div>}
+              {attachments.length > 0 && <details open className="rounded-xl border border-[#37d3ff]/40 bg-[#37d3ff]/5 p-2"><summary className="cursor-pointer text-xs font-semibold text-[#b9f2ff]">已加入 {attachments.length} 個檔案（可展開查看全部）</summary><div className="mt-2 grid gap-2 sm:grid-cols-2">{attachments.map((item) => <div key={item.contextId} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/10 p-2">{item.previewUrl ? <img src={item.previewUrl} alt={item.name} className="h-12 w-12 rounded-lg object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 text-lg">📎</span>}<span className="min-w-0 flex-1 truncate text-xs">{item.name}<span className="block text-[10px] text-muted">{item.status === "ready" ? "已記住於此對話" : "已加入，送出後會與對話關聯"}</span></span><button type="button" className="text-xs text-muted" onClick={() => { if (item.previewUrl) URL.revokeObjectURL(item.previewUrl); setAttachments((current) => current.filter((old) => old.contextId !== item.contextId)); if (attachment?.contextId === item.contextId) setAttachment(null); }}>移除</button></div>)}</div></details>}
               {analysisProgress && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 px-3 py-2"><div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-[#b9f2ff]">{analysisProgress.label}</span><span className="text-muted">{analysisProgress.value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-black/20"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all duration-500" style={{ width: `${analysisProgress.value}%` }} /></div><p className="mt-1 text-[10px] text-muted">圖片以私有雲端直傳，辨識期間請保持此頁開啟。</p></div>}
               {solutionResult && (
                 <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/8 px-3 py-2 text-xs leading-5">
@@ -382,7 +387,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
                 disabled={sending}
                 className="min-w-0 w-full"
               />
-              <Button className="shrink-0" loading={sending} onClick={send} disabled={!input.trim() && !attachment}>
+              <Button className="shrink-0" loading={sending} onClick={send} disabled={!input.trim() && !attachments.length}>
                 送出
               </Button>
               </div>

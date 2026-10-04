@@ -49,6 +49,7 @@ export async function createSession(userId: string, meta: { ip?: string; userAge
     userAgent: (meta.userAgent ?? "").slice(0, 200),
     expiresAt,
   });
+  await db.update(users).set({ lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(users.userId, userId));
   const store = await cookies();
   store.set(SESSION_COOKIE, token, cookieOptions(Math.floor(SESSION_TTL_MS / 1000)));
   return token;
@@ -75,6 +76,7 @@ export async function getSession(): Promise<SessionInfo | null> {
       novaId: users.novaId,
       email: users.email,
       displayName: users.displayName,
+      lastSeenAt: users.lastSeenAt,
       avatarSeed: users.avatarSeed,
       role: users.role,
       status: users.status,
@@ -99,6 +101,11 @@ export async function getSession(): Promise<SessionInfo | null> {
     await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash));
     try { store.set(SESSION_COOKIE, "", cookieOptions(0)); } catch { /* render context */ }
     return null;
+  }
+
+  const now = new Date();
+  if (!row.lastSeenAt || new Date(row.lastSeenAt).getTime() < now.getTime() - 60_000) {
+    await db.update(users).set({ lastSeenAt: now }).where(eq(users.userId, row.userId));
   }
 
   // 延長舊版本 cookie，讓已登入使用者不必因為舊的 14 天期限重新登入。

@@ -631,6 +631,21 @@ export const questions = pgTable(
   ],
 );
 
+export const questionUsageStats = pgTable(
+  "question_usage_stats",
+  {
+    questionId: uuid("question_id").primaryKey().references(() => questions.id, { onDelete: "cascade" }),
+    appearanceCount: integer("appearance_count").notNull().default(0),
+    answerCount: integer("answer_count").notNull().default(0),
+    correctCount: integer("correct_count").notNull().default(0),
+    totalResponseMs: integer("total_response_ms").notNull().default(0),
+    lastAppearedAt: timestamp("last_appeared_at", { withTimezone: true }),
+    lastAnsweredAt: timestamp("last_answered_at", { withTimezone: true }),
+    updatedAt: updated(),
+  },
+  (t) => [index("question_usage_stats_accuracy_idx").on(t.correctCount, t.answerCount), index("question_usage_stats_appearance_idx").on(t.appearanceCount)],
+);
+
 export const questionBankMemberships = pgTable(
   "question_bank_memberships",
   {
@@ -1266,6 +1281,17 @@ export const fileContexts = pgTable(
     updatedAt: updated(),
   },
   (t) => [index("file_context_user_idx").on(t.userId, t.createdAt), index("file_context_hash_idx").on(t.userId, t.sha256)],
+);
+
+export const aiConversationFileContexts = pgTable(
+  "ai_conversation_file_contexts",
+  {
+    id: id(),
+    conversationId: uuid("conversation_id").notNull().references(() => aiConversations.id, { onDelete: "cascade" }),
+    fileContextId: uuid("file_context_id").notNull().references(() => fileContexts.id, { onDelete: "cascade" }),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("ai_conv_file_context_uq").on(t.conversationId, t.fileContextId), index("ai_conv_file_context_conv_idx").on(t.conversationId, t.createdAt)],
 );
 
 export const analysisScopes = pgTable(
@@ -2996,6 +3022,7 @@ export const pkMatchQuestions = pgTable(
   {
     id: id(),
     matchId: uuid("match_id").notNull().references(() => pkMatches.id, { onDelete: "cascade" }),
+    sourceQuestionId: uuid("source_question_id").references(() => questions.id, { onDelete: "set null" }),
     orderIndex: integer("order_index").notNull(),
     type: text("type").notNull().default("single"),
     stem: text("stem").notNull(),

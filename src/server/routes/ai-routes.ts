@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   aiConversations,
+  aiConversationFileContexts,
   aiMessages,
   aiMemory,
   studyMaterials,
@@ -219,7 +220,8 @@ export const routes: RouteDef[] = [
         .where(eq(aiMessages.conversationId, conv.id))
         .orderBy(asc(aiMessages.createdAt))
         .limit(200);
-      return { conversation: conv, messages: msgs };
+      const linkedContexts = await db.select({ id: fileContexts.id, originalName: fileContexts.originalName, status: fileContexts.status, uploadBatch: fileContexts.uploadBatch }).from(aiConversationFileContexts).innerJoin(fileContexts, eq(fileContexts.id, aiConversationFileContexts.fileContextId)).where(and(eq(aiConversationFileContexts.conversationId, conv.id), eq(fileContexts.userId, user.userId))).orderBy(asc(aiConversationFileContexts.createdAt));
+      return { conversation: { ...conv, contextIds: linkedContexts.map((item) => item.id), attachments: linkedContexts }, messages: msgs };
     },
   }),
 
@@ -267,7 +269,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000), contextId: z.string().uuid().optional(), featureKey: z.enum(["ai_context", "learning_ai_chat", "learning_ai_question_generation"]).default("ai_context") }));
+      const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000), contextId: z.string().uuid().optional(), contextIds: z.array(z.string().uuid()).max(30).default([]), featureKey: z.enum(["ai_context", "learning_ai_chat", "learning_ai_question_generation"]).default("ai_context") }));
       const conv = (await db.select().from(aiConversations).where(eq(aiConversations.id, ctx.params.id)).limit(1))[0];
       if (!conv) throw notFound("找不到對話");
       if (conv.userId !== user.userId) throw forbidden();
@@ -280,16 +282,12 @@ export const routes: RouteDef[] = [
         const history = latestConversationMessages(historyRows);
       const context = await buildContext(user.userId, conv.allowContext, conv.contextMaterialId);
       const policy = await getAiPolicy("ai_chat");
-      const attachment = body.contextId
-        ? (await db.select().from(fileContexts).where(and(eq(fileContexts.id, body.contextId), eq(fileContexts.userId, user.userId))).limit(1))[0]
-        : null;
-      const attachmentText = attachment && Array.isArray(attachment.detected)
-        ? (attachment.detected as Array<{ kind?: string; text?: string }>).map((item) => `[${item.kind ?? "內容"}] ${item.text ?? ""}`).join("\n").slice(0, 16000)
-        : "";
-      const attachmentObject = attachment?.objectId ? await readObject(attachment.objectId) : null;
-      const attachmentParts = attachmentObject?.mimeType.startsWith("image/")
-        ? [{ kind: "image" as const, mimeType: attachmentObject.mimeType, base64: attachmentObject.data.toString("base64") }]
-        : [];
+      const requestedContextIds = [...new Set([...(body.contextIds ?? []), ...(body.contextId ? [body.contextId] : [])])];
+      if (requestedContextIds.length) await db.insert(aiConversationFileContexts).values(requestedContextIds.map((fileContextId) => ({ conversationId: conv.id, fileContextId }))).onConflictDoNothing();
+      const linked = await db.select({ context: fileContexts }).from(aiConversationFileContexts).innerJoin(fileContexts, eq(fileContexts.id, aiConversationFileContexts.fileContextId)).where(and(eq(aiConversationFileContexts.conversationId, conv.id), eq(fileContexts.userId, user.userId))).orderBy(asc(aiConversationFileContexts.createdAt)).limit(30);
+      const attachments = linked.map((row) => row.context);
+      const attachmentText = attachments.flatMap((attachment) => Array.isArray(attachment.detected) ? attachment.detected.map((item) => `[${attachment.originalName} · ${item.kind ?? "內容"}] ${item.text ?? ""}`) : []).join("\n").slice(0, 24000);
+      const attachmentParts = (await Promise.all(attachments.map(async (attachment) => attachment.objectId ? readObject(attachment.objectId) : null))).filter((object): object is NonNullable<typeof object> => Boolean(object?.mimeType.startsWith("image/"))).map((object) => ({ kind: "image" as const, mimeType: object.mimeType, base64: object.data.toString("base64") }));
 
       const { data, meta } = await runAiJson<{ reply?: string; importance?: string; action?: { type?: string; payload?: Record<string, unknown>; preview?: string } | null; memory?: Array<{ key: string; value: string }> }>(
         {
