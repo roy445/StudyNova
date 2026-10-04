@@ -20,6 +20,8 @@ const releaseMigrations = [
   "0096_exam_hub_usage_logs.sql",
   "0097_question_usage_stats.sql",
   "0098_ai_conversation_file_contexts.sql",
+  "0099_tester_beta_controls.sql",
+  "0100_tester_feedback_board.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

@@ -9,7 +9,7 @@ import { putObject, signObjectUrl } from "../storage";
 import { adminLog } from "../economy";
 import { notify } from "../notify";
 
-const CATEGORIES = ["bug", "ai", "account", "weekly", "content", "membership", "suggestion", "other"] as const;
+const CATEGORIES = ["bug", "ai", "account", "weekly", "content", "tester", "membership", "suggestion", "other"] as const;
 
 export const CATEGORY_LABEL: Record<string, string> = {
   bug: "功能異常 / Bug",
@@ -17,6 +17,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   account: "帳號與登入",
   weekly: "每週小考",
   content: "教材／題目內容錯誤",
+  tester: "測試員 Beta 回報",
   membership: "Nova / 會員 / 點數",
   suggestion: "功能建議",
   other: "其他",
@@ -293,7 +294,10 @@ export const routes: RouteDef[] = [
         })
         .from(issueReports)
         .leftJoin(users, eq(users.userId, issueReports.userId))
-        .where(status && status !== "all" ? eq(issueReports.status, status) : sql`true`)
+        .where(and(
+          status && status !== "all" ? eq(issueReports.status, status) : sql`true`,
+          ctx.query.get("category") && ctx.query.get("category") !== "all" ? eq(issueReports.category, ctx.query.get("category") as string) : sql`true`,
+        ))
         .orderBy(desc(issueReports.createdAt))
         .limit(200);
 

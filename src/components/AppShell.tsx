@@ -17,6 +17,7 @@ export type ShellUser = {
   avatarSeed?: string;
   role: string;
   isPro: boolean;
+  isTester?: boolean;
 };
 
 function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
@@ -418,9 +419,14 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
               <SymbolIcon name="admin" size={19} /> <span>管理後台</span>
             </Link>
           )}
+          {user.isTester && (
+            <Link href="/tester" className="focus-ring tester-side-nav mt-2 flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm">
+              <span aria-hidden="true">✦</span><span>測試員控制台</span><span className="tester-beta-badge">BETA</span>
+            </Link>
+          )}
         </nav>
         <div className="glass-soft p-3 text-xs">
-          <p className={`truncate font-medium ${user.isPro ? "pro-name" : ""}`}>{user.displayName}</p>
+          <p className={`truncate font-medium ${user.isPro ? "pro-name" : ""} ${user.isTester ? "tester-name" : ""}`}>{user.displayName}</p>
           <p className="truncate text-muted">{user.novaId}</p>
           <div className="mt-2 flex items-center gap-1.5">
             {user.isPro && <Badge tone="gold">Nova Pro</Badge>}
@@ -464,16 +470,17 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                 aria-haspopup="menu"
                 className={`focus-ring flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-xs transition hover:bg-white/5 ${user.isPro ? "pro-frame" : "border-[var(--line)]"}`}
               >
-                <span className={`grid h-6 w-6 place-items-center rounded-full border text-[11px] font-bold text-white shadow-sm ${user.isPro ? "border-amber-200/80 bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "border-cyan-200/40 bg-gradient-to-br from-[#7c5cff] to-[#20c5e8]"}`}>
+                <span className={`grid h-6 w-6 place-items-center rounded-full border text-[11px] font-bold text-white shadow-sm ${user.isTester ? "tester-avatar" : user.isPro ? "border-amber-200/80 bg-gradient-to-br from-[#ffc857] to-[#ff9f43] text-black" : "border-cyan-200/40 bg-gradient-to-br from-[#7c5cff] to-[#20c5e8]"}`}>
                   {user.displayName.slice(0, 1)}
                 </span>
-                <span className={`hidden max-w-[90px] truncate sm:inline ${user.isPro ? "pro-name font-semibold" : ""}`}>{user.displayName}</span>
+                <span className={`hidden max-w-[90px] truncate sm:inline ${user.isPro ? "pro-name font-semibold" : ""} ${user.isTester ? "tester-name" : ""}`}>{user.displayName}</span>
                 <span className="text-[10px] text-muted" aria-hidden="true">⌄</span>
               </button>
               {accountMenuOpen && (
                 <div role="menu" aria-label="帳號選單" className="glass anim-pop absolute right-0 top-[calc(100%+0.5rem)] z-50 w-64 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.35)]">
                   <div className="px-3 py-2.5">
-                    <p className={`truncate text-sm font-semibold ${user.isPro ? "pro-name" : ""}`}>{user.displayName}</p>
+                    <p className={`truncate text-sm font-semibold ${user.isPro ? "pro-name" : ""} ${user.isTester ? "tester-name" : ""}`}>{user.displayName}</p>
+                    {user.isTester && <p className="mt-1 text-[11px] tester-name">✦ 測試員</p>}
                     <p className="mt-0.5 truncate text-[11px] text-muted">{user.novaId}</p>
                   </div>
                   <div className="border-t border-[var(--line)] pt-1.5">

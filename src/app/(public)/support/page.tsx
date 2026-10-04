@@ -29,6 +29,7 @@ const CATEGORIES = [
   ["account", "帳號與登入"],
   ["weekly", "每週小考"],
   ["content", "教材／題目內容錯誤"],
+  ["tester", "測試員 Beta 回報"],
   ["membership", "Nova / 會員 / 點數"],
   ["suggestion", "功能建議"],
   ["other", "其他"],

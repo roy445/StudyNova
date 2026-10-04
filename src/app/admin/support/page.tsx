@@ -44,9 +44,10 @@ const SEV_TONE: Record<string, "muted" | "cyan" | "gold" | "rose"> = { low: "mut
 export default function AdminSupportPage() {
   const toast = useToast();
   const [status, setStatus] = useState("open");
+  const [category, setCategory] = useState("all");
   const list = useApi<{ issues: Issue[]; counts: Array<{ status: string; c: number }>; topCodes: Array<{ errorCode: string; c: number }> }>(
-    `/admin/support/issues?status=${status}`,
-    [status],
+    `/admin/support/issues?status=${status}&category=${encodeURIComponent(category)}`,
+    [status, category],
   );
   const [active, setActive] = useState<Issue | null>(null);
   const [note, setNote] = useState("");
@@ -150,7 +151,7 @@ export default function AdminSupportPage() {
         </Card>
       ) : null}
 
-      <Tabs tabs={STATUS.map(([k, l]) => ({ key: k, label: l }))} active={status} onChange={setStatus} />
+      <div className="flex flex-wrap items-center gap-2"><Tabs tabs={STATUS.map(([k, l]) => ({ key: k, label: l }))} active={status} onChange={setStatus} /><select value={category} onChange={(event) => setCategory(event.target.value)} className="rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2 text-xs"><option value="all">全部分類</option><option value="tester">測試員 Beta 回報</option><option value="bug">功能異常</option><option value="ai">AI 回應</option><option value="content">教材／題目</option><option value="suggestion">功能建議</option></select></div>
 
       <Card title="◇ 問題回報" subtitle="每筆回報都附帶錯誤代碼、追蹤編號與環境資訊">
         {list.loading && <Skeleton lines={5} />}

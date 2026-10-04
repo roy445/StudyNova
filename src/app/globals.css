@@ -631,3 +631,45 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
   from { opacity: 0; transform: translateX(36px) scale(.94); }
   to { opacity: 1; transform: translateX(0) scale(1); }
 }
+
+/* Tester identity: violet/lilac glow, intentionally distinct from admin gold. */
+.tester-name {
+  color: #d8b4fe;
+  text-shadow: 0 0 7px rgba(167, 139, 250, .85), 0 0 18px rgba(124, 92, 255, .55);
+}
+.tester-avatar {
+  border-color: rgba(216, 180, 254, .85);
+  background: linear-gradient(135deg, #7c3aed, #c084fc 55%, #37d3ff);
+  box-shadow: 0 0 14px rgba(167, 139, 250, .7);
+}
+.tester-side-nav {
+  border-color: rgba(167, 139, 250, .45);
+  color: #e9d5ff;
+  background: linear-gradient(90deg, rgba(124, 58, 237, .16), rgba(55, 211, 255, .08));
+  box-shadow: 0 0 18px rgba(124, 58, 237, .12);
+}
+.tester-side-nav:hover {
+  border-color: rgba(216, 180, 254, .75);
+  background: linear-gradient(90deg, rgba(124, 58, 237, .28), rgba(55, 211, 255, .14));
+}
+.tester-beta-badge {
+  margin-left: auto;
+  border: 1px solid rgba(216, 180, 254, .5);
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  color: #e9d5ff;
+  box-shadow: 0 0 10px rgba(167, 139, 250, .45);
+}
+.tester-button {
+  border-color: rgba(216, 180, 254, .55);
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6 55%, #2563eb);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, .28);
+}
+.tester-button:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px rgba(167, 139, 250, .36);
+}

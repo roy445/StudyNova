@@ -12,6 +12,7 @@ import { featureKeyForApiPath, isFeatureGateLive } from "@/lib/feature-version";
 import { classifyAuditPath, writeAudit } from "./audit";
 import { ensureIdentityGroupSchema } from "./db-compat";
 import { classifyDatabaseError, extractDatabaseDiagnostics } from "./db-diagnostics";
+import { requireTesterBeta } from "./tester";
 
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export type AuthMode = "none" | "optional" | "user" | "admin";
@@ -32,6 +33,7 @@ export type RouteDef = {
   path: string;
   auth?: AuthMode;
   featureGate?: string;
+  testerFeature?: string;
   rate?: { limit: number; windowSec: number; key?: string };
   handler: (ctx: Ctx) => Promise<unknown>;
 };
@@ -132,6 +134,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/analytics-routes"),
     import("./routes/pk-routes"),
     import("./routes/chemistry-routes"),
+    import("./routes/tester-routes"),
   ]);
   compiledRoutes = compile(mods.flatMap((m) => m.routes));
   return compiledRoutes;
@@ -225,6 +228,8 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
       const control = await serviceControl();
       if (!control.enabled) throw fail("SERVICE_MAINTENANCE", { message: control.message, details: { estimatedRecoveryAt: control.estimatedRecoveryAt } });
     }
+
+    if (user && def.testerFeature) await requireTesterBeta(user, def.testerFeature);
 
     if (user && def.auth !== "admin" && !def.path.startsWith("/auth") && !def.path.startsWith("/support/legal") && def.path !== "/analytics/events" && def.path !== "/health" && !(await hasCurrentUsageConsent(user.userId))) {
       throw fail("AUTH_USAGE_RULES_REQUIRED");

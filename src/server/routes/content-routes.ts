@@ -538,6 +538,7 @@ export const contentRoutes: RouteDef[] = [
     method: "POST",
     path: "/ocr/documents/:id/vision-analysis",
     auth: "user",
+    testerFeature: "camera_vision_analysis",
     rate: { limit: 20, windowSec: 3600 },
     handler: async (ctx) => {
       const user = ctx.requireUser();

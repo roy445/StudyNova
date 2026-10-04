@@ -1942,6 +1942,8 @@ export const featurePermissions = pgTable(
     label: text("label").notNull(),
     category: text("category").notNull().default("系統與其他"),
     enabled: boolean("enabled").notNull().default(true),
+    testerEnabled: boolean("tester_enabled").notNull().default(false),
+    testerDescription: text("tester_description").notNull().default(""),
     proOnly: boolean("pro_only").notNull().default(false),
     freeDailyLimit: integer("free_daily_limit").notNull().default(0),
     proDailyLimit: integer("pro_daily_limit").notNull().default(0),
@@ -2551,7 +2553,7 @@ export const issueReports = pgTable(
     ticketNo: text("ticket_no").notNull(),
     userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
     contactEmail: text("contact_email").notNull().default(""),
-    category: text("category").notNull().default("bug"), // bug | ai | account | payment | weekly | content | suggestion | other
+    category: text("category").notNull().default("bug"), // bug | ai | account | payment | weekly | content | tester | suggestion | other
     severity: text("severity").notNull().default("normal"), // low | normal | high | blocker
     title: text("title").notNull(),
     description: text("description").notNull(),
@@ -3570,3 +3572,33 @@ export const chemistryLessonProgress = pgTable("chemistry_lesson_progress", {
 export const chemistryFormulas = pgTable("chemistry_formulas", {
   id: id(), conceptId: uuid("concept_id").notNull().references(() => chemistryConcepts.id, { onDelete: "cascade" }), title: text("title").notNull(), expression: text("expression").notNull(), variables: jsonb("variables").$type<Array<{ symbol: string; meaning: string; unit: string }>>().notNull().default([]), usage: text("usage").notNull().default(""), commonMistakes: text("common_mistakes").notNull().default(""), example: text("example").notNull().default(""), status: text("status").notNull().default("published"), createdAt: created(),
 }, (t) => [index("chemistry_formulas_concept_idx").on(t.conceptId)]);
+
+
+export const testerFeedbackPosts = pgTable(
+  "tester_feedback_posts",
+  {
+    id: id(),
+    authorId: uuid("author_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    category: text("category").notNull().default("心得"),
+    status: text("status").notNull().default("open"),
+    pinned: boolean("pinned").notNull().default(false),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("tester_feedback_posts_created_idx").on(t.createdAt), index("tester_feedback_posts_status_idx").on(t.status, t.pinned, t.updatedAt)],
+);
+
+export const testerFeedbackComments = pgTable(
+  "tester_feedback_comments",
+  {
+    id: id(),
+    postId: uuid("post_id").notNull().references(() => testerFeedbackPosts.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("tester_feedback_comments_post_idx").on(t.postId, t.createdAt)],
+);
