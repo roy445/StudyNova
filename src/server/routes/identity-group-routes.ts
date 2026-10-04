@@ -23,7 +23,7 @@ export const routes: RouteDef[] = [
       const groups = await db.select().from(identityGroups).where(q ? or(ilike(identityGroups.name, `%${q}%`), ilike(identityGroups.description, `%${q}%`)) : undefined).orderBy(asc(identityGroups.name));
       const result = [];
       for (const group of groups) {
-        const members = await db.select({ userId: users.userId, displayName: users.displayName, email: users.email, status: users.status }).from(identityGroupMembers).innerJoin(users, eq(users.userId, identityGroupMembers.userId)).where(eq(identityGroupMembers.identityGroupId, group.id)).orderBy(asc(users.displayName));
+        const members = await db.select({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, email: users.email, status: users.status }).from(identityGroupMembers).innerJoin(users, eq(users.userId, identityGroupMembers.userId)).where(eq(identityGroupMembers.identityGroupId, group.id)).orderBy(asc(users.displayName));
         result.push({ ...group, memberCount: members.length, members });
       }
       return { groups: result };

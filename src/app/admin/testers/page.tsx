@@ -17,6 +17,7 @@ export default function TesterAdminPage() {
   const [userSearch, setUserSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const searchPath = userSearch.trim() ? `/admin/users?q=${encodeURIComponent(userSearch.trim())}&page=1&pageSize=20` : null;
   const searchUsers = useApi<{ users: SearchUser[]; total: number }>(searchPath, [userSearch]);
 
@@ -50,6 +51,22 @@ export default function TesterAdminPage() {
     } catch (error) { toast.push("error", errorMessage(error)); }
   }
 
+  async function exportFeedbackCsv() {
+    setExporting(true);
+    try {
+      const response = await fetch("/api/v1/admin/testers/export", { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) throw new Error("無法匯出測試回報 CSV");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `studynova-tester-feedback-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.push("success", "測試回報 CSV 已下載");
+    } catch (error) { toast.push("error", errorMessage(error)); } finally { setExporting(false); }
+  }
+
   if (state.loading) return <p className="text-sm text-muted">載入測試員控制專區…</p>;
   if (state.error || !state.data) return <p className="text-sm text-rose-200">{state.error ?? "無法載入測試員資料"}</p>;
   const data = state.data;
@@ -57,7 +74,7 @@ export default function TesterAdminPage() {
   const searchResults = (searchUsers.data?.users ?? []).filter((user) => user.status === "active");
 
   return <div className="space-y-5">
-    <header className="rounded-3xl border border-violet-300/35 bg-gradient-to-br from-violet-400/15 via-white/[.03] to-cyan-300/10 p-5 shadow-[0_0_45px_rgba(167,139,250,.12)] sm:p-7"><p className="text-xs font-black uppercase tracking-[.25em] text-violet-200">Beta Operations</p><h1 className="mt-2 text-2xl font-black"><span className="tester-name">測試員管理控制專區</span></h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted">管理測試員名單、開關 Beta 功能，並透過既有回報中心直接查看測試結果。測試員不會取得管理員後台權限。</p></header>
+    <header className="rounded-3xl border border-violet-300/35 bg-gradient-to-br from-violet-400/15 via-white/[.03] to-cyan-300/10 p-5 shadow-[0_0_45px_rgba(167,139,250,.12)] sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.25em] text-violet-200">Beta Operations</p><h1 className="mt-2 text-2xl font-black"><span className="tester-name">測試員管理控制專區</span></h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted">管理測試員名單、開關 Beta 功能，並透過既有回報中心直接查看測試結果。測試員不會取得管理員後台權限。</p></div><Button variant="outline" loading={exporting} onClick={() => void exportFeedbackCsv()}>一鍵匯出 CSV</Button></div></header>
     {analytics.data && <section className="space-y-4"><div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6"><Stat label="測試員人數" value={analytics.data.kpis.members} tone="violet" /><Stat label="問題回報總數" value={analytics.data.kpis.totalReports} tone="cyan" /><Stat label="心得貼文" value={analytics.data.kpis.totalPosts} /><Stat label="留言總數" value={analytics.data.kpis.totalComments} /><Stat label="近 7 天活躍" value={analytics.data.kpis.active7} tone="gold" /><Stat label="近 30 天活躍" value={analytics.data.kpis.active30} tone="violet" /></div><div className="grid gap-4 lg:grid-cols-2"><Card title="每日回報活動" subtitle="最近 30 天的問題回報、心得貼文與留言"><BarChart series={analytics.data.daily.map((item) => ({ label: item.date.slice(5), value: item.reports }))} suffix=" 件" /><div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs text-muted"><span>問題回報<br /><strong className="text-cyan-200">{analytics.data.kpis.totalReports}</strong></span><span>心得貼文<br /><strong className="text-violet-200">{analytics.data.kpis.totalPosts}</strong></span><span>留言<br /><strong className="text-amber-200">{analytics.data.kpis.totalComments}</strong></span></div></Card><Card title="每日活躍測試員" subtitle="當日有回報、發文或留言的去重人數"><LineChart series={analytics.data.daily.map((item) => ({ label: item.date.slice(5), value: item.activeUsers }))} suffix=" 人" color="#a78bfa" /></Card></div><Card title="活躍測試員排行" subtitle="依最近 30 天的問題回報、心得與留言總量排序"><div className="space-y-2">{analytics.data.topUsers.map((user, index) => <div key={user.userId} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-sm"><span className="w-6 text-center font-black text-violet-200">{index + 1}</span><span className="min-w-32 flex-1 font-semibold">{user.displayName}<span className="ml-2 text-xs text-muted">{user.novaId}</span></span><span className="text-xs text-cyan-200">回報 {user.reports}</span><span className="text-xs text-violet-200">貼文 {user.posts}</span><span className="text-xs text-amber-200">留言 {user.comments}</span><strong className="rounded-full bg-white/10 px-2 py-1 text-xs">共 {user.total}</strong></div>)}{!analytics.data.topUsers.length && <p className="text-sm text-muted">最近 30 天尚無測試活動。</p>}</div></Card></section>}
     <div className="grid gap-4 lg:grid-cols-[.9fr_1.1fr]">
       <Card title="測試員身分組" subtitle="搜尋使用者名稱或 Nova ID，勾選後儲存即可加入測試員">

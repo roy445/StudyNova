@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { featurePermissions, identityGroupMembers, identityGroups, issueReports, testerFeedbackComments, testerFeedbackNotificationPreferences, testerFeedbackPosts, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
-import { forbidden, notFound } from "../core";
+import { forbidden, notFound, toCsv } from "../core";
 import { ensureTesterGroup, isTesterUser, testerFeatures, testerMembers, TESTER_GROUP_NAME } from "../tester";
 import { notify } from "../notify";
 import { sendAccountEmail, systemAnnouncementEmailTemplate } from "../email";
@@ -139,6 +139,24 @@ export const routes: RouteDef[] = [
       if (!group) throw notFound("無法建立測試員身分組");
       const days = Math.min(90, Math.max(7, Number(ctx.query.get("days") ?? 30) || 30));
       return testerAnalytics(group.id, days);
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/testers/export",
+    auth: "admin",
+    handler: async (ctx) => {
+      const reports = await db.select({ ticketNo: issueReports.ticketNo, category: issueReports.category, title: issueReports.title, severity: issueReports.severity, status: issueReports.status, description: issueReports.description, authorName: users.displayName, authorNovaId: users.novaId, createdAt: issueReports.createdAt }).from(issueReports).leftJoin(users, eq(users.userId, issueReports.userId)).where(eq(issueReports.category, "tester")).orderBy(desc(issueReports.createdAt)).limit(10000);
+      const posts = await db.select({ id: testerFeedbackPosts.id, category: testerFeedbackPosts.category, title: testerFeedbackPosts.title, body: testerFeedbackPosts.body, authorName: users.displayName, authorNovaId: users.novaId, createdAt: testerFeedbackPosts.createdAt }).from(testerFeedbackPosts).innerJoin(users, eq(users.userId, testerFeedbackPosts.authorId)).orderBy(desc(testerFeedbackPosts.createdAt)).limit(10000);
+      const comments = await db.select({ id: testerFeedbackComments.id, postId: testerFeedbackComments.postId, body: testerFeedbackComments.body, authorName: users.displayName, authorNovaId: users.novaId, createdAt: testerFeedbackComments.createdAt }).from(testerFeedbackComments).innerJoin(users, eq(users.userId, testerFeedbackComments.authorId)).orderBy(desc(testerFeedbackComments.createdAt)).limit(20000);
+      const headers = ["資料類型", "識別碼", "回報單號", "貼文 ID", "分類", "標題", "嚴重程度", "狀態", "作者", "作者 Nova ID", "內容", "建立時間"];
+      const rows = [
+        ...reports.map((row) => ({ "資料類型": "問題回報", "識別碼": row.ticketNo, "回報單號": row.ticketNo, "貼文 ID": "", "分類": row.category, "標題": row.title, "嚴重程度": row.severity, "狀態": row.status, "作者": row.authorName, "作者 Nova ID": row.authorNovaId, "內容": row.description, "建立時間": row.createdAt.toISOString() })),
+        ...posts.map((row) => ({ "資料類型": "心得貼文", "識別碼": row.id, "回報單號": "", "貼文 ID": row.id, "分類": row.category, "標題": row.title, "嚴重程度": "", "狀態": "", "作者": row.authorName, "作者 Nova ID": row.authorNovaId, "內容": row.body, "建立時間": row.createdAt.toISOString() })),
+        ...comments.map((row) => ({ "資料類型": "心得留言", "識別碼": row.id, "回報單號": "", "貼文 ID": row.postId, "分類": "留言", "標題": "", "嚴重程度": "", "狀態": "", "作者": row.authorName, "作者 Nova ID": row.authorNovaId, "內容": row.body, "建立時間": row.createdAt.toISOString() })),
+      ];
+      const stamp = new Date().toISOString().slice(0, 10);
+      return new Response(toCsv(rows, headers), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="studynova-tester-feedback-${stamp}.csv"` } });
     },
   }),
   route({
