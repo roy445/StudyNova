@@ -1,42 +1,18 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { featurePermissions, identityGroupMembers, identityGroups, users } from "@/db/schema";
+import { featurePermissions, users } from "@/db/schema";
 import type { AuthUser } from "./auth";
 import { forbidden } from "./core";
 
 export const TESTER_GROUP_NAME = "測試員";
 
-export async function ensureTesterGroup(createdBy: string) {
-  const existing = (await db.select().from(identityGroups).where(eq(identityGroups.name, TESTER_GROUP_NAME)).limit(1))[0];
-  if (existing) return existing;
-  try {
-    const rows = await db.insert(identityGroups).values({
-      name: TESTER_GROUP_NAME,
-      description: "可提前體驗指定 Beta 功能、回報問題並協助驗證版本的測試身分。",
-      badge: "TESTER",
-      color: "#a78bfa",
-      enabled: true,
-      createdBy,
-    }).returning();
-    return rows[0];
-  } catch {
-    return (await db.select().from(identityGroups).where(eq(identityGroups.name, TESTER_GROUP_NAME)).limit(1))[0] ?? null;
-  }
-}
-
 export async function enrollTesterUser(userId: string) {
-  const group = await ensureTesterGroup(userId);
-  if (!group) return false;
-  await db.insert(identityGroupMembers).values({ identityGroupId: group.id, userId, addedBy: userId }).onConflictDoNothing();
+  await db.update(users).set({ role: "tester", updatedAt: new Date() }).where(eq(users.userId, userId));
   return true;
 }
 
 export async function isTesterUser(userId: string) {
-  const rows = await db.select({ id: identityGroupMembers.userId })
-    .from(identityGroupMembers)
-    .innerJoin(identityGroups, eq(identityGroups.id, identityGroupMembers.identityGroupId))
-    .where(and(eq(identityGroupMembers.userId, userId), eq(identityGroups.name, TESTER_GROUP_NAME), eq(identityGroups.enabled, true)))
-    .limit(1);
+  const rows = await db.select({ id: users.userId }).from(users).where(and(eq(users.userId, userId), eq(users.role, "tester"))).limit(1);
   return Boolean(rows[0]);
 }
 
@@ -62,16 +38,14 @@ export async function testerFeatures() {
   }).from(featurePermissions).where(and(eq(featurePermissions.enabled, true), eq(featurePermissions.testerEnabled, true))).orderBy(asc(featurePermissions.category), asc(featurePermissions.label));
 }
 
-export async function testerMembers(groupId: string) {
+export async function testerMembers() {
   return db.select({
     userId: users.userId,
     novaId: users.novaId,
     displayName: users.displayName,
     email: users.email,
     status: users.status,
-    joinedAt: identityGroupMembers.joinedAt,
-  }).from(identityGroupMembers)
-    .innerJoin(users, eq(users.userId, identityGroupMembers.userId))
-    .where(eq(identityGroupMembers.identityGroupId, groupId))
+  }).from(users)
+    .where(and(eq(users.role, "tester"), eq(users.status, "active")))
     .orderBy(asc(users.displayName));
 }

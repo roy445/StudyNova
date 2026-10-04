@@ -25,7 +25,6 @@ import { sendPasswordResetEmail } from "../email";
 import { checkDisplayName } from "../name-moderation";
 import { getRegistrationControl } from "../registration";
 import { deleteObject, objectOwner, putObject, readObject } from "@/server/storage";
-import { enrollTesterUser } from "../tester";
 
 const emailSchema = z.string().email("Email 格式不正確").max(180);
 const passwordSchema = z.string().min(8, "密碼至少 8 個字元").max(128);
@@ -94,7 +93,7 @@ export const routes: RouteDef[] = [
 
       const novaId = await createUniqueNovaId();
       const inserted = await db.transaction(async (tx) => {
-        const createdUsers = await tx.insert(users).values({ novaId, email, passwordHash: hashPassword(body.password), displayName: body.displayName.trim(), role: "student" }).returning({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, role: users.role });
+        const createdUsers = await tx.insert(users).values({ novaId, email, passwordHash: hashPassword(body.password), displayName: body.displayName.trim(), role: body.testerSignup ? "tester" : "student" }).returning({ userId: users.userId, novaId: users.novaId, displayName: users.displayName, role: users.role });
         if (!createdUsers[0]) throw fail("SYS_INTERNAL");
         await tx.insert(legalConsents).values({ userId: createdUsers[0].userId, documentSlug: "registration_terms", documentVersion: terms.version, consentType: "registration", ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
         return createdUsers;
@@ -102,7 +101,7 @@ export const routes: RouteDef[] = [
 
       const user = inserted[0];
       await db.insert(userSettings).values({ userId: user.userId }).onConflictDoNothing();
-      const tester = body.testerSignup ? await enrollTesterUser(user.userId) : false;
+      const tester = body.testerSignup ? true : false;
       await ensureUserEconomy(user.userId);
       await ensureDailyTasks(user.userId);
       await notify({

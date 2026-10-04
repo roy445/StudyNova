@@ -24,6 +24,7 @@ const releaseMigrations = [
   "0100_tester_feedback_board.sql",
   "0101_tester_feedback_notifications.sql",
   "0102_identity_group_member_columns.sql",
+  "0103_migrate_testers_to_role.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

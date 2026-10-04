@@ -364,7 +364,7 @@ export const routes: RouteDef[] = [
           amount: z.number().int().min(-100000).max(100000).optional(),
           days: z.number().int().min(1).max(3650).optional(),
           feature: z.string().max(60).optional(),
-          role: z.enum(["student", "admin"]).optional(),
+          role: z.enum(["student", "tester", "admin"]).optional(),
           title: z.string().max(120).optional(),
           message: z.string().max(400).optional(),
           link: z.string().max(240).optional(),

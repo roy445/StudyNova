@@ -39,7 +39,7 @@ export const users = pgTable(
     nameModerationReason: text("name_moderation_reason").notNull().default(""),
     nameLastCheckedAt: timestamp("name_last_checked_at", { withTimezone: true }),
     nameWarningCount: integer("name_warning_count").notNull().default(0),
-    role: text("role").notNull().default("student"), // student | admin | owner
+    role: text("role").notNull().default("student"), // student | tester | admin | owner
     status: text("status").notNull().default("active"), // active | blocked
     blockedReason: text("blocked_reason").notNull().default(""),
     deletedReason: text("deleted_reason").notNull().default(""),

@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { featurePermissions, identityGroupMembers, identityGroups, issueReports, testerFeedbackComments, testerFeedbackNotificationPreferences, testerFeedbackPosts, users } from "@/db/schema";
+import { featurePermissions, issueReports, testerFeedbackComments, testerFeedbackNotificationPreferences, testerFeedbackPosts, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { forbidden, notFound, toCsv } from "../core";
-import { ensureTesterGroup, isTesterUser, testerFeatures, testerMembers, TESTER_GROUP_NAME } from "../tester";
+import { isTesterUser, testerFeatures, testerMembers, TESTER_GROUP_NAME } from "../tester";
 import { notify } from "../notify";
 import { sendAccountEmail, systemAnnouncementEmailTemplate } from "../email";
 
@@ -39,7 +39,7 @@ async function feedbackBoard() {
 async function feedbackAudience(excludeUserId: string) {
   const [admins, testers] = await Promise.all([
     db.select({ userId: users.userId, email: users.email, displayName: users.displayName }).from(users).where(and(eq(users.status, "active"), inArray(users.role, ["admin", "owner"]))),
-    db.select({ userId: users.userId, email: users.email, displayName: users.displayName }).from(identityGroupMembers).innerJoin(identityGroups, eq(identityGroups.id, identityGroupMembers.identityGroupId)).innerJoin(users, eq(users.userId, identityGroupMembers.userId)).where(and(eq(identityGroups.name, TESTER_GROUP_NAME), eq(identityGroups.enabled, true), eq(users.status, "active"))),
+    db.select({ userId: users.userId, email: users.email, displayName: users.displayName }).from(users).where(and(eq(users.role, "tester"), eq(users.status, "active"))),
   ]);
   return [...new Map([...admins, ...testers].filter((user) => user.userId !== excludeUserId).map((user) => [user.userId, user])).values()];
 }
@@ -54,9 +54,9 @@ async function sendFeedbackAlerts(input: { recipientIds: string[]; excludeUserId
   await Promise.all(emailUsers.map((user) => sendAccountEmail(user.email, systemAnnouncementEmailTemplate({ displayName: user.displayName, title: input.title, body: input.body, link: `${input.baseUrl}/tester`, category: "測試員 Beta 回饋" }), { kind: "tester_feedback", displayName: user.displayName, metadata: { postId: input.postId } })));
 }
 
-async function testerAnalytics(groupId: string, days: number) {
+async function testerAnalytics(days: number) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const members = await testerMembers(groupId);
+  const members = await testerMembers();
   const memberIds = new Set(members.map((member) => member.userId));
   const [reportTotal, postTotal, commentTotal, reports, posts, comments] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(issueReports).where(eq(issueReports.category, "tester")),
@@ -116,10 +116,7 @@ export const routes: RouteDef[] = [
     path: "/admin/testers",
     auth: "admin",
     handler: async (ctx) => {
-      const admin = ctx.requireUser();
-      const group = await ensureTesterGroup(admin.userId);
-      if (!group) throw notFound("無法建立測試員身分組");
-      return { group, members: await testerMembers(group.id), features: await db.select({
+      return { members: await testerMembers(), features: await db.select({
         feature: featurePermissions.feature,
         label: featurePermissions.label,
         category: featurePermissions.category,
@@ -135,10 +132,8 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const group = await ensureTesterGroup(admin.userId);
-      if (!group) throw notFound("無法建立測試員身分組");
       const days = Math.min(90, Math.max(7, Number(ctx.query.get("days") ?? 30) || 30));
-      return testerAnalytics(group.id, days);
+      return testerAnalytics(days);
     },
   }),
   route({
@@ -241,16 +236,14 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const admin = ctx.requireUser();
       const body = await ctx.json(z.object({ userIds: z.array(z.string().uuid()).max(500) }));
-      const group = await ensureTesterGroup(admin.userId);
-      if (!group) throw notFound("找不到測試員身分組");
-      await db.delete(identityGroupMembers).where(eq(identityGroupMembers.identityGroupId, group.id));
-      if (body.userIds.length) {
-        const existingUsers = await db.select({ userId: users.userId }).from(users).where(inArray(users.userId, body.userIds));
-        const ids = existingUsers.map((row) => row.userId);
-        if (ids.length) await db.insert(identityGroupMembers).values(ids.map((userId) => ({ identityGroupId: group.id, userId, addedBy: admin.userId })));
-        return { memberCount: ids.length };
-      }
-      return { memberCount: 0 };
+      const existingUsers = body.userIds.length ? await db.select({ userId: users.userId }).from(users).where(and(inArray(users.userId, body.userIds), eq(users.status, "active"), inArray(users.role, ["student", "tester"]))) : [];
+      const ids = existingUsers.map((row) => row.userId);
+      await db.transaction(async (tx) => {
+        if (ids.length) await tx.update(users).set({ role: "tester", updatedAt: new Date() }).where(inArray(users.userId, ids));
+        if (body.userIds.length) await tx.update(users).set({ role: "student", updatedAt: new Date() }).where(and(eq(users.role, "tester"), notInArray(users.userId, body.userIds)));
+        else await tx.update(users).set({ role: "student", updatedAt: new Date() }).where(eq(users.role, "tester"));
+      });
+      return { memberCount: ids.length };
     },
   }),
 ];

@@ -43,7 +43,7 @@ export default function TesterPage() {
   }
 
   if (state.loading) return <div className="mx-auto max-w-4xl p-5 text-sm text-muted">正在載入測試員控制台…</div>;
-  if (state.error || !state.data) return <div className="mx-auto max-w-4xl p-5"><EmptyState icon="✦" title="測試員資格尚未啟用" hint={state.error ?? "請聯絡管理員加入測試員身分組。"} /></div>;
+  if (state.error || !state.data) return <div className="mx-auto max-w-4xl p-5"><EmptyState icon="✦" title="測試員資格尚未啟用" hint={state.error ?? "請聯絡管理員將你的角色設定為測試員。"} /></div>;
 
   return (
     <main className="min-h-dvh bg-[radial-gradient(circle_at_top,#21163f_0%,#080b18_45%,#060711_100%)] px-3 py-5 text-white sm:px-6 sm:py-8">

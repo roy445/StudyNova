@@ -306,7 +306,7 @@ export default function AdminOverviewPage() {
                     <td className="py-2 font-mono">{u.novaId}</td>
                     <td className="py-2">{u.displayName}</td>
                     <td className="max-w-[160px] truncate py-2 text-muted">{u.email}</td>
-                    <td className="py-2">{u.role}</td>
+                    <td className="py-2">{u.role === "tester" ? <Badge tone="violet">測試員</Badge> : u.role}</td>
                     <td className="py-2">
                       <span title={u.status === "blocked" ? `原因：${u.blockedReason || "未填寫"}｜日期：${u.blockedAt ? formatTaipeiDateTime(u.blockedAt) : "—"}` : "帳號正常"}><Badge tone={u.status === "active" ? "green" : "rose"}>{u.status}</Badge></span>
                     </td>
@@ -512,6 +512,7 @@ export default function AdminOverviewPage() {
             <Field label="角色">
               <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 <option value="student">學生</option>
+                <option value="tester">測試員</option>
                 <option value="admin">管理員</option>
               </Select>
             </Field>
