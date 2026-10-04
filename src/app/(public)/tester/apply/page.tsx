@@ -1,16 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button, Card, Field, Input, Select, Textarea, useToast } from "@/components/ui";
-import { apiPost, errorMessage } from "@/lib/api";
+import { apiPost, errorMessage, useApi } from "@/lib/api";
 
 export default function TesterApplyPage() {
+  const router = useRouter();
   const toast = useToast();
+  const me = useApi<{ user: { userId: string } | null }>("/auth/me");
   const [form, setForm] = useState({ name: "", email: "", ageRange: "高中／大學生", device: "手機與電腦", motivation: "", experience: "", availability: "每週 1–2 小時" });
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+
+  useEffect(() => {
+    if (!sent || me.loading) return;
+    const timer = window.setTimeout(() => {
+      router.replace(me.data?.user ? "/dashboard" : "/login?next=%2Fdashboard");
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [me.data?.user, me.loading, router, sent]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

@@ -26,6 +26,7 @@ const releaseMigrations = [
   "0102_identity_group_member_columns.sql",
   "0103_migrate_testers_to_role.sql",
   "0104_tester_applications_and_decision_links.sql",
+  "0105_remove_tester_recruitment_announcement.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
