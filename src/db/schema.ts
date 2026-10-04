@@ -3602,3 +3602,10 @@ export const testerFeedbackComments = pgTable(
   },
   (t) => [index("tester_feedback_comments_post_idx").on(t.postId, t.createdAt)],
 );
+
+
+export const testerFeedbackNotificationPreferences = pgTable("tester_feedback_notification_preferences", {
+  userId: uuid("user_id").primaryKey().references(() => users.userId, { onDelete: "cascade" }),
+  emailEnabled: boolean("email_enabled").notNull().default(false),
+  updatedAt: updated(),
+});

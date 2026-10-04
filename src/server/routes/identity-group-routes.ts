@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
+import { asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { identityGroups, identityGroupMembers, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
@@ -72,7 +72,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ userIds: z.array(z.string().uuid()).max(500) }));
       const group = (await db.select({ id: identityGroups.id }).from(identityGroups).where(eq(identityGroups.id, ctx.params.id)).limit(1))[0];
       if (!group) throw notFound("找不到身分組");
-      const valid = body.userIds.length ? await db.select({ userId: users.userId }).from(users).where(sql`${users.userId} in (${sql.join(body.userIds.map((id) => sql`${id}::uuid`), sql`, `)})`) : [];
+      const valid = body.userIds.length ? await db.select({ userId: users.userId }).from(users).where(inArray(users.userId, body.userIds)) : [];
       const validIds = valid.map((row) => row.userId);
       await db.delete(identityGroupMembers).where(eq(identityGroupMembers.identityGroupId, group.id));
       if (validIds.length) await db.insert(identityGroupMembers).values(validIds.map((userId) => ({ identityGroupId: group.id, userId, addedBy: admin.userId })));

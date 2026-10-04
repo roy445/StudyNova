@@ -22,6 +22,7 @@ const releaseMigrations = [
   "0098_ai_conversation_file_contexts.sql",
   "0099_tester_beta_controls.sql",
   "0100_tester_feedback_board.sql",
+  "0101_tester_feedback_notifications.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
