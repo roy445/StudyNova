@@ -45,7 +45,14 @@ export const routes: RouteDef[] = [
     path: "/admin/identity-groups/:id",
     auth: "admin",
     handler: async (ctx) => {
-      const body = await ctx.json(groupInput.partial());
+      let body;
+      try {
+        body = await ctx.json(groupInput.partial());
+      } catch (error) {
+        console.warn("[StudyNova][identity-group-validation]", JSON.stringify({ requestId: ctx.req.headers.get("x-request-id") ?? null, method: "PATCH", route: "/admin/identity-groups/:id", groupId: ctx.params.id, error: error instanceof Error ? error.message : String(error) }));
+        throw error;
+      }
+      console.info("[StudyNova][identity-group-patch]", JSON.stringify({ requestId: ctx.req.headers.get("x-request-id") ?? null, groupId: ctx.params.id, fields: Object.keys(body), nameLength: typeof body.name === "string" ? body.name.trim().length : null }));
       const group = (await db.select().from(identityGroups).where(eq(identityGroups.id, ctx.params.id)).limit(1))[0];
       if (!group) throw notFound("找不到身分組");
       const rows = await db.update(identityGroups).set({ ...body, updatedAt: new Date() }).where(eq(identityGroups.id, group.id)).returning();
@@ -69,7 +76,14 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ userIds: z.array(z.string().uuid()).max(500) }));
+      let body;
+      try {
+        body = await ctx.json(z.object({ userIds: z.array(z.string().uuid()).max(500) }));
+      } catch (error) {
+        console.warn("[StudyNova][identity-group-validation]", JSON.stringify({ requestId: ctx.req.headers.get("x-request-id") ?? null, method: "PUT", route: "/admin/identity-groups/:id/members", groupId: ctx.params.id, error: error instanceof Error ? error.message : String(error) }));
+        throw error;
+      }
+      console.info("[StudyNova][identity-group-members]", JSON.stringify({ requestId: ctx.req.headers.get("x-request-id") ?? null, groupId: ctx.params.id, requestedUserCount: body.userIds.length }));
       const group = (await db.select({ id: identityGroups.id }).from(identityGroups).where(eq(identityGroups.id, ctx.params.id)).limit(1))[0];
       if (!group) throw notFound("找不到身分組");
       const valid = body.userIds.length ? await db.select({ userId: users.userId }).from(users).where(inArray(users.userId, body.userIds)) : [];

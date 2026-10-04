@@ -280,6 +280,16 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     return response;
   } catch (err) {
     if (err instanceof AppError) {
+      console.warn("[StudyNova][api-error]", JSON.stringify({
+        requestId: err.requestId,
+        code: err.code,
+        status: err.status,
+        method: def.method,
+        route: def.path,
+        params: Object.keys(params).length ? params : undefined,
+        details: err.details,
+        hint: err.hint,
+      }));
       if (user) {
         const audit = classifyAuditPath(def.path);
         await writeAudit({ userId: user.userId, eventType: audit.eventType, module: audit.module, action: audit.action, resourceId: params.id, outcome: "failure", errorCategory: err.code, ip, userAgent: req.headers.get("user-agent") ?? "", metadata: { status: err.status, httpStatus: err.status, route: def.path, method: def.method, errorCode: err.code } });
@@ -294,6 +304,15 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
       ? (def.path === "/pk/matchmaking/join" ? "PK_MATCHMAKING_STORAGE_ERROR" : "SYS_DB_SCHEMA_MISMATCH")
       : databaseKind === "unavailable" ? "SYS_DB_UNAVAILABLE" : "SYS_INTERNAL";
     const internal = fail(errorKey, { requestId, details: { requestId, stage: `${def.method} ${def.path}` } });
+    console.error("[StudyNova][api-database-error]", JSON.stringify({
+      requestId,
+      code: internal.code,
+      method: def.method,
+      route: def.path,
+      params: Object.keys(params).length ? params : undefined,
+      database,
+      errorName: err instanceof Error ? err.name : typeof err,
+    }));
     // Never persist raw driver messages: Drizzle may include SQL and query parameters.
     const message = database
       ? `Database operation failed (${database.code})`
