@@ -24,7 +24,7 @@ export default function IdentityGroupsPage() {
     try {
       const result = await apiGet<{ groups: Group[] }>(`/admin/identity-groups${query ? `?q=${encodeURIComponent(query)}` : ""}`);
       setGroups(result.groups);
-      if (!selected && result.groups[0]) setSelected(result.groups[0].id);
+      if (!selected && result.groups[0]) selectGroup(result.groups[0]);
     } catch (err) { toast.push("error", errorMessage(err)); }
   }
   useEffect(() => { void load(); }, []);
@@ -43,6 +43,7 @@ export default function IdentityGroupsPage() {
   }
   async function saveGroup() {
     if (!active) return;
+    if (!form.name.trim()) { toast.push("error", "請先輸入身分組名稱"); return; }
     setBusy(true);
     try { await apiPatch(`/admin/identity-groups/${active.id}`, form); await apiPut(`/admin/identity-groups/${active.id}/members`, { userIds: selectedIds }); toast.push("success", "身分組與成員已儲存"); await load(); } catch (err) { toast.push("error", errorMessage(err)); } finally { setBusy(false); }
   }
