@@ -236,14 +236,21 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const admin = ctx.requireUser();
       const body = await ctx.json(z.object({ userIds: z.array(z.string().uuid()).max(500) }));
-      const existingUsers = body.userIds.length ? await db.select({ userId: users.userId }).from(users).where(and(inArray(users.userId, body.userIds), eq(users.status, "active"), inArray(users.role, ["student", "tester"]))) : [];
+      const selectedUsers = body.userIds.length ? await db.select({ userId: users.userId, role: users.role, status: users.status, displayName: users.displayName }).from(users).where(inArray(users.userId, body.userIds)) : [];
+      const existingUsers = selectedUsers.filter((user) => user.status === "active" && user.role !== "owner" && user.role !== "admin");
       const ids = existingUsers.map((row) => row.userId);
+      console.info("[StudyNova][tester-members-update]", JSON.stringify({ requestId: ctx.req.headers.get("x-request-id") ?? null, requestedCount: body.userIds.length, foundCount: selectedUsers.length, eligibleCount: existingUsers.length, selected: selectedUsers.map((user) => ({ userId: user.userId, role: user.role, status: user.status })) }));
       await db.transaction(async (tx) => {
         if (ids.length) await tx.update(users).set({ role: "tester", updatedAt: new Date() }).where(inArray(users.userId, ids));
         if (body.userIds.length) await tx.update(users).set({ role: "student", updatedAt: new Date() }).where(and(eq(users.role, "tester"), notInArray(users.userId, body.userIds)));
         else await tx.update(users).set({ role: "student", updatedAt: new Date() }).where(eq(users.role, "tester"));
       });
-      return { memberCount: ids.length };
+      return {
+        memberCount: ids.length,
+        requestedCount: body.userIds.length,
+        eligibleCount: existingUsers.length,
+        skipped: selectedUsers.filter((user) => !ids.includes(user.userId)).map((user) => ({ userId: user.userId, displayName: user.displayName, role: user.role, status: user.status, reason: user.status !== "active" ? "帳號不是啟用狀態" : user.role === "owner" || user.role === "admin" ? "管理員角色不能改為測試員" : "找不到使用者" })),
+      };
     },
   }),
 ];

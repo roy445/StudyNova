@@ -33,8 +33,9 @@ export default function TesterAdminPage() {
   async function saveMembers() {
     setBusy(true);
     try {
-      const result = await apiPut<{ memberCount: number }>("/admin/testers/members", { userIds: selectedIds });
-      toast.push("success", `測試員成員已更新，共 ${result.memberCount} 人`);
+      const result = await apiPut<{ memberCount: number; requestedCount: number; eligibleCount: number; skipped: Array<{ displayName: string; reason: string }> }>("/admin/testers/members", { userIds: selectedIds });
+      const skipped = result.skipped?.length ? `；${result.skipped.map((item) => `${item.displayName}：${item.reason}`).join("、")}` : "";
+      toast.push(result.memberCount === result.requestedCount ? "success" : "info", `測試員名單已更新：成功 ${result.memberCount} 人／選取 ${result.requestedCount} 人${skipped}`);
       await state.reload();
     } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
