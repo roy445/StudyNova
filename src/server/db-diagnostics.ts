@@ -21,7 +21,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics | null {
   let current: unknown = error;
   const visited = new Set<unknown>();
-  for (let depth = 0; depth < 6 && isRecord(current) && !visited.has(current); depth += 1) {
+  const pending: unknown[] = [current];
+  let fallback: DatabaseDiagnostics | null = null;
+  while (pending.length && visited.size < 20) {
+    current = pending.shift();
+    if (!isRecord(current) || visited.has(current)) continue;
     visited.add(current);
     const record = current as Record<string, unknown>;
     const rawCode = record.code;
@@ -46,11 +50,24 @@ export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics 
         const relation = /relation "([a-zA-Z0-9_]{1,128})" does not exist/i.exec(message)?.[1];
         if (relation) diagnostics.table = relation;
       }
-      return diagnostics;
+      const nested = [record.cause, record.originalError, record.original, record.driverError, record.details];
+      pending.push(...nested.filter(isRecord));
+      if (diagnostics.column || diagnostics.table || diagnostics.constraint) return diagnostics;
+      fallback ??= diagnostics;
+      continue;
     }
-    current = record.cause ?? record.originalError ?? record.original ?? record.driverError;
+    pending.push(record.cause, record.originalError, record.original, record.driverError, record.details);
   }
-  return null;
+  return fallback;
+}
+
+export function databaseTarget() {
+  try {
+    const url = new URL(process.env.DATABASE_URL ?? "");
+    return { host: url.hostname, database: url.pathname.replace(/^\//, "").split("/")[0] || "unknown" };
+  } catch {
+    return { host: "invalid-or-missing", database: "unknown" };
+  }
 }
 
 export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
