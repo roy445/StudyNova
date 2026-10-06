@@ -11,7 +11,7 @@ import { compareSemVer, isValidSemVer } from "@/lib/semver";
 import { featureKeyForApiPath, isFeatureGateLive } from "@/lib/feature-version";
 import { classifyAuditPath, writeAudit } from "./audit";
 import { ensureIdentityGroupMemberColumns, ensureIdentityGroupSchema } from "./db-compat";
-import { classifyDatabaseError, extractDatabaseDiagnostics } from "./db-diagnostics";
+import { classifyDatabaseError, databaseErrorMessage, extractDatabaseDiagnostics } from "./db-diagnostics";
 import { requireTesterBeta } from "./tester";
 
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -317,6 +317,7 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
       params: Object.keys(params).length ? params : undefined,
       database,
       errorName: err instanceof Error ? err.name : typeof err,
+      errorMessage: databaseErrorMessage(err),
     }));
     // Never persist raw driver messages: Drizzle may include SQL and query parameters.
     const message = database

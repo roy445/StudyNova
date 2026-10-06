@@ -422,7 +422,13 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ sessionKey: z.string().min(8).max(120), state: playerState.default("online"), currentMatchId: z.string().uuid().nullable().optional(), currentRoomId: z.string().uuid().nullable().optional(), metadata: z.record(z.string(), z.unknown()).optional() }));
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 90_000);
-      const row = await db.insert(pkPresence).values({ userId: user.userId, sessionKey: body.sessionKey, state: body.state, lastHeartbeatAt: now, expiresAt, currentMatchId: body.currentMatchId ?? null, currentRoomId: body.currentRoomId ?? null, metadata: (body.metadata ?? {}) as Record<string, unknown> }).onConflictDoUpdate({ target: [pkPresence.userId, pkPresence.sessionKey], set: { state: body.state, lastHeartbeatAt: now, expiresAt, currentMatchId: body.currentMatchId ?? null, currentRoomId: body.currentRoomId ?? null, metadata: (body.metadata ?? {}) as Record<string, unknown>, updatedAt: now } }).returning({ id: pkPresence.id });
+      const [matchRef, roomRef] = await Promise.all([
+        body.currentMatchId ? db.select({ id: pkMatches.id }).from(pkMatches).where(eq(pkMatches.id, body.currentMatchId)).limit(1) : Promise.resolve([]),
+        body.currentRoomId ? db.select({ id: pkRooms.id }).from(pkRooms).where(eq(pkRooms.id, body.currentRoomId)).limit(1) : Promise.resolve([]),
+      ]);
+      const currentMatchId = matchRef[0]?.id ?? null;
+      const currentRoomId = roomRef[0]?.id ?? null;
+      const row = await db.insert(pkPresence).values({ userId: user.userId, sessionKey: body.sessionKey, state: body.state, lastHeartbeatAt: now, expiresAt, currentMatchId, currentRoomId, metadata: (body.metadata ?? {}) as Record<string, unknown> }).onConflictDoUpdate({ target: [pkPresence.userId, pkPresence.sessionKey], set: { state: body.state, lastHeartbeatAt: now, expiresAt, currentMatchId, currentRoomId, metadata: (body.metadata ?? {}) as Record<string, unknown>, updatedAt: now } }).returning({ id: pkPresence.id });
       if (body.currentMatchId) await db.update(pkMatchPlayers).set({ connectionState: "connected", lastHeartbeatAt: now }).where(and(eq(pkMatchPlayers.matchId, body.currentMatchId), eq(pkMatchPlayers.userId, user.userId)));
       return { present: Boolean(row[0]), expiresAt };
     },

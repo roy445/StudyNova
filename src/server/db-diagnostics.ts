@@ -55,8 +55,19 @@ export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics 
 
 export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
   const code = extractDatabaseDiagnostics(error)?.code;
-  if (!code) return "other";
+  if (!code) {
+    const message = databaseErrorMessage(error).toLowerCase();
+    if (/connection terminated|connection refused|connection reset|timeout|timed out|econn|socket|too many clients|server closed/i.test(message)) return "unavailable";
+    if (/failed query|relation .* does not exist|column .* does not exist|schema/i.test(message)) return "schema";
+    return "other";
+  }
   if (SCHEMA_ERROR_CODES.has(code)) return "schema";
   if (CONNECTION_ERROR_CODES.has(code) || CONNECTION_ERROR_PREFIXES.some((prefix) => code.startsWith(prefix))) return "unavailable";
   return "other";
+}
+
+export function databaseErrorMessage(error: unknown) {
+  if (!isRecord(error)) return "unknown error";
+  const message = typeof error.message === "string" ? error.message : "unknown error";
+  return message.replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[redacted-db-url]").slice(0, 240);
 }
