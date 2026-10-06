@@ -498,8 +498,27 @@ export const routes: RouteDef[] = [
         try {
           artifact = await createAiArtifact({ userId: user.userId, conversationId: conv.id, messageId: msg.id, ...parsed });
         } catch (error) {
-          console.error("[ai/artifact] generation failed", error);
-          throw fail("SYS_DB_UNAVAILABLE", { message: "產物服務目前尚未完成資料庫或檔案儲存設定，請先套用最新 migration 後再試。" });
+          console.error("[ai/artifact] generation failed", {
+            actionType: action.type,
+            kind: parsed.kind,
+            messageId: msg.id,
+            error,
+          });
+          // Preserve actionable application errors (for example FILE_* or a
+          // missing migration classified by the router). The previous code
+          // converted every renderer, storage, and database failure into
+          // SYS_DB_UNAVAILABLE, which hid the actual cause from the user and
+          // made non-database failures look like a connection outage.
+          if (error instanceof AppError) throw error;
+          throw fail("AI_ARTIFACT_WRITE_FAILED", {
+            details: {
+              stage: "ai_action.create_artifact",
+              actionType: action.type,
+              kind: parsed.kind,
+              table: "ai_artifacts",
+              cause: error instanceof Error ? error.message.slice(0, 240) : "unknown",
+            },
+          });
         }
         result = { artifact, preview: artifact.preview, downloadable: await isProUser(user.userId), openUrl: artifact.objectId ? `/api/files/${artifact.objectId}` : null, studyCenterUrl: "/study?tab=visual-notes" };
       } else {

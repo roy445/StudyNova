@@ -127,6 +127,7 @@ export const ERROR_CATALOG = {
   AI_MATERIAL_PAYLOAD_INVALID: def("SN-AI-6016", 400, "AI", "AI 教材內容格式不完整", "請重新要求 Novi 加入教材，並確認回覆中有教材正文。"),
   AI_MATERIAL_WRITE_FAILED: def("SN-AI-6017", 503, "AI", "AI 教材儲存失敗", "請附上錯誤代碼與追蹤編號回報，管理員可依 stage 檢查 study_materials 資料表。"),
   AI_ACTION_DIAGNOSTIC: def("SN-AI-6018", 500, "AI", "AI 動作執行失敗", "請附上 action、stage、錯誤代碼與追蹤編號，系統已記錄完整診斷資訊。"),
+  AI_ARTIFACT_WRITE_FAILED: def("SN-AI-6020", 503, "AI", "AI 產物建立失敗", "請稍後再試；若持續發生，請提供錯誤代碼與追蹤編號，管理員可檢查檔案儲存與產物資料表。"),
   AI_VOICE_REQUIRED: def("SN-AI-6009", 400, "AI", "語音分析需要 AI 服務", "請先請管理員確認 AI 服務設定。"),
   TTS_BROWSER_SPEECH_ONLY: def("SN-AI-6019", 410, "AI", "伺服器音檔朗讀已停用", "請使用教材或單字旁的裝置內建朗讀；不需要 API key，也不會上傳或保存音檔。"),
 
