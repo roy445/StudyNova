@@ -25,7 +25,7 @@ import { badRequest, fail, forbidden, notFound, todayStr } from "../core";
 import { consumeFeature, isProUser } from "../economy";
 import { extractJson, runAiJson, aiConfigured } from "../ai";
 import { subjectStats, buildPlan } from "./learning-routes";
-import { assertCjkGlyphCoverage, embedCjkFont } from "../cjk-font";
+import { assertCjkPdfGlyphCoverage, embedCjkFont, embedMathFont, hasCjkGlyph, hasMathGlyph, sanitizeTextForCjkPdf } from "../cjk-font";
 import { renderSvgToPng } from "../image-rendering/renderer";
 import { generateQuestions } from "./quiz-routes";
 import { deleteObject, putObject } from "../storage";
@@ -150,32 +150,47 @@ async function buildContext(userId: string, allow: string[], materialId: string 
 }
 
 async function createAiArtifact(params: { userId: string; conversationId: string; messageId: string; kind: string; title: string; body: string }) {
-  // Noto Sans CJK TC does not contain every Unicode compatibility glyph used
-  // by AI-generated chemistry/math text (for example ˣ, ₁ and ₀). NFKC
-  // preserves the meaning while converting those glyphs to stable ASCII
-  // equivalents (x, 1 and 0), preventing an otherwise valid PDF from being
-  // rejected by the glyph coverage check.
-  const title = params.title.normalize("NFKC").slice(0, 120);
-  const body = params.body.normalize("NFKC").slice(0, 20000);
+  const title = params.title.slice(0, 120);
+  const body = params.body.slice(0, 20000);
   let data: Buffer;
   let mimeType: string;
   let filename: string;
   if (params.kind === "pdf") {
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
-    assertCjkGlyphCoverage(`StudyNova · ${title}\n${body}`, "AI PDF");
+    const safeTitle = sanitizeTextForCjkPdf(title).text;
+    const safeBody = sanitizeTextForCjkPdf(body).text;
+    assertCjkPdfGlyphCoverage(`StudyNova · ${safeTitle}\n${safeBody}`, "AI PDF");
     const pdf = await PDFDocument.create();
     const font = await embedCjkFont(pdf);
+    const mathFont = await embedMathFont(pdf);
     let page = pdf.addPage([595, 842]);
     let y = 800;
-    const lines = body.replace(/\r/g, "").split("\n").flatMap((line) => line.match(/.{1,72}/g) ?? [""]);
-    for (const line of [`StudyNova · ${title}`, "", ...lines]) {
+    const lines = safeBody.replace(/\r/g, "").split("\n").flatMap((line) => line.match(/.{1,72}/g) ?? [""]);
+    for (const line of [`StudyNova · ${safeTitle}`, "", ...lines]) {
       if (y < 48) { page = pdf.addPage([595, 842]); y = 800; }
-      page.drawText(line, { x: 42, y, size: line.startsWith("StudyNova") ? 16 : 11, font, color: rgb(0.08, 0.12, 0.22) });
+      const size = line.startsWith("StudyNova") ? 16 : 11;
+      let x = 42;
+      let run = "";
+      let runUsesMath = false;
+      const flush = () => {
+        if (!run) return;
+        const runFont = runUsesMath ? mathFont : font;
+        page.drawText(run, { x, y, size, font: runFont, color: rgb(0.08, 0.12, 0.22) });
+        x += runFont.widthOfTextAtSize(run, size);
+        run = "";
+      };
+      for (const character of Array.from(line)) {
+        const usesMath = !hasCjkGlyph(character) && hasMathGlyph(character);
+        if (run && usesMath !== runUsesMath) flush();
+        runUsesMath = usesMath;
+        run += character;
+      }
+      flush();
       y -= line.startsWith("StudyNova") ? 26 : 17;
     }
     data = Buffer.from(await pdf.save());
     mimeType = "application/pdf";
-    filename = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, "-").slice(0, 80)}.pdf`;
+    filename = `${safeTitle.replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, "-").slice(0, 80)}.pdf`;
   } else {
     const items = body.split("\n").filter(Boolean).slice(0, 14);
     const isMindMap = params.kind === "mind_map";
