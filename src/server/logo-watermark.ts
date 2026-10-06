@@ -3,20 +3,34 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { platformSettings } from "@/db/schema";
+import { memberships, platformSettings } from "@/db/schema";
 
 const LOGO_PATH = join(process.cwd(), "public", "brand", "studynova-logo-square-192.png");
+export type WatermarkScope = "ai-images" | "pdf-exports" | "docx-exports" | "xlsx-exports";
+type WatermarkConfig = { enabled?: boolean; freeMembers?: boolean; proMembers?: boolean; scope?: WatermarkScope[] };
+const DEFAULT_SCOPE: WatermarkScope[] = ["ai-images", "pdf-exports", "docx-exports", "xlsx-exports"];
 
-export async function isLogoWatermarkEnabled() {
+async function getConfig(): Promise<Required<Pick<WatermarkConfig, "enabled" | "freeMembers" | "proMembers">> & { scope: WatermarkScope[] }> {
   const row = (await db.select({ value: platformSettings.value }).from(platformSettings).where(eq(platformSettings.key, "ai_logo_watermark")).limit(1))[0];
-  return (row?.value as { enabled?: unknown } | undefined)?.enabled !== false;
+  const value = (row?.value ?? {}) as WatermarkConfig;
+  const valid = Array.isArray(value.scope) ? value.scope.filter((item): item is WatermarkScope => DEFAULT_SCOPE.includes(item as WatermarkScope)) : DEFAULT_SCOPE;
+  return { enabled: value.enabled !== false, freeMembers: value.freeMembers !== false, proMembers: value.proMembers !== false, scope: valid.length ? valid : DEFAULT_SCOPE };
+}
+
+export async function isLogoWatermarkEnabled(userId?: string, scope: WatermarkScope = "ai-images") {
+  const config = await getConfig();
+  if (!config.enabled || !config.scope.includes(scope)) return false;
+  if (!userId) return true;
+  const membership = (await db.select({ tier: memberships.tier, expiresAt: memberships.expiresAt }).from(memberships).where(eq(memberships.userId, userId)).limit(1))[0];
+  const isPro = membership?.tier === "pro" && (!membership.expiresAt || membership.expiresAt > new Date());
+  return isPro ? config.proMembers : config.freeMembers;
 }
 
 export async function logoBuffer() {
   return readFile(LOGO_PATH);
 }
 
-/** Add a subtle StudyNova logo at the lower-right without changing the source content. */
+/** Add a subtle StudyNova logo at the lower-right without changing source content. */
 export async function applyLogoWatermark(data: Buffer, enabled = true) {
   if (!enabled) return data;
   const logo = (await logoBuffer()).toString("base64");

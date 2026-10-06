@@ -136,7 +136,7 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
   const [jsonPreview, setJsonPreview] = useState<{ previews: Array<Record<string, unknown>>; summary: { total: number; ready: number; warnings: number; errors: number; duplicates: number }; issues: Array<Record<string, unknown>> } | null>(null);
   const [aiGenForm, setAiGenForm] = useState({ subject: "數學", educationLevel: "junior", grade: "", chapter: "", topic: "", types: "single", count: 10, difficulty: "normal", prompt: "", referenceText: "" });
   const [expertSettings, setExpertSettings] = useState({ sourceStrictness: "strict", requireAnswerVerification: true, requireExplanation: true, avoidDuplicates: true, avoidSensitiveContent: true, bloomLevel: "understand", cognitiveSkills: ["concept", "application"], distractorStrategy: "plausible", scenarioStyle: "balanced", language: "zh-TW", temperature: 0.2, qualityThreshold: 80, maxRetries: 1, outputFormat: "structured", referencePriority: "reference_only" });
-  const [logoWatermarkEnabled, setLogoWatermarkEnabled] = useState(true);
+  const [logoWatermark, setLogoWatermark] = useState({ enabled: true, freeMembers: true, proMembers: true, scope: ["ai-images", "pdf-exports", "docx-exports", "xlsx-exports"] });
   const [aiGenFile, setAiGenFile] = useState<File | null>(null);
   const [aiGenResult, setAiGenResult] = useState<{ drafts: Array<Record<string, unknown>>; summary: Record<string, number> } | null>(null);
   const [bankUploadBusy, setBankUploadBusy] = useState(false);
@@ -152,7 +152,7 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
   const [importJob, setImportJob] = useState<{ id: string; status: string; progress: number; processedFiles: number; totalFiles: number; analysisTotalChunks: number; analysisProcessedChunks: number; estimatedSecondsRemaining: number; analysisElapsedSeconds: number; acceptedQuestions: number; duplicateQuestions: number; totalQuestions: number; preview: Array<Record<string, unknown>>; errorMessage: string } | null>(null);
   useEffect(() => {
     const value = platformSettings.data?.settings.find((item) => item.key === "ai_logo_watermark")?.value;
-    if (value && typeof value.enabled === "boolean") setLogoWatermarkEnabled(value.enabled);
+    if (value && typeof value.enabled === "boolean") setLogoWatermark({ enabled: value.enabled, freeMembers: value.freeMembers !== false, proMembers: value.proMembers !== false, scope: Array.isArray(value.scope) ? value.scope.filter((item): item is string => typeof item === "string") : ["ai-images", "pdf-exports", "docx-exports", "xlsx-exports"] });
   }, [platformSettings.data]);
   async function patchImportItem(indexes: number[], payload: Record<string, unknown>) {
     if (!importJob) return;
@@ -413,6 +413,12 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
             <div className="rounded-xl border border-[var(--line)] bg-white/[0.03] p-3"><strong className="text-[var(--text)]">啟用</strong><br />關閉後所有使用者都不能使用此功能，適合暫停維護中的服務。</div>
             <div className="rounded-xl border border-[#ffc857]/20 bg-[#ffc857]/5 p-3"><strong className="text-[#ffd98a]">Pro 專屬</strong><br />開啟後免費會員會被擋下，只有有效 Pro 會員可以使用。</div>
             <div className="rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 p-3"><strong className="text-[#7dd3fc]">Nova 消耗</strong><br />填入 0 代表免費；填入正整數代表每次成功使用會支付該數量 Nova。</div>
+          </div>
+          <div className="mb-4 rounded-2xl border border-amber-300/30 bg-amber-300/5 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold text-amber-100">StudyNova Logo 浮水印政策</p><p className="mt-1 text-xs leading-5 text-muted">集中設定 AI 圖片與檔案匯出的浮水印；可分別決定免費會員與 PRO 會員是否套用，不會修改原始上傳檔案。</p></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={logoWatermark.enabled} onChange={(event) => setLogoWatermark({ ...logoWatermark, enabled: event.target.checked })} className="accent-[#f6c453]" />啟用</label></div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2"><label className="flex items-center gap-2"><input type="checkbox" checked={logoWatermark.freeMembers} onChange={(event) => setLogoWatermark({ ...logoWatermark, freeMembers: event.target.checked })} className="accent-[#f6c453]" />一般／免費會員套用浮水印</label><label className="flex items-center gap-2"><input type="checkbox" checked={logoWatermark.proMembers} onChange={(event) => setLogoWatermark({ ...logoWatermark, proMembers: event.target.checked })} className="accent-[#f6c453]" />PRO 會員套用浮水印</label></div>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs"><span className="w-full font-semibold text-amber-100">套用格式</span>{([["ai-images", "AI 圖片"], ["pdf-exports", "PDF"], ["docx-exports", "Word"], ["xlsx-exports", "Excel"]] as const).map(([key, label]) => <label key={key} className="flex items-center gap-2"><input type="checkbox" checked={logoWatermark.scope.includes(key)} onChange={(event) => setLogoWatermark({ ...logoWatermark, scope: event.target.checked ? [...logoWatermark.scope, key] : logoWatermark.scope.filter((item) => item !== key) })} className="accent-[#f6c453]" />{label}</label>)}</div>
+            <Button size="sm" className="mt-3" onClick={async () => { try { await apiPut("/admin/settings/ai_logo_watermark", { value: { ...logoWatermark, logo: "/brand/studynova-logo-square-192.png" } }); await platformSettings.reload(); toast.push("success", "Logo 浮水印政策已儲存"); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存浮水印政策</Button>
           </div>
           {features.loading && <Skeleton lines={5} />}
           <div className="overflow-x-auto scroll-thin">
@@ -731,10 +737,6 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
       {tab === "bank" && (
         <div className="space-y-4">
         <Card title="◇ AI Question Studio｜Expert Settings" subtitle="先儲存專業出題規則，再生成草稿。伺服器會再次驗證設定，並保留人工審核流程。">
-          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/5 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold text-amber-100">生成檔案 Logo 浮水印</p><p className="mt-1 text-xs text-muted">套用到 AI 產生的圖片與 PDF 匯出，所有會員都適用；不會改動原始上傳檔案。</p></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={logoWatermarkEnabled} onChange={(event) => setLogoWatermarkEnabled(event.target.checked)} className="accent-[#f6c453]" />啟用</label></div>
-            <Button size="sm" className="mt-3" onClick={async () => { try { await apiPut("/admin/settings/ai_logo_watermark", { value: { enabled: logoWatermarkEnabled, scope: ["ai-images", "pdf-exports"], logo: "/brand/studynova-logo-square-192.png" } }); await platformSettings.reload(); toast.push("success", logoWatermarkEnabled ? "Logo 浮水印已開啟" : "Logo 浮水印已關閉"); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存浮水印設定</Button>
-          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="資料嚴格度"><Select value={expertSettings.sourceStrictness} onChange={(e) => setExpertSettings({ ...expertSettings, sourceStrictness: e.target.value })}><option value="strict">嚴格：只用參考資料</option><option value="guided">引導：參考資料優先</option><option value="creative">創意：允許延伸</option></Select></Field>
             <Field label="Bloom 認知層級"><Select value={expertSettings.bloomLevel} onChange={(e) => setExpertSettings({ ...expertSettings, bloomLevel: e.target.value })}><option value="remember">記憶</option><option value="understand">理解</option><option value="apply">應用</option><option value="analyze">分析</option><option value="evaluate">評鑑</option><option value="create">創造</option></Select></Field>

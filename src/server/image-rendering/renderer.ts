@@ -11,13 +11,13 @@ export type ImageRenderHealth = ReturnType<typeof validateCjkFont> & {
 };
 
 /** The single server-side SVG/PNG rendering entry point for image artifacts. */
-export async function renderSvgToPng(svg: string, textToValidate: string) {
+export async function renderSvgToPng(svg: string, textToValidate: string, userId?: string) {
   const started = Date.now();
   const font = validateCjkFont();
   if (!font.valid) throw new Error(`CJK glyph coverage failed: ${font.missingGlyphs.join("")}`);
   assertCjkGlyphCoverage(textToValidate, "圖片文字");
   const raw = await sharp(Buffer.from(withCjkSvgFont(svg))).png().toBuffer();
-  const data = await applyLogoWatermark(raw, await isLogoWatermarkEnabled());
+  const data = await applyLogoWatermark(raw, await isLogoWatermarkEnabled(userId, "ai-images"));
   if (!data.length) throw new Error("Image renderer returned an empty PNG");
   return { data, durationMs: Date.now() - started, renderer: "sharp-librsvg" as const };
 }
