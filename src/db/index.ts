@@ -38,10 +38,10 @@ export const pool =
   new Pool({
     connectionString: secureDatabaseUrl(databaseUrl),
     max: poolMax,
-    connectionTimeoutMillis: 20_000,
+    connectionTimeoutMillis: 8_000,
     idleTimeoutMillis: 30_000,
-    query_timeout: 30_000,
-    statement_timeout: 30_000,
+    query_timeout: 8_000,
+    statement_timeout: 8_000,
     allowExitOnIdle: true,
   });
 
