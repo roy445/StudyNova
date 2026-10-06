@@ -55,6 +55,42 @@ export function latestConversationMessages<T>(newestFirstRows: T[], limit = 16):
   return newestFirstRows.slice(0, limit).reverse();
 }
 
+function extractTruncatedJsonString(raw: string, fieldNames: string[]): string {
+  const cleaned = raw.replace(/^\s*```(?:json|javascript|js)?\s*/i, "").trim();
+  for (const field of fieldNames) {
+    const marker = `"${field}"`;
+    const markerIndex = cleaned.indexOf(marker);
+    if (markerIndex < 0) continue;
+    const openingQuote = cleaned.indexOf('"', cleaned.indexOf(":", markerIndex) + 1);
+    if (openingQuote < 0) continue;
+    let escaped = false;
+    let value = "";
+    for (let index = openingQuote + 1; index < cleaned.length; index += 1) {
+      const character = cleaned[index];
+      if (!escaped && character === '"') {
+        try {
+          return JSON.parse(`"${value}"`) as string;
+        } catch {
+          break;
+        }
+      }
+      value += character;
+      if (escaped) escaped = false;
+      else escaped = character === "\\";
+    }
+    // The provider may stop exactly at maxOutputTokens, leaving the JSON
+    // string without its closing quote. Decode the usable prefix instead of
+    // discarding an otherwise helpful reply.
+    try {
+      return JSON.parse(`"${value.replace(/\\$/, "")}"`) as string;
+    } catch {
+      // Try a conservative fallback for a final incomplete escape sequence.
+      return value.replace(/\\$/, "").replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\t/g, "\t").replace(/\\"/g, '"');
+    }
+  }
+  return "";
+}
+
 export function normalizeChatReply(data: Record<string, unknown>, rawText: string): string {
   const readFields = (value: Record<string, unknown>): string =>
     [value.reply, value.text, value.content, value.message, value.answer]
@@ -66,6 +102,8 @@ export function normalizeChatReply(data: Record<string, unknown>, rawText: strin
   const parsed = extractJson<Record<string, unknown>>(rawText, {});
   const extracted = readFields(parsed);
   if (extracted) return extracted;
+  const truncated = extractTruncatedJsonString(rawText, ["reply", "text", "content", "message", "answer"]).trim();
+  if (truncated) return truncated;
 
   const cleaned = rawText.trim().replace(/^```(?:json|markdown|md)?\s*/i, "").replace(/\s*```$/i, "").trim();
   if (!cleaned || cleaned.startsWith("{") || cleaned.startsWith("[")) return "";
@@ -316,7 +354,7 @@ export const routes: RouteDef[] = [
             { kind: "text", text: `對話紀錄：\n${history.map((m) => `${m.role === "user" ? "學生" : "Novi"}：${m.content}`).join("\n").slice(-5000)}${attachmentText ? `\n\n本次訊息附圖辨識內容：\n${attachmentText}` : ""}` },
             ...attachmentParts,
           ],
-          maxOutputTokens: 1200,
+          maxOutputTokens: 2400,
         },
         {},
       );
