@@ -112,32 +112,38 @@ async function buildContext(userId: string, allow: string[], materialId: string 
 }
 
 async function createAiArtifact(params: { userId: string; conversationId: string; messageId: string; kind: string; title: string; body: string }) {
-  const body = params.body.slice(0, 20000);
+  // Noto Sans CJK TC does not contain every Unicode compatibility glyph used
+  // by AI-generated chemistry/math text (for example ˣ, ₁ and ₀). NFKC
+  // preserves the meaning while converting those glyphs to stable ASCII
+  // equivalents (x, 1 and 0), preventing an otherwise valid PDF from being
+  // rejected by the glyph coverage check.
+  const title = params.title.normalize("NFKC").slice(0, 120);
+  const body = params.body.normalize("NFKC").slice(0, 20000);
   let data: Buffer;
   let mimeType: string;
   let filename: string;
   if (params.kind === "pdf") {
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
-    assertCjkGlyphCoverage(`StudyNova · ${params.title}\n${body}`, "AI PDF");
+    assertCjkGlyphCoverage(`StudyNova · ${title}\n${body}`, "AI PDF");
     const pdf = await PDFDocument.create();
     const font = await embedCjkFont(pdf);
     let page = pdf.addPage([595, 842]);
     let y = 800;
     const lines = body.replace(/\r/g, "").split("\n").flatMap((line) => line.match(/.{1,72}/g) ?? [""]);
-    for (const line of [`StudyNova · ${params.title}`, "", ...lines]) {
+    for (const line of [`StudyNova · ${title}`, "", ...lines]) {
       if (y < 48) { page = pdf.addPage([595, 842]); y = 800; }
       page.drawText(line, { x: 42, y, size: line.startsWith("StudyNova") ? 16 : 11, font, color: rgb(0.08, 0.12, 0.22) });
       y -= line.startsWith("StudyNova") ? 26 : 17;
     }
     data = Buffer.from(await pdf.save());
     mimeType = "application/pdf";
-    filename = `${params.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, "-").slice(0, 80)}.pdf`;
+    filename = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, "-").slice(0, 80)}.pdf`;
   } else {
     const items = body.split("\n").filter(Boolean).slice(0, 14);
     const isMindMap = params.kind === "mind_map";
     const svg = isMindMap
-      ? `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900"><rect width="1400" height="900" fill="#fffdf5"/><g stroke="#8b6f47" stroke-width="5" fill="none" opacity=".75"><path d="M700 450 C480 220 260 180 120 150"/><path d="M700 450 C460 430 250 430 90 450"/><path d="M700 450 C470 650 250 720 120 760"/><path d="M700 450 C930 220 1130 190 1280 150"/><path d="M700 450 C930 430 1140 430 1310 450"/><path d="M700 450 C920 650 1130 720 1280 760"/></g><g font-family="StudyNova CJK, Noto Sans TC, sans-serif" fill="#25324a"><ellipse cx="700" cy="450" rx="190" ry="70" fill="#ffe79a" stroke="#8b6f47" stroke-width="5"/><text x="700" y="460" text-anchor="middle" font-size="34">${escapeXml(params.title.slice(0, 22))}</text>${items.map((item, index) => { const coords = [[120,150],[90,450],[120,760],[1280,150],[1310,450],[1280,760]][index % 6]; return `<rect x="${coords[0] - 100}" y="${coords[1] - 32}" width="200" height="64" rx="18" fill="#d9f3ff" stroke="#6487a0" stroke-width="3"/><text x="${coords[0]}" y="${coords[1] + 8}" text-anchor="middle" font-size="20">${escapeXml(item.slice(0, 18))}</text>`; }).join("")}</g></svg>`
-      : `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600"><rect width="1200" height="1600" fill="#fffef7"/><path d="M80 120 H1120 M80 220 H1120 M80 320 H1120 M80 420 H1120 M80 520 H1120 M80 620 H1120 M80 720 H1120 M80 820 H1120 M80 920 H1120 M80 1020 H1120 M80 1120 H1120 M80 1220 H1120 M80 1320 H1120 M80 1420 H1120" stroke="#b8d5e6" stroke-width="2"/><text x="80" y="80" font-family="StudyNova CJK, Noto Sans TC, sans-serif" font-size="38" fill="#263b66">${escapeXml(params.title.slice(0, 32))}</text>${items.map((item, index) => `<text x="100" y="${155 + index * 100}" font-family="StudyNova CJK, Noto Sans TC, sans-serif" font-size="28" fill="#263b66">${index + 1}. ${escapeXml(item.slice(0, 62))}</text>`).join("")}</svg>`;
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900"><rect width="1400" height="900" fill="#fffdf5"/><g stroke="#8b6f47" stroke-width="5" fill="none" opacity=".75"><path d="M700 450 C480 220 260 180 120 150"/><path d="M700 450 C460 430 250 430 90 450"/><path d="M700 450 C470 650 250 720 120 760"/><path d="M700 450 C930 220 1130 190 1280 150"/><path d="M700 450 C930 430 1140 430 1310 450"/><path d="M700 450 C920 650 1130 720 1280 760"/></g><g font-family="StudyNova CJK, Noto Sans TC, sans-serif" fill="#25324a"><ellipse cx="700" cy="450" rx="190" ry="70" fill="#ffe79a" stroke="#8b6f47" stroke-width="5"/><text x="700" y="460" text-anchor="middle" font-size="34">${escapeXml(title.slice(0, 22))}</text>${items.map((item, index) => { const coords = [[120,150],[90,450],[120,760],[1280,150],[1310,450],[1280,760]][index % 6]; return `<rect x="${coords[0] - 100}" y="${coords[1] - 32}" width="200" height="64" rx="18" fill="#d9f3ff" stroke="#6487a0" stroke-width="3"/><text x="${coords[0]}" y="${coords[1] + 8}" text-anchor="middle" font-size="20">${escapeXml(item.slice(0, 18))}</text>`; }).join("")}</g></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600"><rect width="1200" height="1600" fill="#fffef7"/><path d="M80 120 H1120 M80 220 H1120 M80 320 H1120 M80 420 H1120 M80 520 H1120 M80 620 H1120 M80 720 H1120 M80 820 H1120 M80 920 H1120 M80 1020 H1120 M80 1120 H1120 M80 1220 H1120 M80 1320 H1120 M80 1420 H1120" stroke="#b8d5e6" stroke-width="2"/><text x="80" y="80" font-family="StudyNova CJK, Noto Sans TC, sans-serif" font-size="38" fill="#263b66">${escapeXml(title.slice(0, 32))}</text>${items.map((item, index) => `<text x="100" y="${155 + index * 100}" font-family="StudyNova CJK, Noto Sans TC, sans-serif" font-size="28" fill="#263b66">${index + 1}. ${escapeXml(item.slice(0, 62))}</text>`).join("")}</svg>`;
     data = (await renderSvgToPng(svg, [params.title, ...items].join("\n"))).data;
     mimeType = "image/png";
     filename = `${params.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff-]/g, "-").slice(0, 80)}.png`;
