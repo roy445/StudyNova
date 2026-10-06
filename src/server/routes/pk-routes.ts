@@ -153,7 +153,11 @@ async function generateMatchQuestions(tx: any, matchId: string, input: MatchInpu
       }
     }
   } else {
-    const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(questionBankId ? or(eq(questions.bankId, questionBankId), sql`exists (select 1 from question_bank_memberships qbm where qbm.question_id = ${questions.id} and qbm.bank_id = ${questionBankId})`) : sql`true`, eq(questions.level, level), eq(questions.difficulty, input.difficulty), eq(questions.status, "published"), eq(questions.availableForPk, true))).orderBy(sql`random()`).limit(Math.min(1000, input.questionCount * 12));
+    // The default PK source is the whole published, PK-enabled StudyNova bank,
+    // not a PK-only bank. Prefer the requested difficulty, then transparently
+    // fill from other difficulties when a small bank/recent-dedupe leaves too
+    // few candidates. The level and availableForPk gates still protect scope.
+    const sourceRows = await tx.select({ id: questions.id, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, sourceLabel: questions.sourceLabel, unit: questions.unit, subject: questions.subject }).from(questions).where(and(questionBankId ? or(eq(questions.bankId, questionBankId), sql`exists (select 1 from question_bank_memberships qbm where qbm.question_id = ${questions.id} and qbm.bank_id = ${questionBankId})`) : sql`true`, eq(questions.level, level), eq(questions.status, "published"), eq(questions.availableForPk, true))).orderBy(sql`case when ${questions.difficulty} = ${input.difficulty} then 0 else 1 end, random()`).limit(Math.min(1000, Math.max(input.questionCount * 20, 200)));
     for (const current of sourceRows) {
       if (blueprints.length >= input.questionCount) break;
       const answer = String(current.answer[0] ?? "").trim();
