@@ -27,16 +27,19 @@ const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
 
-const configuredMax = Number(process.env.PG_POOL_MAX ?? (process.env.VERCEL ? 1 : 5));
-const poolMax = Number.isFinite(configuredMax) ? Math.min(10, Math.max(1, Math.floor(configuredMax))) : 1;
+// Vercel isolates can receive several requests before the isolate is recycled.
+// One connection made dashboard reads and PK/background writes queue behind one
+// another and can hit connectionTimeoutMillis during short Neon bursts.
+const configuredMax = Number(process.env.PG_POOL_MAX ?? (process.env.VERCEL ? 3 : 5));
+const poolMax = Number.isFinite(configuredMax) ? Math.min(10, Math.max(1, Math.floor(configuredMax))) : 3;
 
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
     connectionString: secureDatabaseUrl(databaseUrl),
     max: poolMax,
-    connectionTimeoutMillis: 10_000,
-    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 20_000,
+    idleTimeoutMillis: 30_000,
     query_timeout: 30_000,
     statement_timeout: 30_000,
     allowExitOnIdle: true,

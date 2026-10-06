@@ -67,7 +67,13 @@ export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
 }
 
 export function databaseErrorMessage(error: unknown) {
-  if (!isRecord(error)) return "unknown error";
-  const message = typeof error.message === "string" ? error.message : "unknown error";
-  return message.replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[redacted-db-url]").slice(0, 240);
+  let current: unknown = error;
+  const visited = new Set<unknown>();
+  const messages: string[] = [];
+  for (let depth = 0; depth < 6 && isRecord(current) && !visited.has(current); depth += 1) {
+    visited.add(current);
+    if (typeof current.message === "string" && current.message.trim()) messages.push(current.message.trim());
+    current = current.cause ?? current.originalError ?? current.original ?? current.driverError;
+  }
+  return (messages.join(" | ") || "unknown error").replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[redacted-db-url]").slice(0, 240);
 }
