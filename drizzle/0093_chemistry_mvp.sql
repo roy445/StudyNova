@@ -62,7 +62,7 @@ DO $$
 DECLARE c record; l_id uuid;
 BEGIN
   FOR c IN SELECT id, title FROM chemistry_concepts WHERE subject='CHEMISTRY' LOOP
-    INSERT INTO chemistry_lessons (concept_id, title, subtitle, level, estimated_minutes, sort_order) VALUES (c.id, c.title || '：先建立直覺', '用簡單例子理解這個概念要解決的問題。', 0, 5, 0) RETURNING id INTO l_id ON CONFLICT DO NOTHING;
+    INSERT INTO chemistry_lessons (concept_id, title, subtitle, level, estimated_minutes, sort_order) VALUES (c.id, c.title || '：先建立直覺', '用簡單例子理解這個概念要解決的問題。', 0, 5, 0) ON CONFLICT DO NOTHING RETURNING id INTO l_id;
     IF l_id IS NOT NULL THEN
       INSERT INTO chemistry_lesson_steps (lesson_id, step_type, title, body, order_index) VALUES (l_id, 'explain', '先問：為什麼需要這個概念？', '這一課會把化學符號連回可觀察的粒子與數量，不要求你先背公式。', 0), (l_id, 'example', '看一個簡單例子', '先圈出題目提供的資訊，再判斷它描述的是粒子、元素還是化合物。', 1), (l_id, 'check', '自我檢查', '用自己的話說明這個概念；如果說不清楚，可以回到前置概念。', 2) ON CONFLICT DO NOTHING;
     END IF;
@@ -85,8 +85,8 @@ BEGIN
   SELECT id INTO bank_id FROM question_banks WHERE name = '高中化學 MVP 官方題庫' LIMIT 1;
   FOR c IN SELECT id, slug FROM chemistry_concepts WHERE slug IN ('atom-structure','proton-neutron-electron','atomic-number-mass-number','element-symbols','chemical-formula','molecule-counting','relative-molecular-mass') ORDER BY sort_order LIMIT 10 LOOP
     i := i + 1;
-    INSERT INTO questions (bank_id, owner_id, origin, target_bank, bank_category, source_label, subject, topic, chapter, tags, source_type, estimated_seconds, points, status, level, difficulty, type, stem, options, answer, explanation, fingerprint)
-    VALUES (bank_id, owner_id, 'admin', 'chemistry', 'chemistry', 'StudyNova 官方化學 MVP', '化學', '高中化學', '第一階段', ARRAY['chemistry', c.slug], 'official', 60, 1, 'published', 'senior', CASE WHEN i > 7 THEN 'hard' ELSE 'easy' END, 'single',
+    INSERT INTO questions (bank_id, owner_id, origin, target_bank, bank_category, source_label, subject, topic, chapter, unit, tags, source_type, estimated_seconds, points, status, level, difficulty, type, stem, options, answer, explanation, fingerprint)
+    VALUES (bank_id, owner_id, 'admin', 'chemistry', 'chemistry', 'StudyNova 官方化學 MVP', '化學', '高中化學', '第一階段', '第一章', to_jsonb(ARRAY['chemistry', c.slug]), 'official', 60, 1, 'published', 'senior', CASE WHEN i > 7 THEN 'hard' ELSE 'easy' END, 'single',
       CASE i WHEN 1 THEN '原子中帶正電的粒子是哪一種？' WHEN 2 THEN '原子序代表原子核中的哪一種數量？' WHEN 3 THEN '中性氧原子有 8 個質子，電子數是多少？' WHEN 4 THEN '質量數 23、原子序 11 的鈉原子有幾個中子？' WHEN 5 THEN '下列哪一個是氧元素的正確元素符號？' WHEN 6 THEN 'H₂O 中總共有幾個原子？' WHEN 7 THEN 'CO₂ 中氧原子的數量是多少？' WHEN 8 THEN 'H₂O 的相對分子質量是多少？（H=1，O=16）' WHEN 9 THEN 'NaCl 代表一個鈉原子和幾個氯原子？' ELSE '化學式下標 2 最直接表示什麼？' END,
       CASE i WHEN 1 THEN '["電子","質子","中子","原子核"]'::jsonb WHEN 2 THEN '["中子數","質子數","電子層數","質量數"]'::jsonb WHEN 3 THEN '["0","8","16","不一定"]'::jsonb WHEN 4 THEN '["11","12","23","34"]'::jsonb WHEN 5 THEN '["O","Ox","Og","0"]'::jsonb WHEN 6 THEN '["2","3","4","6"]'::jsonb WHEN 7 THEN '["1","2","3","4"]'::jsonb WHEN 8 THEN '["16","17","18","20"]'::jsonb WHEN 9 THEN '["0","1","2","不一定"]'::jsonb ELSE '["有 2 個相同原子","有 2 種元素","質量數是 2","電荷是 2"]'::jsonb END,
       CASE i WHEN 1 THEN '["質子"]'::jsonb WHEN 2 THEN '["質子數"]'::jsonb WHEN 3 THEN '["8"]'::jsonb WHEN 4 THEN '["12"]'::jsonb WHEN 5 THEN '["O"]'::jsonb WHEN 6 THEN '["3"]'::jsonb WHEN 7 THEN '["2"]'::jsonb WHEN 8 THEN '["18"]'::jsonb WHEN 9 THEN '["1"]'::jsonb ELSE '["有 2 個相同原子"]'::jsonb END,
