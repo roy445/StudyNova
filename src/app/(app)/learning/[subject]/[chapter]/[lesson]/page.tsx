@@ -44,6 +44,8 @@ export default function LessonPage({ params }: { params: Promise<{ subject: stri
   const [quizIndex, setQuizIndex] = useState(0);
   const [quizChoice, setQuizChoice] = useState<number | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  // Hydrate client-only completion state after the lesson is available.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (lesson) setCompleted(window.localStorage.getItem(`studynova:lesson:${lesson.slug}:completed`) === "1"); }, [lesson]);
   if (routeParams.subject !== "chemistry" || routeParams.chapter !== "ch1" || !lesson) return notFound();
   const stopSpeaking = () => { if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel(); setSpoken(false); };

@@ -22,6 +22,8 @@ export default function TesterAdminPage() {
   const searchUsers = useApi<{ users: SearchUser[]; total: number }>(searchPath, [userSearch]);
 
   useEffect(() => {
+    // Hydrate the selection control from the server-owned member list.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (state.data) setSelectedIds(state.data.members.map((member) => member.userId));
   }, [state.data?.members]);
 

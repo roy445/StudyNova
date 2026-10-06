@@ -22,7 +22,7 @@ export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics 
   let current: unknown = error;
   const visited = new Set<unknown>();
   const pending: unknown[] = [current];
-  let fallback: DatabaseDiagnostics | null = null;
+  let diagnosticsFound: DatabaseDiagnostics | null = null;
   while (pending.length && visited.size < 20) {
     current = pending.shift();
     if (!isRecord(current) || visited.has(current)) continue;
@@ -52,13 +52,12 @@ export function extractDatabaseDiagnostics(error: unknown): DatabaseDiagnostics 
       }
       const nested = [record.cause, record.originalError, record.original, record.driverError, record.details];
       pending.push(...nested.filter(isRecord));
-      if (diagnostics.column || diagnostics.table || diagnostics.constraint) return diagnostics;
-      fallback ??= diagnostics;
+      diagnosticsFound = { ...(diagnosticsFound ?? {}), ...diagnostics };
       continue;
     }
     pending.push(record.cause, record.originalError, record.original, record.driverError, record.details);
   }
-  return fallback;
+  return diagnosticsFound;
 }
 
 export function databaseTarget() {

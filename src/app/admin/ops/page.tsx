@@ -152,6 +152,8 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
   const [importJob, setImportJob] = useState<{ id: string; status: string; progress: number; processedFiles: number; totalFiles: number; analysisTotalChunks: number; analysisProcessedChunks: number; estimatedSecondsRemaining: number; analysisElapsedSeconds: number; acceptedQuestions: number; duplicateQuestions: number; totalQuestions: number; preview: Array<Record<string, unknown>>; errorMessage: string } | null>(null);
   useEffect(() => {
     const value = platformSettings.data?.settings.find((item) => item.key === "ai_logo_watermark")?.value;
+    // This effect hydrates local form state from the persisted admin setting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (value && typeof value.enabled === "boolean") setLogoWatermark({ enabled: value.enabled, freeMembers: value.freeMembers !== false, proMembers: value.proMembers !== false, scope: Array.isArray(value.scope) ? value.scope.filter((item): item is string => typeof item === "string") : ["ai-images", "pdf-exports", "docx-exports", "xlsx-exports"] });
   }, [platformSettings.data]);
   async function patchImportItem(indexes: number[], payload: Record<string, unknown>) {
