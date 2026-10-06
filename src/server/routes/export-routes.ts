@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
-import { Document, Packer, Paragraph, TextRun } from "docx";
+import { Document, Header, ImageRun, Packer, Paragraph, TextRun } from "docx";
 import ExcelJS from "exceljs";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import JSZip from "jszip";
@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { dailyTasks, focusSessions, notes, novaTransactions, platformSettings, studyMaterials, studyPlans, studyRecords, tasks, userAchievements, userVocabularies, wrongQuestions, xpTransactions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { grantNova, isProUser } from "../economy";
+import { isLogoWatermarkEnabled, logoBuffer } from "../logo-watermark";
 
 const DATASETS = {
   notes: { label: "我的專屬筆記", table: notes },
@@ -79,6 +80,8 @@ async function renderPdf(rows: Array<Record<string, unknown>>, title: string) {
   assertCjkGlyphCoverage([title, "StudyNova 單字書／學習資料", `共 ${rows.length} 筆　・　產生日期 ${dateLabel}`, ...rowLines].join("\n"), "PDF 匯出");
   const pdf = await PDFDocument.create();
   const font = await embedCjkFont(pdf);
+  const watermarkEnabled = await isLogoWatermarkEnabled();
+  const logo = watermarkEnabled ? await pdf.embedPng(await logoBuffer()) : null;
   const bold = font;
   let page = pdf.addPage([595, 842]);
   let y = 795;
@@ -88,11 +91,13 @@ async function renderPdf(rows: Array<Record<string, unknown>>, title: string) {
     page = pdf.addPage([595, 842]);
     y = 795;
     page.drawText("StudyNova 單字書／學習資料", { x: margin, y, size: 9, font: bold, color: rgb(0.25, 0.38, 0.5) });
+    if (logo) page.drawImage(logo, { x: 485, y: 34, width: 72, height: 72, opacity: 0.2 });
     y -= 28;
   };
   page.drawText(title, { x: margin, y, size: 20, font: bold, color: rgb(0.08, 0.24, 0.4) });
   y -= 28;
   page.drawText(`共 ${rows.length} 筆　・　產生日期 ${dateLabel}`, { x: margin, y, size: 9, font, color: rgb(0.35, 0.4, 0.46) });
+  if (logo) page.drawImage(logo, { x: 485, y: 34, width: 72, height: 72, opacity: 0.2 });
   y -= 28;
   for (let index = 0; index < rows.length; index += 1) {
     const lines = readableRow(rows[index], index);
@@ -105,8 +110,8 @@ async function renderPdf(rows: Array<Record<string, unknown>>, title: string) {
   }
   return Buffer.from(await pdf.save());
 }
-async function renderDocx(rows: Array<Record<string, unknown>>, title: string) { const children = [new Paragraph({ children: [new TextRun({ text: title, bold: true, size: 30 })] }), ...rows.flatMap((row, index) => readableRow(row, index).map((line, lineIndex) => new Paragraph({ children: [new TextRun({ text: line, bold: lineIndex === 0, size: lineIndex === 0 ? 24 : 20 })] })))]; return Packer.toBuffer(new Document({ sections: [{ children }] })); }
-async function renderXlsx(rows: Array<Record<string, unknown>>, title: string) { const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet(title.slice(0, 28)); const vocabulary = rows.length > 0 && rows.every(isVocabularyRow); const output = vocabulary ? rows.map((row, index) => ({ 項次: index + 1, 單字: wordValue(row, "word", ""), 詞性: wordValue(row, "partOfSpeech", ""), 音標: wordValue(row, "phonetic", ""), 中文意思: wordValue(row, "meaning", ""), 英文例句: wordValue(row, "example", ""), 例句翻譯: wordValue(row, "exampleZh", "") })) : rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !["id", "userId", "analysis"].includes(key)))); const keys = Array.from(new Set(output.flatMap((row) => Object.keys(row)))); sheet.addRow(keys); output.forEach((row) => sheet.addRow(keys.map((key) => typeof row[key] === "object" ? JSON.stringify(row[key]) : row[key]))); sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } }; sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF245A78" } }; sheet.columns.forEach((column) => { column.width = 22; }); return Buffer.from(await workbook.xlsx.writeBuffer()); }
+async function renderDocx(rows: Array<Record<string, unknown>>, title: string) { const children = [new Paragraph({ children: [new TextRun({ text: title, bold: true, size: 30 })] }), ...rows.flatMap((row, index) => readableRow(row, index).map((line, lineIndex) => new Paragraph({ children: [new TextRun({ text: line, bold: lineIndex === 0, size: lineIndex === 0 ? 24 : 20 })] })))]; const headers = await isLogoWatermarkEnabled() ? { default: new Header({ children: [new Paragraph({ children: [new ImageRun({ data: await logoBuffer(), transformation: { width: 42, height: 42 }, type: "png" })] })] }) } : undefined; return Packer.toBuffer(new Document({ sections: [{ headers, children }] })); }
+async function renderXlsx(rows: Array<Record<string, unknown>>, title: string) { const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet(title.slice(0, 28)); const vocabulary = rows.length > 0 && rows.every(isVocabularyRow); const output = vocabulary ? rows.map((row, index) => ({ 項次: index + 1, 單字: wordValue(row, "word", ""), 詞性: wordValue(row, "partOfSpeech", ""), 音標: wordValue(row, "phonetic", ""), 中文意思: wordValue(row, "meaning", ""), 英文例句: wordValue(row, "example", ""), 例句翻譯: wordValue(row, "exampleZh", "") })) : rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !["id", "userId", "analysis"].includes(key)))); const keys = Array.from(new Set(output.flatMap((row) => Object.keys(row)))); sheet.addRow(keys); output.forEach((row) => sheet.addRow(keys.map((key) => typeof row[key] === "object" ? JSON.stringify(row[key]) : row[key]))); sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } }; sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF245A78" } }; sheet.columns.forEach((column) => { column.width = 22; }); if (await isLogoWatermarkEnabled()) { const imageId = workbook.addImage({ buffer: Buffer.from(await logoBuffer()) as never, extension: "png" }); sheet.addImage(imageId, { tl: { col: Math.max(0, keys.length - 2), row: 0 }, ext: { width: 52, height: 52 } }); } return Buffer.from(await workbook.xlsx.writeBuffer()); }
 async function renderBinary(rows: Array<Record<string, unknown>>, format: Exclude<Format, "json" | "csv" | "txt" | "md" | "zip">, title: string) { if (format === "pdf") return renderPdf(rows, title); if (format === "docx") return renderDocx(rows, title); return renderXlsx(rows, title); }
 function attachment(data: string | Buffer, filename: string, type: string) { return new Response(typeof data === "string" ? data : (new Uint8Array(data) as unknown as BodyInit), { headers: { "content-type": `${type}; charset=utf-8`, "content-disposition": `attachment; filename="${filename}"` } }); }
 export const routes: RouteDef[] = [

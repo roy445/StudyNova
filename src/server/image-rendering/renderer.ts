@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { assertCjkGlyphCoverage, cjkTestText, validateCjkFont, withCjkSvgFont } from "../cjk-font";
+import { applyLogoWatermark, isLogoWatermarkEnabled } from "../logo-watermark";
 
 export type ImageRenderHealth = ReturnType<typeof validateCjkFont> & {
   renderer: "sharp-librsvg";
@@ -15,7 +16,8 @@ export async function renderSvgToPng(svg: string, textToValidate: string) {
   const font = validateCjkFont();
   if (!font.valid) throw new Error(`CJK glyph coverage failed: ${font.missingGlyphs.join("")}`);
   assertCjkGlyphCoverage(textToValidate, "圖片文字");
-  const data = await sharp(Buffer.from(withCjkSvgFont(svg))).png().toBuffer();
+  const raw = await sharp(Buffer.from(withCjkSvgFont(svg))).png().toBuffer();
+  const data = await applyLogoWatermark(raw, await isLogoWatermarkEnabled());
   if (!data.length) throw new Error("Image renderer returned an empty PNG");
   return { data, durationMs: Date.now() - started, renderer: "sharp-librsvg" as const };
 }
