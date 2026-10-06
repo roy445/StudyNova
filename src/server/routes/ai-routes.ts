@@ -25,7 +25,7 @@ import { badRequest, fail, forbidden, notFound, todayStr } from "../core";
 import { consumeFeature, isProUser } from "../economy";
 import { extractJson, runAiJson, aiConfigured } from "../ai";
 import { subjectStats, buildPlan } from "./learning-routes";
-import { assertCjkPdfGlyphCoverage, embedCjkFont, embedMathFont, hasCjkGlyph, hasMathGlyph, sanitizeTextForCjkPdf } from "../cjk-font";
+import { assertCjkPdfGlyphCoverage, assertMathGlyphCoverage, embedCjkFont, embedMathFont, hasCjkGlyph, hasMathGlyph, sanitizeTextForCjkPdf } from "../cjk-font";
 import { renderSvgToPng } from "../image-rendering/renderer";
 import { generateQuestions } from "./quiz-routes";
 import { deleteObject, putObject } from "../storage";
@@ -157,6 +157,7 @@ async function createAiArtifact(params: { userId: string; conversationId: string
   let filename: string;
   if (params.kind === "pdf") {
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+    assertMathGlyphCoverage();
     const safeTitle = sanitizeTextForCjkPdf(title).text;
     const safeBody = sanitizeTextForCjkPdf(body).text;
     assertCjkPdfGlyphCoverage(`StudyNova · ${safeTitle}\n${safeBody}`, "AI PDF");

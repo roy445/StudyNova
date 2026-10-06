@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { runCjkHealth } from "@/server/cjk-health";
-import { assertCjkGlyphCoverage, assertCjkPdfGlyphCoverage, findMissingCjkGlyphs, sanitizeTextForCjkPdf, validateCjkFont } from "@/server/cjk-font";
+import { assertCjkGlyphCoverage, assertCjkPdfGlyphCoverage, assertMathGlyphCoverage, findMissingCjkGlyphs, sanitizeTextForCjkPdf, validateCjkFont } from "@/server/cjk-font";
 import { VISUAL_NOTE_ICONS } from "@/lib/visual-note-icons";
 
 describe("StudyNova CJK output system", () => {
@@ -17,13 +17,18 @@ describe("StudyNova CJK output system", () => {
   });
 
   it("replaces unsupported AI PDF glyphs without changing supported text", () => {
-    const result = sanitizeTextForCjkPdf("💡 本次重點：H₂O ✅");
-    expect(result.text).toBe("提示 本次重點：H₂O 完成");
+    const mathText = "H₂O、x²、a₃、log₂x、√、∑、∫、≤、≥、∞、ⁿ";
+    const result = sanitizeTextForCjkPdf(`💡 本次重點：${mathText} ✅`);
+    expect(result.text).toBe(`提示 本次重點：${mathText} 完成`);
     expect(result.replaced).toEqual([
       { from: "💡", to: "提示" },
       { from: "✅", to: "完成" },
     ]);
     expect(() => assertCjkPdfGlyphCoverage(result.text, "AI PDF")).not.toThrow();
+    expect(() => assertMathGlyphCoverage(mathText, "AI PDF 數學格式")).not.toThrow();
+    expect(result.text).not.toContain("H2O");
+    expect(result.text).not.toContain("x2");
+    expect(result.text).toContain("log₂x");
   });
 
   it("renders Traditional Chinese through PDF, PNG and SVG paths", async () => {

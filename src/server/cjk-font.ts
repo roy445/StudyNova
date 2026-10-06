@@ -8,6 +8,7 @@ const FONT_FILENAME = "NotoSansCJKTC-Regular.ttf";
 const FONT_PATH = path.join(process.cwd(), "src", "server", "fonts", FONT_FILENAME);
 const MATH_FONT_FILENAME = "DejaVuSans.ttf";
 const MATH_FONT_PATH = path.join(process.cwd(), "src", "server", "fonts", MATH_FONT_FILENAME);
+export const PDF_MATH_REGRESSION_TEXT = "H₂O x² a₃ log₂x √ ∑ ∫ ≤ ≥ ∞ ⁿ";
 const TEST_TEXT = `這是一段繁體中文測試文字。國文、英文、數學、自然、社會、AI 學習助手、錯題本、智慧複習、線上 PK、回報專員 StudyNova ${VISUAL_NOTE_ICONS.join(" ")}`;
 let cachedFont: Buffer | null = null;
 let cachedDataUrl: string | null = null;
@@ -58,6 +59,22 @@ export function hasCjkGlyph(character: string) {
 export function hasMathGlyph(character: string) {
   const codePoint = character.codePointAt(0);
   return codePoint !== undefined && getMathFontFace().hasGlyphForCodePoint(codePoint);
+}
+
+/**
+ * Runtime guard for the glyphs most often produced by chemistry and math explanations.
+ * Keep this separate from CJK coverage: these characters are intentionally rendered
+ * by the fallback math font and must never be normalized into plain ASCII.
+ */
+export function assertMathGlyphCoverage(text = PDF_MATH_REGRESSION_TEXT, context = "數學文字") {
+  const missing = Array.from(new Set(Array.from(text).filter((character) => {
+    if (/\s/.test(character) || hasCjkGlyph(character)) return false;
+    return !hasMathGlyph(character);
+  })));
+  if (missing.length) {
+    const details = missing.map((character) => `${character} (U+${character.codePointAt(0)?.toString(16).toUpperCase()})`).join("、");
+    throw new Error(`${context}缺少數學字型 glyph：${details}。`);
+  }
 }
 
 export function findMissingCjkGlyphs(text: string) {
