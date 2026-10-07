@@ -107,7 +107,7 @@ export function Button({
 
 export function Card({ children, className = "", title, subtitle, action, delay = 0 }: { children?: ReactNode; className?: string; title?: ReactNode; subtitle?: ReactNode; action?: ReactNode; delay?: number }) {
   return (
-    <section className={`glass anim-in p-4 sm:p-5 ${className}`} style={{ animationDelay: `${delay}ms` }}>
+    <section className={`glass anim-in min-w-0 max-w-full p-4 sm:p-5 ${className}`} style={{ animationDelay: `${delay}ms` }}>
       {(title || action) && (
         <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
