@@ -93,3 +93,9 @@ FROM users u
 WHERE p.bot_key ~ '^nova-bot-(0[1-9]|10)$'
   AND u.nova_id = 'NOVA-PK-' || right(p.bot_key, 2)
   AND p.user_id IS DISTINCT FROM u.user_id;
+
+-- Keep legacy profile rows for historical matches, but only the ten new
+-- account-backed profiles may be selected for future matchmaking.
+UPDATE pk_bot_profiles
+SET enabled = false, updated_at = now()
+WHERE bot_key NOT LIKE 'nova-bot-%';
