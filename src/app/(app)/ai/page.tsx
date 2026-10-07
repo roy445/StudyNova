@@ -175,6 +175,20 @@ export default function AiPage() {
     }
   }
 
+  async function removeAttachment(contextId: string) {
+    if (!activeId) return;
+    try {
+      await apiDelete(`/ai/conversations/${activeId}/attachments/${contextId}`);
+      const removed = attachments.find((item) => item.contextId === contextId);
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      setAttachments((current) => current.filter((item) => item.contextId !== contextId));
+      setAttachment((current) => (current?.contextId === contextId ? null : current));
+      toast.push("success", "檔案已從聊天室永久刪除");
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    }
+  }
+
 async function resolveAction(messageId: string, confirm: boolean) {
     const action = messages.find((item) => item.id === messageId)?.action;
     if (confirm && action?.type === "create_quiz" && !confirmNovaSpend("Novi 建立測驗", aiPracticeCost)) return;
@@ -361,7 +375,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
 
             <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
               <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/heic,.pdf" multiple hidden onChange={(e) => void uploadAndAnalyze(e.target.files)} />
-              {attachments.length > 0 && <details open className="rounded-xl border border-[#37d3ff]/40 bg-[#37d3ff]/5 p-2"><summary className="cursor-pointer text-xs font-semibold text-[#b9f2ff]">已加入 {attachments.length} 個檔案（可展開查看全部）</summary><div className="mt-2 grid gap-2 sm:grid-cols-2">{attachments.map((item) => <div key={item.contextId} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/10 p-2">{item.previewUrl ? <img src={item.previewUrl} alt={item.name} className="h-12 w-12 rounded-lg object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 text-lg">📎</span>}<span className="min-w-0 flex-1 truncate text-xs">{item.name}<span className="block text-[10px] text-muted">{item.status === "ready" ? "已記住於此對話" : "已加入，送出後會與對話關聯"}</span></span><button type="button" className="text-xs text-muted" onClick={() => { if (item.previewUrl) URL.revokeObjectURL(item.previewUrl); setAttachments((current) => current.filter((old) => old.contextId !== item.contextId)); if (attachment?.contextId === item.contextId) setAttachment(null); }}>移除</button></div>)}</div></details>}
+              {attachments.length > 0 && <details open className="rounded-xl border border-[#37d3ff]/40 bg-[#37d3ff]/5 p-2"><summary className="cursor-pointer text-xs font-semibold text-[#b9f2ff]">已加入 {attachments.length} 個檔案（可展開查看全部）</summary><div className="mt-2 grid gap-2 sm:grid-cols-2">{attachments.map((item) => <div key={item.contextId} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/10 p-2">{item.previewUrl ? <img src={item.previewUrl} alt={item.name} className="h-12 w-12 rounded-lg object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 text-lg">📎</span>}<span className="min-w-0 flex-1 truncate text-xs">{item.name}<span className="block text-[10px] text-muted">{item.status === "ready" ? "已記住於此對話" : "已加入，送出後會與對話關聯"}</span></span><button type="button" className="text-xs text-muted" onClick={() => void removeAttachment(item.contextId)}>移除</button></div>)}</div></details>}
               {analysisProgress && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/5 px-3 py-2"><div className="mb-1 flex items-center justify-between text-[11px]"><span className="text-[#b9f2ff]">{analysisProgress.label}</span><span className="text-muted">{analysisProgress.value}%</span></div><div className="h-2 overflow-hidden rounded-full bg-black/20"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all duration-500" style={{ width: `${analysisProgress.value}%` }} /></div><p className="mt-1 text-[10px] text-muted">圖片以私有雲端直傳，辨識期間請保持此頁開啟。</p></div>}
               {solutionResult && (
                 <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/8 px-3 py-2 text-xs leading-5">

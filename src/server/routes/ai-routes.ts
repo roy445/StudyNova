@@ -287,6 +287,62 @@ export const routes: RouteDef[] = [
   }),
 
   route({
+    method: "DELETE",
+    path: "/ai/conversations/:id/attachments/:contextId",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const conversationId = z.string().uuid().parse(ctx.params.id);
+      const contextId = z.string().uuid().parse(ctx.params.contextId);
+      let objectId: string | null = null;
+      let deleteContext = false;
+
+      await db.transaction(async (tx) => {
+        const conversation = (await tx
+          .select({ id: aiConversations.id })
+          .from(aiConversations)
+          .where(and(eq(aiConversations.id, conversationId), eq(aiConversations.userId, user.userId)))
+          .limit(1))[0];
+        if (!conversation) throw notFound("找不到對話");
+
+        const context = (await tx
+          .select({ objectId: fileContexts.objectId })
+          .from(fileContexts)
+          .where(and(eq(fileContexts.id, contextId), eq(fileContexts.userId, user.userId)))
+          .limit(1))[0];
+        if (!context) throw notFound("找不到這個檔案");
+        objectId = context.objectId;
+
+        const linked = (await tx
+          .select({ id: aiConversationFileContexts.id })
+          .from(aiConversationFileContexts)
+          .innerJoin(fileContexts, eq(fileContexts.id, aiConversationFileContexts.fileContextId))
+          .where(and(eq(aiConversationFileContexts.conversationId, conversationId), eq(aiConversationFileContexts.fileContextId, contextId), eq(fileContexts.userId, user.userId)))
+          .limit(1))[0];
+
+        if (linked) {
+          await tx
+            .delete(aiConversationFileContexts)
+            .where(and(eq(aiConversationFileContexts.conversationId, conversationId), eq(aiConversationFileContexts.fileContextId, contextId)));
+        }
+        const stillLinked = await tx
+          .select({ id: aiConversationFileContexts.id })
+          .from(aiConversationFileContexts)
+          .where(eq(aiConversationFileContexts.fileContextId, contextId))
+          .limit(1);
+        if (!linked && stillLinked[0]) throw notFound("這個檔案不屬於目前聊天室");
+        if (!stillLinked[0]) {
+          await tx.delete(fileContexts).where(and(eq(fileContexts.id, contextId), eq(fileContexts.userId, user.userId)));
+          deleteContext = true;
+        }
+      });
+
+      if (deleteContext && objectId) await deleteObject(objectId, user.userId, false);
+      return { deleted: true, contextId };
+    },
+  }),
+
+  route({
     method: "PATCH",
     path: "/ai/conversations/:id",
     auth: "user",
