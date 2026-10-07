@@ -29,6 +29,7 @@ const releaseMigrations = [
   "0105_remove_tester_recruitment_announcement.sql",
   "0106_restore_tester_recruitment_announcement.sql",
   "0107_pk_bot_accounts.sql",
+  "0108_users_system_column_repair.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
