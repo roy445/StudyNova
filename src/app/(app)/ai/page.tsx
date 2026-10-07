@@ -314,6 +314,11 @@ async function resolveAction(messageId: string, confirm: boolean) {
             <div className="mb-3 rounded-xl border border-[#7c5cff]/25 bg-[#7c5cff]/8 px-3 py-2 text-xs leading-5 text-muted"><span className="font-semibold text-[#c4b5fd]">{activeMode.label}的用途：</span> {activeMode.description}</div>
 
             <div className="min-w-0 flex-1 space-y-3 overflow-y-auto scroll-thin pr-1">
+              <aside className="sticky top-0 z-10 rounded-2xl border border-amber-300/35 bg-[#2b2111]/95 px-3.5 py-3 text-xs leading-5 text-amber-50 shadow-lg shadow-black/10 backdrop-blur-md" aria-label="數學解答準確度提醒">
+                <p className="font-bold text-amber-200">📌 數學解答提醒</p>
+                <p className="mt-1">數學題的解答錯誤機率可能比其他科目高，原因是數學需要精確辨識符號、括號、次方、單位與題目條件；照片或手寫內容若模糊、題意不完整，或同一題有多種解法時，AI 也可能在推理步驟中出現計算或判斷偏差。</p>
+                <p className="mt-1 text-amber-200/90">請把 Novi 的答案當作解題協助，務必逐步核對公式、代入與最後答案；重要作業或考試請再用課本、老師或計算機確認。數學解答若有不準確的地方，Novi 先跟你說聲抱歉 🙏 我們會持續改善。</p>
+              </aside>
               {loadingMsg && <Skeleton lines={4} />}
               {messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
