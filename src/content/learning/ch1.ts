@@ -12,7 +12,7 @@ export type Lesson = {
   comparisons: Array<{ label: string; left: string; right: string }>;
   commonErrors: string[];
   sourcePages: string;
-  interactive: "classification" | "states" | "atoms" | "bonds";
+  interactive: "classification" | "states" | "atoms" | "bonds" | "logarithm";
   quiz: { question: string; options: string[]; answer: number; explanation: string };
 };
 
@@ -20,7 +20,7 @@ export const learningSubjects = [
   { slug: "chemistry", icon: "🧪", title: "高中化學", subtitle: "從基礎概念開始，一步一步建立完整化學觀念。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
   { slug: "physics", icon: "⚛️", title: "高中物理", subtitle: "力學、電磁學與波動的互動課程準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
   { slug: "biology", icon: "🧬", title: "高中生物", subtitle: "細胞、遺傳與生態的完整學習路徑準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
-  { slug: "math", icon: "📐", title: "高中數學", subtitle: "函數、幾何與機率的互動課程準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
+  { slug: "math", icon: "📐", title: "高中數學", subtitle: "從科學記號與常用對數開始，建立高一數學的解題基礎。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
   { slug: "english", icon: "🇬🇧", title: "高中英文", subtitle: "字彙、文法與閱讀的學習路徑準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
 ];
 
@@ -124,3 +124,111 @@ export const chemistryLessons: Lesson[] = [
     quiz: { question: "下列何者最能解釋金屬具有導電性？", options: ["金屬原子沒有電子", "價電子可在晶體中移動", "金屬一定溶於水", "金屬由分子組成"], answer: 1, explanation: "金屬鍵模型中的價電子具有離域性，可在晶體中移動並傳遞電荷。" },
   },
 ];
+
+
+export const mathChapter = {
+  slug: "ch1",
+  title: "CH1 常用對數",
+  subtitle: "從科學記號、有效數字與位數判斷，建立常用對數的定義、運算與生活應用能力。",
+  source: "1-4常用對數_merged.pdf（使用者提供講義）",
+  sourcePages: "第 1–22 頁（PDF 共 65 頁）",
+};
+
+export const mathLessons: Lesson[] = [
+  {
+    slug: "scientific-notation",
+    number: "01",
+    title: "科學記號、有效數字與位數",
+    summary: "學會用 a×10ⁿ 表示很大或很小的數，並由指數快速判斷整數位數與小數首次出現非零數字的位置。",
+    details: [
+      { title: "科學記號的標準形式", body: "每個正數都能寫成 a×10ⁿ，其中 1≤a<10，n 是整數。指數為正時表示數值很大，指數為負時表示數值很小。", example: "17,420,000 = 1.742×10⁷；0.000000054 = 5.4×10⁻⁸。" },
+      { title: "有效數字怎麼數？", body: "先寫成科學記號，再依題目要求四捨五入係數。係數中所有非零數字，以及夾在非零數字間的 0，都是有效數字。", example: "1.742×10⁷ 有 4 位有效數字；取 3 位有效數字為 1.74×10⁷。" },
+      { title: "指數與位數的關係", body: "若 n≥0，a×10ⁿ 的整數部分有 n+1 位；若 n=−k，則從小數點後第 k 位開始出現非零數字。遇到非整數指數時，先用對數估計其落在哪兩個整數之間。", example: "3.21×10⁸ 的整數部分是 9 位；3.24×10⁻⁵ 從小數點後第 5 位開始出現非零數字。" },
+      { title: "科學記號的運算", body: "乘除時先運算係數、指數相加或相減，再把結果整理成標準形式；加減時要先調整成相同的 10 次方。", example: "(3×10⁵)(2×10⁻³)=6×10²；(2.3×10⁶)+(4.1×10⁵)=2.71×10⁶。" },
+    ],
+    minutes: 35,
+    concepts: ["a×10ⁿ 的標準形式", "有效數字與四捨五入", "指數判斷整數位數", "科學記號的乘除加減"],
+    formulas: ["1≤a<10", "n≥0：整數部分 n+1 位", "n=−k：小數點後第 k 位開始非零"],
+    comparisons: [
+      { label: "大數 vs 小數", left: "正指數：數值放大", right: "負指數：數值縮小" },
+      { label: "乘除 vs 加減", left: "係數運算、指數相加減", right: "先化成相同次方再運算" },
+    ],
+    commonErrors: ["把指數 n 直接當成位數，忘記正指數要加 1", "有效數字與小數位數混淆", "科學記號加減時沒有先對齊 10 的次方"],
+    sourcePages: "第 1–2 頁",
+    interactive: "logarithm",
+    quiz: { question: "3.24×10⁻⁵ 從小數點後第幾位開始出現非零數字？", options: ["第 3 位", "第 4 位", "第 5 位", "第 6 位"], answer: 2, explanation: "10⁻⁵ 的 1 從小數點後第 5 位開始，因此 3.24×10⁻⁵ 也是第 5 位開始出現非零數字。" },
+  },
+  {
+    slug: "log-definition",
+    number: "02",
+    title: "常用對數的定義與計算機",
+    summary: "從 10 的乘冪理解 log，熟悉 log p 與 10ˡᵒᵍ p 的互換，並用計算機求近似值。",
+    details: [
+      { title: "常用對數的定義", body: "若正數 p=10ᵃ，則稱 a 為 p 的常用對數，記作 a=log p。底數 10 在常用對數中通常省略不寫。", example: "10³=1000，所以 log 1000=3；10⁻⁵=0.00001，所以 log 0.00001=−5。" },
+      { title: "定義的雙向轉換", body: "p=10ᵃ 與 a=log p 是完全等價的兩種寫法。任何正數 p 都可以寫成 10 的 log p 次方，但 log 的真數必須是正數。", example: "10ˡᵒᵍ 12=12；若 10ˣ=6，則 x=log 6。" },
+      { title: "計算機求近似值", body: "計算機的 log 鍵可以求出常用對數。題目若要求四捨五入到小數點後幾位，最後一步才進行四捨五入。", example: "log 6≈0.778151125，因此取到小數點後 4 位是 0.7782。" },
+      { title: "對數值的範圍判斷", body: "利用 10ⁿ 的大小先估計 log p。若 10⁴<p<10⁵，就能判斷 4<log p<5；若 10⁻⁴<p<10⁻³，則 −4<log p<−3。", example: "1409 介於 10³ 與 10⁴ 之間，所以 3<log 1409<4。" },
+    ],
+    minutes: 40,
+    concepts: ["p=10ᵃ ⇔ a=log p", "log 1=0 與 log 10ⁿ=n", "計算機近似值", "對數值的上下界"],
+    formulas: ["p=10ᵃ ⇔ a=log p", "10ˡᵒᵍ p=p（p>0）", "log 10ⁿ=n"],
+    comparisons: [
+      { label: "指數式 vs 對數式", left: "10ᵃ=p：求出 p", right: "a=log p：求出指數 a" },
+      { label: "正數 vs 非正數真數", left: "log p 有意義（p>0）", right: "log 0、log 負數在實數範圍無意義" },
+    ],
+    commonErrors: ["忘記常用對數底數是 10", "把 log p 當成 10p", "對數真數寫成 0 或負數", "四捨五入過早造成答案誤差"],
+    sourcePages: "第 3–6 頁",
+    interactive: "logarithm",
+    quiz: { question: "若 10ˣ=0.5，x 應表示為什麼？", options: ["log 5", "log 0.5", "10 log 0.5", "0.5 log 10"], answer: 1, explanation: "依定義 10ˣ=p ⇔ x=log p，因此 x=log 0.5。" },
+  },
+  {
+    slug: "log-laws",
+    number: "03",
+    title: "對數的運算與方程式",
+    summary: "結合指數律與對數定義，處理乘方、對數表達、位數與含對數的簡單方程。",
+    details: [
+      { title: "乘方與對數的連結", body: "若 10ᵃ=p，則 10ᵏᵃ=pᵏ；因此 10²ˡᵒᵍ 6=6²=36。這類題目先辨認『10 的某個對數次方』，通常不必按計算機。", example: "10ˡᵒᵍ 29=29；10⁻ˡᵒᵍ 3=1/3。" },
+      { title: "用對數判斷位數", body: "若正整數 N 的常用對數為 x，且 m<x<m+1，則 N 的整數部分有 m+1 位。對 2ᵖ−1 類題目，要先估計 p log 2，再判斷整數位數。", example: "若 2¹²⁷=10ᵏ，則 k=127 log 2≈38.2，因此 2¹²⁷−1 是 39 位數。" },
+      { title: "建立方程式再取對數", body: "看到 10ˣ=A 時，直接寫 x=log A；看到數值是某個 10 的乘冪時，則可用 log 10ⁿ=n 化簡。保持等式兩邊的定義一致，不要混用自然對數。", example: "10ᵗ=0.055，所以 t=log 0.055≈−1.2596。" },
+    ],
+    minutes: 45,
+    concepts: ["10ˡᵒᵍ p 的化簡", "pᵏ 與 k log p", "利用 log 判斷位數", "10ˣ=A 型方程"],
+    formulas: ["10ˡᵒᵍ p=p", "10ᵏˡᵒᵍ p=pᵏ", "m<log N<m+1 ⇒ N 有 m+1 位（N 為正整數）"],
+    comparisons: [
+      { label: "直接化簡 vs 計算機", left: "10ˡᵒᵍ p 優先用定義化簡", right: "非特殊值才用計算機近似" },
+      { label: "log N 的位置", left: "N>1：log N 為正", right: "0<N<1：log N 為負" },
+    ],
+    commonErrors: ["把 10²ˡᵒᵍ 6 誤算成 12", "判斷位數時忘記最後的 −1 不一定改變位數邊界", "把 log 的乘法誤寫成 log(a+b)=log a+log b"],
+    sourcePages: "第 6–7 頁、第 10–12 頁",
+    interactive: "logarithm",
+    quiz: { question: "10²ˡᵒᵍ 6 的值為何？", options: ["12", "36", "6²ˡᵒᵍ 10", "log 36"], answer: 1, explanation: "10ˡᵒᵍ 6=6，所以 10²ˡᵒᵍ 6=(10ˡᵒᵍ 6)²=36。" },
+  },
+  {
+    slug: "log-applications",
+    number: "04",
+    title: "常用對數的生活與科學應用",
+    summary: "把對數連到 pH、分貝、星等、人口與班佛定律，練習從文字情境建立數學模型。",
+    details: [
+      { title: "酸鹼值 pH", body: "pH=−log[H⁺]，其中 [H⁺] 是氫離子濃度。濃度每相差 10 倍，pH 就相差 1；混合溶液要先平均濃度，再取對數。", example: "[H⁺]=10⁻³ mol/L 時，pH=3。" },
+      { title: "聲音強度與分貝", body: "分貝函數 d(I)=10 log(I/I₀)，I₀=10⁻¹² W/m²。先把強度比 I/I₀ 算清楚，再代入對數；反過來求強度時要改寫成 10 的乘冪。", example: "I=10² W/m² 時，d=10 log(10¹⁴)=140 分貝。" },
+      { title: "星等與距離", body: "星等公式會把距離的乘法關係轉成對數。解題時先整理含 log d 的等式，再用 10 的乘冪表示距離，最後才換算單位。", example: "M=m+5−5 log d；移項後可求 d=10^((m+5−M)/5)。" },
+      { title: "從資料看世界", body: "班佛定律、人口與步行速度等情境，都能用 log 描述尺度變化。重點不是背公式，而是確認變數單位、代入順序與最後的四捨五入要求。", example: "首位數字為 a 的比例約為 log(1+1/a)；a=7 時再用計算機取近似值。" },
+    ],
+    minutes: 45,
+    concepts: ["pH 酸鹼值", "分貝與聲音強度", "視星等與絕對星等", "班佛定律與人口模型"],
+    formulas: ["pH=−log[H⁺]", "d(I)=10 log(I/I₀)", "M=m+5−5 log d", "比例≈log(1+1/a)"],
+    comparisons: [
+      { label: "直接量 vs 對數量", left: "強度、濃度、距離等原始量", right: "pH、分貝、星等等對數尺度" },
+      { label: "正向代入 vs 反向求解", left: "已知原始量，代入公式求尺度", right: "已知尺度，改寫成 10 的乘冪求原始量" },
+    ],
+    commonErrors: ["pH 前面的負號漏掉", "分貝公式忘記除以基準強度 I₀", "星等公式移項時 5 的係數處理錯誤", "忽略題目指定的單位與四捨五入位數"],
+    sourcePages: "第 5–6 頁、第 8–18 頁",
+    interactive: "logarithm",
+    quiz: { question: "若 [H⁺]=10⁻³ mol/L，該溶液的 pH 為何？", options: ["−3", "0.001", "3", "10³"], answer: 2, explanation: "pH=−log(10⁻³)=−(−3)=3。" },
+  },
+];
+
+export const learningCurriculum = {
+  chemistry: { chapter: chemistryChapter, lessons: chemistryLessons },
+  math: { chapter: mathChapter, lessons: mathLessons },
+} as const;
