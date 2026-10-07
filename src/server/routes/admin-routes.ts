@@ -284,7 +284,7 @@ export const routes: RouteDef[] = [
     path: "/admin/overview",
     auth: "admin",
     handler: async () => {
-      const [userCount] = await db.select({ c: sql<number>`count(*)::int` }).from(users);
+      const [userCount] = await db.select({ c: sql<number>`count(*)::int` }).from(users).where(eq(users.isSystem, false));
       const [proCount] = await db
         .select({ c: sql<number>`count(*)::int` })
         .from(memberships)
@@ -296,7 +296,7 @@ export const routes: RouteDef[] = [
       const newUsers = await db
         .select({ day: sql<string>`to_char(${users.createdAt}, 'YYYY-MM-DD')`, c: sql<number>`count(*)::int` })
         .from(users)
-        .where(sql`${users.createdAt} > now() - interval '14 days'`)
+        .where(and(eq(users.isSystem, false), sql`${users.createdAt} > now() - interval '14 days'`))
         .groupBy(sql`to_char(${users.createdAt}, 'YYYY-MM-DD')`)
         .orderBy(sql`to_char(${users.createdAt}, 'YYYY-MM-DD')`);
       return {
@@ -344,10 +344,10 @@ export const routes: RouteDef[] = [
         .leftJoin(memberships, eq(memberships.userId, users.userId))
         .leftJoin(novaAccounts, eq(novaAccounts.userId, users.userId))
         .leftJoin(assistantProfiles, eq(assistantProfiles.userId, users.userId))
-        .where(q ? or(ilike(users.novaId, like), ilike(users.email, like), ilike(users.displayName, like)) : sql`true`)
+        .where(and(eq(users.isSystem, false), q ? or(ilike(users.novaId, like), ilike(users.email, like), ilike(users.displayName, like)) : sql`true`))
         .orderBy(desc(users.createdAt))
         .limit(pageSize)
-        .offset((page - 1) * pageSize), db.select({ count: sql<number>`count(*)::int` }).from(users).where(q ? or(ilike(users.novaId, like), ilike(users.email, like), ilike(users.displayName, like)) : sql`true`)]);
+        .offset((page - 1) * pageSize), db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.isSystem, false), q ? or(ilike(users.novaId, like), ilike(users.email, like), ilike(users.displayName, like)) : sql`true`))]);
       return { users: rows, total: total[0]?.count ?? 0, page, pageSize };
     },
   }),
@@ -1950,7 +1950,8 @@ export const routes: RouteDef[] = [
           .select({ novaId: users.novaId, displayName: users.displayName, email: users.email, role: users.role, status: users.status, createdAt: users.createdAt, tier: memberships.tier, nova: novaAccounts.balance })
           .from(users)
           .leftJoin(memberships, eq(memberships.userId, users.userId))
-          .leftJoin(novaAccounts, eq(novaAccounts.userId, users.userId));
+          .leftJoin(novaAccounts, eq(novaAccounts.userId, users.userId))
+          .where(eq(users.isSystem, false));
         return csvResponse("studynova-users.csv", rows as never);
       }
       if (kind === "grades") {

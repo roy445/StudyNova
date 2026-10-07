@@ -41,6 +41,7 @@ export const users = pgTable(
     nameWarningCount: integer("name_warning_count").notNull().default(0),
     role: text("role").notNull().default("student"), // student | tester | admin | owner
     status: text("status").notNull().default("active"), // active | blocked
+    isSystem: boolean("is_system").notNull().default(false),
     blockedReason: text("blocked_reason").notNull().default(""),
     deletedReason: text("deleted_reason").notNull().default(""),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -2920,6 +2921,7 @@ export const pkBotProfiles = pgTable(
   "pk_bot_profiles",
   {
     id: id(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
     botKey: text("bot_key").notNull(),
     displayName: text("display_name").notNull(),
     avatarUrl: text("avatar_url").notNull().default(""),
@@ -2939,7 +2941,7 @@ export const pkBotProfiles = pgTable(
     createdAt: created(),
     updatedAt: updated(),
   },
-  (t) => [uniqueIndex("pk_bot_profiles_key_uq").on(t.botKey), index("pk_bot_profiles_active_idx").on(t.enabled, t.difficulty)],
+  (t) => [uniqueIndex("pk_bot_profiles_key_uq").on(t.botKey), uniqueIndex("pk_bot_profiles_user_uq").on(t.userId), index("pk_bot_profiles_active_idx").on(t.enabled, t.difficulty)],
 );
 
 export const pkTeams = pgTable(

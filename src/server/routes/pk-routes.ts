@@ -194,7 +194,7 @@ async function addBotOpponents(matchId: string, count: number) {
   const profiles = await db.select().from(pkBotProfiles).where(eq(pkBotProfiles.enabled, true)).orderBy(asc(pkBotProfiles.botLevel), asc(pkBotProfiles.createdAt)).limit(Math.max(0, count));
   for (const profile of profiles) {
     const orders = await questionOrders(db, matchId, profile.id);
-    const player = (await db.insert(pkMatchPlayers).values({ matchId, userId: null, botProfileId: profile.id, role: "bot", connectionState: "connected", optionOrders: orders }).onConflictDoNothing().returning())[0];
+    const player = (await db.insert(pkMatchPlayers).values({ matchId, userId: profile.userId ?? null, botProfileId: profile.id, role: "bot", connectionState: "connected", optionOrders: orders }).onConflictDoNothing().returning())[0];
     if (!player) continue;
     await db.insert(pkBotSessions).values({ matchId, playerId: player.id, botProfileId: profile.id }).onConflictDoNothing();
   }
