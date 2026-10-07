@@ -34,6 +34,7 @@ import { analyzeSolution, createFileContext } from "../unified-ai-engine";
 import { AppError } from "../errors";
 import { readObject } from "../storage";
 import { SUBJECTS } from "../subject-strategies";
+import { normalizeMathMarkup } from "../math-markup";
 import { AI_SOLUTION_UPLOAD_FEATURE } from "../quota-policy";
 import { getAiPolicy, policyInstructions } from "../ai-policy";
 
@@ -159,7 +160,7 @@ async function createAiArtifact(params: { userId: string; conversationId: string
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
     assertMathGlyphCoverage();
     const safeTitle = sanitizeTextForCjkPdf(title).text;
-    const safeBody = sanitizeTextForCjkPdf(body).text;
+    const safeBody = sanitizeTextForCjkPdf(normalizeMathMarkup(body)).text;
     assertCjkPdfGlyphCoverage(`StudyNova · ${safeTitle}\n${safeBody}`, "AI PDF");
     const pdf = await PDFDocument.create();
     const font = await embedCjkFont(pdf);
