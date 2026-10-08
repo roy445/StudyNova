@@ -714,7 +714,8 @@ export const routes: RouteDef[] = [
           proDailyLimit: z.number().int().min(-1).max(100000).optional(),
           monthlyLimit: z.number().int().min(0).max(1000000).optional(),
           novaCost: z.number().int().min(0).max(10000).optional(),
-          announce: z.boolean().default(true),
+          // 功能開關本身不應通知全站；只有管理員明確傳入 announce=true 才公告。
+          announce: z.boolean().default(false),
         }),
       );
       const before = (await db.select().from(featurePermissions).where(eq(featurePermissions.id, ctx.params.id)).limit(1))[0];
@@ -1895,7 +1896,7 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       const admin = ctx.requireUser();
-      const body = await ctx.json(z.object({ enabled: z.boolean().optional(), priceNova: z.number().int().min(0).max(100000).optional(), announce: z.boolean().default(true) }));
+      const body = await ctx.json(z.object({ enabled: z.boolean().optional(), priceNova: z.number().int().min(0).max(100000).optional(), announce: z.boolean().default(false) }));
       const before = (await db.select().from(assistantItems).where(eq(assistantItems.id, ctx.params.id)).limit(1))[0];
       if (!before) throw notFound("找不到商品");
       const { announce, ...updates } = body;

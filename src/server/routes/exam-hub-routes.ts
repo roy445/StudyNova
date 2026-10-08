@@ -7,8 +7,10 @@ import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 import { createAiBackgroundJob } from "../ai-background";
 import { queue } from "../queue";
-import { putObject } from "../storage";
+import { putObject, readObject } from "../storage";
 import { extractText } from "./content-routes";
+import { extractPdfQuestionChunks, parseNumberedChoiceQuestionText, renderPdfImagePages } from "../pdf-question-extract";
+import { runAiJson } from "../ai";
 import { recordQuestionAnswer, recordQuestionAppearance } from "../question-stats";
 
 function openWindow() {
@@ -128,7 +130,28 @@ export const routes: RouteDef[] = [
       const data = Buffer.from(await file.arrayBuffer());
       const mime = file.type || "application/octet-stream";
       const stored = await putObject({ userId: admin.userId, filename: `exam-${hub.id}-${file.name}`, mimeType: mime, data, allow: ["pdf", "text", "image"] });
-      const text = await extractText(mime, data, admin.userId, "其他");
+      let text = "";
+      if (mime === "application/pdf") {
+        try {
+          const chunks = await extractPdfQuestionChunks(data, 12_000);
+          text = chunks.map((chunk) => chunk.text).join("\n\n").trim();
+        } catch {
+          text = "";
+        }
+        // Scanned PDFs have no text layer. OCR the first pages instead of silently
+        // saving an empty material; the original PDF remains in object storage.
+        if (!text) {
+          try {
+            const pages = await renderPdfImagePages(data, 1.2);
+            const ocrPages = await Promise.all(pages.slice(0, 8).map((page) => extractText("image/png", Buffer.from(page.base64, "base64"), admin.userId, "其他")));
+            text = ocrPages.join("\n\n").trim();
+          } catch {
+            text = "";
+          }
+        }
+      } else {
+        text = await extractText(mime, data, admin.userId, "其他");
+      }
       const pending = (await db.insert(examHubMaterialImports).values({ examHubId: hub.id, uploadedBy: admin.userId, filename: file.name, mimeType: mime, objectId: stored.id, extractedText: text, status: "pending" }).returning())[0];
       results.push({ importId: pending.id, filename: file.name, status: "pending", chars: text.length });
     }
@@ -155,6 +178,47 @@ export const routes: RouteDef[] = [
       }
     });
     return { imported: imported.length, materialIds: imported };
+  }}),
+  route({ method: "POST", path: "/admin/exam-hubs/:id/material-imports/:importId/analyze", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const hub = (await db.select().from(examHubs).where(eq(examHubs.id, ctx.params.id)).limit(1))[0];
+    const material = (await db.select().from(examHubMaterialImports).where(and(eq(examHubMaterialImports.id, ctx.params.importId), eq(examHubMaterialImports.examHubId, ctx.params.id))).limit(1))[0];
+    if (!hub || !material) throw notFound("找不到段考資料來源");
+    let text = material.extractedText.trim();
+    if (!text && material.objectId) {
+      const original = await readObject(material.objectId);
+      if (original.mimeType === "application/pdf") {
+        const chunks = await extractPdfQuestionChunks(original.data, 12_000);
+        text = chunks.map((chunk) => chunk.text).join("\n\n").trim();
+      }
+    }
+    if (!text) throw fail("SYS_CONFLICT", { message: "這份檔案沒有可讀文字。請確認 PDF 有文字層，或改用清楚的 JPG／PNG 題目照片。" });
+    const parsed = parseNumberedChoiceQuestionText(text);
+    let drafts: Array<Record<string, unknown>> = parsed.map((question) => ({ subject: hub.name.includes("英") ? "英文" : "其他", type: question.type, stem: question.stem, options: question.options, answer: question.answer, acceptedAnswers: [], synonyms: [], variants: [], acceptableTranslations: [], explanation: question.explanation, difficulty: question.difficulty, topic: question.topic, chapter: "", unit: "", learningPoint: "由原卷題目匯入，請管理員確認答案與解析。", aiConfidence: question.confidence, sourceType: "uploaded_exam_paper", sourceMetadata: { filename: material.filename, questionNumber: question.questionNumber, answerSource: question.answerSource }, analysis: { source: "deterministic-pdf-parser", answerSource: question.answerSource } }));
+    if (!drafts.length) {
+      const ai = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_paper_question_extract", userId: admin.userId, system: "你是台灣段考試卷解析器。只能根據原文輸出 JSON 陣列，每題必須有 stem、type(single或multiple)、options(至少4個字串)、answer(可為空陣列)、explanation。找不到完整選項就不要建立該題，不得輸出空白題目。", parts: [{ kind: "text", text: `請從以下原卷文字拆出所有選擇題：\n${text.slice(0, 60_000)}` }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
+      drafts = ai.data.filter((row) => String(row.stem ?? row.question ?? "").trim() && Array.isArray(row.options) && (row.options as unknown[]).length >= 4).map((row, index) => ({ subject: "其他", type: String(row.type ?? "single"), stem: String(row.stem ?? row.question), options: (row.options as unknown[]).map(String), answer: Array.isArray(row.answer) ? row.answer.map(String) : [], acceptedAnswers: [], synonyms: [], variants: [], acceptableTranslations: [], explanation: String(row.explanation ?? "請管理員確認答案。"), difficulty: "normal", topic: "段考原卷", chapter: "", unit: "", learningPoint: "由原卷匯入，請管理員確認。", aiConfidence: 0.65, sourceType: "uploaded_exam_paper", sourceMetadata: { filename: material.filename, aiExtracted: true, itemIndex: index }, analysis: { source: "ai-paper-parser" } }));
+    }
+    if (!drafts.length) throw fail("SYS_CONFLICT", { message: "找不到可互動的四選一／多選題。請使用含清楚題號與選項的檔案，或先手動整理題目。" });
+    const job = (await db.insert(examQuestionGenerationJobs).values({ examHubId: hub.id, requestedBy: admin.userId, status: "ready", requirements: { educationLevel: hub.educationLevel, schoolName: hub.schoolName ?? "", grade: hub.grade, subject: "其他", examNumber: hub.examNumber, chapters: [], units: [], vocabularyRange: [], questionTypes: ["single", "multiple"], difficulty: "normal" }, sourcePolicy: { useGlobalBank: false, useMaterials: true, useExisting: false, generateNew: false, materialIds: [material.materialId ?? ""], questionIds: [] } }).returning())[0];
+    await db.insert(examQuestionGenerationItems).values(drafts.map((draft, itemIndex) => ({ jobId: job.id, itemIndex, draft, quality: { passed: true, score: 100, checks: { source: true, nonEmpty: true, options: true } }, analysis: (draft.analysis ?? {}) as Record<string, unknown>, sourceMetadata: (draft.sourceMetadata ?? {}) as Record<string, unknown>, status: "generated" })));
+    return { job, itemCount: drafts.length, message: `已解析 ${drafts.length} 題，請查看逐題預覽後確認入庫。` };
+  }}),
+  route({ method: "POST", path: "/admin/exam-hubs/:id/material-imports/:importId/analyze-vocabulary", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const material = (await db.select().from(examHubMaterialImports).where(and(eq(examHubMaterialImports.id, ctx.params.importId), eq(examHubMaterialImports.examHubId, ctx.params.id))).limit(1))[0];
+    if (!material) throw notFound("找不到段考資料來源");
+    const text = material.extractedText.trim();
+    if (!text) throw fail("SYS_CONFLICT", { message: "這份檔案尚未讀到文字，無法分析單字。" });
+    const result = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_vocabulary_extract", userId: admin.userId, system: "你是台灣國高中英文單字範圍整理器。只從提供文字擷取真正的英文單字，不要把句子、題號、選項或功能詞整段當單字。輸出 JSON 陣列，每項包含 word、meaning、partOfSpeech、example、exampleZh、phonetic、collocations、phrases、synonyms、antonyms。", parts: [{ kind: "text", text: text.slice(0, 60_000) }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
+    const rows = result.data.map((row) => ({ hubId: ctx.params.id, word: String(row.word ?? "").trim(), normalizedWord: String(row.word ?? "").trim().toLocaleLowerCase("en-US"), meaning: String(row.meaning ?? ""), partOfSpeech: String(row.partOfSpeech ?? ""), example: String(row.example ?? ""), exampleZh: String(row.exampleZh ?? ""), phonetic: String(row.phonetic ?? ""), collocations: Array.isArray(row.collocations) ? row.collocations.map(String) : [], phrases: Array.isArray(row.phrases) ? row.phrases.map(String) : [], synonyms: Array.isArray(row.synonyms) ? row.synonyms.map(String) : [], antonyms: Array.isArray(row.antonyms) ? row.antonyms.map(String) : [], published: true })).filter((row) => /^[A-Za-z][A-Za-z' -]{1,80}$/.test(row.word));
+    const inserted = rows.length ? await db.insert(examHubWords).values(rows).onConflictDoNothing().returning() : [];
+    return { analyzed: rows.length, added: inserted.length, words: inserted };
+  }}),
+  route({ method: "DELETE", path: "/admin/exam-hubs/:id", auth: "admin", handler: async (ctx) => {
+    const deleted = await db.delete(examHubs).where(eq(examHubs.id, ctx.params.id)).returning({ id: examHubs.id });
+    if (!deleted.length) throw notFound("找不到段考專區");
+    return { deleted: true, id: ctx.params.id };
   }}),
   route({ method: "GET", path: "/admin/exam-hubs/:id/words", auth: "admin", handler: async (ctx) => ({ words: await db.select().from(examHubWords).where(eq(examHubWords.hubId, ctx.params.id)).orderBy(asc(examHubWords.word)) }) }),
   route({ method: "POST", path: "/admin/exam-hubs/:id/words", auth: "admin", handler: async (ctx) => { const body = await ctx.json(z.object({ words: z.array(wordInput).min(1).max(1000) })); const rows = await db.insert(examHubWords).values(body.words.map((word) => ({ ...word, hubId: ctx.params.id, normalizedWord: word.word.toLocaleLowerCase("en-US") }))).onConflictDoNothing().returning(); return { words: rows, added: rows.length }; } }),

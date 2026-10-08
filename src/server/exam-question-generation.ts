@@ -75,9 +75,14 @@ export async function generateExamQuestion(params: { requirements: ExamGeneratio
     userId,
     system: "你負責產生待管理員審核的段考題目，絕不發布。輸出必須是合法 JSON。",
     parts: [{ kind: "text", text: prompt }],
-    maxOutputTokens: 2600,
+    maxOutputTokens: 4200,
     temperature: 0.25,
   }, {});
+  const generatedStem = String(response.data?.stem ?? "").trim();
+  const generatedOptions = Array.isArray(response.data?.options) ? response.data.options.filter((value) => String(value).trim()) : [];
+  if (!generatedStem || (response.data?.type === "single" && generatedOptions.length < 4)) {
+    throw new Error("AI_EMPTY_QUESTION_OUTPUT: AI 沒有回傳完整題幹與選項，請稍後重試或改用上傳原卷分析。");
+  }
   const draft = { ...response.data, sourceType: response.data.sourceType || "ai_generated", sourceMetadata: { ...(response.data.sourceMetadata ?? {}), provider: response.meta.provider, model: response.meta.model, itemIndex } };
   const quality = qualityCheckDraft(draft, requirements, candidates.map((item) => String(item.stem ?? "")));
   return { draft, quality, provider: response.meta.provider, model: response.meta.model };

@@ -380,7 +380,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const unread = notif.data?.unread ?? 0;
   const nova = summary.data?.nova ?? 0;
   const level = summary.data?.novi?.level ?? 1;
-  const featureNotices = (summary.data?.announcements ?? []).filter((item) => item.pinned && (item.targetFeature === "all" || item.targetFeature === featureKey)).slice(0, 3);
+  const featureNotice = Array.from(new Map((summary.data?.announcements ?? []).filter((item) => item.pinned && (item.targetFeature === "all" || item.targetFeature === featureKey)).map((item) => [`${item.title}|${item.body}`, item])).values())[0];
 
   const kindLabel = useMemo(
     () => ({ material: "教材", note: "筆記", quiz: "測驗", question: "題目", activity: "活動" }) as Record<string, string>,
@@ -527,7 +527,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         </header>
 
         <main className="app-main mx-auto min-w-0 max-w-6xl overflow-x-clip px-3 py-4 sm:px-5 sm:py-6">
-          {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => { return <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p><p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>; })}</section>}
+          {featureNotice && <section aria-label="功能公告" className="mb-3"><div className="flex min-h-11 items-center gap-2 overflow-hidden rounded-full border border-[#37d3ff]/25 bg-[#0b1226]/95 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,.18)]"><span className="shrink-0 text-sm text-[#ffc857]" aria-hidden="true">📢</span><div className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap scroll-thin"><span className="text-xs font-semibold text-[#dff9ff]">{featureNotice.title}</span><span className="mx-2 text-[#61738f]">·</span><span className="text-xs text-muted">{featureNotice.body}</span></div>{featureNotice.link ? <Link href={featureNotice.link} className="shrink-0 text-xs font-bold text-[#7dd3fc] hover:underline">查看 →</Link> : null}</div></section>}
           {FEATURE_GUIDANCE[featureKey] && <div className="mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
           {children}
           <footer aria-label="網站資訊" className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
