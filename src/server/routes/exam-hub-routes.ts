@@ -185,19 +185,24 @@ export const routes: RouteDef[] = [
     const material = (await db.select().from(examHubMaterialImports).where(and(eq(examHubMaterialImports.id, ctx.params.importId), eq(examHubMaterialImports.examHubId, ctx.params.id))).limit(1))[0];
     if (!hub || !material) throw notFound("找不到段考資料來源");
     let text = material.extractedText.trim();
+    let visionParts: Array<{ kind: "image"; mimeType: string; base64: string }> = [];
     if (!text && material.objectId) {
       const original = await readObject(material.objectId);
       if (original.mimeType === "application/pdf") {
         const chunks = await extractPdfQuestionChunks(original.data, 12_000);
         text = chunks.map((chunk) => chunk.text).join("\n\n").trim();
+        if (!text) {
+          const pages = await renderPdfImagePages(original.data, 1.65);
+          visionParts = pages.slice(0, 8).map((page) => ({ kind: "image" as const, mimeType: "image/png", base64: page.base64 }));
+        }
       }
     }
-    if (!text) throw fail("SYS_CONFLICT", { message: "這份檔案沒有可讀文字。請確認 PDF 有文字層，或改用清楚的 JPG／PNG 題目照片。" });
+    if (!text && !visionParts.length) throw fail("SYS_CONFLICT", { message: "這份檔案沒有可讀文字或可分析頁面。請改用清楚的 JPG／PNG 題目照片。" });
     const parsed = parseNumberedChoiceQuestionText(text);
     let drafts: Array<Record<string, unknown>> = parsed.map((question) => ({ subject: hub.name.includes("英") ? "英文" : "其他", type: question.type, stem: question.stem, options: question.options, answer: question.answer, acceptedAnswers: [], synonyms: [], variants: [], acceptableTranslations: [], explanation: question.explanation, difficulty: question.difficulty, topic: question.topic, chapter: "", unit: "", learningPoint: "由原卷題目匯入，請管理員確認答案與解析。", aiConfidence: question.confidence, sourceType: "uploaded_exam_paper", sourceMetadata: { filename: material.filename, questionNumber: question.questionNumber, answerSource: question.answerSource }, analysis: { source: "deterministic-pdf-parser", answerSource: question.answerSource } }));
     if (!drafts.length) {
-      const ai = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_paper_question_extract", userId: admin.userId, system: "你是台灣段考試卷解析器。只能根據原文輸出 JSON 陣列，每題必須有 stem、type(single或multiple)、options(至少4個字串)、answer(可為空陣列)、explanation。找不到完整選項就不要建立該題，不得輸出空白題目。", parts: [{ kind: "text", text: `請從以下原卷文字拆出所有選擇題：\n${text.slice(0, 60_000)}` }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
-      drafts = ai.data.filter((row) => String(row.stem ?? row.question ?? "").trim() && Array.isArray(row.options) && (row.options as unknown[]).length >= 4).map((row, index) => ({ subject: "其他", type: String(row.type ?? "single"), stem: String(row.stem ?? row.question), options: (row.options as unknown[]).map(String), answer: Array.isArray(row.answer) ? row.answer.map(String) : [], acceptedAnswers: [], synonyms: [], variants: [], acceptableTranslations: [], explanation: String(row.explanation ?? "請管理員確認答案。"), difficulty: "normal", topic: "段考原卷", chapter: "", unit: "", learningPoint: "由原卷匯入，請管理員確認。", aiConfidence: 0.65, sourceType: "uploaded_exam_paper", sourceMetadata: { filename: material.filename, aiExtracted: true, itemIndex: index }, analysis: { source: "ai-paper-parser" } }));
+      const ai = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_paper_question_extract", userId: admin.userId, system: "你是台灣高中英文段考試卷解析器。請逐頁閱讀原卷影像，保留題號、完整題幹、所有選項與圖片／表格資訊。只能輸出 JSON 陣列，每題必須有 stem、type(single或multiple)、options(至少4個字串)、answer(沒有答案就輸出空陣列)、explanation。不要建立空白題目，也不要把閱讀文章或說明文字誤當成題目。", parts: visionParts.length ? [{ kind: "text", text: "請從以下段考試卷影像拆出所有可互動的四選一或多選題；即使沒有答案，也要保留題目與選項。" }, ...visionParts] : [{ kind: "text", text: `請從以下原卷文字拆出所有選擇題：\n${text.slice(0, 60_000)}` }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
+      drafts = ai.data.filter((row) => String(row.stem ?? row.question ?? "").trim() && Array.isArray(row.options) && (row.options as unknown[]).length >= 4).map((row, index) => ({ subject: hub.name.includes("英") || material.filename.includes("英文") ? "英文" : "其他", type: String(row.type ?? "single"), stem: String(row.stem ?? row.question), options: (row.options as unknown[]).map(String), answer: Array.isArray(row.answer) ? row.answer.map(String) : [], acceptedAnswers: [], synonyms: [], variants: [], acceptableTranslations: [], explanation: String(row.explanation ?? "請管理員確認答案。"), difficulty: "normal", topic: "段考原卷", chapter: "", unit: "", learningPoint: "由原卷匯入，請管理員確認。", aiConfidence: 0.65, sourceType: "uploaded_exam_paper", sourceMetadata: { filename: material.filename, aiExtracted: true, pageCount: visionParts.length, itemIndex: index }, analysis: { source: "ai-paper-vision-parser" } }));
     }
     if (!drafts.length) throw fail("SYS_CONFLICT", { message: "找不到可互動的四選一／多選題。請使用含清楚題號與選項的檔案，或先手動整理題目。" });
     const job = (await db.insert(examQuestionGenerationJobs).values({ examHubId: hub.id, requestedBy: admin.userId, status: "ready", requirements: { educationLevel: hub.educationLevel, schoolName: hub.schoolName ?? "", grade: hub.grade, subject: "其他", examNumber: hub.examNumber, chapters: [], units: [], vocabularyRange: [], questionTypes: ["single", "multiple"], difficulty: "normal" }, sourcePolicy: { useGlobalBank: false, useMaterials: true, useExisting: false, generateNew: false, materialIds: [material.materialId ?? ""], questionIds: [] } }).returning())[0];
@@ -208,9 +213,18 @@ export const routes: RouteDef[] = [
     const admin = ctx.requireUser();
     const material = (await db.select().from(examHubMaterialImports).where(and(eq(examHubMaterialImports.id, ctx.params.importId), eq(examHubMaterialImports.examHubId, ctx.params.id))).limit(1))[0];
     if (!material) throw notFound("找不到段考資料來源");
-    const text = material.extractedText.trim();
-    if (!text) throw fail("SYS_CONFLICT", { message: "這份檔案尚未讀到文字，無法分析單字。" });
-    const result = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_vocabulary_extract", userId: admin.userId, system: "你是台灣國高中英文單字範圍整理器。只從提供文字擷取真正的英文單字，不要把句子、題號、選項或功能詞整段當單字。輸出 JSON 陣列，每項包含 word、meaning、partOfSpeech、example、exampleZh、phonetic、collocations、phrases、synonyms、antonyms。", parts: [{ kind: "text", text: text.slice(0, 60_000) }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
+    let text = material.extractedText.trim();
+    let visionParts: Array<{ kind: "image"; mimeType: string; base64: string }> = [];
+    if (!text && material.objectId) {
+      const original = await readObject(material.objectId);
+      if (original.mimeType === "application/pdf") {
+        const chunks = await extractPdfQuestionChunks(original.data, 12_000);
+        text = chunks.map((chunk) => chunk.text).join("\n\n").trim();
+        if (!text) visionParts = (await renderPdfImagePages(original.data, 1.65)).slice(0, 8).map((page) => ({ kind: "image" as const, mimeType: "image/png", base64: page.base64 }));
+      }
+    }
+    if (!text && !visionParts.length) throw fail("SYS_CONFLICT", { message: "這份檔案尚未讀到文字或可分析頁面，無法分析單字。" });
+    const result = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_vocabulary_extract", userId: admin.userId, system: "你是台灣國高中英文單字範圍整理器。請閱讀原卷影像或文字，只擷取真正的英文單字，不要把句子、題號、選項或功能詞整段當單字。輸出 JSON 陣列，每項包含 word、meaning、partOfSpeech、example、exampleZh、phonetic、collocations、phrases、synonyms、antonyms。", parts: visionParts.length ? [{ kind: "text", text: "請從這份段考試卷中整理值得複習的英文單字。" }, ...visionParts] : [{ kind: "text", text: text.slice(0, 60_000) }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
     const rows = result.data.map((row) => ({ hubId: ctx.params.id, word: String(row.word ?? "").trim(), normalizedWord: String(row.word ?? "").trim().toLocaleLowerCase("en-US"), meaning: String(row.meaning ?? ""), partOfSpeech: String(row.partOfSpeech ?? ""), example: String(row.example ?? ""), exampleZh: String(row.exampleZh ?? ""), phonetic: String(row.phonetic ?? ""), collocations: Array.isArray(row.collocations) ? row.collocations.map(String) : [], phrases: Array.isArray(row.phrases) ? row.phrases.map(String) : [], synonyms: Array.isArray(row.synonyms) ? row.synonyms.map(String) : [], antonyms: Array.isArray(row.antonyms) ? row.antonyms.map(String) : [], published: true })).filter((row) => /^[A-Za-z][A-Za-z' -]{1,80}$/.test(row.word));
     const inserted = rows.length ? await db.insert(examHubWords).values(rows).onConflictDoNothing().returning() : [];
     return { analyzed: rows.length, added: inserted.length, words: inserted };
