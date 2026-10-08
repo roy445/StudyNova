@@ -45,7 +45,7 @@ type Dashboard = {
   novi: { level: number; xp: number } | null;
   activities: Array<{ id: string; title: string; cover: string; goalValue: number; progress: number; rewardNova: number; endsAt: string }>;
   announcements: Array<{ id: string; title: string; body: string; link: string; pinned: boolean }>;
-  marquee: Array<{ id: string; title: string }>;
+  marquee: Array<{ id: string; title: string; body?: string; link?: string }>;
   openWeek: { id: string; weekCode: string; title: string; novaCost: number } | null;
   isPro: boolean;
   aiEnabled: boolean;
@@ -103,7 +103,7 @@ export default function DashboardPage() {
         <div className="glass marquee-shell overflow-hidden px-0 py-2" aria-label="公告跑馬燈">
           <div className="marquee-track flex w-max items-center gap-3 whitespace-nowrap px-3 text-xs text-[#7dd3fc]">
             {[...marqueeSegment, ...marqueeSegment].map((m, i) => (
-              <span key={`${m.id}-${i}`} aria-hidden={i >= marqueeSegment.length} className="marquee-item inline-flex items-center rounded-full border border-[#37d3ff]/20 bg-[#0b1226]/75 px-3 py-1.5">📣 {m.title}</span>
+              <span key={`${m.id}-${i}`} aria-hidden={i >= marqueeSegment.length} className="marquee-item inline-flex items-center gap-2 rounded-full border border-[#37d3ff]/20 bg-[#0b1226]/75 px-3 py-1.5"><strong className="shrink-0 text-[#b9f2ff]">📣 {m.title}</strong>{m.body ? <span className="whitespace-nowrap text-[#dbeafe]">{m.body}</span> : null}</span>
             ))}
           </div>
         </div>
