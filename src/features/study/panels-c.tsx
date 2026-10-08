@@ -62,6 +62,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
   const [tipLoading, setTipLoading] = useState(false);
   const [detailWord, setDetailWord] = useState<Word | null>(null);
   const [memoryMode, setMemoryMode] = useState(false);
+  const [showAllWords, setShowAllWords] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
   const words = data?.words ?? [];
@@ -115,13 +116,13 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
       title="▤ 每日 10 個單字"
       subtitle={`${track === "senior" ? "高中 7000 單" : track === "junior" ? "國中 2000 單" : `程度 ${data?.level}`}・每日 ${data?.dailyTarget ?? words.length} 個・目前第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
       action={
-        <div className="flex flex-wrap items-center gap-2"><SpeechRateControl rate={speechRate} onChange={setSpeechRate} /><Button size="sm" variant={memoryMode ? "outline" : "ghost"} onClick={() => setMemoryMode((value) => !value)}>{memoryMode ? "返回練習" : "記憶卡"}</Button>{!memoryMode && <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !py-1.5 text-xs">
+        <div className="flex flex-wrap items-center gap-2"><SpeechRateControl rate={speechRate} onChange={setSpeechRate} /><Button size="sm" variant={memoryMode ? "gold" : "outline"} onClick={() => setMemoryMode((value) => !value)}>{memoryMode ? "← 返回練習" : "✦ 開啟記憶卡"}</Button>{!memoryMode && <label className="flex items-center gap-1.5 rounded-xl border border-[#7c5cff]/35 bg-[#7c5cff]/10 px-2 py-1.5 text-xs font-semibold text-[#e5ddff]"><span>練習方式</span><Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !border-0 !bg-transparent !py-0 text-xs">
           <option value="card">單字卡</option>
           <option value="en2zh">英 → 中</option>
           <option value="zh2en">中 → 英</option>
           <option value="spell">拼寫</option>
           <option value="timed">限時挑戰</option>
-        </Select>}</div>
+        </Select></label>}</div>
       }
         >
       {memoryMode ? (
@@ -159,12 +160,12 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
         </div>
         {current.meanings && current.meanings.length > 1 && <div className="mt-3"><p className="text-[11px] font-semibold text-muted">一字多意</p><div className="mt-1 flex flex-wrap gap-1.5">{current.meanings.slice(0, 6).map((meaning) => <span key={meaning} className="rounded-lg bg-white/10 px-2 py-1 text-xs">{meaning}</span>)}</div></div>}
         {current.phrases?.length ? <div className="mt-3"><p className="text-[11px] font-semibold text-muted">常用片語</p><div className="mt-1 grid gap-1.5 sm:grid-cols-2">{current.phrases.slice(0, 4).map((phrase) => <div key={`${phrase.en}-${phrase.zh}`} className="rounded-lg bg-black/15 px-2.5 py-1.5 text-xs"><span className="font-medium">{phrase.en}</span><span className="ml-1 text-muted">{phrase.zh}</span></div>)}</div></div> : null}
-        <div className="mt-3 rounded-xl bg-black/15 px-3 py-2 text-xs leading-5"><div className="flex items-center justify-between gap-2"><p className="text-muted">實用例句（{examplesFor(current).length}）</p><Button size="sm" variant="ghost" onClick={() => examplesFor(current).forEach((item, itemIndex) => window.setTimeout(() => speak(item.english, "en-US", speechRate), itemIndex * 1900))}>朗讀全部</Button></div>{examplesFor(current).length ? <div className="mt-1 space-y-2">{examplesFor(current).map((item, itemIndex) => <div key={`${item.english}-${itemIndex}`}><p className="text-[#dcecff]">{item.english}</p>{item.chinese && <p className="text-[#ffc857]">{item.chinese}</p>}</div>)}</div> : <p className="text-muted">該單字目前尚未有自然例句</p>}</div>
+        <details className="mt-3 rounded-xl bg-black/15 px-3 py-2 text-xs leading-5"><summary className="cursor-pointer list-none font-semibold text-[#b9f2ff]">▸ 查看實用例句（{examplesFor(current).length}）</summary><div className="mt-2 flex justify-end"><Button size="sm" variant="ghost" onClick={() => examplesFor(current).forEach((item, itemIndex) => window.setTimeout(() => speak(item.english, "en-US", speechRate), itemIndex * 1900))}>朗讀全部</Button></div>{examplesFor(current).length ? <div className="mt-1 space-y-2">{examplesFor(current).map((item, itemIndex) => <div key={`${item.english}-${itemIndex}`}><p className="text-[#dcecff]">{item.english}</p>{item.chinese && <p className="text-[#ffc857]">{item.chinese}</p>}</div>)}</div> : <p className="mt-2 text-muted">該單字目前尚未有自然例句</p>}</details>
         <div className="mt-3 flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => setDetailWord(current)}>查看完整解析</Button><span className="text-[11px] text-muted">熟悉度 {current.familiarity}%・點擊下方單字可切換</span></div>
       </section>
 
       <ol className="mb-3 space-y-2" aria-label="今日單字清單">
-        {words.map((word, wordIndex) => (
+        {words.slice(0, showAllWords ? words.length : 1).map((word, wordIndex) => (
           <li key={word.id}>
             <button
               type="button"
@@ -179,14 +180,14 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
                     <span className="text-xs text-muted">{word.part_of_speech}</span>
                     <span className="text-sm text-[#7dd3fc]">{word.meaning}</span>
                   </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-[#dcecff]">{examplesFor(word)[0]?.english || "該單字目前尚未有自然例句"}</span>
-                  {examplesFor(word)[0]?.chinese && <span className="block text-xs leading-relaxed text-[#ffc857]">{examplesFor(word)[0].chinese}</span>}
+                  <details className="mt-1 text-xs" onClick={(event) => event.stopPropagation()}><summary className="cursor-pointer text-[#9ec5d8]">查看例句</summary><span className="mt-1 block leading-relaxed text-[#dcecff]">{examplesFor(word)[0]?.english || "該單字目前尚未有自然例句"}</span>{examplesFor(word)[0]?.chinese && <span className="block leading-relaxed text-[#ffc857]">{examplesFor(word)[0].chinese}</span>}</details>
                 </span>
               </div>
             </button>
           </li>
         ))}
       </ol>
+      {words.length > 1 && <Button full variant="outline" onClick={() => setShowAllWords((value) => !value)}>{showAllWords ? "收合其他單字 ↑" : `展開其餘 ${words.length - 1} 個單字 ↓`}</Button>}
 
       <div
         className="glass-soft flex min-h-[190px] touch-pan-y select-none flex-col items-center justify-center gap-2 p-5 text-center"
