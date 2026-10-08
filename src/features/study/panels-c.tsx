@@ -116,7 +116,7 @@ export function WordsPanel({ track }: { track?: "junior" | "senior" } = {}) {
       title="▤ 每日 10 個單字"
       subtitle={`${track === "senior" ? "高中 7000 單" : track === "junior" ? "國中 2000 單" : `程度 ${data?.level}`}・每日 ${data?.dailyTarget ?? words.length} 個・目前第 ${index + 1}/${words.length} 個・答對 ${stats.correct}/${stats.total}`}
       action={
-        <div className="flex flex-wrap items-center gap-2"><SpeechRateControl rate={speechRate} onChange={setSpeechRate} /><Button size="sm" variant={memoryMode ? "gold" : "outline"} onClick={() => setMemoryMode((value) => !value)}>{memoryMode ? "← 返回練習" : "✦ 開啟記憶卡"}</Button>{!memoryMode && <label className="flex items-center gap-1.5 rounded-xl border border-[#7c5cff]/35 bg-[#7c5cff]/10 px-2 py-1.5 text-xs font-semibold text-[#e5ddff]"><span>練習方式</span><Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !border-0 !bg-transparent !py-0 text-xs">
+        <div className="flex flex-wrap items-center gap-2"><SpeechRateControl rate={speechRate} onChange={setSpeechRate} /><Button size="sm" variant="gold" className="memory-entry-button border border-[#fff0b3]/80 shadow-[0_0_22px_rgba(255,200,87,.42)]" onClick={() => setMemoryMode((value) => !value)}>{memoryMode ? "← 返回練習" : "✦ 開啟記憶卡"}</Button>{!memoryMode && <label className="flex items-center gap-1.5 rounded-xl border border-[#7c5cff]/35 bg-[#7c5cff]/10 px-2 py-1.5 text-xs font-semibold text-[#e5ddff]"><span>練習方式</span><Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className="!w-auto !border-0 !bg-transparent !py-0 text-xs">
           <option value="card">單字卡</option>
           <option value="en2zh">英 → 中</option>
           <option value="zh2en">中 → 英</option>
