@@ -93,15 +93,17 @@ export default function DashboardPage() {
     );
   }
   if (error || !data) return <ErrorState message={error ?? "載入失敗"} onRetry={reload} />;
+  const marqueeCopies = Math.max(2, Math.ceil(8 / Math.max(1, data.marquee.length)));
+  const marqueeSegment = Array.from({ length: marqueeCopies }, () => data.marquee).flat();
 
 
   return (
     <div className="space-y-4">
       {data.marquee.length > 0 && (
-        <div className="glass overflow-hidden px-0 py-2">
-          <div className="marquee-track flex w-max gap-10 whitespace-nowrap px-4 text-xs text-[#7dd3fc]">
-            {[...data.marquee, ...data.marquee].map((m, i) => (
-              <span key={`${m.id}-${i}`}>📣 {m.title}</span>
+        <div className="glass marquee-shell overflow-hidden px-0 py-2" aria-label="公告跑馬燈">
+          <div className="marquee-track flex w-max items-center gap-3 whitespace-nowrap px-3 text-xs text-[#7dd3fc]">
+            {[...marqueeSegment, ...marqueeSegment].map((m, i) => (
+              <span key={`${m.id}-${i}`} aria-hidden={i >= marqueeSegment.length} className="marquee-item inline-flex items-center rounded-full border border-[#37d3ff]/20 bg-[#0b1226]/75 px-3 py-1.5">📣 {m.title}</span>
             ))}
           </div>
         </div>
