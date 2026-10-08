@@ -367,7 +367,14 @@ html[data-theme="light"] select option {
   50% { filter: drop-shadow(0 0 8px currentColor); opacity: 1; }
 }
 .marquee-track {
-  animation: nova-marquee 26s linear infinite;
+  /* 長公告以閱讀速度移動，不追求快速炫技；觸控或滑鼠停留時可暫停閱讀。 */
+  animation: nova-marquee 78s linear infinite;
+  will-change: transform;
+}
+.marquee-shell:hover .marquee-track,
+.marquee-shell:focus-within .marquee-track,
+.marquee-shell:active .marquee-track {
+  animation-play-state: paused;
 }
 
 .skeleton {
