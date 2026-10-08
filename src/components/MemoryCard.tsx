@@ -166,7 +166,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
 
         <button
           type="button"
-          className={`memory-card-rainbow group relative min-h-[310px] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(55,211,255,0.14),transparent_42%),linear-gradient(145deg,rgba(19,29,57,0.98),rgba(10,14,31,0.98))] px-5 py-8 text-center shadow-[0_24px_80px_-40px_rgba(55,211,255,0.8)] transition hover:border-[#37d3ff]/40 sm:min-h-[360px] sm:px-10`}
+          className={`memory-card-rainbow group relative min-h-[310px] w-full overflow-hidden rounded-[28px] border border-[#ffc857]/30 bg-[radial-gradient(circle_at_top,rgba(255,200,87,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(255,112,170,0.16),transparent_42%),linear-gradient(145deg,rgba(42,28,55,0.99),rgba(10,14,31,0.98))] px-5 py-8 text-center shadow-[0_24px_80px_-40px_rgba(255,200,87,0.82)] transition hover:border-[#ffc857]/70 sm:min-h-[360px] sm:px-10`}
           onClick={() => setRevealed((value) => !value)}
           aria-label={revealed ? "隱藏中文" : "顯示中文"}
         >
@@ -208,7 +208,8 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
         {onRate && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="單字熟悉度">
           {(["again", "hard", "good", "easy"] as const).map((value) => {
             const labels = { again: "😵 不會", hard: "😐 有點忘", good: "🙂 會了", easy: "🔥 非常熟" };
-            return <button key={value} type="button" disabled={Boolean(rating)} onClick={() => void rate(value)} className={`memory-card-action focus-ring rounded-xl border px-3 py-2.5 text-xs font-medium transition ${rating === value ? "ring-2 ring-[#37d3ff]/70" : ""}`}>
+            const accents = { again: "[--memory-accent:#ff70aa]", hard: "[--memory-accent:#ffc857]", good: "[--memory-accent:#65e6b8]", easy: "[--memory-accent:#37d3ff]" };
+            return <button key={value} type="button" disabled={Boolean(rating)} onClick={() => void rate(value)} className={`memory-card-action focus-ring rounded-xl border px-3 py-2.5 text-xs font-medium transition ${accents[value]} ${rating === value ? "ring-2 ring-[#ffc857]/80" : ""}`}>
               {rating === value ? "已記錄" : labels[value]}
             </button>;
           })}
