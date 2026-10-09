@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
 import { learningCurriculum } from "@/content/learning/ch1";
 
 export default async function ChapterPage({ params }: { params: Promise<{ subject: string; chapter: string }> }) {
@@ -8,7 +8,8 @@ export default async function ChapterPage({ params }: { params: Promise<{ subjec
   const curriculum = learningCurriculum[subject as keyof typeof learningCurriculum];
   if (!curriculum || chapter !== curriculum.chapter.slug) notFound();
   const { chapter: currentChapter, lessons } = curriculum;
-  return <div className="space-y-6 pb-24"><header><Link href={`/learning/${subject}`} className="text-xs text-cyan-200 hover:underline">← 線上學習</Link><div className="mt-3 flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-semibold tracking-[.25em] text-cyan-200">COURSE MAP</p><h1 className="mt-2 text-3xl font-black">{currentChapter.title}</h1><p className="mt-3 max-w-2xl text-sm leading-7 text-muted">{currentChapter.subtitle}</p></div></div></header>
+  return <div className="space-y-6 pb-24"><header><Link href={`/learning/${subject}`} className="text-xs text-cyan-200 hover:underline">← 線上學習</Link><div className="mt-3 flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-semibold tracking-[.25em] text-cyan-200">COURSE MAP</p><h1 className="mt-2 text-3xl font-black">{currentChapter.title}</h1><p className="mt-3 max-w-2xl text-sm leading-7 text-muted">{currentChapter.subtitle}</p></div><Badge tone="cyan">教材來源：{currentChapter.sourcePages}</Badge></div></header>
+    {"gradeLabel" in currentChapter && <Card title="年級與分組範圍" subtitle="這份教材目前只建立高一內容，未提供的高二、高三章節不會在此頁假裝已開放。"><p className="text-sm leading-7 text-muted">年級：<strong className="text-cyan-100">{currentChapter.gradeLabel}</strong></p><p className="mt-2 text-sm leading-7 text-muted">{currentChapter.scopeNote}</p><div className="mt-3 flex flex-wrap gap-2">{currentChapter.tracks.map((track) => <span key={track} className="rounded-full border border-[var(--line)] px-2.5 py-1 text-xs text-muted">{track}</span>)}</div></Card>}
     <Card title="學習路徑" subtitle="先理解，再互動、練習與回顧。完成度會在實際完成活動後更新。"><div className="grid gap-3">{lessons.map((lesson) => <Link href={`/learning/${subject}/${chapter}/${lesson.slug}`} key={lesson.slug} className="group rounded-2xl border border-[var(--line)] bg-white/[0.025] p-4 transition hover:-translate-y-0.5 hover:border-cyan-300/40"><div className="flex flex-wrap items-start justify-between gap-3"><div className="flex gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-sm font-bold text-cyan-200">{lesson.number}</span><div><h2 className="font-bold">{lesson.title}</h2><p className="mt-1 text-sm leading-6 text-muted">{lesson.summary}</p></div></div><div className="text-right text-xs text-muted">約 {lesson.minutes} 分鐘<br /><span className="text-cyan-200">開始 →</span></div></div><div className="mt-3 flex flex-wrap gap-2">{lesson.concepts.slice(0, 4).map((concept) => <span key={concept} className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-muted">{concept}</span>)}</div></Link>)}</div></Card>
   </div>;
 }
