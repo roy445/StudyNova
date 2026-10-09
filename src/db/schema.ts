@@ -3109,7 +3109,7 @@ export const pkMatchmakingQueue = pgTable(
     lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
-  (t) => [uniqueIndex("pk_matchmaking_user_active_uq").on(t.userId, t.status), index("pk_matchmaking_waiting_idx").on(t.status, t.matchType, t.subject, t.difficulty, t.joinedAt)],
+  (t) => [uniqueIndex("pk_matchmaking_user_active_uq").on(t.userId).where(sql`${t.status} IN ('waiting', 'matching')`), index("pk_matchmaking_waiting_idx").on(t.status, t.matchType, t.subject, t.difficulty, t.joinedAt)],
 );
 
 export const pkPresence = pgTable(
