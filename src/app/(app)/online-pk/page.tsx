@@ -54,6 +54,7 @@ type Difficulty = "easy" | "normal" | "hard";
 type CreateForm = { mode: "1v1" | "2v2" | "3v3" | "多人"; gradeLevel: GradeLevel; difficulty: Difficulty; teamMode: "solo" | "team" };
 type PkSources = { banks: Array<{ id: string; name: string; questionCount: number }>; vocabulary: { id: string; name: string; questionCount: number }; folders: Array<{ id: string; name: string; questionCount: number }>; materials: Array<{ id: string; title: string; subject: string }> };
 type AuthMe = { user: { userId: string; displayName: string; avatarSeed?: string | null } | null };
+type MatchmakingStatus = { matched: boolean; matchId: string | null; queue: { id: string; status: string; mode: string; grade: string; difficulty: string; joinedAt: string } | null; matchStatus?: string | null };
 const DEFAULT_FORM: CreateForm = { mode: "1v1", gradeLevel: "JUNIOR_HIGH", difficulty: "normal", teamMode: "solo" };
 const MATCHMAKING_STATUSES = ["已加入真人配對佇列", "正在尋找相同條件的真人玩家", "找到對手後會自動進入賽場"] as const;
 
@@ -147,15 +148,15 @@ export default function OnlinePkPage() {
         if (matchmakingPollRef.current) return;
         matchmakingPollRef.current = true;
         try {
-          const result = await apiPost<{ matched: boolean; matchId?: string; message: string }>("/pk/matchmaking/join", { mode: form.mode, gradeLevel: form.gradeLevel, difficulty: form.difficulty, teamMode: form.teamMode });
+          const result = await apiGet<MatchmakingStatus>("/pk/matchmaking/status", { fresh: true });
           if (result.matchId) {
             setMatchId(result.matchId);
             setQueueing(false);
             setQueueMessage("");
-            toast.push("success", result.message);
+            toast.push("success", result.matchStatus === "countdown" ? "已找到對手，準備進入倒數！" : "已找到對手！");
             return;
           }
-          setQueueMessage(result.message);
+          setQueueMessage("正在尋找相同條件的真人對手……");
           const freshOverview = await apiGet<Overview>("/pk/overview", { fresh: true });
           setOverviewData(() => freshOverview);
           if (freshOverview.myMatchId) {
@@ -169,7 +170,7 @@ export default function OnlinePkPage() {
           matchmakingPollRef.current = false;
         }
       })();
-    }, 5000);
+    }, 3000);
     return () => window.clearInterval(timer);
   }, [form, queueing, setOverviewData, toast]);
 

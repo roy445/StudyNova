@@ -642,10 +642,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
 .pk-matchmaking-label { color: #7dd3fc; font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
 .pk-question-avatar { display: grid; width: 72px; height: 72px; place-items: center; border: 2px dashed rgba(255,200,87,.72); border-radius: 999px; color: #ffc857; background: radial-gradient(circle, rgba(255,200,87,.18), rgba(124,92,255,.18)); font-size: 36px; font-weight: 900; box-shadow: 0 0 24px rgba(255,200,87,.24); }
 .pk-question-avatar-searching { animation: pk-question-pulse 1.8s ease-in-out infinite; }
-.pk-matchmaking-link { position: relative; display: flex; height: 94px; align-items: center; justify-content: center; }
-.pk-matchmaking-link-core { position: absolute; width: 100%; height: 2px; overflow: hidden; background: linear-gradient(90deg, transparent, #37d3ff 20%, #a78bfa 50%, #ffc857 80%, transparent); box-shadow: 0 0 14px rgba(55,211,255,.82); animation: pk-link-flow 1.4s linear infinite; }
+.pk-matchmaking-link { position: relative; display: flex; height: 94px; align-items: center; justify-content: center; will-change: transform; }
+.pk-matchmaking-link::before, .pk-matchmaking-link::after { position: absolute; width: 100%; height: 1px; border-radius: 999px; background: linear-gradient(90deg, transparent, rgba(55,211,255,.36), rgba(167,139,250,.5), rgba(255,200,87,.36), transparent); content: ""; filter: blur(2px); opacity: .68; animation: pk-link-sweep 2.4s ease-in-out infinite; }
+.pk-matchmaking-link::after { animation-delay: -1.2s; opacity: .3; transform: scaleX(.72); }
+.pk-matchmaking-link-core { position: absolute; width: 100%; height: 2px; overflow: hidden; background: linear-gradient(90deg, transparent, #37d3ff 20%, #a78bfa 50%, #ffc857 80%, transparent); box-shadow: 0 0 14px rgba(55,211,255,.82); animation: pk-link-flow 1.4s cubic-bezier(.4,0,.2,1) infinite; will-change: transform, opacity; }
 .pk-matchmaking-link-core::after { position: absolute; inset: -5px 0; background: inherit; content: ""; filter: blur(5px); opacity: .55; }
-.pk-matchmaking-link-node { position: absolute; width: 8px; height: 8px; border: 1px solid #dff9ff; border-radius: 50%; background: #37d3ff; box-shadow: 0 0 12px #37d3ff; animation: pk-node-travel 2.2s linear infinite; }
+.pk-matchmaking-link-node { position: absolute; width: 8px; height: 8px; border: 1px solid #dff9ff; border-radius: 50%; background: #37d3ff; box-shadow: 0 0 12px #37d3ff; animation: pk-node-travel 2.2s cubic-bezier(.4,0,.2,1) infinite; will-change: left, opacity, transform; }
 .pk-matchmaking-link-node-one { animation-delay: -.4s; }
 .pk-matchmaking-link-node-two { animation-delay: -1.15s; }
 .pk-matchmaking-link-node-three { animation-delay: -1.8s; }
@@ -655,6 +657,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
 @keyframes pk-search-opponent-in { from { opacity: 0; transform: translateX(18px) scale(.94); } to { opacity: 1; transform: translateX(0) scale(1); } }
 @keyframes pk-question-pulse { 0%, 100% { transform: scale(1); filter: brightness(.94); } 50% { transform: scale(1.06); filter: brightness(1.2); } }
 @keyframes pk-link-flow { 0% { opacity: .35; transform: scaleX(.72); } 50% { opacity: 1; transform: scaleX(1); } 100% { opacity: .35; transform: scaleX(.72); } }
+@keyframes pk-link-sweep { 0%, 100% { opacity: .18; transform: scaleX(.58); } 50% { opacity: .9; transform: scaleX(1); } }
 @keyframes pk-node-travel { 0% { left: 0; opacity: 0; transform: scale(.6); } 12% { opacity: 1; } 88% { opacity: 1; } 100% { left: calc(100% - 8px); opacity: 0; transform: scale(1.1); } }
 @keyframes pk-database-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); box-shadow: 0 0 28px rgba(124,92,255,.68); } }
 @media (max-width: 540px) { .pk-matchmaking-visual { grid-template-columns: 1fr 1.15fr 1fr; min-height: 238px; padding-inline: 8px; } .pk-question-avatar, .pk-matchmaking-player-you .rounded-full { width: 58px !important; height: 58px !important; } .pk-matchmaking-database-mark { width: 36px; height: 36px; font-size: 20px; } }

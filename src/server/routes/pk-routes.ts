@@ -442,6 +442,20 @@ export const routes: RouteDef[] = [
     },
   }),
   route({
+    method: "GET",
+    path: "/pk/matchmaking/status",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const now = new Date();
+      const queue = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), sql`${pkMatchmakingQueue.status} in ('waiting', 'matching', 'matched')`, sql`${pkMatchmakingQueue.expiresAt} >= ${now}`)).orderBy(desc(pkMatchmakingQueue.joinedAt)).limit(1))[0] ?? null;
+      if (!queue) return { queue: null, matched: false, matchId: null };
+      if (queue.status !== "matched") return { queue: { id: queue.id, status: queue.status, mode: queue.matchType, grade: queue.grade, difficulty: queue.difficulty, joinedAt: queue.joinedAt }, matched: false, matchId: null };
+      const match = (await db.select({ id: pkMatches.id, status: pkMatches.status }).from(pkMatchPlayers).innerJoin(pkMatches, eq(pkMatches.id, pkMatchPlayers.matchId)).where(and(eq(pkMatchPlayers.userId, user.userId), gte(pkMatches.createdAt, queue.joinedAt), sql`${pkMatches.status} in ('matching', 'countdown', 'in_progress', 'paused')`)).orderBy(desc(pkMatches.createdAt)).limit(1))[0] ?? null;
+      return { queue: { id: queue.id, status: queue.status, mode: queue.matchType, grade: queue.grade, difficulty: queue.difficulty, joinedAt: queue.joinedAt }, matched: Boolean(match), matchId: match?.id ?? null, matchStatus: match?.status ?? null };
+    },
+  }),
+  route({
     method: "POST",
     path: "/pk/matchmaking/join",
     auth: "user",
