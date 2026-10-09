@@ -283,7 +283,17 @@ export default function OnlinePkPage() {
 
   async function cancelQueue() {
     setBusy(true);
-    try { await apiPost("/pk/matchmaking/cancel", {}); sessionStorage.removeItem("studynova:pk-ticket"); setQueueing(false); setQueueMessage(""); await overview.reload(); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
+    try {
+      await apiPost("/pk/matchmaking/cancel", {});
+      sessionStorage.removeItem("studynova:pk-ticket");
+      setQueueing(false);
+      setQueueMessage("");
+      setBusy(false);
+      void overview.reload();
+    } catch (error) {
+      toast.push("error", errorMessage(error));
+      setBusy(false);
+    }
   }
 
   async function createRoom() {

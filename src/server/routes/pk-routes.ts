@@ -511,8 +511,9 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      await db.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting")));
-      return { cancelled: true };
+      const now = new Date();
+      const cancelled = await db.update(pkMatchmakingQueue).set({ status: "cancelled", lastHeartbeatAt: now }).where(and(eq(pkMatchmakingQueue.userId, user.userId), sql`${pkMatchmakingQueue.status} in ('waiting', 'matching', 'matched')`)).returning({ id: pkMatchmakingQueue.id });
+      return { cancelled: cancelled.length > 0, cancelledCount: cancelled.length };
     },
   }),
   route({
