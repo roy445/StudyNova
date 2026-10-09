@@ -10,7 +10,6 @@ import { APP_VERSION } from "@/lib/app-version";
 import { compareSemVer, isValidSemVer } from "@/lib/semver";
 import { featureKeyForApiPath, isFeatureGateLive } from "@/lib/feature-version";
 import { classifyAuditPath, writeAudit } from "./audit";
-import { ensureIdentityGroupMemberColumns, ensureIdentityGroupSchema } from "./db-compat";
 import { classifyDatabaseError, databaseErrorMessage, databaseTarget, extractDatabaseDiagnostics } from "./db-diagnostics";
 import { requireTesterBeta } from "./tester";
 
@@ -181,16 +180,6 @@ async function touchLastSeen(userId: string) {
 }
 
 export async function handleApiRequest(req: Request, pathSegments: string[]): Promise<Response> {
-  try {
-    await ensureIdentityGroupSchema();
-  } catch (error) {
-    console.error("[StudyNova][db-preflight] identity group schema unavailable", error);
-  }
-  try {
-    await ensureIdentityGroupMemberColumns();
-  } catch (error) {
-    console.error("[StudyNova][db-preflight] identity group member columns unavailable", error);
-  }
   const routes = await loadRoutes();
   const url = new URL(req.url);
   const found = match(routes, req.method, pathSegments);
@@ -308,7 +297,7 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     const errorKey = databaseKind === "schema"
       ? (def.path === "/pk/matchmaking/join" ? "PK_MATCHMAKING_STORAGE_ERROR" : "SYS_DB_SCHEMA_MISMATCH")
       : databaseKind === "unavailable" ? "SYS_DB_UNAVAILABLE" : "SYS_INTERNAL";
-    const internal = fail(errorKey, { requestId, details: { requestId, stage: `${def.method} ${def.path}` } });
+    const internal = fail(errorKey, { requestId, details: { requestId, stage: `${def.method} ${def.path}`, databaseKind, database } });
     console.error("[StudyNova][api-database-error]", JSON.stringify({
       requestId,
       code: internal.code,
@@ -326,7 +315,7 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
       : /failed query:/i.test(err instanceof Error ? err.message : String(err))
         ? "Database operation failed (query omitted)"
         : safeErrorMessage(err);
-    await logSystemError(`api:${def.method} ${def.path}`, message, { ip, code: internal.code, requestId, route: def.path, method: def.method, stage: "route_handler", ...(database ? { database } : {}) }, user?.userId ?? null);
+    await logSystemError(`api:${def.method} ${def.path}`, message, { ip, code: internal.code, requestId, route: def.path, method: def.method, stage: "route_handler", databaseKind, ...(database ? { database } : {}) }, user?.userId ?? null);
     return errorResponse(internal);
   }
 }
