@@ -69,6 +69,25 @@ body {
   min-height: 100dvh;
 }
 
+.online-presence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  max-width: 6.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(110, 241, 170, .32);
+  border-radius: 999px;
+  background: rgba(20, 90, 62, .28);
+  color: #a7f3c6;
+  padding: .22rem .45rem;
+  font-size: .58rem;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.online-presence-dot { width: .42rem; height: .42rem; flex: 0 0 auto; border-radius: 999px; background: #6ef1aa; box-shadow: 0 0 0 0 rgba(110, 241, 170, .6); animation: online-presence-pulse 1.8s ease-out infinite; }
+@keyframes online-presence-pulse { 0% { box-shadow: 0 0 0 0 rgba(110, 241, 170, .58); } 70% { box-shadow: 0 0 0 .32rem rgba(110, 241, 170, 0); } 100% { box-shadow: 0 0 0 0 rgba(110, 241, 170, 0); } }
+
 .maintenance-screen {
   background:
     radial-gradient(760px 520px at 50% 38%, rgba(255, 170, 45, 0.11), transparent 65%),
@@ -410,6 +429,26 @@ html[data-motion="reduced"] *::after {
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
+}
+
+@media print {
+  @page { margin: 16mm 15mm; size: A4; }
+  body { background: #fff !important; color: #172033 !important; }
+  .learning-handout { color: #172033; font-family: "StudyNova CJK", "Noto Sans TC", sans-serif; line-height: 1.75; }
+  .learning-handout .handout-cover { border-bottom: 3px solid #37a9c9; margin-bottom: 1.5rem; padding-bottom: 1.2rem; }
+  .learning-handout .handout-kicker { color: #1685a8; font-size: 10pt; font-weight: 800; letter-spacing: .16em; }
+  .learning-handout h1 { margin: .35rem 0 .7rem; color: #102a43; font-size: 26pt; line-height: 1.25; }
+  .learning-handout h2 { margin: 1.5rem 0 .65rem; border-bottom: 1px solid #b9d5df; color: #126782; font-size: 16pt; }
+  .learning-handout h3 { margin: 0 0 .35rem; color: #263d55; font-size: 12pt; }
+  .learning-handout section { break-inside: avoid; }
+  .learning-handout .handout-block { margin: .75rem 0; break-inside: avoid; }
+  .learning-handout .handout-example { border-left: 3px solid #e4b34d; background: #fff8e6; padding: .45rem .7rem; }
+  .learning-handout .handout-meta { color: #63758a; font-size: 10pt; }
+  .learning-handout .handout-formulas { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem 1.5rem; padding-left: 1.25rem; }
+  .learning-handout table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  .learning-handout th, .learning-handout td { border: 1px solid #b9c9d4; padding: .45rem .55rem; text-align: left; vertical-align: top; }
+  .learning-handout th { background: #eaf5f8; color: #126782; }
+  .learning-handout .handout-notes { border-top: 1px solid #aab9c5; margin-top: 1.25rem; padding-top: .6rem; color: #63758a; }
 }
 
 /* ----------------------------------------------------- app layout */

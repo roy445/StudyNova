@@ -179,12 +179,18 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   );
   const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
+  const presence = useApi<{ online: number; asOf: string }>("/pk/presence/summary");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void presence.reload(); }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [presence.reload]);
 
   useEffect(() => {
     let registration: ServiceWorkerRegistration | undefined;
@@ -465,6 +471,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
             <Link href="/dashboard" className="focus-ring flex items-center gap-2 lg:hidden">
               <LogoMark size={62} />
               <span className="neon-text text-base font-extrabold">StudyNova</span>
+              <span className="online-presence-badge" title="目前正在 StudyNova 一起學習的人數"><span className="online-presence-dot" />{presence.data?.online ?? "—"} 人在線</span>
             </Link>
             <div className="flex-1" />
             <button onClick={() => setSearchOpen(true)} aria-label="搜尋" className="focus-ring rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">

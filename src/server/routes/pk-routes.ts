@@ -462,6 +462,16 @@ export const routes: RouteDef[] = [
     },
   }),
   route({
+    method: "GET",
+    path: "/pk/presence/summary",
+    auth: "user",
+    handler: async () => {
+      const now = new Date();
+      const rows = await db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), sql`${pkPresence.state} <> 'offline'`));
+      return { online: Number(rows[0]?.count ?? 0), asOf: now.toISOString() };
+    },
+  }),
+  route({
     method: "POST",
     path: "/pk/presence/heartbeat",
     auth: "user",
