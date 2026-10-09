@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Skeleton, Stat, useToast } from "@/components/ui";
 import { MatchmakingAnimation } from "@/components/MatchmakingAnimation";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -105,6 +105,7 @@ export default function OnlinePkPage() {
   const [busy, setBusy] = useState(false);
   const [queueing, setQueueing] = useState(false);
   const [queueMessage, setQueueMessage] = useState("");
+  const matchmakingPollRef = useRef(false);
   const [matchId, setMatchId] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchData | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
@@ -143,7 +144,18 @@ export default function OnlinePkPage() {
     if (!queueing) return;
     const timer = window.setInterval(() => {
       void (async () => {
+        if (matchmakingPollRef.current) return;
+        matchmakingPollRef.current = true;
         try {
+          const result = await apiPost<{ matched: boolean; matchId?: string; message: string }>("/pk/matchmaking/join", { mode: form.mode, gradeLevel: form.gradeLevel, difficulty: form.difficulty, teamMode: form.teamMode });
+          if (result.matchId) {
+            setMatchId(result.matchId);
+            setQueueing(false);
+            setQueueMessage("");
+            toast.push("success", result.message);
+            return;
+          }
+          setQueueMessage(result.message);
           const freshOverview = await apiGet<Overview>("/pk/overview", { fresh: true });
           setOverviewData(() => freshOverview);
           if (freshOverview.myMatchId) {
@@ -153,11 +165,13 @@ export default function OnlinePkPage() {
           }
         } catch {
           // Keep the queue UI available; the next poll or visible error will recover.
+        } finally {
+          matchmakingPollRef.current = false;
         }
       })();
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [queueing, setOverviewData]);
+  }, [form, queueing, setOverviewData, toast]);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);

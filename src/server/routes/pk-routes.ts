@@ -456,9 +456,8 @@ export const routes: RouteDef[] = [
       const pair = await db.transaction(async (tx) => {
         await tx.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), sql`${pkMatchmakingQueue.expiresAt} < ${now}`));
         const existing = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), gte(pkMatchmakingQueue.expiresAt, now))).limit(1))[0];
-        if (existing) return { own: existing, candidate: null };
-        const rows = await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning();
-        const own = rows[0] ?? (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"))).limit(1))[0];
+        const rows = existing ? [] : await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning();
+        const own = existing ?? rows[0] ?? (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"))).limit(1))[0];
         if (!own) throw conflict("你的真人配對狀態無法建立，請重新操作。");
         const candidate = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), ne(pkMatchmakingQueue.userId, user.userId), gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1).for("update", { skipLocked: true }))[0];
         if (!candidate) return { own, candidate: null };
@@ -468,7 +467,7 @@ export const routes: RouteDef[] = [
         if (!ownClaimed) throw conflict("配對狀態已變更，請重新搜尋。");
         return { own: ownClaimed, candidate: claimed[0] };
       });
-      if (!pair.candidate) return { queue: pair.own, matched: false, message: pair.own.status === "waiting" ? "目前沒有足夠真人；一般快速配對不會自動加入 Bot，請改用『Bot 練習場』。" : "正在尋找對手……" };
+      if (!pair.candidate) return { queue: pair.own, matched: false, message: "正在尋找相同條件的真人對手……" };
       try {
         const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
         await db.insert(pkMatchPlayers).values({ matchId: match.match.id, userId: pair.candidate.userId, optionOrders: await questionOrders(db, match.match.id, pair.candidate.userId) }).onConflictDoNothing();
