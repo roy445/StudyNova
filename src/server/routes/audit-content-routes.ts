@@ -12,6 +12,15 @@ import { classifyTextbookDatabaseError } from "../textbook-diagnostics";
 const idSchema = z.string().uuid();
 const stageScope = z.object({ stageId: idSchema.optional(), schoolId: idSchema.optional(), gradeId: idSchema.optional(), subjectId: idSchema.optional() });
 const formFlag = (form: FormData, key: string, fallback: boolean) => form.get(key) === null ? fallback : form.get(key) === "true";
+function uniqueEducationSubjects<T extends { name: string; enabled: boolean; sortOrder: number }>(rows: T[]) {
+  const unique = new Map<string, T>();
+  for (const row of rows) {
+    const key = row.name.trim().normalize("NFKC").toLocaleLowerCase();
+    const previous = unique.get(key);
+    if (!previous || (!previous.enabled && row.enabled) || (previous.enabled === row.enabled && row.sortOrder < previous.sortOrder)) unique.set(key, row);
+  }
+  return [...unique.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "zh-Hant"));
+}
 function logTextbookDatabaseFailure(ctx: Ctx, error: unknown, operation: string, validation: string) {
   const requestId = ctx.req.headers.get("x-request-id") ?? "unavailable";
   const raw = error instanceof Error ? error : new Error(String(error));
@@ -92,7 +101,15 @@ export const routes: RouteDef[] = [
     await writeAudit({ userId: ctx.user?.userId, eventType: "admin_operation", module: "audit", action: "audit_timeline.view", resourceId: ctx.params.userId, ip: ctx.ip, metadata: { status: 200, route: "/admin/audit-logs/:userId/timeline", method: "GET", targetCount: rows.length } });
     return { logs: rows };
   }}),
-  route({ method: "GET", path: "/education/options", auth: "user", handler: async () => ({ stages: await db.select().from(educationStages).where(eq(educationStages.enabled, true)).orderBy(asc(educationStages.sortOrder)), schools: await db.select().from(educationSchools).where(eq(educationSchools.enabled, true)).orderBy(asc(educationSchools.sortOrder)), grades: await db.select().from(educationGrades).where(eq(educationGrades.enabled, true)).orderBy(asc(educationGrades.sortOrder)), subjects: await db.select().from(educationSubjects).where(eq(educationSubjects.enabled, true)).orderBy(asc(educationSubjects.sortOrder)) }) }),
+  route({ method: "GET", path: "/education/options", auth: "user", handler: async () => {
+    const [stages, schools, grades, subjectRows] = await Promise.all([
+      db.select().from(educationStages).where(eq(educationStages.enabled, true)).orderBy(asc(educationStages.sortOrder)),
+      db.select().from(educationSchools).where(eq(educationSchools.enabled, true)).orderBy(asc(educationSchools.sortOrder)),
+      db.select().from(educationGrades).where(eq(educationGrades.enabled, true)).orderBy(asc(educationGrades.sortOrder)),
+      db.select().from(educationSubjects).where(eq(educationSubjects.enabled, true)).orderBy(asc(educationSubjects.sortOrder), asc(educationSubjects.name)),
+    ]);
+    return { stages, schools, grades, subjects: uniqueEducationSubjects(subjectRows) };
+  } }),
   route({ method: "GET", path: "/textbooks", auth: "user", handler: async (ctx) => {
     const q = ctx.query.get("q")?.trim(); const scope = stageScope.safeParse(Object.fromEntries(["stageId", "schoolId", "gradeId", "subjectId"].map(k => [k, ctx.query.get(k) || undefined]))).data ?? {};
     const filters = [eq(textbookEditions.enabled, true), scope.stageId ? eq(textbookEditions.stageId, scope.stageId) : undefined, scope.schoolId ? eq(textbookEditions.schoolId, scope.schoolId) : undefined, scope.gradeId ? eq(textbookEditions.gradeId, scope.gradeId) : undefined, scope.subjectId ? eq(textbookEditions.subjectId, scope.subjectId) : undefined, q ? or(ilike(textbookEditions.publisher, `%${q}%`), ilike(textbookEditions.version, `%${q}%`), ilike(textbookEditions.volume, `%${q}%`)) : undefined].filter(Boolean);
@@ -101,9 +118,22 @@ export const routes: RouteDef[] = [
   }}),
   route({ method: "GET", path: "/textbooks/:id", auth: "user", handler: async (ctx) => { const edition = (await db.select({ edition: publicEditionColumns }).from(textbookEditions).innerJoin(educationStages, eq(educationStages.id, textbookEditions.stageId)).innerJoin(userSettings, eq(userSettings.schoolLevel, educationStages.key)).where(and(eq(textbookEditions.id, ctx.params.id), eq(textbookEditions.enabled, true), eq(userSettings.userId, ctx.user!.userId))).limit(1))[0]?.edition; if (!edition) throw notFound("找不到符合目前教育階段的教材版本"); const lessons = await db.select().from(textbookLessons).where(and(eq(textbookLessons.editionId, edition.id), eq(textbookLessons.enabled, true))).orderBy(asc(textbookLessons.sortOrder)); const contents = lessons.length ? await db.select().from(textbookContents).where(and(inArray(textbookContents.lessonId, lessons.map(l => l.id)), eq(textbookContents.enabled, true))).orderBy(asc(textbookContents.sortOrder)) : []; return { edition, lessons: lessons.map(l => ({ ...l, contents: contents.filter(c => c.lessonId === l.id) })) }; } }),
   route({ method: "GET", path: "/admin/teaching/overview", auth: "admin", handler: async () => {
-    const subjects = await db.select({ id: educationSubjects.id, name: educationSubjects.name, enabled: educationSubjects.enabled, stageId: educationSubjects.stageId, sortOrder: educationSubjects.sortOrder }).from(educationSubjects).orderBy(asc(educationSubjects.sortOrder), asc(educationSubjects.name));
-    const editions = await db.select({ id: textbookEditions.id, subjectId: textbookEditions.subjectId, publisher: textbookEditions.publisher, version: textbookEditions.version, volume: textbookEditions.volume, enabled: textbookEditions.enabled, ocrStatus: textbookEditions.ocrStatus, updatedAt: textbookEditions.updatedAt }).from(textbookEditions).orderBy(desc(textbookEditions.updatedAt));
-    return { subjects, editions };
+    const [subjectRows, editions, lessons, contents] = await Promise.all([
+      db.select({ id: educationSubjects.id, name: educationSubjects.name, enabled: educationSubjects.enabled, stageId: educationSubjects.stageId, sortOrder: educationSubjects.sortOrder }).from(educationSubjects).orderBy(asc(educationSubjects.sortOrder), asc(educationSubjects.name)),
+      db.select({ id: textbookEditions.id, subjectId: textbookEditions.subjectId, subjectName: educationSubjects.name, publisher: textbookEditions.publisher, version: textbookEditions.version, volume: textbookEditions.volume, enabled: textbookEditions.enabled, ocrStatus: textbookEditions.ocrStatus, updatedAt: textbookEditions.updatedAt }).from(textbookEditions).leftJoin(educationSubjects, eq(educationSubjects.id, textbookEditions.subjectId)).orderBy(desc(textbookEditions.updatedAt)),
+      db.select({ id: textbookLessons.id, editionId: textbookLessons.editionId }).from(textbookLessons).where(eq(textbookLessons.enabled, true)),
+      db.select({ lessonId: textbookContents.lessonId }).from(textbookContents).where(eq(textbookContents.enabled, true)),
+    ]);
+    const subjectMap = new Map(uniqueEducationSubjects(subjectRows).map((subject) => [subject.name.trim().normalize("NFKC").toLocaleLowerCase(), subject]));
+    const lessonCount = new Map<string, number>();
+    const contentCount = new Map<string, number>();
+    for (const lesson of lessons) lessonCount.set(lesson.editionId, (lessonCount.get(lesson.editionId) ?? 0) + 1);
+    const lessonToEdition = new Map(lessons.map((lesson) => [lesson.id, lesson.editionId]));
+    for (const content of contents) { const editionId = lessonToEdition.get(content.lessonId); if (editionId) contentCount.set(editionId, (contentCount.get(editionId) ?? 0) + 1); }
+    return {
+      subjects: [...subjectMap.values()],
+      editions: editions.map((edition) => ({ ...edition, lessonCount: lessonCount.get(edition.id) ?? 0, contentCount: contentCount.get(edition.id) ?? 0 })),
+    };
   }}),
   route({ method: "PATCH", path: "/admin/teaching/subjects/:id", auth: "admin", handler: async (ctx) => {
     const body = await ctx.json(z.object({ enabled: z.boolean() }));
