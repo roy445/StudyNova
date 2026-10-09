@@ -328,6 +328,11 @@ async function matchPayload(matchId: string, userId: string) {
   if (!match) throw notFound("找不到 PK 賽場");
   const player = await getPlayer(matchId, userId);
   if (!player) throw forbidden("你不是這場 PK 的參與者");
+  let reconnectToken: string | null = null;
+  if (player.role === "player" && (!player.reconnectTokenHash || !player.reconnectExpiresAt || player.reconnectExpiresAt < new Date())) {
+    reconnectToken = randomToken(32);
+    await db.update(pkMatchPlayers).set({ reconnectTokenHash: sha256(reconnectToken), reconnectExpiresAt: new Date(Date.now() + 24 * 60 * 60_000) }).where(eq(pkMatchPlayers.id, player.id));
+  }
   const staleBefore = new Date(Date.now() - 45_000);
   if (["countdown", "in_progress", "paused"].includes(match.status)) {
     await db.update(pkMatchPlayers).set({ connectionState: "disconnected" }).where(and(eq(pkMatchPlayers.matchId, matchId), eq(pkMatchPlayers.role, "player"), eq(pkMatchPlayers.connectionState, "connected"), lte(pkMatchPlayers.lastHeartbeatAt, staleBefore)));
@@ -340,6 +345,7 @@ async function matchPayload(matchId: string, userId: string) {
     match: { id: match.id, roomId: match.roomId, status: match.status, mode: match.mode, teamMode: match.teamMode, subject: match.subject, grade: match.grade, unit: match.unit, difficulty: match.difficulty, questionCount: match.questionCount, questionTimeSec: match.questionTimeSec, currentQuestion: match.currentQuestion, startsAt: match.startsAt, endsAt: match.endsAt, finishedAt: match.finishedAt, allowLateJoin: match.allowLateJoin, allowSpectators: match.allowSpectators, showRanking: match.showRanking },
     room: room ? { id: room.id, name: room.name, roomCode: room.roomCode, shareToken: room.shareToken, visibility: room.visibility, maxPlayers: room.maxPlayers, status: room.status, hostId: room.hostId } : null,
     me: { userId, score: player.score, combo: player.combo, maxCombo: player.maxCombo, correctCount: player.correctCount, answeredCount: Number(answerCount[0]?.count ?? 0), rank: player.rank },
+    reconnectToken,
     players: players.map((row) => ({ ...row.player, userId: row.player.role === "bot" ? `bot:${row.player.botProfileId ?? row.player.id}` : row.player.userId, displayName: row.player.role === "bot" ? `${row.botName || "PK Bot"} 🤖` : row.displayName, novaId: row.player.role === "bot" ? `${row.botName || "PK-BOT"}-BOT` : row.novaId, avatarSeed: row.player.role === "bot" ? "nova" : row.avatarSeed, optionOrders: undefined })),
     questions: questionRows.map((question) => publicQuestion(question, userId, matchId)),
   };
@@ -464,13 +470,14 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const config = await getPkConfig();
       settingsError(config, "quickMatchEnabled");
-      const body = await ctx.json(z.object({ mode: matchMode, gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), teamMode: teamMode.default("solo") }));
+      const body = await ctx.json(z.object({ mode: matchMode, gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), teamMode: teamMode.default("solo"), idempotencyKey: z.string().min(8).max(120).optional() }));
       if (!config.allowedModes.includes(body.mode)) throw badRequest("這個 PK 模式目前未開放");
       const now = new Date();
+      const idempotencyKey = body.idempotencyKey ?? randomToken(16);
       const pair = await db.transaction(async (tx) => {
         await tx.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), sql`${pkMatchmakingQueue.expiresAt} < ${now}`));
         const existing = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), gte(pkMatchmakingQueue.expiresAt, now))).limit(1))[0];
-        const rows = existing ? [] : await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning();
+        const rows = existing ? [] : await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning();
         const own = existing ?? rows[0] ?? (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"))).limit(1))[0];
         if (!own) throw conflict("你的真人配對狀態無法建立，請重新操作。");
         const candidate = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), ne(pkMatchmakingQueue.userId, user.userId), gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1).for("update", { skipLocked: true }))[0];
@@ -485,6 +492,7 @@ export const routes: RouteDef[] = [
       try {
         const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
         await db.insert(pkMatchPlayers).values({ matchId: match.match.id, userId: pair.candidate.userId, optionOrders: await questionOrders(db, match.match.id, pair.candidate.userId) }).onConflictDoNothing();
+        await db.update(pkMatchmakingQueue).set({ matchId: match.match.id }).where(and(inArray(pkMatchmakingQueue.id, [pair.own.id, pair.candidate.id]), eq(pkMatchmakingQueue.status, "matched")));
         const startsAt = new Date(Date.now() + 3_000);
         const countdownMatch = (await db.update(pkMatches).set({ status: "countdown", startsAt, updatedAt: new Date() }).where(and(eq(pkMatches.id, match.match.id), eq(pkMatches.status, "matching"))).returning())[0];
         if (!countdownMatch) throw conflict("真人配對已建立，但賽場狀態無法進入倒數，請重新搜尋。");
@@ -569,7 +577,9 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       await accessMatch(ctx.params.id, user.userId);
-      return sseResponse(ctx.params.id, ctx.req.signal);
+      const lastEventId = Number(ctx.req.headers.get("last-event-id") ?? "0");
+      const replay = await db.select({ eventType: pkMatchEvents.eventType, payload: pkMatchEvents.payload, sequence: pkMatchEvents.sequence }).from(pkMatchEvents).where(and(eq(pkMatchEvents.matchId, ctx.params.id), sql`${pkMatchEvents.sequence} > ${Number.isFinite(lastEventId) ? lastEventId : 0}`)).orderBy(asc(pkMatchEvents.sequence)).limit(100);
+      return sseResponse(ctx.params.id, ctx.req.signal, replay.map((event) => ({ type: event.eventType, payload: event.payload, sequence: event.sequence })));
     },
   }),
   route({
@@ -602,6 +612,21 @@ export const routes: RouteDef[] = [
       const now = new Date();
       await db.update(pkMatchPlayers).set({ connectionState: "connected", lastHeartbeatAt: now }).where(and(eq(pkMatchPlayers.matchId, ctx.params.id), eq(pkMatchPlayers.userId, user.userId)));
       return { connected: true, at: now };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/pk/matches/:id/reconnect",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ reconnectToken: z.string().min(16).max(200) }));
+      const access = await accessMatch(ctx.params.id, user.userId);
+      if (!access.player.reconnectTokenHash || access.player.reconnectTokenHash !== sha256(body.reconnectToken) || !access.player.reconnectExpiresAt || access.player.reconnectExpiresAt < new Date()) throw forbidden("重連憑證已失效，請重新登入後加入賽場");
+      const now = new Date();
+      await db.update(pkMatchPlayers).set({ connectionState: "connected", lastHeartbeatAt: now }).where(eq(pkMatchPlayers.id, access.player.id));
+      await emitMatchEvent(ctx.params.id, "player_reconnected", user.userId, { userId: user.userId });
+      return { reconnected: true, at: now, match: await matchPayload(ctx.params.id, user.userId) };
     },
   }),
   route({

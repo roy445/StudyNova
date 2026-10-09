@@ -46,6 +46,7 @@ type MatchData = {
   me: { userId: string; score: number; combo: number; maxCombo: number; correctCount: number; answeredCount: number; rank: number | null };
   players: MatchPlayer[];
   questions: MatchQuestion[];
+  reconnectToken?: string | null;
 };
 type AnswerResult = { accepted: boolean; replay: boolean; isCorrect: boolean; scoreAwarded: number; combo: number; score: number; serverResponseMs?: number; finished?: boolean };
 
@@ -124,9 +125,22 @@ export default function OnlinePkPage() {
     try {
       const value = await apiGet<MatchData>(`/pk/matches/${id}`);
       setMatch(value);
+      if (value.reconnectToken) window.localStorage.setItem(`studynova:pk-reconnect:${id}`, value.reconnectToken);
       if (value.match.status === "in_progress" && !questionStartedAt) setQuestionStartedAt(Date.now());
       if (value.match.status === "completed") setQueueing(false);
     } catch (error) {
+      const reconnectToken = window.localStorage.getItem(`studynova:pk-reconnect:${id}`);
+      if (reconnectToken) {
+        try {
+          const recovered = await apiPost<{ reconnected: boolean; match: MatchData }>(`/pk/matches/${id}/reconnect`, { reconnectToken });
+          setMatch(recovered.match);
+          if (recovered.match.reconnectToken) window.localStorage.setItem(`studynova:pk-reconnect:${id}`, recovered.match.reconnectToken);
+          toast.push("success", "已恢復 PK 連線");
+          return;
+        } catch {
+          // Fall through to the original error so the user receives a useful API code.
+        }
+      }
       toast.push("error", errorMessage(error));
     } finally {
       setMatchLoading(false);
@@ -236,7 +250,9 @@ export default function OnlinePkPage() {
     setBusy(true);
     try {
       if (restart) await apiPost("/pk/matchmaking/cancel", {});
-      const result = await apiPost<{ matched: boolean; matchId?: string; message: string }>("/pk/matchmaking/join", { mode: form.mode, gradeLevel: form.gradeLevel, difficulty: form.difficulty, teamMode: form.teamMode });
+      const ticketKey = restart || !sessionStorage.getItem("studynova:pk-ticket") ? randomKey() : sessionStorage.getItem("studynova:pk-ticket")!;
+      sessionStorage.setItem("studynova:pk-ticket", ticketKey);
+      const result = await apiPost<{ matched: boolean; matchId?: string; message: string }>("/pk/matchmaking/join", { mode: form.mode, gradeLevel: form.gradeLevel, difficulty: form.difficulty, teamMode: form.teamMode, idempotencyKey: ticketKey });
       if (result.matchId) { setMatchId(result.matchId); setQueueing(false); setQueueMessage(""); toast.push("success", result.message); }
       else { setQueueing(true); setQueueMessage(result.message); toast.push("info", result.message); }
       await overview.reload();
@@ -267,7 +283,7 @@ export default function OnlinePkPage() {
 
   async function cancelQueue() {
     setBusy(true);
-    try { await apiPost("/pk/matchmaking/cancel", {}); setQueueing(false); setQueueMessage(""); await overview.reload(); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
+    try { await apiPost("/pk/matchmaking/cancel", {}); sessionStorage.removeItem("studynova:pk-ticket"); setQueueing(false); setQueueMessage(""); await overview.reload(); } catch (error) { toast.push("error", errorMessage(error)); } finally { setBusy(false); }
   }
 
   async function createRoom() {

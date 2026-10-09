@@ -2968,6 +2968,8 @@ export const pkMatchPlayers = pgTable(
     teamId: uuid("team_id").references(() => pkTeams.id, { onDelete: "set null" }),
     role: text("role").notNull().default("player"),
     connectionState: text("connection_state").notNull().default("connected"),
+    reconnectTokenHash: text("reconnect_token_hash"),
+    reconnectExpiresAt: timestamp("reconnect_expires_at", { withTimezone: true }),
     optionOrders: jsonb("option_orders").$type<Record<string, string[]>>().notNull().default({}),
     score: integer("score").notNull().default(0),
     combo: integer("combo").notNull().default(0),
@@ -3103,13 +3105,15 @@ export const pkMatchmakingQueue = pgTable(
     questionCount: integer("question_count").notNull().default(10),
     questionTimeSec: integer("question_time_sec").notNull().default(30),
     questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "restrict" }),
+    matchId: uuid("match_id").references(() => pkMatches.id, { onDelete: "set null" }),
+    idempotencyKey: text("idempotency_key").notNull().default(sql`gen_random_uuid()::text`),
     status: text("status").notNull().default("waiting"),
     options: jsonb("options").$type<Record<string, unknown>>().notNull().default({}),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
-  (t) => [uniqueIndex("pk_matchmaking_user_active_uq").on(t.userId).where(sql`${t.status} IN ('waiting', 'matching')`), index("pk_matchmaking_waiting_idx").on(t.status, t.matchType, t.subject, t.difficulty, t.joinedAt)],
+  (t) => [uniqueIndex("pk_matchmaking_user_active_uq").on(t.userId).where(sql`${t.status} IN ('waiting', 'matching')`), uniqueIndex("pk_matchmaking_idempotency_uq").on(t.userId, t.idempotencyKey), index("pk_matchmaking_waiting_idx").on(t.status, t.matchType, t.subject, t.difficulty, t.joinedAt), index("pk_matchmaking_match_idx").on(t.matchId)],
 );
 
 export const pkPresence = pgTable(
