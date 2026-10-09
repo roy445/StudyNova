@@ -100,6 +100,17 @@ export const routes: RouteDef[] = [
     return { editions: rows.map((row) => row.edition) };
   }}),
   route({ method: "GET", path: "/textbooks/:id", auth: "user", handler: async (ctx) => { const edition = (await db.select({ edition: publicEditionColumns }).from(textbookEditions).innerJoin(educationStages, eq(educationStages.id, textbookEditions.stageId)).innerJoin(userSettings, eq(userSettings.schoolLevel, educationStages.key)).where(and(eq(textbookEditions.id, ctx.params.id), eq(textbookEditions.enabled, true), eq(userSettings.userId, ctx.user!.userId))).limit(1))[0]?.edition; if (!edition) throw notFound("找不到符合目前教育階段的教材版本"); const lessons = await db.select().from(textbookLessons).where(and(eq(textbookLessons.editionId, edition.id), eq(textbookLessons.enabled, true))).orderBy(asc(textbookLessons.sortOrder)); const contents = lessons.length ? await db.select().from(textbookContents).where(and(inArray(textbookContents.lessonId, lessons.map(l => l.id)), eq(textbookContents.enabled, true))).orderBy(asc(textbookContents.sortOrder)) : []; return { edition, lessons: lessons.map(l => ({ ...l, contents: contents.filter(c => c.lessonId === l.id) })) }; } }),
+  route({ method: "GET", path: "/admin/teaching/overview", auth: "admin", handler: async () => {
+    const subjects = await db.select({ id: educationSubjects.id, name: educationSubjects.name, enabled: educationSubjects.enabled, stageId: educationSubjects.stageId, sortOrder: educationSubjects.sortOrder }).from(educationSubjects).orderBy(asc(educationSubjects.sortOrder), asc(educationSubjects.name));
+    const editions = await db.select({ id: textbookEditions.id, subjectId: textbookEditions.subjectId, publisher: textbookEditions.publisher, version: textbookEditions.version, volume: textbookEditions.volume, enabled: textbookEditions.enabled, ocrStatus: textbookEditions.ocrStatus, updatedAt: textbookEditions.updatedAt }).from(textbookEditions).orderBy(desc(textbookEditions.updatedAt));
+    return { subjects, editions };
+  }}),
+  route({ method: "PATCH", path: "/admin/teaching/subjects/:id", auth: "admin", handler: async (ctx) => {
+    const body = await ctx.json(z.object({ enabled: z.boolean() }));
+    const row = (await db.update(educationSubjects).set({ enabled: body.enabled }).where(eq(educationSubjects.id, ctx.params.id)).returning())[0];
+    if (!row) throw notFound("找不到教學科目");
+    return { subject: row };
+  }}),
   route({ method: "GET", path: "/admin/textbooks", auth: "admin", handler: async () => {
     try {
       return { editions: await db.select().from(textbookEditions).orderBy(asc(textbookEditions.sortOrder), desc(textbookEditions.createdAt)) };
