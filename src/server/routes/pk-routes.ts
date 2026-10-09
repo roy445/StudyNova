@@ -515,6 +515,15 @@ export const routes: RouteDef[] = [
       const idempotencyKey = body.idempotencyKey ?? randomToken(16);
       const pair = await db.transaction(async (tx) => {
         await tx.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), sql`${pkMatchmakingQueue.expiresAt} < ${now}`));
+        const sameRequest = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.idempotencyKey, idempotencyKey))).limit(1))[0];
+        if (sameRequest) {
+          if (sameRequest.status === "matched" && sameRequest.matchId) {
+            const linkedMatch = (await tx.select({ id: pkMatches.id, status: pkMatches.status }).from(pkMatches).where(and(eq(pkMatches.id, sameRequest.matchId), sql`${pkMatches.status} in ('matching', 'countdown', 'in_progress', 'paused')`)).limit(1))[0];
+            if (linkedMatch) return { own: sameRequest, candidate: null, existingMatchId: linkedMatch.id };
+          }
+          if (sameRequest.status === "matched") await tx.update(pkMatchmakingQueue).set({ status: "cancelled", lastHeartbeatAt: now }).where(and(eq(pkMatchmakingQueue.id, sameRequest.id), eq(pkMatchmakingQueue.status, "matched")));
+          else return { own: sameRequest, candidate: null, existingMatchId: null };
+        }
         let existing: typeof pkMatchmakingQueue.$inferSelect | undefined = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), sql`${pkMatchmakingQueue.status} in ('waiting', 'matching', 'matched')`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(desc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
         if (existing?.status === "matched") {
           const linkedMatch = existing.matchId ? (await tx.select({ id: pkMatches.id, status: pkMatches.status }).from(pkMatches).where(and(eq(pkMatches.id, existing.matchId), sql`${pkMatches.status} in ('matching', 'countdown', 'in_progress', 'paused')`)).limit(1))[0] : null;
@@ -523,11 +532,11 @@ export const routes: RouteDef[] = [
           existing = undefined;
         }
         const ownRating = await ensurePkRating(tx, user.userId);
-        const rows = existing ? [] : await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, rating: ownRating.rating, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
+        const rows = existing ? [] : await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, rating: ownRating.rating, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning();
         const own = existing ?? rows[0] ?? (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), sql`${pkMatchmakingQueue.status} in ('waiting', 'matching', 'matched')`)).orderBy(desc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
         if (!own) {
           const retryKey = randomToken(16);
-          const retry = (await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, rating: ownRating.rating, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey: retryKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning())[0];
+          const retry = (await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, rating: ownRating.rating, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey: retryKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning())[0];
           if (!retry) throw conflict("你的真人配對狀態無法建立，請重新操作。");
           return { own: retry, candidate: null, existingMatchId: null };
         }
