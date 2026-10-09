@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, Progress } from "@/components/ui";
-import { inferSpeechLanguage, speechTextForVocabularyWord, stripPronunciationAnnotations } from "@/lib/browser-speech";
 
 export type MemoryCardWord = {
   id: string;
@@ -11,9 +10,6 @@ export type MemoryCardWord = {
   example?: string | null;
   example_zh?: string | null;
   part_of_speech?: string | null;
-  phonetic?: string | null;
-  usPhonetic?: string | null;
-  ukPhonetic?: string | null;
   familiarity?: number | null;
 };
 
@@ -22,42 +18,38 @@ type MemoryCardProps = {
   sourceKey: string;
   title?: string;
   subtitle?: string;
-  onRate?: (rating: "again" | "hard" | "good" | "easy", word: MemoryCardWord) => void | Promise<void>;
 };
 
-function readFavorites(storageKey: string) {
-  if (typeof window === "undefined") return new Set<string>();
-  try {
-    const stored = window.localStorage.getItem(storageKey);
-    return stored ? new Set(JSON.parse(stored) as string[]) : new Set<string>();
-  } catch {
-    return new Set<string>();
-  }
-}
-
 function speak(text: string) {
-  const speechText = stripPronunciationAnnotations(text);
-  if (typeof window === "undefined" || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined" || !speechText) return false;
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(speechText);
-  utterance.lang = inferSpeechLanguage(speechText);
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US";
   utterance.rate = 0.88;
   utterance.pitch = 1;
   window.speechSynthesis.speak(utterance);
   return true;
 }
 
-export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "先想想看，再點擊中文查看答案。", onRate }: MemoryCardProps) {
+export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "先想想看，再點擊中文查看答案。" }: MemoryCardProps) {
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [loop, setLoop] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
-  const [rating, setRating] = useState<string | null>(null);
-  const [favorites, setFavorites] = useState<Set<string>>(() => readFavorites(`studynova:memory-card:favorites:${sourceKey}`));
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const current = words[index];
   const favoriteStorageKey = `studynova:memory-card:favorites:${sourceKey}`;
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(favoriteStorageKey);
+      if (stored) setFavorites(new Set(JSON.parse(stored) as string[]));
+    } catch {
+      // Local storage may be unavailable in private browsing; the feature still works in memory.
+    }
+  }, [favoriteStorageKey]);
 
   useEffect(() => {
     return () => {
@@ -70,7 +62,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
     if (!autoPlay || !current || words.length < 2) return;
     if (autoTimer.current) clearTimeout(autoTimer.current);
     autoTimer.current = setTimeout(() => {
-      speak(speechTextForVocabularyWord(current.word, current.part_of_speech ?? "", current.meaning));
+      speak(current.word);
       autoTimer.current = setTimeout(() => {
         setRevealed(false);
         setIndex((value) => {
@@ -101,7 +93,6 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
   function goTo(nextIndex: number) {
     if (autoTimer.current) clearTimeout(autoTimer.current);
     setRevealed(false);
-    setRating(null);
     setIndex(nextIndex);
   }
 
@@ -133,17 +124,6 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
     }
   }
 
-  async function rate(nextRating: "again" | "hard" | "good" | "easy") {
-    if (!onRate || rating) return;
-    setRating(nextRating);
-    try {
-      await onRate(nextRating, current);
-      goNext();
-    } catch {
-      setRating(null);
-    }
-  }
-
   return (
     <Card title={title} subtitle={subtitle}>
       <div className="space-y-4">
@@ -154,7 +134,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
             <button
               type="button"
               onClick={toggleFavorite}
-              className={`memory-card-action focus-ring inline-flex min-h-9 items-center gap-1 rounded-xl border px-3 transition ${favorites.has(current.id) ? "[--memory-accent:#ffc857] text-[#ffc857]" : "[--memory-accent:#37d3ff] text-muted"}`}
+              className={`focus-ring inline-flex min-h-9 items-center gap-1 rounded-xl border px-3 transition ${favorites.has(current.id) ? "border-[#ffc857]/60 bg-[#ffc857]/10 text-[#ffc857]" : "border-[var(--line)] bg-white/5 text-muted hover:bg-white/10"}`}
               title={favoriteLabel}
               aria-label={favoriteLabel}
             >
@@ -166,16 +146,14 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
 
         <button
           type="button"
-          className={`memory-card-rainbow group relative min-h-[310px] w-full overflow-hidden rounded-[28px] border border-[#ffc857]/30 bg-[radial-gradient(circle_at_top,rgba(255,200,87,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(255,112,170,0.16),transparent_42%),linear-gradient(145deg,rgba(42,28,55,0.99),rgba(10,14,31,0.98))] px-5 py-8 text-center shadow-[0_24px_80px_-40px_rgba(255,200,87,0.82)] transition hover:border-[#ffc857]/70 sm:min-h-[360px] sm:px-10`}
+          className="group relative min-h-[310px] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(55,211,255,0.14),transparent_42%),linear-gradient(145deg,rgba(19,29,57,0.98),rgba(10,14,31,0.98))] px-5 py-8 text-center shadow-[0_24px_80px_-40px_rgba(55,211,255,0.8)] transition hover:border-[#37d3ff]/40 sm:min-h-[360px] sm:px-10"
           onClick={() => setRevealed((value) => !value)}
           aria-label={revealed ? "隱藏中文" : "顯示中文"}
         >
           <span className="absolute left-5 top-5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#37d3ff]/70">StudyNova / Memory</span>
-          <span className="memory-card-spark absolute right-5 top-12" aria-hidden="true">✦</span>
           <span className="absolute right-5 top-5 text-xs text-muted">{revealed ? "中英對照" : "英文提示"}</span>
           <span className="flex min-h-[250px] flex-col items-center justify-center gap-3">
             <span className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl">{current.word}</span>
-            {(current.phonetic || current.usPhonetic || current.ukPhonetic) && <span className="text-xs tracking-wide text-white/55">{current.phonetic || current.usPhonetic || current.ukPhonetic}</span>}
             {current.part_of_speech && <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted">{current.part_of_speech}</span>}
             <span className={`max-w-[34rem] text-lg leading-relaxed transition sm:text-xl ${revealed ? "text-[#37d3ff]" : "text-white/30"}`}>
               {revealed ? current.meaning : "點擊卡片查看中文"}
@@ -194,7 +172,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
           <Button variant="ghost" onClick={() => setRevealed((value) => !value)}>
             {revealed ? "隱藏中文" : "中文"}
           </Button>
-          <Button variant="ghost" onClick={() => { if (!speak(speechTextForVocabularyWord(current.word, current.part_of_speech ?? "", current.meaning))) window.alert("此瀏覽器不支援語音朗讀"); }}>
+          <Button variant="ghost" onClick={() => { if (!speak(current.word)) window.alert("此瀏覽器不支援語音朗讀"); }}>
             朗讀
           </Button>
           <Button variant="outline" onClick={goPrevious} disabled={!loop && index === 0}>
@@ -205,21 +183,11 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
           </Button>
         </div>
 
-        {onRate && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="單字熟悉度">
-          {(["again", "hard", "good", "easy"] as const).map((value) => {
-            const labels = { again: "😵 不會", hard: "😐 有點忘", good: "🙂 會了", easy: "🔥 非常熟" };
-            const accents = { again: "[--memory-accent:#ff70aa]", hard: "[--memory-accent:#ffc857]", good: "[--memory-accent:#65e6b8]", easy: "[--memory-accent:#37d3ff]" };
-            return <button key={value} type="button" disabled={Boolean(rating)} onClick={() => void rate(value)} className={`memory-card-action focus-ring rounded-xl border px-3 py-2.5 text-xs font-medium transition ${accents[value]} ${rating === value ? "ring-2 ring-[#ffc857]/80" : ""}`}>
-              {rating === value ? "已記錄" : labels[value]}
-            </button>;
-          })}
-        </div>}
-
         <div className="grid gap-2 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => setLoop((value) => !value)}
-            className={`memory-card-action focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${loop ? "[--memory-accent:#37d3ff]" : "[--memory-accent:#7c5cff]"}`}
+            className={`focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${loop ? "border-[#37d3ff]/50 bg-[#37d3ff]/10" : "border-[var(--line)] bg-white/5"}`}
           >
             <span><span className="mr-2 text-base" aria-hidden="true">↻</span>全部循環</span>
             <span className="text-muted">{loop ? "開啟" : "關閉"}</span>
@@ -227,7 +195,7 @@ export function MemoryCard({ words, sourceKey, title = "記憶卡", subtitle = "
           <button
             type="button"
             onClick={() => setAutoPlay((value) => !value)}
-            className={`memory-card-action focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${autoPlay ? "[--memory-accent:#a78bfa]" : "[--memory-accent:#ff70aa]"}`}
+            className={`focus-ring flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition ${autoPlay ? "border-[#a78bfa]/60 bg-[#a78bfa]/10" : "border-[var(--line)] bg-white/5"}`}
           >
             <span><span className="mr-2 text-base" aria-hidden="true">▷</span>連續播放</span>
             <span className="text-muted">{autoPlay ? "播放中" : "關閉"}</span>

@@ -476,7 +476,7 @@ function ChallengeInner() {
             </div>
             <p className="mt-3 text-[11px] text-muted">題庫來源：使用管理者提供的國中英文 2000 字與高中英文參考詞彙表 PDF。</p>
           </Card>
-          <WordsPanel key={vocabTrack} track={vocabTrack} />
+          <WordsPanel key={vocabTrack} />
         </div>
       )}
 

@@ -8,6 +8,15 @@ import { BrowserSpeechControls } from "@/components/BrowserSpeechControls";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
+const FEATURED_MATERIALS = [
+  {
+    title: "台灣的原住民族（高中篇）",
+    subject: "歷史／社會",
+    description: "從部落到原住民，整理原住民族分類的演變與外力介入社會的歷史脈絡。",
+    href: "/materials/taiwan-indigenous-peoples-high-school.pdf",
+  },
+];
+
 type Material = { id: string; title: string; subject: string; kind: string; status: string; summary: string; content: string; tags: string[]; createdAt: string; visibility: string; shareSlug?: string | null };
 type LearningPackageView = { id: string; status: string; progress: number; currentStep: string; errors: Record<string, string>; selectedSteps: string[]; results?: Record<string, { completedAt?: string }> };
 
@@ -190,7 +199,7 @@ export function MaterialsPanel() {
   return (
     <Card
       title="📚 我的教材"
-      subtitle="英文教材專區：支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理英文重點、單字與題目"
+      subtitle="線上教材專區：支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理重點、單字與題目"
       action={<Button size="sm" onClick={() => setOpen(true)}>＋ 新增教材</Button>}
     >
       <NovaCostNotice cost={materialCost} action="AI 整理教材" className="mb-3" />
@@ -199,6 +208,35 @@ export function MaterialsPanel() {
       {!loading && !error && !data?.materials.length && <EmptyState icon="📁" title="還沒有教材" hint="上傳課本講義 PDF 或貼上文字，AI 就能幫你整理。" />}
 
       <div className="max-h-[70vh] grid gap-2 overflow-y-auto overscroll-contain scroll-thin pr-1 touch-pan-y sm:grid-cols-2">
+        {FEATURED_MATERIALS.map((material) => (
+          <article key={material.href} className="glass-soft solid-data-surface border border-cyan-300/25 bg-cyan-300/[0.06] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{material.title}</p>
+                <p className="text-[11px] text-muted">{material.subject}・PDF・線上教材</p>
+              </div>
+              <Badge tone="cyan">推薦</Badge>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted">{material.description}</p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <a
+                href={material.href}
+                target="_blank"
+                rel="noreferrer"
+                className="focus-ring inline-flex min-h-[34px] items-center justify-center rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-3 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110 active:scale-[0.98]"
+              >
+                開啟教材
+              </a>
+              <a
+                href={material.href}
+                download
+                className="focus-ring inline-flex min-h-[34px] items-center justify-center rounded-xl border border-[var(--line)] bg-transparent px-3 py-1.5 text-xs font-medium text-[var(--text)] transition-all hover:bg-white/5 active:scale-[0.98]"
+              >
+                下載 PDF
+              </a>
+            </div>
+          </article>
+        ))}
         {data?.materials.map((m) => (
           <div key={m.id} className="glass-soft solid-data-surface p-3">
             <div className="flex items-start justify-between gap-2">

@@ -107,7 +107,7 @@ export function Button({
 
 export function Card({ children, className = "", title, subtitle, action, delay = 0 }: { children?: ReactNode; className?: string; title?: ReactNode; subtitle?: ReactNode; action?: ReactNode; delay?: number }) {
   return (
-    <section className={`glass anim-in min-w-0 max-w-full p-4 sm:p-5 ${className}`} style={{ animationDelay: `${delay}ms` }}>
+    <section className={`glass anim-in p-4 sm:p-5 ${className}`} style={{ animationDelay: `${delay}ms` }}>
       {(title || action) && (
         <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
@@ -154,7 +154,7 @@ export function Field({ label, children, hint, required }: { label: string; chil
 }
 
 const inputBase =
-  "focus-ring w-full rounded-xl border border-[var(--line)] bg-[#0b1428] px-3 py-2.5 text-sm text-[var(--text)] placeholder:text-[color:var(--muted)] transition focus:border-[#37d3ff]";
+  "focus-ring w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2.5 text-sm text-[var(--text)] placeholder:text-[color:var(--muted)] transition focus:border-[#37d3ff]";
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   const { className = "", ...rest } = props;
@@ -167,9 +167,9 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  const { className = "", children, style, ...rest } = props;
+  const { className = "", children, ...rest } = props;
   return (
-    <select {...rest} style={{ colorScheme: "dark", ...style }} className={`${inputBase} appearance-none bg-[var(--surface-solid)] ${className}`}>
+    <select {...rest} className={`${inputBase} appearance-none bg-[var(--surface-solid)] ${className}`}>
       {children}
     </select>
   );
@@ -214,7 +214,7 @@ export function Skeleton({ lines = 3, className = "" }: { lines?: number; classN
   );
 }
 
-export function EmptyState({ icon = "◇", title, hint, action }: { icon?: string; title: string; hint?: string; action?: ReactNode }) {
+export function EmptyState({ icon = "✨", title, hint, action }: { icon?: string; title: string; hint?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--line)] px-4 py-8 text-center">
       <span className="text-3xl">{icon}</span>
@@ -228,7 +228,7 @@ export function EmptyState({ icon = "◇", title, hint, action }: { icon?: strin
 export function ErrorState({ message, onRetry, code, requestId }: { message: string; onRetry?: () => void; code?: string | null; requestId?: string | null }) {
   return (
     <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100">
-      <p className="font-medium"><span className="mr-1 text-rose-300">!</span>{message}</p>
+      <p className="font-medium">😥 {message}</p>
       {(code || requestId) && (
         <p className="mt-1 font-mono text-[11px] opacity-80">
           {code ? `錯誤代碼：${code}` : ""}
@@ -258,7 +258,7 @@ export function ErrorState({ message, onRetry, code, requestId }: { message: str
   );
 }
 
-export function Modal({ open, onClose, title, children, wide = false, fullScreen = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; fullScreen?: boolean }) {
+export function Modal({ open, onClose, title, children, wide = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -273,18 +273,18 @@ export function Modal({ open, onClose, title, children, wide = false, fullScreen
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className={`fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm ${fullScreen ? "p-0" : "p-3 sm:p-4"}`} onClick={onClose}>
+    <div className="fixed inset-0 z-[150] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`glass anim-pop overflow-y-auto overscroll-contain scroll-thin bg-[var(--surface-solid)] touch-pan-y ${fullScreen ? "h-[100dvh] w-full max-w-none rounded-none px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:p-8" : `max-h-[calc(100dvh-1.5rem)] w-[min(94vw,44rem)] rounded-3xl p-4 sm:max-h-[calc(100dvh-2rem)] sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}`}
+        className={`glass anim-pop max-h-[92dvh] w-full overflow-y-auto scroll-thin rounded-b-none p-4 sm:rounded-3xl sm:p-5 ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
       >
-        <div className={`${fullScreen ? "sticky top-0 z-10 -mx-4 mb-4 bg-[var(--surface-solid)]/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8" : "mb-3"} flex items-center justify-between gap-3`}>
-          <h3 className="min-w-0 truncate text-base font-semibold">{title}</h3>
-          <button onClick={onClose} aria-label={fullScreen ? "返回" : "關閉"} className="focus-ring min-h-10 shrink-0 rounded-xl border border-[var(--line)] px-3 py-2 text-xs text-muted hover:bg-white/10">
-            {fullScreen ? "返回" : "✕"}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-base font-semibold">{title}</h3>
+          <button onClick={onClose} aria-label="關閉" className="focus-ring rounded-lg px-2 py-1 text-muted hover:bg-white/10">
+            ✕
           </button>
         </div>
         {children}
@@ -293,7 +293,7 @@ export function Modal({ open, onClose, title, children, wide = false, fullScreen
   );
 }
 
-export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; label: string; icon?: ReactNode; featured?: boolean }>; active: string; onChange: (key: string) => void }) {
+export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; label: string; icon?: ReactNode }>; active: string; onChange: (key: string) => void }) {
   return (
     <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
       {tabs.map((t) => (
@@ -301,7 +301,7 @@ export function Tabs({ tabs, active, onChange }: { tabs: Array<{ key: string; la
           key={t.key}
           onClick={() => onChange(t.key)}
           className={`focus-ring shrink-0 rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm ${
-            active === t.key ? "bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white shadow-lg" : t.featured ? "border border-cyan-300/70 bg-gradient-to-r from-cyan-300/20 via-violet-400/20 to-amber-300/15 text-cyan-50 shadow-[0_0_18px_rgba(55,211,255,.32)] animate-pulse" : "border border-[var(--line)] bg-white/5 text-muted hover:text-[var(--text)]"
+            active === t.key ? "bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white shadow-lg" : "border border-[var(--line)] bg-white/5 text-muted hover:text-[var(--text)]"
           }`}
         >
           {t.icon && <span className="mr-1">{t.icon}</span>}
