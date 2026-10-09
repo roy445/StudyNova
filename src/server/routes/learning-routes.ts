@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, gte, sql, isNull, lte } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql, isNull, lte, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   gradeRecords,
@@ -24,22 +24,40 @@ import {
   achievements,
   userAchievements,
   dailyWords,
+  dailyWordAppearances,
+  wordExamples,
+  platformSettings,
   wordProgress,
   questions,
+  userVocabularies,
+  learningEvents,
+  reviewItems,
+  knowledgeNodes,
 } from "@/db/schema";
 import { route, zDate, type RouteDef } from "../router";
-import { addDaysStr, badRequest, daysBetween, fail, notFound, round1, todayStr, trend } from "../core";
+import { addDaysStr, badRequest, daysBetween, fail, notFound, randomToken, round1, todayStr, trend, toCsv } from "../core";
 import {
   bumpAchievement,
   claimDailyTask,
   ensureDailyTasks,
   grantLearningReward,
+  grantNova,
   progressActivities,
   progressDailyTask,
 } from "../economy";
+import { isProUser } from "../economy";
 import { isWeekOpen } from "../queue";
 import { unreadCount } from "../notify";
+
+function taipeiDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 import { runAiJson, aiConfigured } from "../ai";
+import { ensureSeeded } from "../seed";
+import { initialReviewState, scheduleReview, type ReviewRating } from "../review-scheduler";
 
 /* --------------------------------------------------------- analytics */
 
@@ -202,13 +220,133 @@ export async function buildPlan(userId: string, date: string) {
 
 /* ------------------------------------------------------------ routes */
 
+type ExportKind = "vocabulary" | "wrong";
+type ExportSettings = { enabled: boolean; proOnly: boolean; allowedKinds: ExportKind[]; novaPerKb: number; minimumNova: number };
+const DEFAULT_EXPORT_SETTINGS: ExportSettings = { enabled: true, proOnly: true, allowedKinds: ["vocabulary", "wrong"], novaPerKb: 1, minimumNova: 5 };
+
+async function exportSettings(): Promise<ExportSettings> {
+  const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "learning_exports")).limit(1))[0];
+  const value = (row?.value ?? {}) as Partial<ExportSettings>;
+  return {
+    enabled: value.enabled ?? DEFAULT_EXPORT_SETTINGS.enabled,
+    proOnly: value.proOnly ?? DEFAULT_EXPORT_SETTINGS.proOnly,
+    allowedKinds: (value.allowedKinds ?? DEFAULT_EXPORT_SETTINGS.allowedKinds).filter((k): k is ExportKind => k === "vocabulary" || k === "wrong"),
+    novaPerKb: Math.max(0, Number(value.novaPerKb ?? DEFAULT_EXPORT_SETTINGS.novaPerKb)),
+    minimumNova: Math.max(0, Math.floor(Number(value.minimumNova ?? DEFAULT_EXPORT_SETTINGS.minimumNova))),
+  };
+}
+
+async function buildLearningExport(userId: string, kind: ExportKind) {
+  const rows = kind === "wrong"
+    ? await db.select({ subject: wrongQuestions.subject, wrongCount: wrongQuestions.wrongCount, mastery: wrongQuestions.mastery, reason: wrongQuestions.reason, nextReviewAt: wrongQuestions.nextReviewAt }).from(wrongQuestions).where(eq(wrongQuestions.userId, userId)).orderBy(desc(wrongQuestions.wrongCount))
+    : await db.select({ word: userVocabularies.word, meaning: userVocabularies.meaning, partOfSpeech: userVocabularies.partOfSpeech, phonetic: userVocabularies.phonetic, example: userVocabularies.example, exampleZh: userVocabularies.exampleZh, familiarity: userVocabularies.familiarity, reviewCount: userVocabularies.reviewCount }).from(userVocabularies).where(eq(userVocabularies.userId, userId)).orderBy(asc(userVocabularies.word));
+  const csv = toCsv(rows as Array<Record<string, unknown>>);
+  const bytes = Buffer.byteLength(csv, "utf8");
+  return { csv, bytes };
+}
+
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/learning/center-control",
+    auth: "user",
+    handler: async () => {
+      const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "learning_center_control")).limit(1))[0];
+      const value = (row?.value ?? {}) as Record<string, unknown>;
+      return { status: value.status === "repairing" || value.status === "disabled" ? value.status : "enabled", message: typeof value.message === "string" ? value.message : "學習中心目前正常運作。", updatedAt: row?.updatedAt?.toISOString?.() ?? null };
+    },
+  }),
+  /* ----------------------------------------------- intelligent review */
+  route({
+    method: "GET",
+    path: "/review/due",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const limit = Math.min(100, Math.max(1, Number(ctx.query.get("limit") ?? 30)));
+      const rows = await db
+        .select()
+        .from(reviewItems)
+        .where(and(eq(reviewItems.userId, user.userId), lte(reviewItems.dueAt, new Date()), ne(reviewItems.state, "suspended")))
+        .orderBy(asc(reviewItems.dueAt))
+        .limit(limit);
+      return { items: rows, count: rows.length };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/review/items",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        contentType: z.enum(["vocabulary", "wrong_question", "material_highlight", "knowledge_point", "sentence"]),
+        contentId: z.string().uuid(),
+        conceptId: z.string().uuid().nullable().optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
+      }));
+      const initial = initialReviewState();
+      await db.insert(reviewItems).values({
+        userId: user.userId,
+        contentType: body.contentType,
+        contentId: body.contentId,
+        conceptId: body.conceptId ?? null,
+        dueAt: initial.dueAt,
+        metadata: body.metadata ?? {},
+      }).onConflictDoNothing();
+      const item = (await db.select().from(reviewItems).where(and(eq(reviewItems.userId, user.userId), eq(reviewItems.contentType, body.contentType), eq(reviewItems.contentId, body.contentId))).limit(1))[0];
+      return { item };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/review/items/:id/review",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({
+        rating: z.enum(["again", "hard", "good", "easy"]),
+        responseTimeMs: z.number().int().min(0).max(86_400_000).default(0),
+        hintUsed: z.boolean().default(false),
+        confidence: z.number().int().min(0).max(100).nullable().optional(),
+        source: z.string().max(40).default("review"),
+        idempotencyKey: z.string().max(160).optional(),
+      }));
+      const item = (await db.select().from(reviewItems).where(and(eq(reviewItems.id, ctx.params.id), eq(reviewItems.userId, user.userId))).limit(1))[0];
+      if (!item) throw notFound("找不到複習項目");
+      if (item.state === "suspended") throw badRequest("這個複習項目目前已暫停");
+      const now = new Date();
+      const next = scheduleReview(item, body.rating as ReviewRating, now);
+      const updated = await db.update(reviewItems).set({ ...next, updatedAt: now }).where(eq(reviewItems.id, item.id)).returning();
+      const idempotencyKey = body.idempotencyKey ?? `review:${item.id}:${now.getTime()}:${randomToken()}`;
+      await db.insert(learningEvents).values({
+        userId: user.userId,
+        eventType: "review",
+        objectType: item.contentType,
+        objectId: item.contentId,
+        conceptId: item.conceptId,
+        occurredAt: now,
+        responseTimeMs: body.responseTimeMs,
+        correct: body.rating !== "again",
+        hintUsed: body.hintUsed,
+        confidence: body.confidence ?? null,
+        source: body.source,
+        idempotencyKey,
+        metadata: { rating: body.rating, reviewItemId: item.id },
+      }).onConflictDoNothing();
+      return { item: updated[0], eventRecorded: true };
+    },
+  }),
+
   route({
     method: "GET",
     path: "/dashboard",
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      try {
       const today = todayStr();
       const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
       await ensureDailyTasks(user.userId, today);
@@ -242,6 +380,9 @@ export const routes: RouteDef[] = [
         .where(and(eq(exams.userId, user.userId), gte(exams.examDate, today)))
         .orderBy(asc(exams.examDate))
         .limit(3);
+      const countdownSetting = (await db.select().from(platformSettings).where(eq(platformSettings.key, "exam_countdowns")).limit(1))[0];
+      const countdownConfig = (countdownSetting?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
+      const countdowns = [countdownConfig.exam ? { type: "exam", name: countdownConfig.exam.name ?? "考試倒數", date: countdownConfig.exam.date ?? "", enabled: countdownConfig.exam.enabled !== false } : null, countdownConfig.gsat ? { type: "gsat", name: countdownConfig.gsat.name ?? "學測倒數", date: countdownConfig.gsat.date ?? "", enabled: countdownConfig.gsat.enabled !== false } : null].filter((item): item is { type: string; name: string; date: string; enabled: boolean } => Boolean(item?.enabled && item.date)).map((item) => ({ ...item, daysLeft: Math.max(0, Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000)), urgent: Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000) <= 5 }));
 
       const [dueWrong] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -260,7 +401,11 @@ export const routes: RouteDef[] = [
       const nova = (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0];
       const novi = (await db.select().from(assistantProfiles).where(eq(assistantProfiles.userId, user.userId)).limit(1))[0];
       const streak = await streakDays(user.userId);
-      await bumpAchievement(user.userId, "streak_days", streak);
+      try {
+        await bumpAchievement(user.userId, "streak_days", streak);
+      } catch (error) {
+        console.error("[dashboard] achievement update skipped", error);
+      }
 
       const now = new Date();
       const liveActivities = await db
@@ -274,7 +419,7 @@ export const routes: RouteDef[] = [
       const anns = await db
         .select()
         .from(announcements)
-        .where(and(lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`))
+        .where(and(eq(announcements.status, "published"), eq(announcements.showHome, true), lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`))
         .orderBy(desc(announcements.pinned), asc(announcements.sortOrder), desc(announcements.startsAt))
         .limit(8);
 
@@ -308,6 +453,7 @@ export const routes: RouteDef[] = [
         weakest,
         recentGrades,
         upcomingExams: upcomingExams.map((e) => ({ ...e, daysLeft: daysBetween(today, e.examDate) })),
+        countdowns,
         dueWrong: dueWrong?.count ?? 0,
         wordsDue: wordsDue?.count ?? 0,
         nova: nova?.balance ?? 0,
@@ -320,6 +466,10 @@ export const routes: RouteDef[] = [
         isPro: user.isPro,
         aiEnabled: aiConfigured(),
       };
+      } catch (error) {
+        console.error("[dashboard] read failed; returning safe shell", error);
+        return { today: todayStr(), greeting: `嗨，${user.displayName}！`, minutes: 0, focusMinutes: 0, goal: 45, streak: 0, tasks: [], plan: { totalMinutes: 0, rationale: "資料暫時載入中，稍後可重新整理。", blocks: [] }, stats: [], weakest: null, recentGrades: [], upcomingExams: [], countdowns: [], dueWrong: 0, wordsDue: 0, nova: 0, novi: null, activities: [], announcements: [], marquee: [], openWeek: null, unread: 0, isPro: user.isPro, aiEnabled: aiConfigured(), degraded: true };
+      }
     },
   }),
 
@@ -332,7 +482,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const records = await db.select().from(gradeRecords).where(eq(gradeRecords.userId, user.userId)).orderBy(desc(gradeRecords.examDate));
       const goals = await db.select().from(grades).where(eq(grades.userId, user.userId));
-      return { records, goals, stats: await subjectStats(user.userId) };
+      return { records, goals, stats: await subjectStats(user.userId), gradeInputWindow: await getGradeInputWindow(), examDateInputWindow: await getExamDateInputWindow() };
     },
   }),
 
@@ -342,6 +492,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      await assertGradeInputOpen();
       const body = await ctx.json(
         z.object({
           subject: z.string().min(1).max(20),
@@ -488,6 +639,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      await assertExamDateInputOpen();
       const body = await ctx.json(
         z.object({
           name: z.string().min(1).max(60),
@@ -576,31 +728,97 @@ export const routes: RouteDef[] = [
   /* -------------------------------------------------------- focus */
   route({
     method: "POST",
-    path: "/focus/complete",
+    path: "/focus/start",
+    auth: "user",
+    rate: { limit: 10, windowSec: 3600, key: "focus-start" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ minutes: z.number().int().min(1).max(300) }));
+      const now = new Date();
+      const rows = await db.transaction(async (tx) => {
+        await tx.update(focusSessions).set({ status: "cancelled", completedAt: now }).where(and(eq(focusSessions.userId, user.userId), inArray(focusSessions.status, ["running", "paused"])));
+        return tx.insert(focusSessions).values({ userId: user.userId, minutes: 0, plannedMinutes: body.minutes, elapsedSeconds: 0, status: "running", startedAt: now, rewardGranted: false, studyRecorded: false, completedAt: null }).returning();
+      });
+      return { session: rows[0] };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/pause",
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(
-        z.object({
-          minutes: z.number().int().min(1).max(300),
-          subject: z.string().min(1).max(20),
-          reflection: z.string().max(500).optional(),
-          roomId: z.string().uuid().nullable().optional(),
-        }),
-      );
-      const rows = await db
-        .insert(focusSessions)
-        .values({ userId: user.userId, minutes: body.minutes, subject: body.subject, reflection: body.reflection ?? "", roomId: body.roomId ?? null })
-        .returning();
-      const { streak } = await recordStudy({ userId: user.userId, kind: "focus", subject: body.subject, minutes: body.minutes, detail: { sessionId: rows[0].id } });
-      const reward = await grantLearningReward({
-        userId: user.userId,
-        nova: Math.max(3, Math.round(body.minutes / 5)),
-        xp: Math.max(5, body.minutes * 2),
-        reason: `專注學習 ${body.minutes} 分鐘`,
-        idempotencyKey: `focus:${rows[0].id}`,
-      });
-      return { session: rows[0], reward, streak };
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid() }));
+      const session = (await db.select().from(focusSessions).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId), eq(focusSessions.status, "running"))).limit(1))[0];
+      if (!session) throw badRequest("找不到進行中的專注計時，請重新開始");
+      const now = new Date();
+      const elapsedSeconds = session.elapsedSeconds + Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
+      const rows = await db.update(focusSessions).set({ status: "paused", elapsedSeconds, pausedAt: now }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), eq(focusSessions.status, "running"))).returning();
+      if (!rows[0]) throw badRequest("專注計時狀態已變更，請重新整理");
+      return { session: rows[0] };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/resume",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid() }));
+      const now = new Date();
+      const rows = await db.update(focusSessions).set({ status: "running", startedAt: now, pausedAt: null }).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId), eq(focusSessions.status, "paused"))).returning();
+      if (!rows[0]) throw badRequest("找不到暫停中的專注計時，請重新開始");
+      return { session: rows[0] };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/cancel",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid() }));
+      const rows = await db.update(focusSessions).set({ status: "cancelled", completedAt: new Date() }).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId), inArray(focusSessions.status, ["running", "paused"]))).returning({ id: focusSessions.id });
+      return { cancelled: Boolean(rows[0]) };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/focus/complete",
+    auth: "user",
+    rate: { limit: 30, windowSec: 3600, key: "focus-complete" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ sessionId: z.string().uuid(), subject: z.string().min(1).max(20), reflection: z.string().max(500).optional() }));
+      let session = (await db.select().from(focusSessions).where(and(eq(focusSessions.id, body.sessionId), eq(focusSessions.userId, user.userId))).limit(1))[0];
+      if (!session || session.status === "cancelled") throw badRequest("專注計時不存在或已取消，請重新開始");
+      if (session.status !== "completed") {
+        const now = new Date();
+        const elapsed = session.elapsedSeconds + (session.status === "running" ? Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000)) : 0);
+        const billableSeconds = Math.min(elapsed, session.plannedMinutes * 60);
+        const minutes = Math.floor(billableSeconds / 60);
+        if (minutes < 1) throw badRequest("至少專注一分鐘後才能完成記錄");
+        const completed = await db.update(focusSessions).set({ minutes, subject: body.subject, reflection: body.reflection ?? "", elapsedSeconds: billableSeconds, status: "completed", completedAt: now, pausedAt: null }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), inArray(focusSessions.status, ["running", "paused"]))).returning();
+        if (!completed[0]) throw badRequest("專注計時狀態已變更，請重新整理");
+        session = completed[0];
+      }
+      let streak = 0;
+      if (!session.studyRecorded) {
+        const recorded = await recordStudy({ userId: user.userId, kind: "focus", subject: session.subject, minutes: session.minutes, detail: { sessionId: session.id } });
+        streak = recorded.streak;
+        await db.update(focusSessions).set({ studyRecorded: true }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), eq(focusSessions.studyRecorded, false)));
+      }
+      let reward = { nova: 0, xp: 0 };
+      if (!session.rewardGranted) {
+        reward = await grantLearningReward({ userId: user.userId, nova: Math.max(3, Math.round(session.minutes / 5)), xp: Math.max(5, session.minutes * 2), reason: `專注學習 ${session.minutes} 分鐘`, idempotencyKey: `focus:${session.id}` });
+        await db.update(focusSessions).set({ rewardGranted: true }).where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, user.userId), eq(focusSessions.rewardGranted, false)));
+      }
+      session = (await db.select().from(focusSessions).where(eq(focusSessions.id, session.id)).limit(1))[0] ?? session;
+      return { session, reward, streak };
     },
   }),
 
@@ -610,7 +828,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const rows = await db.select().from(focusSessions).where(eq(focusSessions.userId, user.userId)).orderBy(desc(focusSessions.completedAt)).limit(50);
+      const rows = await db.select().from(focusSessions).where(and(eq(focusSessions.userId, user.userId), eq(focusSessions.status, "completed"), sql`${focusSessions.completedAt} is not null`)).orderBy(desc(focusSessions.completedAt)).limit(50);
       return { sessions: rows };
     },
   }),
@@ -802,6 +1020,72 @@ export const routes: RouteDef[] = [
 
   route({
     method: "GET",
+    path: "/wrong-questions",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const subject = ctx.query.get("subject")?.trim();
+      const page = Math.max(1, Number(ctx.query.get("page") ?? 1) || 1);
+      const limit = Math.min(50, Math.max(1, Number(ctx.query.get("limit") ?? 20) || 20));
+      const filters = [eq(wrongQuestions.userId, user.userId), isNull(wrongQuestions.resolvedAt), ...(subject ? [eq(wrongQuestions.subject, subject)] : [])];
+      const rows = await db.select({ wrong: wrongQuestions, question: questions }).from(wrongQuestions).innerJoin(questions, eq(questions.id, wrongQuestions.questionId)).where(and(...filters)).orderBy(desc(wrongQuestions.lastWrongAt)).limit(limit).offset((page - 1) * limit);
+      const [{ count: total }] = await db.select({ count: sql<number>`count(*)::int` }).from(wrongQuestions).where(and(...filters));
+      return { items: rows.map((row) => ({ ...row.wrong, question: row.question })), page, limit, total, hasNext: page * limit < Number(total) };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/wrong-questions/:id/answer",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ response: z.array(z.string().max(500)).max(10), idempotencyKey: z.string().max(100).optional() }));
+      const row = (await db.select({ wrong: wrongQuestions, question: questions }).from(wrongQuestions).innerJoin(questions, eq(questions.id, wrongQuestions.questionId)).where(and(eq(wrongQuestions.id, ctx.params.id), eq(wrongQuestions.userId, user.userId))).limit(1))[0];
+      if (!row) throw notFound("找不到這題錯題");
+      const expected = row.question.answer.map((value) => String(value).trim().toLocaleLowerCase());
+      const actual = body.response.map((value) => value.trim().toLocaleLowerCase());
+      const correct = expected.length === actual.length && expected.every((value) => actual.includes(value));
+      const nextMastery = Math.min(100, Math.max(0, row.wrong.mastery + (correct ? 25 : -5)));
+      const updated = (await db.update(wrongQuestions).set({ mastery: nextMastery, reviewCount: sql`${wrongQuestions.reviewCount} + 1`, wrongCount: correct ? row.wrong.wrongCount : sql`${wrongQuestions.wrongCount} + 1`, resolvedAt: correct && nextMastery >= 80 ? new Date() : null, nextReviewAt: new Date(Date.now() + (correct ? 3 : 1) * 86_400_000) }).where(eq(wrongQuestions.id, row.wrong.id)).returning())[0];
+      return { correct, expected: row.question.answer, explanation: row.question.explanation, item: updated };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/adaptive/next",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      try {
+        const dueItems = await db.select().from(reviewItems).where(and(eq(reviewItems.userId, user.userId), lte(reviewItems.dueAt, new Date()), ne(reviewItems.state, "suspended"))).orderBy(asc(reviewItems.dueAt)).limit(20);
+      const weakConcepts = await db.select().from(knowledgeNodes).where(and(eq(knowledgeNodes.userId, user.userId), sql`${knowledgeNodes.mastery} < 70`)).orderBy(asc(knowledgeNodes.mastery), desc(knowledgeNodes.updatedAt)).limit(10);
+      const since = new Date(Date.now() - 30 * 86_400_000);
+      const [eventSummary] = await db.select({ total: count(), correct: sql<number>`coalesce(sum(case when ${learningEvents.correct} then 1 else 0 end),0)::int`, seconds: sql<number>`coalesce(sum(${learningEvents.durationSec}),0)::int`, activeDays: sql<number>`count(distinct date(${learningEvents.occurredAt}))::int` }).from(learningEvents).where(and(eq(learningEvents.userId, user.userId), gte(learningEvents.occurredAt, since)));
+      const weakSubjects = await db.select({ subject: wrongQuestions.subject, count: sql<number>`count(*)::int` }).from(wrongQuestions).where(and(eq(wrongQuestions.userId, user.userId), isNull(wrongQuestions.resolvedAt))).groupBy(wrongQuestions.subject).orderBy(desc(sql`count(*)`)).limit(5);
+      const recommendations = [
+        ...(dueItems.length ? [{ kind: "review", priority: 1, title: `先複習 ${dueItems.length} 個到期項目`, reason: "依 FSRS 排程，現在是較有效率的回憶時機。", count: dueItems.length }] : []),
+        ...weakConcepts.slice(0, 3).map((node, index) => ({ kind: "concept", priority: 2 + index, title: `補強「${node.title}」`, reason: `目前熟練度約 ${node.mastery}%，建議先閱讀相關教材，再做一次主動回憶。`, nodeId: node.id, mastery: node.mastery })),
+        ...(weakSubjects[0] ? [{ kind: "wrong", priority: 6, title: `處理 ${weakSubjects[0].subject} 錯題`, reason: `目前有 ${weakSubjects[0].count} 題未解決錯題，適合安排短時段集中修正。`, subject: weakSubjects[0].subject, count: weakSubjects[0].count }] : []),
+      ].slice(0, 6);
+      return {
+        generatedAt: new Date().toISOString(),
+        metrics: { reviewsDue: dueItems.length, events30d: Number(eventSummary?.total ?? 0), correctEvents30d: Number(eventSummary?.correct ?? 0), studySeconds30d: Number(eventSummary?.seconds ?? 0), activeDays30d: Number(eventSummary?.activeDays ?? 0) },
+        dueItems,
+        weakConcepts,
+        weakSubjects,
+        recommendations,
+        };
+      } catch (error) {
+        console.error("[adaptive] read failed; returning empty plan", error);
+        return { generatedAt: new Date().toISOString(), metrics: { reviewsDue: 0, events30d: 0, correctEvents30d: 0, studySeconds30d: 0, activeDays30d: 0 }, dueItems: [], weakConcepts: [], weakSubjects: [], recommendations: [], degraded: true };
+      }
+    },
+  }),
+
+  route({
+    method: "GET",
     path: "/achievements",
     auth: "user",
     handler: async (ctx) => {
@@ -826,28 +1110,76 @@ export const routes: RouteDef[] = [
       const q = (ctx.query.get("q") ?? "").trim();
       if (q.length < 1) return { results: [] };
       const like = `%${q}%`;
-      const mats = await db.execute(sql`
-        select 'material' as kind, id::text, title, subject, created_at from study_materials
-        where user_id = ${user.userId} and (title ilike ${like} or content ilike ${like}) limit 10`);
-      const nts = await db.execute(sql`
-        select 'note' as kind, id::text, title, subject, created_at from notes
-        where user_id = ${user.userId} and (title ilike ${like} or body ilike ${like}) limit 10`);
-      const qzs = await db.execute(sql`
-        select 'quiz' as kind, id::text, title, subject, created_at from quizzes
-        where user_id = ${user.userId} and title ilike ${like} limit 10`);
-      const qs = await db
-        .select({ id: questions.id, stem: questions.stem, subject: questions.subject, difficulty: questions.difficulty })
-        .from(questions)
-        .where(and(sql`${questions.stem} ilike ${like}`, sql`(${questions.ownerId} = ${user.userId} or ${questions.origin} = 'bank')`))
-        .limit(10);
-      const acts = await db.select().from(activities).where(and(eq(activities.published, true), sql`${activities.title} ilike ${like}`)).limit(5);
+      const tsQuery = q.replace(/[!&|():*<>]/g, " ").trim() || q;
+      const [mats, nts, qzs, words, wrongs, ai, acts] = await Promise.all([
+        db.execute(sql`
+          select 'material' as kind, id::text, title, subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(content,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from study_materials
+          where user_id = ${user.userId} and (title ilike ${like} or content ilike ${like} or to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(content,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, created_at desc limit 12`),
+        db.execute(sql`
+          select 'note' as kind, id::text, title, subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(body,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from notes
+          where user_id = ${user.userId} and (title ilike ${like} or body ilike ${like} or to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(body,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, created_at desc limit 12`),
+        db.execute(sql`
+          select 'quiz' as kind, id::text, title, subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(title,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from quizzes
+          where user_id = ${user.userId} and (title ilike ${like} or to_tsvector('simple', coalesce(title,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, created_at desc limit 8`),
+        db.execute(sql`
+          select 'vocabulary' as kind, id::text, word as title, '單字' as subject, created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(word,'') || ' ' || coalesce(meaning,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from daily_words
+          where word ilike ${like} or meaning ilike ${like} or to_tsvector('simple', coalesce(word,'') || ' ' || coalesce(meaning,'')) @@ websearch_to_tsquery('simple', ${tsQuery})
+          order by rank desc, word asc limit 12`),
+        db.execute(sql`
+          select 'wrong' as kind, w.id::text, left(q.stem, 100) as title, w.subject, w.last_wrong_at as created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(q.stem,'') || ' ' || coalesce(w.reason,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from wrong_questions w join questions q on q.id = w.question_id
+          where w.user_id = ${user.userId} and (q.stem ilike ${like} or w.reason ilike ${like} or to_tsvector('simple', coalesce(q.stem,'') || ' ' || coalesce(w.reason,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, w.last_wrong_at desc limit 10`),
+        db.execute(sql`
+          select 'ai_conversation' as kind, c.id::text, c.title, 'Novi' as subject, c.updated_at as created_at,
+            ts_rank_cd(to_tsvector('simple', coalesce(c.title,'') || ' ' || coalesce(m.content,'')), websearch_to_tsquery('simple', ${tsQuery})) as rank
+          from ai_conversations c join ai_messages m on m.conversation_id = c.id
+          where c.user_id = ${user.userId} and (c.title ilike ${like} or m.content ilike ${like} or to_tsvector('simple', coalesce(c.title,'') || ' ' || coalesce(m.content,'')) @@ websearch_to_tsquery('simple', ${tsQuery}))
+          order by rank desc, c.updated_at desc limit 10`),
+        db.select({ id: activities.id, title: activities.title, startsAt: activities.startsAt }).from(activities).where(and(eq(activities.published, true), sql`${activities.title} ilike ${like}`)).limit(5),
+      ]);
+      const resultRows = [
+        ...(mats.rows as Array<Record<string, unknown>>),
+        ...(nts.rows as Array<Record<string, unknown>>),
+        ...(qzs.rows as Array<Record<string, unknown>>),
+        ...(words.rows as Array<Record<string, unknown>>),
+        ...(wrongs.rows as Array<Record<string, unknown>>),
+        ...(ai.rows as Array<Record<string, unknown>>),
+        ...acts.map((a) => ({ kind: "activity", id: a.id, title: a.title, subject: "活動", created_at: a.startsAt })),
+      ];
+      return { query: q, mode: "postgres-hybrid", results: resultRows.slice(0, 60) };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/words/catalog",
+    auth: "user",
+    handler: async () => {
+      await ensureSeeded();
+      const rows = await db.execute(sql`select level, count(*)::int as count from daily_words where level in ('junior', 'senior') group by level`);
+      const counts = new Map(rows.rows.map((row) => [String(row.level), Number(row.count)]));
+      const settingRow = (await db.select().from(platformSettings).where(eq(platformSettings.key, "challenge_vocabulary_source")).limit(1))[0];
+      const setting = (settingRow?.value ?? {}) as { manualOpen?: boolean; minimumWords?: number };
+      const totalWords = [...counts.values()].reduce((sum, value) => sum + value, 0);
+      const minimumWords = Math.max(100, Number(setting.minimumWords ?? 100));
       return {
-        results: [
-          ...(mats.rows as Array<Record<string, unknown>>),
-          ...(nts.rows as Array<Record<string, unknown>>),
-          ...(qzs.rows as Array<Record<string, unknown>>),
-          ...qs.map((x) => ({ kind: "question", id: x.id, title: x.stem.slice(0, 80), subject: x.subject, created_at: null })),
-          ...acts.map((a) => ({ kind: "activity", id: a.id, title: a.title, subject: "活動", created_at: a.startsAt })),
+        sourceAvailability: { unlocked: setting.manualOpen === true || totalWords >= minimumWords, totalWords, minimumWords, manualOpen: setting.manualOpen === true },
+        tracks: [
+          { id: "senior", label: "高中 7000 單挑戰", description: "依高中英文參考詞彙表，適合高中學習與大考準備", count: counts.get("senior") ?? 0 },
+          { id: "junior", label: "國中 2000 單挑戰", description: "依國中英文 2000 字，打好基礎字彙力", count: counts.get("junior") ?? 0 },
         ],
       };
     },
@@ -860,18 +1192,75 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
-      const count = settings?.dailyWordCount ?? 10;
-      const level = settings?.englishLevel ?? "A2";
-      const rows = await db.execute(sql`
-        select w.id, w.word, w.meaning, w.part_of_speech, w.example, w.example_zh, w.level,
-               coalesce(p.familiarity, 0) as familiarity, coalesce(p.correct_count,0) as correct_count,
-               coalesce(p.wrong_count,0) as wrong_count, p.memory_tip
-        from daily_words w
-        left join word_progress p on p.word_id = w.id and p.user_id = ${user.userId}
-        where w.level = ${level} or w.level = 'ALL'
-        order by coalesce(p.familiarity, -1) asc, coalesce(p.wrong_count,0) desc, random()
-        limit ${count}`);
-      return { words: rows.rows, level, count };
+      // 同一學制的所有使用者每天看到同一批單字；個人設定只影響學習提醒，不改變共同題目。
+      const dailyTarget = 10;
+      const requestedTrack = ctx.query.get("track");
+      const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : settings?.schoolLevel === "senior" ? "senior" : "junior";
+      const dateKey = taipeiDateKey();
+      const [{ total }] = await db.select({ total: count() }).from(dailyWords).where(eq(dailyWords.level, track));
+      const totalWords = Number(total ?? 0);
+      const resetAt = "每天 00:00（台灣時間）";
+      if (!totalWords) return { words: [], level: track, track, count: 0, dailyTarget, appearedCount: 0, totalWords: 0, resetAt, appearanceDate: dateKey };
+      const previousAppearances = await db.select({ wordId: dailyWordAppearances.wordId, appearanceDate: dailyWordAppearances.appearanceDate }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWords.level, track)));
+      const previousWordIds = new Set(previousAppearances.map((row) => row.wordId));
+      const todayWordIds = new Set(previousAppearances.filter((row) => row.appearanceDate === dateKey).map((row) => row.wordId));
+      const priorUniqueCount = previousWordIds.size - todayWordIds.size;
+      const offset = (priorUniqueCount % totalWords);
+      const fetchWords = (limit: number, skip: number) => db
+        .select({
+          id: dailyWords.id,
+          word: dailyWords.word,
+          meaning: dailyWords.meaning,
+          meanings: dailyWords.meanings,
+          phrases: dailyWords.phrases,
+          part_of_speech: dailyWords.partOfSpeech,
+          phonetic: dailyWords.usPhonetic,
+          example: dailyWords.example,
+          example_zh: dailyWords.exampleZh,
+          level: dailyWords.level,
+          familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
+          correct_count: sql<number>`coalesce(${wordProgress.correctCount}, 0)`,
+          wrong_count: sql<number>`coalesce(${wordProgress.wrongCount}, 0)`,
+          memory_tip: wordProgress.memoryTip,
+        })
+        .from(dailyWords)
+        .leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId)))
+        .where(eq(dailyWords.level, track))
+        .orderBy(asc(dailyWords.word))
+        .limit(limit)
+        .offset(skip);
+      const first = await fetchWords(dailyTarget, offset);
+      const remaining = dailyTarget - first.length;
+      const rows = remaining > 0 ? [...first, ...(await fetchWords(remaining, 0))] : first;
+      if (rows.length) {
+        await db.insert(dailyWordAppearances).values(rows.map((row) => ({ userId: user.userId, wordId: row.id, appearanceDate: dateKey }))).onConflictDoNothing();
+      }
+      const exampleRows = await db
+        .select({ wordId: wordExamples.wordId, english: wordExamples.english, chinese: wordExamples.chinese, level: wordExamples.level, sourceKind: wordExamples.sourceKind, createdAt: wordExamples.createdAt })
+        .from(wordExamples)
+        .where(inArray(wordExamples.wordId, rows.map((row) => row.id)))
+        .orderBy(asc(wordExamples.createdAt));
+      const examplesByWord = new Map<string, Array<{ english: string; chinese: string; level: string; sourceKind: string }>>();
+      for (const example of exampleRows) {
+        const list = examplesByWord.get(example.wordId) ?? [];
+        const normalized = example.english.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        if (normalized && !list.some((item) => item.english.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === normalized)) {
+          list.push({ english: example.english, chinese: example.chinese, level: example.level, sourceKind: example.sourceKind });
+        }
+        examplesByWord.set(example.wordId, list);
+      }
+      const enrichedRows = rows.map((row) => {
+        const relatedExamples = examplesByWord.get(row.id) ?? [];
+        const examples = relatedExamples.length
+          ? relatedExamples
+          : row.example.trim()
+            ? [{ english: row.example, chinese: row.example_zh, level: "一般", sourceKind: "source" }]
+            : [];
+        return { ...row, examples, exampleSentences: examples };
+      });
+      const appearanceRows = await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWords.level, track)));
+      const appearedCount = new Set(appearanceRows.map((row) => row.wordId)).size;
+      return { words: enrichedRows, level: track, track, count: enrichedRows.length, dailyTarget, appearedCount, totalWords, resetAt, appearanceDate: dateKey };
     },
   }),
 
@@ -879,12 +1268,111 @@ export const routes: RouteDef[] = [
     method: "GET",
     path: "/words/all",
     auth: "user",
-    handler: async () => {
-      const rows = await db.select().from(dailyWords).orderBy(asc(dailyWords.word)).limit(500);
-      return { words: rows };
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const requestedTrack = ctx.query.get("track");
+      const source = ctx.query.get("source");
+      if (source === "vocabulary") {
+        const settingRow = (await db.select().from(platformSettings).where(eq(platformSettings.key, "challenge_vocabulary_source")).limit(1))[0];
+        const setting = (settingRow?.value ?? {}) as { manualOpen?: boolean; minimumWords?: number };
+        const [{ total: vocabularyTotal }] = await db.select({ total: count() }).from(dailyWords);
+        const minimumWords = Math.max(100, Number(setting.minimumWords ?? 100));
+        if (setting.manualOpen !== true && Number(vocabularyTotal ?? 0) < minimumWords) throw badRequest(`字詞百科題庫尚未開放，目前 ${Number(vocabularyTotal ?? 0)}/${minimumWords} 個單字`);
+      }
+      const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : null;
+      const requestedLimit = Number(ctx.query.get("limit") ?? 500);
+      // 只有明確開放且透過 source=vocabulary 的百科挑戰可讀取全庫；一般查詢不可用 query 參數繞過解鎖。
+      const unlockedOnly = source !== "vocabulary";
+      const baseLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
+      const [{ total: totalRow }] = await db.select({ total: count() }).from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined);
+      const totalWords = Number(totalRow ?? 0);
+      const appearanceRows = unlockedOnly ? await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), track ? eq(dailyWords.level, track) : undefined)) : [];
+      const unlockedIds = [...new Set(appearanceRows.map((row) => row.wordId))];
+      const unlockedCount = unlockedIds.length;
+      const limit = baseLimit;
+      const rows = await db.select({
+        id: dailyWords.id,
+        word: dailyWords.word,
+        meaning: dailyWords.meaning,
+        meanings: dailyWords.meanings,
+        phrases: dailyWords.phrases,
+        partOfSpeech: dailyWords.partOfSpeech,
+        example: dailyWords.example,
+        exampleZh: dailyWords.exampleZh,
+        level: dailyWords.level,
+        familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
+      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(and(track ? eq(dailyWords.level, track) : undefined, unlockedOnly ? (unlockedIds.length ? inArray(dailyWords.id, unlockedIds) : sql`false`) : undefined)).orderBy(asc(dailyWords.word)).limit(limit);
+      return { words: rows, unlockedCount, totalWords, unlockedOnly };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/exports/my-learning/estimate",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const settings = await exportSettings();
+      const kind = ctx.query.get("kind") === "wrong" ? "wrong" : "vocabulary";
+      if (!settings.enabled || !settings.allowedKinds.includes(kind)) throw fail("QUOTA_FEATURE_DISABLED", { message: "此匯出項目目前未開放" });
+      if (settings.proOnly && !(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "學習紀錄匯出功能僅限 PRO 會員" });
+      const file = await buildLearningExport(user.userId, kind);
+      const novaCost = Math.max(settings.minimumNova, Math.ceil(file.bytes / 1024) * settings.novaPerKb);
+      return { kind, bytes: file.bytes, rows: file.csv.split("\n").length - 1, novaCost, currency: "Nova", warning: `下載前會消耗 ${novaCost} Nova，檔案大小約 ${(file.bytes / 1024).toFixed(1)} KB。` };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/exports/my-learning",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const settings = await exportSettings();
+      const kind = ctx.query.get("kind") === "wrong" ? "wrong" : "vocabulary";
+      if (!settings.enabled || !settings.allowedKinds.includes(kind)) throw fail("QUOTA_FEATURE_DISABLED", { message: "此匯出項目目前未開放" });
+      if (settings.proOnly && !(await isProUser(user.userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "學習紀錄匯出功能僅限 PRO 會員" });
+      const file = await buildLearningExport(user.userId, kind);
+      const novaCost = Math.max(settings.minimumNova, Math.ceil(file.bytes / 1024) * settings.novaPerKb);
+      const charge = await grantNova({ userId: user.userId, amount: -novaCost, reason: `匯出學習紀錄：${kind}`, source: "learning_export", idempotencyKey: `export:${user.userId}:${kind}:${randomToken(12)}` });
+      return new Response(file.csv, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="studynova-${kind}.csv"`, "x-nova-charged": String(novaCost), "x-nova-balance": String(charge.balance) } });
     },
   }),
 ];
+
+type GradeInputWindow = { enabled: boolean; startsAt: string | null; endsAt: string | null; open: boolean };
+
+async function getGradeInputWindow(): Promise<GradeInputWindow> {
+  const setting = (await db.select().from(platformSettings).where(eq(platformSettings.key, "grade_input_window")).limit(1))[0];
+  const value = (setting?.value ?? {}) as { enabled?: boolean; startsAt?: string | null; endsAt?: string | null };
+  const startsAt = value.startsAt || null;
+  const endsAt = value.endsAt || null;
+  const now = Date.now();
+  const open = value.enabled !== false && (!startsAt || Number.isNaN(new Date(startsAt).getTime()) || new Date(startsAt).getTime() <= now) && (!endsAt || Number.isNaN(new Date(endsAt).getTime()) || new Date(endsAt).getTime() >= now);
+  return { enabled: value.enabled !== false, startsAt, endsAt, open };
+}
+
+async function assertGradeInputOpen() {
+  const window = await getGradeInputWindow();
+  if (!window.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: "目前未開放成績輸入，請等待管理員開放。" });
+  if (window.startsAt && new Date(window.startsAt).getTime() > Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: `成績輸入將於 ${new Date(window.startsAt).toLocaleString("zh-TW")} 開放。` });
+  if (window.endsAt && new Date(window.endsAt).getTime() < Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: "本次成績輸入時段已結束，請等待管理員重新開放。" });
+}
+
+async function getExamDateInputWindow(): Promise<GradeInputWindow> {
+  const setting = (await db.select().from(platformSettings).where(eq(platformSettings.key, "exam_date_input_window")).limit(1))[0];
+  const value = (setting?.value ?? {}) as { enabled?: boolean; startsAt?: string | null; endsAt?: string | null };
+  const startsAt = value.startsAt || null;
+  const endsAt = value.endsAt || null;
+  const now = Date.now();
+  const open = value.enabled !== false && (!startsAt || Number.isNaN(new Date(startsAt).getTime()) || new Date(startsAt).getTime() <= now) && (!endsAt || Number.isNaN(new Date(endsAt).getTime()) || new Date(endsAt).getTime() >= now);
+  return { enabled: value.enabled !== false, startsAt, endsAt, open };
+}
+
+async function assertExamDateInputOpen() {
+  const window = await getExamDateInputWindow();
+  if (!window.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: "目前未開放段考日期輸入，請等待管理員開放。" });
+  if (window.startsAt && new Date(window.startsAt).getTime() > Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: `段考日期輸入將於 ${new Date(window.startsAt).toLocaleString("zh-TW")} 開放。` });
+  if (window.endsAt && new Date(window.endsAt).getTime() < Date.now()) throw fail("QUOTA_FEATURE_DISABLED", { message: "本次段考日期輸入時段已結束，請等待管理員重新開放。" });
+}
 
 function buildNoviAdvice(input: {
   displayName: string;
@@ -897,13 +1385,13 @@ function buildNoviAdvice(input: {
   stats: SubjectStat[];
 }) {
   const parts: string[] = [];
-  parts.push(`${input.displayName}，今天累積 ${input.minutes} / ${input.goal} 分鐘`);
-  if (input.streak > 1) parts.push(`已連續學習 ${input.streak} 天，保持節奏！`);
+  parts.push(`今天累積學習 ${input.minutes} / ${input.goal} 分鐘`);
+  if (input.streak > 1) parts.push(`連續學習紀錄：${input.streak} 天`);
   const rising = input.stats.find((s) => s.trend === "up");
-  if (rising) parts.push(`${rising.subject}從 ${Math.round(rising.first)} 進步到 ${Math.round(rising.latest)}，做得很好。`);
+  if (rising) parts.push(`${rising.subject}近期平均：${Math.round(rising.first)} → ${Math.round(rising.latest)} 分`);
   if (input.weakest && input.stats.length) parts.push(`${input.weakest.subject}平均 ${input.weakest.average} 分，是目前最需要補強的科目。`);
-  if (input.dueWrong > 0) parts.push(`有 ${input.dueWrong} 題錯題到了複習時間，建議先花 15 分鐘處理。`);
+  if (input.dueWrong > 0) parts.push(`待複習錯題：${input.dueWrong} 題`);
   if (input.upcoming) parts.push(`距離「${input.upcoming.name}」還有 ${input.upcoming.days} 天。`);
-  if (parts.length === 1) parts.push("先從今日任務開始，完成第一項就能拿到 Nova！");
+  if (parts.length === 1) parts.push("目前沒有其他待處理項目。");
   return parts.join("　");
 }

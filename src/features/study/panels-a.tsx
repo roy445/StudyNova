@@ -199,7 +199,7 @@ export function MaterialsPanel() {
   return (
     <Card
       title="📚 我的教材"
-      subtitle="線上教材專區：支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理重點、單字與題目"
+      subtitle="英文教材專區：支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理英文重點、單字與題目"
       action={<Button size="sm" onClick={() => setOpen(true)}>＋ 新增教材</Button>}
     >
       <NovaCostNotice cost={materialCost} action="AI 整理教材" className="mb-3" />
@@ -219,19 +219,10 @@ export function MaterialsPanel() {
             </div>
             <p className="mt-2 text-xs leading-relaxed text-muted">{material.description}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <a
-                href={material.href}
-                target="_blank"
-                rel="noreferrer"
-                className="focus-ring inline-flex min-h-[34px] items-center justify-center rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-3 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110 active:scale-[0.98]"
-              >
+              <a href={material.href} target="_blank" rel="noreferrer" className="focus-ring inline-flex min-h-[34px] items-center justify-center rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-3 py-1.5 text-xs font-medium text-white transition-all hover:brightness-110 active:scale-[0.98]">
                 開啟教材
               </a>
-              <a
-                href={material.href}
-                download
-                className="focus-ring inline-flex min-h-[34px] items-center justify-center rounded-xl border border-[var(--line)] bg-transparent px-3 py-1.5 text-xs font-medium text-[var(--text)] transition-all hover:bg-white/5 active:scale-[0.98]"
-              >
+              <a href={material.href} download className="focus-ring inline-flex min-h-[34px] items-center justify-center rounded-xl border border-[var(--line)] bg-transparent px-3 py-1.5 text-xs font-medium text-[var(--text)] transition-all hover:bg-white/5 active:scale-[0.98]">
                 下載 PDF
               </a>
             </div>
