@@ -449,21 +449,31 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ mode: matchMode, gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), teamMode: teamMode.default("solo") }));
       if (!config.allowedModes.includes(body.mode)) throw badRequest("這個 PK 模式目前未開放");
       const now = new Date();
-      await db.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), sql`${pkMatchmakingQueue.expiresAt} < ${now}`));
-      const existing = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), gte(pkMatchmakingQueue.expiresAt, now))).limit(1))[0];
-      if (existing) return { queue: existing, matched: false, message: "正在尋找對手……" };
-      const rows = await db.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
-      const candidate = (await db.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), sql`${pkMatchmakingQueue.userId} <> ${user.userId}`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
-      if (!candidate) {
-        return { queue: rows[0], matched: false, message: "目前沒有足夠真人；一般快速配對不會自動加入 Bot，請改用『Bot 練習場』。" };
+      const pair = await db.transaction(async (tx) => {
+        await tx.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), sql`${pkMatchmakingQueue.expiresAt} < ${now}`));
+        const existing = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), gte(pkMatchmakingQueue.expiresAt, now))).limit(1))[0];
+        if (existing) return { own: existing, candidate: null };
+        const rows = await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning();
+        const own = rows[0] ?? (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"))).limit(1))[0];
+        if (!own) throw conflict("你的真人配對狀態無法建立，請重新操作。");
+        const candidate = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), ne(pkMatchmakingQueue.userId, user.userId), gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1).for("update", { skipLocked: true }))[0];
+        if (!candidate) return { own, candidate: null };
+        const claimed = await tx.update(pkMatchmakingQueue).set({ status: "matched", lastHeartbeatAt: now }).where(and(eq(pkMatchmakingQueue.id, candidate.id), eq(pkMatchmakingQueue.status, "waiting"))).returning();
+        if (!claimed[0]) return { own, candidate: null };
+        const ownClaimed = (await tx.update(pkMatchmakingQueue).set({ status: "matched", lastHeartbeatAt: now }).where(and(eq(pkMatchmakingQueue.id, own.id), eq(pkMatchmakingQueue.status, "waiting"))).returning())[0];
+        if (!ownClaimed) throw conflict("配對狀態已變更，請重新搜尋。");
+        return { own: ownClaimed, candidate: claimed[0] };
+      });
+      if (!pair.candidate) return { queue: pair.own, matched: false, message: pair.own.status === "waiting" ? "目前沒有足夠真人；一般快速配對不會自動加入 Bot，請改用『Bot 練習場』。" : "正在尋找對手……" };
+      try {
+        const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
+        await db.insert(pkMatchPlayers).values({ matchId: match.match.id, userId: pair.candidate.userId, optionOrders: await questionOrders(db, match.match.id, pair.candidate.userId) }).onConflictDoNothing();
+        await emitMatchEvent(match.match.id, "match_found", null, { matchId: match.match.id, playerCount: 2 });
+        return { queue: pair.own, matched: true, matchId: match.match.id, message: "已找到對手！" };
+      } catch (error) {
+        await db.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(inArray(pkMatchmakingQueue.id, [pair.own.id, pair.candidate.id]), eq(pkMatchmakingQueue.status, "matched")));
+        throw error;
       }
-      const updated = await db.update(pkMatchmakingQueue).set({ status: "matched" }).where(and(eq(pkMatchmakingQueue.id, candidate.id), eq(pkMatchmakingQueue.status, "waiting"))).returning();
-      if (!updated[0]) return { queue: rows[0], matched: false, message: "正在尋找對手……" };
-      await db.update(pkMatchmakingQueue).set({ status: "matched" }).where(and(eq(pkMatchmakingQueue.id, rows[0].id), eq(pkMatchmakingQueue.status, "waiting")));
-      const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
-      await db.insert(pkMatchPlayers).values({ matchId: match.match.id, userId: candidate.userId, optionOrders: await questionOrders(db, match.match.id, candidate.userId) }).onConflictDoNothing();
-      await emitMatchEvent(match.match.id, "match_found", null, { matchId: match.match.id, playerCount: 2 });
-      return { queue: updated[0], matched: true, matchId: match.match.id, message: "已找到對手！" };
     },
   }),
   route({
