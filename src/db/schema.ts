@@ -3102,6 +3102,7 @@ export const pkMatchmakingQueue = pgTable(
     grade: text("grade").notNull().default(""),
     unit: text("unit").notNull().default(""),
     difficulty: text("difficulty").notNull().default("normal"),
+    rating: integer("rating").notNull().default(1000),
     questionCount: integer("question_count").notNull().default(10),
     questionTimeSec: integer("question_time_sec").notNull().default(30),
     questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "restrict" }),
@@ -3114,6 +3115,22 @@ export const pkMatchmakingQueue = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (t) => [uniqueIndex("pk_matchmaking_user_active_uq").on(t.userId).where(sql`${t.status} IN ('waiting', 'matching')`), uniqueIndex("pk_matchmaking_idempotency_uq").on(t.userId, t.idempotencyKey), index("pk_matchmaking_waiting_idx").on(t.status, t.matchType, t.subject, t.difficulty, t.joinedAt), index("pk_matchmaking_match_idx").on(t.matchId)],
+);
+
+export const pkPlayerRatings = pgTable(
+  "pk_player_ratings",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    rating: integer("rating").notNull().default(1000),
+    realMatches: integer("real_matches").notNull().default(0),
+    realWins: integer("real_wins").notNull().default(0),
+    realDraws: integer("real_draws").notNull().default(0),
+    realLosses: integer("real_losses").notNull().default(0),
+    updatedAt: updated(),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("pk_player_ratings_user_uq").on(t.userId), index("pk_player_ratings_rank_idx").on(t.rating, t.updatedAt)],
 );
 
 export const pkPresence = pgTable(

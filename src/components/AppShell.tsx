@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
-  { href: "/online-pk", label: "線上 PK", icon: "duel", special: true },
+  { href: "/pk", label: "線上 PK", icon: "duel", special: true },
   { href: "/weekly", label: "小考", icon: "weekly" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
@@ -67,7 +67,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
-  { href: "/online-pk", label: "線上 PK", icon: "duel" },
+  { href: "/pk", label: "線上 PK", icon: "duel" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
@@ -297,7 +297,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     sessionStorage.setItem(storageKey, sessionKey);
     let timer: ReturnType<typeof setTimeout>;
     const heartbeat = () => {
-      void apiPost("/pk/presence/heartbeat", { sessionKey, state: pathname.startsWith("/online-pk") ? "online" : "recently_active", metadata: { route: pathname } }).catch(() => {});
+      void apiPost("/pk/presence/heartbeat", { sessionKey, state: pathname.startsWith("/pk") ? "online" : "recently_active", metadata: { route: pathname } }).catch(() => {});
       timer = setTimeout(heartbeat, 45_000);
     };
     const onVisibility = () => { if (document.visibilityState === "visible") heartbeat(); };
@@ -418,7 +418,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
           {(examHubs.data?.hubs.length ? [...SIDE_NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const isPk = item.href === "/online-pk";
+            const isPk = item.href === "/pk";
             return (
               <Link
                 key={item.href}
@@ -564,7 +564,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
           {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const isPk = item.href === "/online-pk";
+            const isPk = item.href === "/pk";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
             return (
               <li key={item.href} className="flex-1">

@@ -16,6 +16,7 @@ import {
   pkMatchPlayers,
   pkMatches,
   pkMatchmakingQueue,
+  pkPlayerRatings,
   pkPlayerAnswers,
   pkPresence,
   pkRewards,
@@ -190,6 +191,17 @@ async function activeFriends(userId: string, ids: string[]) {
   return rows.map((row) => row.friendId);
 }
 
+async function ensurePkRating(tx: any, userId: string) {
+  await tx.insert(pkPlayerRatings).values({ userId }).onConflictDoNothing({ target: pkPlayerRatings.userId });
+  return (await tx.select().from(pkPlayerRatings).where(eq(pkPlayerRatings.userId, userId)).limit(1))[0];
+}
+
+function ratingGapForWait(joinedAt: Date, now: Date) {
+  const waitedSeconds = Math.max(0, Math.floor((now.getTime() - joinedAt.getTime()) / 1000));
+  // Start strict, then widen every ten seconds so a quiet queue does not stall forever.
+  return Math.min(600, 100 + Math.floor(waitedSeconds / 10) * 100);
+}
+
 async function addBotOpponents(matchId: string, count: number) {
   const profiles = await db.select().from(pkBotProfiles).where(eq(pkBotProfiles.enabled, true)).orderBy(asc(pkBotProfiles.botLevel), asc(pkBotProfiles.createdAt)).limit(Math.max(0, count));
   for (const profile of profiles) {
@@ -238,7 +250,7 @@ async function createMatch(ownerId: string, input: MatchInput, roomInput?: { nam
   });
   publishPkEvent(result.match.id, { type: "match_created", payload: { matchId: result.match.id, status: result.match.status } });
   for (const userId of result.invited) {
-    await notify({ userId, kind: "pk_invite", title: `⚔️ ${result.room?.name ?? "線上 PK"} 邀請`, body: "好友邀請你加入線上 PK 等候室。", link: result.room ? `/online-pk?room=${result.room.shareToken}` : `/online-pk?match=${result.match.id}`, dedupeKey: `pk-invite:${result.match.id}:${userId}`, push: true });
+    await notify({ userId, kind: "pk_invite", title: `⚔️ ${result.room?.name ?? "線上 PK"} 邀請`, body: "好友邀請你加入線上 PK 等候室。", link: result.room ? `/pk?room=${result.room.shareToken}` : `/pk?match=${result.match.id}`, dedupeKey: `pk-invite:${result.match.id}:${userId}`, push: true });
   }
   return result;
 }
@@ -288,6 +300,28 @@ async function addWrongForAnswer(userId: string, question: PkQuestionRow) {
   return wrongRow ?? null;
 }
 
+async function updateRealRatings(ranked: Array<{ player: typeof pkMatchPlayers.$inferSelect; rank: number }>) {
+  const realPlayers = ranked.filter((row) => row.player.role === "player" && row.player.userId);
+  if (realPlayers.length < 2) return;
+  await db.transaction(async (tx) => {
+    const ratings = new Map<string, typeof pkPlayerRatings.$inferSelect>();
+    for (const row of realPlayers) {
+      const rating = await ensurePkRating(tx, row.player.userId!);
+      ratings.set(row.player.userId!, rating);
+    }
+    for (const row of realPlayers) {
+      const userId = row.player.userId!;
+      const current = ratings.get(userId)!;
+      const opponents = realPlayers.filter((item) => item.player.userId !== userId).map((item) => ratings.get(item.player.userId!)!.rating);
+      const opponentAverage = opponents.reduce((sum, value) => sum + value, 0) / opponents.length;
+      const expected = 1 / (1 + 10 ** ((opponentAverage - current.rating) / 400));
+      const actual = row.rank === 1 ? 1 : row.rank === realPlayers.length ? 0 : 0.5;
+      const delta = Math.max(-40, Math.min(40, Math.round(24 * (actual - expected))));
+      await tx.update(pkPlayerRatings).set({ rating: sql`greatest(100, ${pkPlayerRatings.rating} + ${delta})`, realMatches: sql`${pkPlayerRatings.realMatches} + 1`, realWins: sql`${pkPlayerRatings.realWins} + ${row.rank === 1 ? 1 : 0}`, realDraws: sql`${pkPlayerRatings.realDraws} + ${row.rank > 1 && row.rank < realPlayers.length ? 1 : 0}`, realLosses: sql`${pkPlayerRatings.realLosses} + ${row.rank === realPlayers.length ? 1 : 0}`, updatedAt: new Date() }).where(eq(pkPlayerRatings.userId, userId));
+    }
+  });
+}
+
 export async function finishPkMatch(matchId: string) {
   const completed = await db.update(pkMatches).set({ status: "completed", finishedAt: new Date(), updatedAt: new Date() }).where(and(eq(pkMatches.id, matchId), sql`${pkMatches.status} in ('in_progress', 'paused', 'countdown')`, isNull(pkMatches.finishedAt))).returning();
   const match = completed[0] ?? (await db.select().from(pkMatches).where(and(eq(pkMatches.id, matchId), eq(pkMatches.status, "completed"))).limit(1))[0];
@@ -295,6 +329,7 @@ export async function finishPkMatch(matchId: string) {
   const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, matchId));
   const ranked = calculateRanks(players.filter((row) => row.player.role !== "spectator").map((row) => row.player));
   const byPlayerId = new Map(ranked.map((row) => [row.player.id, row.rank]));
+  if (completed[0]) await updateRealRatings(ranked);
   for (const row of ranked) {
     await db.update(pkMatchPlayers).set({ rank: row.rank, connectionState: "finished", finishedAt: new Date() }).where(eq(pkMatchPlayers.id, row.player.id));
     if (row.player.role !== "player" || !row.player.userId) continue;
@@ -315,7 +350,7 @@ export async function finishPkMatch(matchId: string) {
       await progressActivities(row.player.userId, "quiz", 1);
       await recordStudy({ userId: row.player.userId, kind: "online_pk", subject: match.subject, minutes: Math.max(1, Math.round(((match.finishedAt?.getTime() ?? Date.now()) - (match.startsAt?.getTime() ?? Date.now())) / 60_000)), detail: { matchId, rank: byPlayerId.get(row.player.id) ?? null } });
       await bumpAchievement(row.player.userId, "pk_matches", 1);
-      await notify({ userId: row.player.userId, kind: "pk_result", title: "🏁 PK 結算完成", body: `你在 ${match.subject} PK 取得第 ${byPlayerId.get(row.player.id) ?? "—"} 名。`, link: `/online-pk?match=${matchId}`, dedupeKey: `pk-result:${matchId}:${row.player.userId}`, push: true });
+      await notify({ userId: row.player.userId, kind: "pk_result", title: "🏁 PK 結算完成", body: `你在 ${match.subject} PK 取得第 ${byPlayerId.get(row.player.id) ?? "—"} 名。`, link: `/pk?match=${matchId}`, dedupeKey: `pk-result:${matchId}:${row.player.userId}`, push: true });
     }
   }
   await db.update(pkPresence).set({ state: "recently_active", currentMatchId: null, currentRoomId: null, updatedAt: new Date() }).where(eq(pkPresence.currentMatchId, matchId));
@@ -477,16 +512,19 @@ export const routes: RouteDef[] = [
       const pair = await db.transaction(async (tx) => {
         await tx.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(eq(pkMatchmakingQueue.userId, user.userId), eq(pkMatchmakingQueue.status, "waiting"), sql`${pkMatchmakingQueue.expiresAt} < ${now}`));
         const existing = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), sql`${pkMatchmakingQueue.status} in ('waiting', 'matching', 'matched')`, gte(pkMatchmakingQueue.expiresAt, now))).orderBy(desc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
-        const rows = existing ? [] : await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).onConflictDoNothing().returning();
+        const ownRating = await ensurePkRating(tx, user.userId);
+        const rows = existing ? [] : await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, rating: ownRating.rating, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning();
         const own = existing ?? rows[0] ?? (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.userId, user.userId), sql`${pkMatchmakingQueue.status} in ('waiting', 'matching', 'matched')`)).orderBy(desc(pkMatchmakingQueue.joinedAt)).limit(1))[0];
         if (!own) {
           const retryKey = randomToken(16);
-          const retry = (await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey: retryKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning())[0];
+          const retry = (await tx.insert(pkMatchmakingQueue).values({ userId: user.userId, matchType: body.mode, questionBankId: null, subject: "全站題目", grade: body.gradeLevel, unit: "", difficulty: body.difficulty, rating: ownRating.rating, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, options: { teamMode: body.teamMode }, idempotencyKey: retryKey, expiresAt: new Date(now.getTime() + 5 * 60_000) }).returning())[0];
           if (!retry) throw conflict("你的真人配對狀態無法建立，請重新操作。");
           return { own: retry, candidate: null };
         }
         if (own.status !== "waiting") return { own, candidate: null };
-        const candidate = (await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), ne(pkMatchmakingQueue.userId, user.userId), gte(pkMatchmakingQueue.expiresAt, now))).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(1).for("update", { skipLocked: true }))[0];
+        const ownGap = ratingGapForWait(own.joinedAt, now);
+        const candidates = await tx.select().from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), eq(pkMatchmakingQueue.matchType, body.mode), eq(pkMatchmakingQueue.subject, own.subject), eq(pkMatchmakingQueue.grade, body.gradeLevel), eq(pkMatchmakingQueue.difficulty, body.difficulty), ne(pkMatchmakingQueue.userId, user.userId), gte(pkMatchmakingQueue.expiresAt, now), sql`COALESCE((${pkMatchmakingQueue.options}->>'teamMode'), 'solo') = ${body.teamMode}`, sql`abs(${pkMatchmakingQueue.rating} - ${ownRating.rating}) <= 600`)).orderBy(asc(pkMatchmakingQueue.joinedAt)).limit(30).for("update", { skipLocked: true });
+        const candidate = candidates.find((item: typeof pkMatchmakingQueue.$inferSelect) => Math.abs(item.rating - ownRating.rating) <= Math.max(ownGap, ratingGapForWait(item.joinedAt, now)));
         if (!candidate) return { own, candidate: null };
         const claimed = await tx.update(pkMatchmakingQueue).set({ status: "matched", lastHeartbeatAt: now }).where(and(eq(pkMatchmakingQueue.id, candidate.id), eq(pkMatchmakingQueue.status, "waiting"))).returning();
         if (!claimed[0]) return { own, candidate: null };
@@ -534,7 +572,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]), sourceType: z.enum(["bank", "vocabulary", "material"]).default("bank"), sourceId: z.string().uuid().nullable().optional(), questionBankId: z.string().uuid().nullable().optional() }));
       if (body.visibility === "private" && !body.password) throw badRequest("私人房間請設定房間密碼，或使用分享連結邀請");
       const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp, sourceType: body.sourceType, sourceId: body.sourceId ?? null, questionBankId: body.questionBankId ?? null }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
-      return { match: result.match, room: result.room, shareUrl: `/online-pk?room=${result.room?.shareToken ?? ""}` };
+      return { match: result.match, room: result.room, shareUrl: `/pk?room=${result.room?.shareToken ?? ""}` };
     },
   }),
   route({

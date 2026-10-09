@@ -21,7 +21,7 @@ describe("PK matchmaking production schema contract", () => {
   it("maps every ORM column to the deployed queue migration names", () => {
     const names = getTableConfig(pkMatchmakingQueue).columns.map((column) => column.name);
     expect(names).toEqual([
-      "id", "user_id", "match_type", "subject", "grade", "unit", "difficulty",
+      "id", "user_id", "match_type", "subject", "grade", "unit", "difficulty", "rating",
       "question_count", "question_time_sec", "question_bank_id", "match_id", "idempotency_key", "status", "options",
       "joined_at", "last_heartbeat_at", "expires_at",
     ]);
