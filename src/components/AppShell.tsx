@@ -240,7 +240,23 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
-    const send = (name: "FCP" | "LCP" | "CLS" | "TBT" | "TTI", value: number) => { void apiPost("/performance/vitals", { name, value, route: pathname, navigationType: performance.getEntriesByType("navigation")[0]?.entryType ?? "navigation" }).catch(() => {}); };
+    type VitalName = "FCP" | "LCP" | "CLS" | "TBT" | "TTI";
+    const latest = new Map<VitalName, number>();
+    const timers = new Map<VitalName, number>();
+    const send = (name: VitalName, value: number) => {
+      if (!Number.isFinite(value) || value < 0) return;
+      latest.set(name, value);
+      if (timers.has(name)) return;
+      const timer = window.setTimeout(() => {
+        timers.delete(name);
+        const metric = latest.get(name);
+        if (metric === undefined) return;
+        void apiPost("/performance/vitals", { name, value: metric, route: pathname, navigationType: performance.getEntriesByType("navigation")[0]?.entryType ?? "navigation" }).catch(() => {
+          // Observability must never block navigation, learning, or PK interactions.
+        });
+      }, 800);
+      timers.set(name, timer);
+    };
     const observers: PerformanceObserver[] = [];
     try {
       const paint = new PerformanceObserver((list) => { const entry = list.getEntries().find((item) => item.name === "first-contentful-paint"); if (entry) send("FCP", entry.startTime); });
@@ -257,7 +273,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     } catch {}
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     if (nav?.domInteractive) send("TTI", nav.domInteractive);
-    return () => observers.forEach((observer) => observer.disconnect());
+    return () => { observers.forEach((observer) => observer.disconnect()); timers.forEach((timer) => window.clearTimeout(timer)); };
   }, [pathname]);
 
   useEffect(() => {

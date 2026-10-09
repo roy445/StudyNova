@@ -23,8 +23,8 @@ export const routes: RouteDef[] = [
   route({
     method: "POST",
     path: "/performance/vitals",
-    auth: "optional",
-    rate: { limit: 600, windowSec: 3600, key: "performance-vitals" },
+    auth: "none",
+    rate: { limit: 120, windowSec: 3600, key: "performance-vitals" },
     handler: async (ctx) => {
       const body = await ctx.json(metricSchema);
       await db.insert(systemLogs).values({ userId: ctx.user?.userId ?? null, level: "metric", scope: "web-vitals", message: body.name, meta: { name: body.name, value: body.value, route: body.route, navigationType: body.navigationType ?? "", device: body.device ?? "unknown", timestamp: new Date().toISOString() } });
