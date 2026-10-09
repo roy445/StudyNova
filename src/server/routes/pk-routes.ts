@@ -328,6 +328,10 @@ async function matchPayload(matchId: string, userId: string) {
   if (!match) throw notFound("找不到 PK 賽場");
   const player = await getPlayer(matchId, userId);
   if (!player) throw forbidden("你不是這場 PK 的參與者");
+  const staleBefore = new Date(Date.now() - 45_000);
+  if (["countdown", "in_progress", "paused"].includes(match.status)) {
+    await db.update(pkMatchPlayers).set({ connectionState: "disconnected" }).where(and(eq(pkMatchPlayers.matchId, matchId), eq(pkMatchPlayers.role, "player"), eq(pkMatchPlayers.connectionState, "connected"), lte(pkMatchPlayers.lastHeartbeatAt, staleBefore)));
+  }
   const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, avatarSeed: users.avatarSeed, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, matchId)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score));
   const questionRows = await db.select().from(pkMatchQuestions).where(eq(pkMatchQuestions.matchId, matchId)).orderBy(asc(pkMatchQuestions.orderIndex));
   const room = match.roomId ? (await db.select().from(pkRooms).where(eq(pkRooms.id, match.roomId)).limit(1))[0] ?? null : null;
@@ -468,8 +472,12 @@ export const routes: RouteDef[] = [
       try {
         const match = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: false, allowSpectators: false, showRanking: true, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp });
         await db.insert(pkMatchPlayers).values({ matchId: match.match.id, userId: pair.candidate.userId, optionOrders: await questionOrders(db, match.match.id, pair.candidate.userId) }).onConflictDoNothing();
-        await emitMatchEvent(match.match.id, "match_found", null, { matchId: match.match.id, playerCount: 2 });
-        return { queue: pair.own, matched: true, matchId: match.match.id, message: "已找到對手！" };
+        const startsAt = new Date(Date.now() + 3_000);
+        const countdownMatch = (await db.update(pkMatches).set({ status: "countdown", startsAt, updatedAt: new Date() }).where(and(eq(pkMatches.id, match.match.id), eq(pkMatches.status, "matching"))).returning())[0];
+        if (!countdownMatch) throw conflict("真人配對已建立，但賽場狀態無法進入倒數，請重新搜尋。");
+        await emitMatchEvent(match.match.id, "match_found", null, { matchId: match.match.id, playerCount: 2, realOpponent: true });
+        await emitMatchEvent(match.match.id, "countdown_started", null, { startsAt: startsAt.toISOString(), realOpponent: true });
+        return { queue: pair.own, matched: true, matchId: match.match.id, message: "已找到對手，3 秒後開始！" };
       } catch (error) {
         await db.update(pkMatchmakingQueue).set({ status: "cancelled" }).where(and(inArray(pkMatchmakingQueue.id, [pair.own.id, pair.candidate.id]), eq(pkMatchmakingQueue.status, "matched")));
         throw error;
