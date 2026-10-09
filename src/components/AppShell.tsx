@@ -468,10 +468,12 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         {/* Header */}
         <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/85 backdrop-blur-xl">
           <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5 sm:px-5">
-            <Link href="/dashboard" className="focus-ring flex items-center gap-2 lg:hidden">
+            <Link href="/dashboard" className="focus-ring flex min-w-0 items-center gap-2 lg:hidden">
               <LogoMark size={62} />
-              <span className="neon-text text-base font-extrabold">StudyNova</span>
-              <span className="online-presence-badge" title="目前正在 StudyNova 一起學習的人數"><span className="online-presence-dot" />{presence.data?.online ?? "—"} 人在線</span>
+              <span className="flex min-w-0 flex-col items-start gap-0.5">
+                <span className="neon-text text-base font-extrabold leading-tight">StudyNova</span>
+                <span className="online-presence-badge" title="目前正在 StudyNova 一起學習的人數"><span className="online-presence-dot" />{presence.data?.online ?? "—"} 人在線</span>
+              </span>
             </Link>
             <div className="flex-1" />
             <button onClick={() => setSearchOpen(true)} aria-label="搜尋" className="focus-ring rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
