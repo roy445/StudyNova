@@ -243,36 +243,39 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     type VitalName = "FCP" | "LCP" | "CLS" | "TBT" | "TTI";
     const latest = new Map<VitalName, number>();
     const timers = new Map<VitalName, number>();
-    const send = (name: VitalName, value: number) => {
-      if (!Number.isFinite(value) || value < 0) return;
+    const sent = new Set<VitalName>();
+    const schedule = (name: VitalName, value: number) => {
+      if (sent.has(name) || !Number.isFinite(value) || value < 0) return;
       latest.set(name, value);
-      if (timers.has(name)) return;
-      const timer = window.setTimeout(() => {
+      const previous = timers.get(name);
+      if (previous) window.clearTimeout(previous);
+      timers.set(name, window.setTimeout(() => {
         timers.delete(name);
+        if (sent.has(name)) return;
         const metric = latest.get(name);
         if (metric === undefined) return;
+        sent.add(name);
         void apiPost("/performance/vitals", { name, value: metric, route: pathname, navigationType: performance.getEntriesByType("navigation")[0]?.entryType ?? "navigation" }).catch(() => {
           // Observability must never block navigation, learning, or PK interactions.
         });
-      }, 800);
-      timers.set(name, timer);
+      }, 1_200));
     };
     const observers: PerformanceObserver[] = [];
     try {
-      const paint = new PerformanceObserver((list) => { const entry = list.getEntries().find((item) => item.name === "first-contentful-paint"); if (entry) send("FCP", entry.startTime); });
+      const paint = new PerformanceObserver((list) => { const entry = list.getEntries().find((item) => item.name === "first-contentful-paint"); if (entry) schedule("FCP", entry.startTime); });
       paint.observe({ type: "paint", buffered: true }); observers.push(paint);
     } catch {}
     try {
-      const lcp = new PerformanceObserver((list) => { const entry = list.getEntries().at(-1); if (entry) send("LCP", entry.startTime); });
+      const lcp = new PerformanceObserver((list) => { const entry = list.getEntries().at(-1); if (entry) schedule("LCP", entry.startTime); });
       lcp.observe({ type: "largest-contentful-paint", buffered: true }); observers.push(lcp);
     } catch {}
     try {
       let cls = 0;
-      const layout = new PerformanceObserver((list) => { for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) if (!entry.hadRecentInput) cls += entry.value ?? 0; send("CLS", cls); });
+      const layout = new PerformanceObserver((list) => { for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) if (!entry.hadRecentInput) cls += entry.value ?? 0; schedule("CLS", cls); });
       layout.observe({ type: "layout-shift", buffered: true }); observers.push(layout);
     } catch {}
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    if (nav?.domInteractive) send("TTI", nav.domInteractive);
+    if (nav?.domInteractive) schedule("TTI", nav.domInteractive);
     return () => { observers.forEach((observer) => observer.disconnect()); timers.forEach((timer) => window.clearTimeout(timer)); };
   }, [pathname]);
 
