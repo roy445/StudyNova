@@ -1,10 +1,12 @@
 import { historyChapter, historyLessons } from "./history";
 import { physicsChapter, physicsLessons, physicsTracks } from "./physics";
+import { physicsExtraLessons } from "./physics-extra";
 
 export type LearningStatus = "DRAFT" | "DEVELOPING" | "BETA" | "PUBLISHED" | "MAINTENANCE" | "ARCHIVED";
 
 export type Lesson = {
   slug: string;
+  unit?: string;
   number: string;
   title: string;
   summary: string;
@@ -22,7 +24,7 @@ export type Lesson = {
 export const learningSubjects = [
   { slug: "chemistry", icon: "🧪", title: "高中化學", subtitle: "從基礎概念開始，一步一步建立完整化學觀念。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
   { slug: "history", icon: "▥", title: "高中歷史", subtitle: "從原住民族、外力治理到移民社會，建立台灣歷史的長時段脈絡。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
-  { slug: "physics", icon: "⚛️", title: "高中物理", subtitle: "高一基礎物理第 3 章：熱。涵蓋溫度、熱量、物態變化、熱傳與生活應用。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放", gradeLabel: "高一", tracks: physicsTracks },
+  { slug: "physics", icon: "⚛️", title: "高中物理", subtitle: "高一基礎物理第 1～4 章：物理學與人類生活、運動與力、熱、聲音。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放", gradeLabel: "高一", tracks: physicsTracks },
   { slug: "biology", icon: "🧬", title: "高中生物", subtitle: "細胞、遺傳與生態的完整學習路徑準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
   { slug: "math", icon: "📐", title: "高中數學", subtitle: "從科學記號與常用對數開始，建立高一數學的解題基礎。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
   { slug: "english", icon: "🇬🇧", title: "高中英文", subtitle: "字彙、文法與閱讀的學習路徑準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
@@ -236,5 +238,5 @@ export const learningCurriculum = {
   chemistry: { chapter: chemistryChapter, lessons: chemistryLessons },
   math: { chapter: mathChapter, lessons: mathLessons },
   history: { chapter: historyChapter, lessons: historyLessons },
-  physics: { chapter: physicsChapter, lessons: physicsLessons },
+  physics: { chapter: { ...physicsChapter, slug: "ch1-4", title: "高一基礎物理 CH1–CH4", subtitle: "依教材順序完整整理物理學與人類生活、運動與力、熱、聲音四章。", sourcePages: "PDF 第 1–131 頁" }, lessons: [...physicsExtraLessons.slice(0, 3), ...physicsExtraLessons.slice(3, 7), ...physicsLessons, ...physicsExtraLessons.slice(7)] },
 } as const;
