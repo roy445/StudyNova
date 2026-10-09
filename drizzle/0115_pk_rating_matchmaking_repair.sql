@@ -1,5 +1,6 @@
--- PK v4: rating-aware, atomic matchmaking.
--- Safe to run on a database that already has the PK queue.
+-- PK Rating matchmaking repair.
+-- Run this if 0114 stopped at the users(user_id) foreign-key error.
+-- It is idempotent and uses the real users primary-key column: users.id.
 ALTER TABLE pk_matchmaking_queue
   ADD COLUMN IF NOT EXISTS rating integer NOT NULL DEFAULT 1000;
 
@@ -21,6 +22,3 @@ CREATE INDEX IF NOT EXISTS pk_player_ratings_rank_idx
   ON pk_player_ratings (rating DESC, updated_at DESC);
 CREATE INDEX IF NOT EXISTS pk_matchmaking_rating_wait_idx
   ON pk_matchmaking_queue (status, match_type, grade, difficulty, rating, joined_at);
-
--- Preserve a stable default rating for existing queue tickets.
-UPDATE pk_matchmaking_queue SET rating = 1000 WHERE rating IS NULL;
