@@ -50,6 +50,7 @@ function ProfileInner() {
   const proPlans = useApi<{ plans: Array<{ id: string; days: number; priceNova: number }> }>("/membership/pro-exchange-plans");
   const push = useApi<{ configured: boolean; publicKey: string; subscriptions: number }>("/push/config");
   const settings = useApi<{ settings: Record<string, unknown> }>("/account/settings");
+  const timeline = useApi<{ items: Array<{ id: string; type: string; kind: string; subject: string; title: string; detail: Record<string, unknown>; minutes: number; occurredAt: string; source: string }>; filter: string }>("/learning/timeline?limit=60");
 
   const [displayName, setDisplayName] = useState("");
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -173,6 +174,7 @@ function ProfileInner() {
       <Tabs
         tabs={[
           { key: "profile", label: "個人資料", icon: "◎" },
+          { key: "footprint", label: "學習足跡", icon: "◷" },
           { key: "novi", label: "Novi 養成", icon: "✦" },
           { key: "shop", label: "商店", icon: "▧" },
           { key: "nova", label: "Nova 紀錄", icon: "✦" },
@@ -355,6 +357,26 @@ function ProfileInner() {
                 </div>
               </div>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "footprint" && (
+        <div className="space-y-4">
+          <Card title="◷ 學習足跡" subtitle="查看最近完成的學習、測驗、錯題、AI 使用與專注紀錄。">
+            {timeline.loading && <Skeleton lines={6} />}
+            {timeline.error && <ErrorState message={timeline.error} onRetry={timeline.reload} />}
+            {!timeline.loading && !timeline.error && !timeline.data?.items.length && <EmptyState icon="◷" title="還沒有學習足跡" hint="完成一次學習、測驗或專注活動後，紀錄會顯示在這裡。" />}
+            {!!timeline.data?.items.length && (
+              <div className="space-y-2">
+                {timeline.data.items.map((item) => (
+                  <div key={`${item.source}-${item.id}`} className="flex gap-3 rounded-2xl border border-[var(--line)] bg-white/[.025] p-3">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#37d3ff]/10 text-[#7dd3fc]">{item.type === "quiz" ? "✓" : item.type === "ai" ? "✦" : item.type === "wrong" ? "!" : item.type === "focus" ? "◉" : "▸"}</div>
+                    <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">{item.title}</p><span className="text-xs text-muted">{new Date(item.occurredAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span></div><p className="mt-1 text-xs text-muted">{item.subject} ・ {item.minutes > 0 ? `${item.minutes} 分鐘` : "學習紀錄"} ・ {item.kind}</p></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       )}

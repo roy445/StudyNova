@@ -1,8 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { handleUploadPresigned } from "@vercel/blob/client";
-import { head, issueSignedToken } from "@vercel/blob";
+import { head, issueSignedToken, presignUrl } from "@vercel/blob";
 import { db } from "@/db";
 import { examPrepActivities, examPrepImportJobs, examPrepQuestionDrafts, questionBankMemberships, questionBanks, questionSources, questionVersions, questions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
@@ -57,18 +56,12 @@ export const routes: RouteDef[] = [
       const admin = ctx.requireUser();
       await activity(ctx.params.id);
       if (!process.env.BLOB_READ_WRITE_TOKEN && !(process.env.VERCEL_OIDC_TOKEN && process.env.BLOB_STORE_ID)) throw fail("FILE_STORAGE_MISCONFIG", { message: "Vercel Blob 尚未提供認證；請確認 BLOB_READ_WRITE_TOKEN，或 VERCEL_OIDC_TOKEN 與 BLOB_STORE_ID 已套用到 Production。" });
-      const body = await ctx.json(z.record(z.string(), z.unknown()));
-      const result = await handleUploadPresigned({
-        request: ctx.req,
-        body: body as never,
-        getSignedToken: async (pathname, clientPayload) => {
-          const payload = clientPayload ? JSON.parse(clientPayload) as { activityId?: string } : {};
-          if (payload.activityId !== ctx.params.id || !pathname.startsWith(`exam-prep/${ctx.params.id}/`)) throw fail("PERM_FILE_DENIED", { message: "Blob 上傳範圍驗證失敗。" });
-          const token = await issueSignedToken({ pathname, operations: ["put"], token: process.env.BLOB_READ_WRITE_TOKEN, oidcToken: process.env.VERCEL_OIDC_TOKEN, storeId: process.env.BLOB_STORE_ID, allowedContentTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp", "text/plain", "text/markdown", "application/json"], maximumSizeInBytes: 500 * 1024 * 1024 });
-          return { token, urlOptions: { addRandomSuffix: true } };
-        },
-      });
-      return result;
+      const body = await ctx.json(z.object({ type: z.literal("blob.generate-presigned-url"), payload: z.object({ pathname: z.string().min(1).max(500), clientPayload: z.string().nullable().optional(), multipart: z.boolean().optional() }) }));
+      const payload = body.payload.clientPayload ? JSON.parse(body.payload.clientPayload) as { activityId?: string } : {};
+      if (payload.activityId !== ctx.params.id || !body.payload.pathname.startsWith(`exam-prep/${ctx.params.id}/`)) throw fail("PERM_FILE_DENIED", { message: "Blob 上傳範圍驗證失敗。" });
+      const token = await issueSignedToken({ pathname: body.payload.pathname, operations: ["put"], token: process.env.BLOB_READ_WRITE_TOKEN, oidcToken: process.env.VERCEL_OIDC_TOKEN, storeId: process.env.BLOB_STORE_ID, allowedContentTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp", "text/plain", "text/markdown", "application/json"], maximumSizeInBytes: 500 * 1024 * 1024 });
+      const presigned = await presignUrl(token, { operation: "put", pathname: body.payload.pathname, access: "private", addRandomSuffix: true });
+      return { type: body.type, presignedUrlPayload: presigned };
     },
   }),
   route({
