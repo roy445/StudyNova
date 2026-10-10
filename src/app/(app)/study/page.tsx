@@ -3,30 +3,22 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Badge, Button, Card, EmptyState, Select, Skeleton, Tabs, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Select, Skeleton, useToast } from "@/components/ui";
 import { apiPost, useApi } from "@/lib/api";
 import { MaterialsPanel, NotesPanel, OcrPanel } from "@/features/study/panels-a";
 import { QuizPanel, WrongPanel } from "@/features/study/panels-b";
 import { FocusPanel, MyVocabularyPanel, QuickMemoryPanel, SentencesPanel, VoicePanel, VisualNotesPanel, WordLibraryPanel, WordsPanel } from "@/features/study/panels-c";
 import { learningSubjects } from "@/content/learning/ch1";
 
-const TABS = [
-  { key: "timeline", label: "我的學習足跡", icon: "◷" },
-  { key: "online-courses", label: "線上學習", icon: "📚", featured: true },
-  { key: "one-page", label: "考前一頁紙", icon: "▤" },
-  { key: "materials", label: "教材", icon: "▦" },
-  { key: "ocr", label: "圖片 OCR", icon: "▧" },
-  { key: "quiz", label: "測驗", icon: "▤" },
-  { key: "wrong", label: "錯題本", icon: "◇" },
-  { key: "words", label: "單字", icon: "⌁" },
-  { key: "visual-notes", label: "重點心智圖", icon: "✦" },
-  { key: "word-library", label: "字詞百科", icon: "▤" },
-  { key: "my-vocabulary", label: "我的單字", icon: "◇" },
-  { key: "quick-memory", label: "快速背", icon: "✦" },
-  { key: "sentences", label: "句子", icon: "◌" },
-  { key: "voice", label: "錄音", icon: "◉" },
-  { key: "focus", label: "計時", icon: "◷" },
-  { key: "notes", label: "筆記", icon: "▤" },
+const MORE_TOOLS = [
+  { key: "timeline", label: "學習足跡", icon: "◷", description: "查看自己的學習紀錄" },
+  { key: "one-page", label: "考前一頁紙", icon: "▤", description: "把重點整理成一頁" },
+  { key: "materials", label: "教材", icon: "▦", description: "管理與閱讀教材" },
+  { key: "ocr", label: "圖片 OCR", icon: "▧", description: "從圖片辨識內容" },
+  { key: "visual-notes", label: "重點心智圖", icon: "✦", description: "把內容整理成視覺重點" },
+  { key: "voice", label: "錄音", icon: "◉", description: "用語音複習" },
+  { key: "focus", label: "專注計時", icon: "◷", description: "記錄專注學習時間" },
+  { key: "notes", label: "筆記", icon: "▤", description: "整理自己的學習筆記" },
 ];
 
 function TimelinePanel() {
@@ -61,6 +53,7 @@ function StudyInner() {
   const centerControl = useApi<{ status: "enabled" | "repairing" | "disabled"; message: string }>("/learning/center-control");
   const examHubs = useApi<{ hubs: Array<{ id: string; name: string; examNumber: string; closeAt: string | null }> }>("/exam-hubs/available");
   const [tab, setTab] = useState(params.get("tab") === "plan" ? "timeline" : (params.get("tab") ?? "timeline"));
+  const [autoGenerate, setAutoGenerate] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
 
@@ -90,7 +83,14 @@ function StudyInner() {
 
       {examHubs.data?.hubs.length ? <Link href={`/exam-hubs/${examHubs.data.hubs[0].id}`} className="group block overflow-hidden rounded-[1.75rem] border-2 border-[#ffc857]/65 bg-[radial-gradient(circle_at_85%_15%,rgba(255,200,87,.3),transparent_35%),linear-gradient(135deg,rgba(52,27,72,.98),rgba(8,28,58,.98))] p-5 shadow-[0_0_32px_rgba(255,200,87,.17)] transition hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(255,200,87,.3)]"><div className="flex flex-wrap items-center justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><Badge tone="gold">限時段考考題專區</Badge><Badge tone="rose">現在開放</Badge></div><h2 className="mt-2 text-xl font-black text-white sm:text-2xl">{examHubs.data.hubs[0].name}</h2><p className="mt-1 text-sm text-slate-200">{examHubs.data.hubs[0].examNumber}・計時作答、完成後留下個人紀錄。</p></div><span className="rounded-xl bg-[#ffc857] px-4 py-2.5 text-sm font-black text-slate-950">立即作答 →</span></div></Link> : null}
 
-      <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Link href="/learning" className="group rounded-2xl border border-cyan-300/30 bg-cyan-300/[0.06] p-4 transition hover:-translate-y-0.5 hover:border-cyan-200/70"><span className="text-3xl">📚</span><h2 className="mt-2 font-black">繼續學習</h2><p className="mt-1 text-xs text-muted">回到線上課程與教材</p><p className="mt-3 text-xs font-semibold text-cyan-200">開始學習 →</p></Link>
+        <button type="button" onClick={() => { setTab("quiz"); setAutoGenerate(true); }} className="group rounded-2xl border-2 border-violet-300/45 bg-gradient-to-br from-violet-500/20 to-cyan-400/5 p-4 text-left transition hover:-translate-y-0.5 hover:border-violet-200/80"><span className="text-3xl">✦</span><h2 className="mt-2 font-black">AI幫你出</h2><p className="mt-1 text-xs text-muted">依主題與教材產生專屬測驗</p><p className="mt-3 text-xs font-semibold text-violet-200">開始 AI 出題 →</p></button>
+        <button type="button" onClick={() => { setTab("quiz"); setAutoGenerate(false); }} className="group rounded-2xl border border-amber-300/30 bg-amber-300/[0.05] p-4 text-left transition hover:-translate-y-0.5 hover:border-amber-200/70"><span className="text-3xl">✓</span><h2 className="mt-2 font-black">練習與單字</h2><p className="mt-1 text-xs text-muted">測驗、錯題本與單字複習</p><p className="mt-3 text-xs font-semibold text-amber-200">開始練習 →</p></button>
+        <button type="button" onClick={() => setTab("more")} className="group rounded-2xl border border-white/15 bg-white/[0.03] p-4 text-left transition hover:-translate-y-0.5 hover:border-white/35"><span className="text-3xl">⋯</span><h2 className="mt-2 font-black">更多功能</h2><p className="mt-1 text-xs text-muted">OCR、筆記、專注與其他工具</p><p className="mt-3 text-xs font-semibold text-slate-200">查看全部功能 →</p></button>
+      </div>
+
+      {tab === "more" && <Card title="更多功能" subtitle="常用功能已放在上方，其他工具集中收在這裡。"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{MORE_TOOLS.map((tool) => <button type="button" key={tool.key} onClick={() => setTab(tool.key)} className="rounded-2xl border border-[var(--line)] bg-white/[.025] p-3 text-left transition hover:border-cyan-300/40"><span className="text-2xl">{tool.icon}</span><p className="mt-2 text-sm font-bold">{tool.label}</p><p className="mt-1 text-xs text-muted">{tool.description}</p></button>)}</div></Card>}
 
       <div ref={contentRef} className={`scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))] ${tab === "words" || tab === "word-library" || tab === "my-vocabulary" || tab === "visual-notes" ? "study-vocabulary-fullbleed" : ""}`}>
         {tab === "timeline" && <TimelinePanel />}
@@ -98,7 +98,7 @@ function StudyInner() {
         {tab === "one-page" && <OnePagePanel />}
         {tab === "materials" && <MaterialsPanel />}
         {tab === "ocr" && <OcrPanel />}
-        {tab === "quiz" && <QuizPanel />}
+        {tab === "quiz" && <QuizPanel key={autoGenerate ? "ai-generate" : "quiz"} autoGenerate={autoGenerate} />}
         {tab === "wrong" && <WrongPanel />}
         {tab === "words" && <WordsPanel />}
         {tab === "visual-notes" && <VisualNotesPanel />}

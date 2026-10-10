@@ -12,13 +12,13 @@ type Attempt = { id: string; quizId: string; status: string; score: number; tota
 type QuizQuestion = { id: string; type: string; stem: string; options: string[] };
 type ReviewItem = { questionId: string; stem: string; options: string[]; answer: string[]; explanation: string; response: string[]; isCorrect: boolean };
 
-export function QuizPanel() {
+export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) {
   const toast = useToast();
   const list = useApi<{ quizzes: Quiz[]; attempts: Attempt[] }>("/quizzes");
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
   const quizGenerateCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
-  const [genOpen, setGenOpen] = useState(false);
+  const [genOpen, setGenOpen] = useState(autoGenerate);
   const [form, setForm] = useState({ subject: "英文", topic: "", materialId: "", sourceText: "", count: 5, difficulty: "normal", type: "single", timeLimitSec: 600 });
   const [active, setActive] = useState<{ quiz: Quiz; questions: QuizQuestion[]; attemptId: string } | null>(null);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
