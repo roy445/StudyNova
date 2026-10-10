@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS "exam_prep_activities" (
   "close_at" timestamp with time zone,
   "question_bank_id" uuid REFERENCES "question_banks"("id") ON DELETE SET NULL,
   "settings" jsonb NOT NULL DEFAULT '{}'::jsonb,
-  "created_by" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE RESTRICT,
+  "created_by" uuid NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT,
   "published_at" timestamp with time zone,
   "archived_at" timestamp with time zone,
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
