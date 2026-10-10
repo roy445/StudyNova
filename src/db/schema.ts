@@ -3354,6 +3354,52 @@ export const examHubs = pgTable(
   (t) => [index("exam_hubs_match_idx").on(t.educationLevel, t.schoolName, t.grade, t.status), index("exam_hubs_window_idx").on(t.openAt, t.closeAt)],
 );
 
+/* ---------------------------------------------- EXAM PREP CENTER */
+export const examPrepActivities = pgTable(
+  "exam_prep_activities",
+  {
+    id: id(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    educationLevel: text("education_level").notNull(),
+    grade: integer("grade").notNull(),
+    semester: text("semester").notNull().default(""),
+    examName: text("exam_name").notNull(),
+    scope: text("scope").notNull().default(""),
+    timezone: text("timezone").notNull().default("Asia/Taipei"),
+    openMode: text("open_mode").notNull().default("manual"), // manual | scheduled
+    status: text("status").notNull().default("draft"), // draft | analyzing | pending_review | scheduled | open | closed | archived
+    openAt: timestamp("open_at", { withTimezone: true }),
+    closeAt: timestamp("close_at", { withTimezone: true }),
+    questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "set null" }),
+    settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: uuid("created_by").notNull().references(() => users.userId, { onDelete: "restrict" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_prep_activities_slug_uq").on(t.slug), index("exam_prep_activities_status_window_idx").on(t.status, t.openAt, t.closeAt), index("exam_prep_activities_target_idx").on(t.educationLevel, t.grade, t.status)],
+);
+
+export const examPrepSubjects = pgTable(
+  "exam_prep_subjects",
+  {
+    id: id(),
+    activityId: uuid("activity_id").notNull().references(() => examPrepActivities.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+    chapters: jsonb("chapters").$type<string[]>().notNull().default([]),
+    units: jsonb("units").$type<string[]>().notNull().default([]),
+    questionTypes: jsonb("question_types").$type<string[]>().notNull().default([]),
+    difficulty: text("difficulty").notNull().default("normal"),
+    questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_prep_subjects_activity_subject_uq").on(t.activityId, t.subject), index("exam_prep_subjects_activity_idx").on(t.activityId)],
+);
+
 export const examHubWords = pgTable(
   "exam_hub_words",
   {

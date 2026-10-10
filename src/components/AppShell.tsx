@@ -177,7 +177,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
     "/dashboard",
   );
-  const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
+  const examPrep = useApi<{ activities: Array<{ id: string; closeAt: string | null; effectiveStatus: string }>; profile: { schoolLevel: string | null; grade: number | null } | null }>("/exam-prep/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
   const presence = useApi<{ online: number; asOf: string }>("/pk/presence/summary");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
@@ -422,7 +422,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           <Wordmark size={42} />
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
-          {(examHubs.data?.hubs.length ? [...SIDE_NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
+          {(examPrep.data?.activities.length ? [...SIDE_NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
             return (
@@ -571,7 +571,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       {/* Mobile bottom nav */}
       <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
-          {(examHubs.data?.hubs.length ? [...NAV, { href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : NAV).map((item) => {
+          {(examPrep.data?.activities.length ? [...NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities[0]?.closeAt }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);

@@ -124,6 +124,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/learning-actions-routes"),
     import("./routes/exam-appeal-routes"),
     import("./routes/exam-hub-routes"),
+    import("./routes/exam-prep-routes"),
     import("./routes/ai-background-routes"),
     import("./routes/daily-knowledge-routes"),
     import("./routes/pro-renewal-routes"),
