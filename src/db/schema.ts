@@ -3477,6 +3477,12 @@ export const examPrepQuestionDrafts = pgTable(
     explanation: text("explanation").notNull().default(""),
     confidence: real("confidence").notNull().default(0),
     sourceMetadata: jsonb("source_metadata").$type<Record<string, unknown>>().notNull().default({}),
+    analysis: jsonb("analysis").$type<Record<string, unknown>>().notNull().default({}),
+    quality: jsonb("quality").$type<Record<string, unknown>>().notNull().default({}),
+    analysisStatus: text("analysis_status").notNull().default("queued"), // queued | analyzing | completed | quality_failed | failed
+    analysisAttempts: integer("analysis_attempts").notNull().default(0),
+    analysisError: text("analysis_error").notNull().default(""),
+    analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
     status: text("status").notNull().default("needs_review"), // needs_review | approved | rejected
     questionId: uuid("question_id").references(() => questions.id, { onDelete: "set null" }),
     adminNote: text("admin_note").notNull().default(""),

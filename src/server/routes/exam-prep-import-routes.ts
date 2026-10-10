@@ -1,10 +1,11 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { db } from "@/db";
-import { examPrepActivities, examPrepImportJobs, examPrepQuestionDrafts } from "@/db/schema";
+import { examPrepActivities, examPrepImportJobs, examPrepQuestionDrafts, questionBankMemberships, questionBanks, questionSources, questionVersions, questions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
-import { putObject } from "../storage";
+import { putObject, signObjectUrl } from "../storage";
 import { queue } from "../queue";
 import { checksum, listExamPrepImportDetails } from "../exam-prep-import";
 
@@ -22,6 +23,20 @@ function normalizeMime(file: File) {
   if (/\.json$/i.test(file.name)) return "application/json";
   return "text/plain";
 }
+
+function questionFingerprint(activityId: string, draft: { subject: string; type: string; stem: string }) {
+  return createHash("sha256").update(`${activityId}\n${draft.subject}\n${draft.type}\n${draft.stem}`.trim().toLocaleLowerCase()).digest("hex");
+}
+
+const draftPatch = z.object({
+  stem: z.string().min(1).max(20000).optional(),
+  options: z.array(z.string().max(5000)).max(20).optional(),
+  answer: z.array(z.string().max(5000)).max(20).optional(),
+  explanation: z.string().max(20000).optional(),
+  subject: z.string().max(60).optional(),
+  adminNote: z.string().max(2000).optional(),
+  status: z.enum(["needs_review", "approved", "rejected"]).optional(),
+});
 
 async function activity(id: string) {
   const row = (await db.select().from(examPrepActivities).where(eq(examPrepActivities.id, id)).limit(1))[0];
@@ -76,9 +91,10 @@ export const routes: RouteDef[] = [
     path: "/admin/exam-prep/imports/:id",
     auth: "admin",
     handler: async (ctx) => {
+      const admin = ctx.requireUser();
       const details = await listExamPrepImportDetails(ctx.params.id);
       if (!details) throw notFound("找不到段考考卷匯入工作");
-      return details;
+      return { ...details, pages: details.pages.map((page) => ({ ...page, previewUrl: page.objectId ? signObjectUrl(page.objectId, admin.userId) : null })), assets: details.assets.map((asset) => ({ ...asset, previewUrl: signObjectUrl(asset.objectId, admin.userId) })) };
     },
   }),
   route({
@@ -95,15 +111,66 @@ export const routes: RouteDef[] = [
     },
   }),
   route({
+    method: "POST",
+    path: "/admin/exam-prep/imports/:id/analyze",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const job = (await db.select().from(examPrepImportJobs).where(eq(examPrepImportJobs.id, ctx.params.id)).limit(1))[0];
+      if (!job) throw notFound("找不到段考考卷匯入工作");
+      const drafts = await db.select({ id: examPrepQuestionDrafts.id }).from(examPrepQuestionDrafts).where(eq(examPrepQuestionDrafts.jobId, job.id));
+      if (!drafts.length) throw fail("SYS_CONFLICT", { message: "目前沒有可分析的題目草稿。" });
+      await db.update(examPrepQuestionDrafts).set({ analysisStatus: "queued", analysisError: "", updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.jobId, job.id));
+      for (const draft of drafts) await queue().enqueue({ name: "exam_prep_draft_analysis", payload: { draftId: draft.id, userId: admin.userId }, uniqueKey: `exam-prep-draft-analysis:${draft.id}:${Date.now()}` });
+      void queue().drain(1);
+      return { queued: drafts.length, jobId: job.id };
+    },
+  }),
+  route({
     method: "PATCH",
     path: "/admin/exam-prep/imports/:id/drafts/:draftId",
     auth: "admin",
     handler: async (ctx) => {
-      const body = await ctx.json(z.object({ stem: z.string().min(1).max(20000).optional(), options: z.array(z.string().max(5000)).max(20).optional(), answer: z.array(z.string().max(5000)).max(20).optional(), explanation: z.string().max(20000).optional(), subject: z.string().max(60).optional(), adminNote: z.string().max(2000).optional(), status: z.enum(["needs_review", "rejected"]).optional() }));
-      const draft = (await db.select({ id: examPrepQuestionDrafts.id }).from(examPrepQuestionDrafts).where(and(eq(examPrepQuestionDrafts.id, ctx.params.draftId), eq(examPrepQuestionDrafts.jobId, ctx.params.id))).limit(1))[0];
+      const body = await ctx.json<z.infer<typeof draftPatch>>(draftPatch);
+      const draft = (await db.select().from(examPrepQuestionDrafts).where(and(eq(examPrepQuestionDrafts.id, ctx.params.draftId), eq(examPrepQuestionDrafts.jobId, ctx.params.id))).limit(1))[0];
       if (!draft) throw notFound("找不到題目草稿");
+      if (body.status === "approved" && (!(draft.quality as { passed?: boolean }).passed || (draft.quality as { answerConflict?: boolean }).answerConflict || draft.analysisStatus !== "completed")) throw fail("SYS_CONFLICT", { message: "題目尚未通過 AI 品質檢查或存在答案衝突，不能確認。" });
       const row = (await db.update(examPrepQuestionDrafts).set({ ...body, updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id)).returning())[0];
       return { draft: row };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/imports/:id/confirm",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ draftIds: z.array(z.string().uuid()).min(1).max(500) }));
+      const job = (await db.select().from(examPrepImportJobs).where(eq(examPrepImportJobs.id, ctx.params.id)).limit(1))[0];
+      if (!job) throw notFound("找不到段考考卷匯入工作");
+      const target = await activity(job.activityId);
+      const drafts = await db.select().from(examPrepQuestionDrafts).where(and(eq(examPrepQuestionDrafts.jobId, job.id), inArray(examPrepQuestionDrafts.id, body.draftIds)));
+      const invalid = drafts.filter((draft) => draft.status !== "approved" || draft.analysisStatus !== "completed" || !(draft.quality as { passed?: boolean }).passed || (draft.quality as { answerConflict?: boolean }).answerConflict || !draft.stem.trim());
+      if (drafts.length !== body.draftIds.length || invalid.length) throw fail("SYS_CONFLICT", { message: "仍有題目未通過 AI 品質檢查、尚未審核或存在答案衝突。", details: { invalidDraftIds: invalid.map((draft) => draft.id) } });
+      let bankId = target.questionBankId;
+      await db.transaction(async (tx) => {
+        if (!bankId) {
+          const bank = (await tx.insert(questionBanks).values({ name: `${target.name} 正式題庫`, description: "管理員確認後發布的段考題庫", subject: drafts[0]?.subject ?? "其他", grade: String(target.grade), educationLevel: target.educationLevel, scope: `exam-prep:${target.id}`, bankKind: "exam", scopeMetadata: { examPrepActivityId: target.id }, visibility: "private", status: "published", createdBy: admin.userId }).returning())[0];
+          bankId = bank.id;
+          await tx.update(examPrepActivities).set({ questionBankId: bank.id, updatedAt: new Date() }).where(eq(examPrepActivities.id, target.id));
+        }
+        for (const draft of drafts) {
+          const fingerprint = questionFingerprint(target.id, draft);
+          const existing = (await tx.select().from(questions).where(eq(questions.fingerprint, fingerprint)).limit(1))[0];
+          const question = existing ?? (await tx.insert(questions).values({ bankId, origin: "admin", targetBank: "exam", bankCategory: "exam", sourceLabel: `段考考卷 ${job.filename}`, subject: draft.subject, topic: "", chapter: "", unit: "", sourceType: "uploaded_exam_paper", status: "published", level: target.educationLevel, difficulty: "normal", type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation, metadata: { aiAnalysis: draft.analysis, quality: draft.quality, importJobId: job.id, importDraftId: draft.id }, fingerprint }).returning())[0];
+          await tx.insert(questionBankMemberships).values({ bankId, questionId: question.id, relation: existing ? "referenced" : "included", sourceMetadata: { importJobId: job.id, importDraftId: draft.id }, addedBy: admin.userId }).onConflictDoNothing();
+          await tx.insert(questionSources).values({ questionId: question.id, sourceType: "uploaded_exam_paper", sourceId: null, sourceLabel: `段考 ${target.name}｜${job.filename}`, metadata: { importJobId: job.id, importDraftId: draft.id, pageStart: draft.pageStart, pageEnd: draft.pageEnd }, createdBy: admin.userId });
+          if (!existing) await tx.insert(questionVersions).values({ questionId: question.id, version: 1, snapshot: question as unknown as Record<string, unknown>, changeReason: "段考考卷人工審核確認", createdBy: admin.userId });
+          await tx.update(examPrepQuestionDrafts).set({ questionId: question.id, updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
+        }
+      });
+      await db.update(examPrepImportJobs).set({ status: "completed", stage: "ready", progress: 100, updatedAt: new Date(), completedAt: new Date() }).where(eq(examPrepImportJobs.id, job.id));
+      return { confirmed: drafts.length, bankId, activityId: target.id };
     },
   }),
 ];

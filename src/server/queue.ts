@@ -36,6 +36,7 @@ import { processPkBotJob } from "./pk-bot-engine";
 import { DAILY_KNOWLEDGE_SUBJECTS, generateDailyKnowledge, fingerprint } from "./daily-knowledge";
 import { publishScheduledRelease } from "./release-publisher";
 import { processExamPrepImport } from "./exam-prep-import";
+import { processExamPrepDraftAnalysis } from "./exam-prep-draft-analysis";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -59,7 +60,8 @@ export type JobName =
   | "data_retention"
   | "name_moderation_scan"
   | "release_publish"
-  | "exam_prep_import";
+  | "exam_prep_import"
+  | "exam_prep_draft_analysis";
 
 
 export type JobPayload = Record<string, unknown>;
@@ -87,6 +89,14 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     if (!jobId) throw new Error("缺少段考考卷匯入工作 ID");
     const result = await processExamPrepImport(jobId);
     return `段考考卷匯入 ${jobId}：${result.status}，產生 ${result.draftCount} 題草稿`;
+  },
+
+  async exam_prep_draft_analysis(payload) {
+    const draftId = typeof payload.draftId === "string" ? payload.draftId : "";
+    const userId = typeof payload.userId === "string" ? payload.userId : "";
+    if (!draftId || !userId) throw new Error("缺少段考題目草稿分析參數");
+    const result = await processExamPrepDraftAnalysis(draftId, userId);
+    return `段考題目草稿 ${draftId}：${result.status}`;
   },
 
   async daily_tasks_refresh() {
