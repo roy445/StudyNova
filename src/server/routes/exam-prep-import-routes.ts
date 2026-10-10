@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { handleUpload } from "@vercel/blob/client";
-import { head } from "@vercel/blob";
+import { handleUploadPresigned } from "@vercel/blob/client";
+import { head, issueSignedToken } from "@vercel/blob";
 import { db } from "@/db";
 import { examPrepActivities, examPrepImportJobs, examPrepQuestionDrafts, questionBankMemberships, questionBanks, questionSources, questionVersions, questions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
@@ -56,15 +56,16 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const admin = ctx.requireUser();
       await activity(ctx.params.id);
-      if (!process.env.BLOB_READ_WRITE_TOKEN) throw fail("FILE_STORAGE_MISCONFIG", { message: "Vercel Blob 尚未連接到此 Vercel Project，請設定 BLOB_READ_WRITE_TOKEN 後重新部署。" });
+      if (!process.env.BLOB_READ_WRITE_TOKEN && !(process.env.VERCEL_OIDC_TOKEN && process.env.BLOB_STORE_ID)) throw fail("FILE_STORAGE_MISCONFIG", { message: "Vercel Blob 尚未提供認證；請確認 BLOB_READ_WRITE_TOKEN，或 VERCEL_OIDC_TOKEN 與 BLOB_STORE_ID 已套用到 Production。" });
       const body = await ctx.json(z.record(z.string(), z.unknown()));
-      const result = await handleUpload({
+      const result = await handleUploadPresigned({
         request: ctx.req,
         body: body as never,
-        onBeforeGenerateToken: async (pathname, clientPayload) => {
+        getSignedToken: async (pathname, clientPayload) => {
           const payload = clientPayload ? JSON.parse(clientPayload) as { activityId?: string } : {};
           if (payload.activityId !== ctx.params.id || !pathname.startsWith(`exam-prep/${ctx.params.id}/`)) throw fail("PERM_FILE_DENIED", { message: "Blob 上傳範圍驗證失敗。" });
-          return { allowedContentTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp", "text/plain", "text/markdown", "application/json"], maximumSizeInBytes: 500 * 1024 * 1024, addRandomSuffix: true, tokenPayload: JSON.stringify({ userId: admin.userId, activityId: ctx.params.id }) };
+          const token = await issueSignedToken({ pathname, operations: ["put"], token: process.env.BLOB_READ_WRITE_TOKEN, oidcToken: process.env.VERCEL_OIDC_TOKEN, storeId: process.env.BLOB_STORE_ID, allowedContentTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp", "text/plain", "text/markdown", "application/json"], maximumSizeInBytes: 500 * 1024 * 1024 });
+          return { token, urlOptions: { addRandomSuffix: true } };
         },
       });
       return result;
