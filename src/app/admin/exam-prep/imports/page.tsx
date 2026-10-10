@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { upload as uploadBlob } from "@vercel/blob/client";
 import { useEffect, useState } from "react";
 import { apiGet, apiPatch, apiPost, useApi } from "@/lib/api";
 import { Badge, Button, Card, EmptyState, Field, Select, useToast } from "@/components/ui";
@@ -39,12 +40,8 @@ export default function AdminExamPrepImportsPage() {
     const selectedFiles = Array.from(files);
     setBusy(true);
     try {
-      const uploadPlan = await apiPost<{ uploads: Array<{ objectId: string; uploadUrl: string; contentType: string }> }>(`/admin/exam-prep/activities/${selectedActivityId}/imports/upload-url`, { files: selectedFiles.map((file) => ({ filename: file.name, contentType: contentTypeOf(file), size: file.size })) });
-      await Promise.all(uploadPlan.uploads.map(async (uploadItem, index) => {
-        const response = await fetch(uploadItem.uploadUrl, { method: "PUT", headers: { "Content-Type": uploadItem.contentType }, body: selectedFiles[index] });
-        if (!response.ok) throw new Error(`${selectedFiles[index].name} 直傳失敗（${response.status}）`);
-      }));
-      await apiPost(`/admin/exam-prep/activities/${selectedActivityId}/imports/complete`, { files: uploadPlan.uploads.map((uploadItem, index) => ({ filename: selectedFiles[index].name, objectId: uploadItem.objectId, size: selectedFiles[index].size, contentType: uploadItem.contentType })) });
+      const uploaded = await Promise.all(selectedFiles.map((file) => uploadBlob(`exam-prep/${selectedActivityId}/${file.name}`, file, { access: "private", contentType: contentTypeOf(file), handleUploadUrl: `/api/v1/admin/exam-prep/activities/${selectedActivityId}/imports/blob-upload`, clientPayload: JSON.stringify({ activityId: selectedActivityId }), multipart: file.size > 50 * 1024 * 1024 })));
+      await apiPost(`/admin/exam-prep/activities/${selectedActivityId}/imports/blob-complete`, { files: uploaded.map((blob, index) => ({ filename: selectedFiles[index].name, pathname: blob.pathname, size: selectedFiles[index].size, contentType: contentTypeOf(selectedFiles[index]) })) });
       toast.push("success", `已直傳 ${selectedFiles.length} 份考卷，加入背景解析`); await loadJobs();
     }
     catch (error) { toast.push("error", error instanceof Error ? error.message : "上傳失敗"); }

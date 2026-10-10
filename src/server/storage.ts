@@ -124,6 +124,12 @@ export async function putObject(params: {
   return rows[0];
 }
 
+export async function registerBlobObject(params: { userId: string; pathname: string; filename: string; mimeType: string; sizeBytes: number }) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) throw fail("FILE_STORAGE_MISCONFIG", { message: "Vercel Blob 尚未設定 BLOB_READ_WRITE_TOKEN" });
+  const rows = await db.insert(storageObjects).values({ userId: params.userId, driver: "blob", storageKey: params.pathname, bucket: "", mimeType: params.mimeType.split(";")[0].trim().toLowerCase(), sizeBytes: params.sizeBytes, filename: params.filename.slice(0, 180), data: null }).returning({ id: storageObjects.id, storageKey: storageObjects.storageKey, mimeType: storageObjects.mimeType, sizeBytes: storageObjects.sizeBytes });
+  return rows[0];
+}
+
 export async function readObject(objectId: string): Promise<{ data: Buffer; mimeType: string; filename: string; userId: string | null }> {
   const rows = await db.select().from(storageObjects).where(eq(storageObjects.id, objectId)).limit(1);
   const row = rows[0];

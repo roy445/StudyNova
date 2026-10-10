@@ -1,11 +1,13 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { handleUpload } from "@vercel/blob/client";
+import { head } from "@vercel/blob";
 import { db } from "@/db";
 import { examPrepActivities, examPrepImportJobs, examPrepQuestionDrafts, questionBankMemberships, questionBanks, questionSources, questionVersions, questions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
-import { createPresignedUpload, objectOwner, putObject, signObjectUrl, verifyPresignedUpload } from "../storage";
+import { createPresignedUpload, objectOwner, putObject, registerBlobObject, signObjectUrl, verifyPresignedUpload } from "../storage";
 import { queue } from "../queue";
 import { checksum, listExamPrepImportDetails } from "../exam-prep-import";
 
@@ -46,6 +48,50 @@ async function activity(id: string) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/activities/:id/imports/blob-upload",
+    auth: "admin",
+    rate: { limit: 100, windowSec: 3600, key: "exam-prep-blob-upload" },
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      await activity(ctx.params.id);
+      const body = await ctx.json(z.record(z.string(), z.unknown()));
+      const result = await handleUpload({
+        request: ctx.req,
+        body: body as never,
+        onBeforeGenerateToken: async (pathname, clientPayload) => {
+          const payload = clientPayload ? JSON.parse(clientPayload) as { activityId?: string } : {};
+          if (payload.activityId !== ctx.params.id || !pathname.startsWith(`exam-prep/${ctx.params.id}/`)) throw fail("PERM_FILE_DENIED", { message: "Blob 上傳範圍驗證失敗。" });
+          return { allowedContentTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp", "text/plain", "text/markdown", "application/json"], maximumSizeInBytes: 500 * 1024 * 1024, addRandomSuffix: true, tokenPayload: JSON.stringify({ userId: admin.userId, activityId: ctx.params.id }) };
+        },
+      });
+      return result;
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/activities/:id/imports/blob-complete",
+    auth: "admin",
+    rate: { limit: 100, windowSec: 3600, key: "exam-prep-blob-complete" },
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const target = await activity(ctx.params.id);
+      const body = await ctx.json(z.object({ files: z.array(z.object({ filename: z.string().min(1).max(180), pathname: z.string().min(1).max(500), size: z.number().int().positive(), contentType: z.string().min(1).max(120) })).min(1).max(20) }));
+      const imports: Array<{ id: string; filename: string; status: string }> = [];
+      for (const file of body.files) {
+        if (!file.pathname.startsWith(`exam-prep/${target.id}/`)) throw fail("PERM_FILE_DENIED", { message: "Blob 檔案路徑驗證失敗。" });
+        const blob = await head(file.pathname);
+        if (Number(blob.size) !== file.size) throw fail("FILE_UPLOAD_INCOMPLETE", { message: `${file.filename} 上傳大小驗證失敗。` });
+        const stored = await registerBlobObject({ userId: admin.userId, pathname: file.pathname, filename: file.filename, mimeType: file.contentType, sizeBytes: file.size });
+        const job = (await db.insert(examPrepImportJobs).values({ activityId: target.id, uploadedBy: admin.userId, filename: file.filename, mimeType: file.contentType.split(";")[0].toLowerCase(), objectId: stored.id, checksum: file.pathname, status: "uploaded", stage: "uploaded", progress: 0 }).returning())[0];
+        await queue().enqueue({ name: "exam_prep_import", payload: { jobId: job.id }, uniqueKey: `exam-prep-import:${job.id}` });
+        imports.push({ id: job.id, filename: job.filename, status: job.status });
+      }
+      void queue().drain(1);
+      return { activityId: target.id, imports };
+    },
+  }),
   route({
     method: "POST",
     path: "/admin/exam-prep/activities/:id/imports/upload-url",
