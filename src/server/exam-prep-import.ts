@@ -51,8 +51,13 @@ export async function processExamPrepImport(jobId: string) {
     const pageRows: Array<{ id: string; pageNumber: number; pageEnd: number; extractedText: string }> = [];
     for (const image of pageImages) {
       const existingChunk = chunks.find((chunk) => image.page >= chunk.pageStart && image.page <= chunk.pageEnd);
-      const pageObject = await putObject({ userId: job.uploadedBy, filename: `exam-prep-${job.id}-page-${image.page}.png`, mimeType: "image/png", data: Buffer.from(image.base64, "base64"), allow: ["image"] });
-      const page = (await db.insert(examPrepImportPages).values({ jobId, pageNumber: image.page, pageEnd: existingChunk?.pageEnd ?? image.page, objectId: pageObject.id, extractedText: existingChunk?.text ?? "", status: existingChunk?.text ? "ready" : "needs_ocr" }).returning({ id: examPrepImportPages.id, pageNumber: examPrepImportPages.pageNumber, pageEnd: examPrepImportPages.pageEnd, extractedText: examPrepImportPages.extractedText }))[0];
+      const pageData = Buffer.from(image.base64, "base64");
+      let pageText = existingChunk?.text ?? "";
+      if (!pageText) {
+        try { pageText = (await extractText("image/png", pageData, job.uploadedBy, subject)).trim(); } catch { pageText = ""; }
+      }
+      const pageObject = await putObject({ userId: job.uploadedBy, filename: `exam-prep-${job.id}-page-${image.page}.png`, mimeType: "image/png", data: pageData, allow: ["image"] });
+      const page = (await db.insert(examPrepImportPages).values({ jobId, pageNumber: image.page, pageEnd: existingChunk?.pageEnd ?? image.page, objectId: pageObject.id, extractedText: pageText, status: pageText ? "ready" : "needs_ocr" }).returning({ id: examPrepImportPages.id, pageNumber: examPrepImportPages.pageNumber, pageEnd: examPrepImportPages.pageEnd, extractedText: examPrepImportPages.extractedText }))[0];
       await db.insert(examPrepImportAssets).values({ jobId, pageId: page.id, assetType: "image", objectId: pageObject.id, pageNumber: image.page, label: `原卷第 ${image.page} 頁`, metadata: { source: "pdf-render" } });
       pageRows.push(page);
     }
@@ -60,7 +65,10 @@ export async function processExamPrepImport(jobId: string) {
       const page = (await db.insert(examPrepImportPages).values({ jobId, pageNumber: 1, pageEnd: 1, extractedText: text, status: text ? "ready" : "needs_ocr" }).returning({ id: examPrepImportPages.id, pageNumber: examPrepImportPages.pageNumber, pageEnd: examPrepImportPages.pageEnd, extractedText: examPrepImportPages.extractedText }))[0];
       pageRows.push(page);
     }
-    if (!chunks.length && text) chunks = [{ pageStart: 1, pageEnd: pageCount, text }];
+    if (!chunks.length) {
+      const ocrChunks = pageRows.filter((page) => page.extractedText.trim()).map((page) => ({ pageStart: page.pageNumber, pageEnd: page.pageEnd || page.pageNumber, text: page.extractedText }));
+      chunks = ocrChunks.length ? ocrChunks : text ? [{ pageStart: 1, pageEnd: pageCount, text }] : [];
+    }
     await updateJob(jobId, { stage: "question_split", progress: 60 });
     const drafts = chunks.flatMap((chunk) => parseNumberedChoiceQuestionText(chunk.text).map((question) => ({ jobId, activityId: job.activityId, questionNumber: question.questionNumber, pageStart: question.sourcePage ?? chunk.pageStart, pageEnd: chunk.pageEnd, type: question.type, subject, stem: question.stem, options: question.options, answer: question.answer, explanation: question.explanation, confidence: question.confidence, sourceMetadata: { filename: job.filename, pageStart: chunk.pageStart, pageEnd: chunk.pageEnd, answerSource: question.answerSource, parser: "deterministic-numbered-choice" }, status: "needs_review" as const })));
     if (drafts.length) await db.insert(examPrepQuestionDrafts).values(drafts);
