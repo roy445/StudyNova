@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { upload as uploadBlob } from "@vercel/blob/client";
+import { uploadPresigned as uploadBlob } from "@vercel/blob/client";
 import { useEffect, useState } from "react";
 import { APP_VERSION } from "@/lib/app-version";
 import { apiGet, apiPatch, apiPost, useApi } from "@/lib/api";
