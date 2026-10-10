@@ -1,11 +1,11 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { db } from "@/db";
 import { examPrepActivities, examPrepImportJobs, examPrepQuestionDrafts, questionBankMemberships, questionBanks, questionSources, questionVersions, questions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
-import { putObject, signObjectUrl } from "../storage";
+import { createPresignedUpload, objectOwner, putObject, signObjectUrl, verifyPresignedUpload } from "../storage";
 import { queue } from "../queue";
 import { checksum, listExamPrepImportDetails } from "../exam-prep-import";
 
@@ -48,6 +48,41 @@ async function activity(id: string) {
 export const routes: RouteDef[] = [
   route({
     method: "POST",
+    path: "/admin/exam-prep/activities/:id/imports/upload-url",
+    auth: "admin",
+    rate: { limit: 100, windowSec: 3600, key: "exam-prep-large-upload" },
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      await activity(ctx.params.id);
+      const body = await ctx.json(z.object({ files: z.array(z.object({ filename: z.string().min(1).max(180), contentType: z.string().min(1).max(120), size: z.number().int().positive().max(500 * 1024 * 1024) })).min(1).max(20) }));
+      const uploads = await Promise.all(body.files.map((file) => createPresignedUpload({ userId: admin.userId, filename: `exam-prep-${ctx.params.id}-${file.filename}`, mimeType: file.contentType, sizeBytes: file.size, allow: file.contentType.startsWith("image/") ? ["image"] : file.contentType === "application/pdf" ? ["pdf"] : ["text"], maxBytes: 500 * 1024 * 1024 })));
+      return { uploads };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/activities/:id/imports/complete",
+    auth: "admin",
+    rate: { limit: 100, windowSec: 3600, key: "exam-prep-large-upload-complete" },
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const target = await activity(ctx.params.id);
+      const body = await ctx.json(z.object({ files: z.array(z.object({ filename: z.string().min(1).max(180), objectId: z.string().uuid(), size: z.number().int().positive(), contentType: z.string().min(1).max(120) })).min(1).max(20) }));
+      const imports: Array<{ id: string; filename: string; status: string }> = [];
+      for (const file of body.files) {
+        const owner = await objectOwner(file.objectId);
+        if (!owner || owner.userId !== admin.userId) throw fail("PERM_FILE_DENIED", { message: "上傳檔案擁有者驗證失敗。" });
+        await verifyPresignedUpload(file.objectId, file.size, file.contentType.split(";")[0].toLowerCase());
+        const job = (await db.insert(examPrepImportJobs).values({ activityId: target.id, uploadedBy: admin.userId, filename: file.filename, mimeType: file.contentType.split(";")[0].toLowerCase(), objectId: file.objectId, checksum: file.objectId, status: "uploaded", stage: "uploaded", progress: 0 }).returning())[0];
+        await queue().enqueue({ name: "exam_prep_import", payload: { jobId: job.id }, uniqueKey: `exam-prep-import:${job.id}` });
+        imports.push({ id: job.id, filename: job.filename, status: job.status });
+      }
+      void queue().drain(1);
+      return { activityId: target.id, imports };
+    },
+  }),
+  route({
+    method: "POST",
     path: "/admin/exam-prep/activities/:id/imports",
     auth: "admin",
     rate: { limit: 20, windowSec: 3600, key: "exam-prep-import" },
@@ -82,7 +117,20 @@ export const routes: RouteDef[] = [
     auth: "admin",
     handler: async (ctx) => {
       await activity(ctx.params.id);
-      const jobs = await db.select().from(examPrepImportJobs).where(eq(examPrepImportJobs.activityId, ctx.params.id)).orderBy(desc(examPrepImportJobs.createdAt)).limit(100);
+      const jobs = await db.select({
+        id: examPrepImportJobs.id,
+        activityId: examPrepImportJobs.activityId,
+        filename: examPrepImportJobs.filename,
+        mimeType: examPrepImportJobs.mimeType,
+        status: examPrepImportJobs.status,
+        stage: examPrepImportJobs.stage,
+        progress: examPrepImportJobs.progress,
+        pageCount: examPrepImportJobs.pageCount,
+        draftCount: examPrepImportJobs.draftCount,
+        errorMessage: sql<string>`left(${examPrepImportJobs.errorMessage}, 500)`.as("error_message"),
+        createdAt: examPrepImportJobs.createdAt,
+        updatedAt: examPrepImportJobs.updatedAt,
+      }).from(examPrepImportJobs).where(eq(examPrepImportJobs.activityId, ctx.params.id)).orderBy(desc(examPrepImportJobs.createdAt)).limit(50);
       return { imports: jobs };
     },
   }),

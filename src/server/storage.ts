@@ -47,12 +47,14 @@ async function s3Client() {
   });
 }
 
-export async function createPresignedUpload(params: { userId: string; filename: string; mimeType: string; sizeBytes: number }) {
+export async function createPresignedUpload(params: { userId: string; filename: string; mimeType: string; sizeBytes: number; allow?: Array<keyof typeof ALLOWED_MIME>; maxBytes?: number }) {
   const { userId, filename, mimeType, sizeBytes } = params;
   if (!s3Configured()) throw fail("FILE_STORAGE_MISCONFIG", { message: "Vercel 直傳需要設定 S3 / R2 Object Storage" });
-  if (!sizeBytes || sizeBytes > MAX_BYTES) throw fail("FILE_TOO_LARGE", { hint: `單檔上限為 ${(MAX_BYTES / 1024 / 1024).toFixed(0)}MB，請壓縮後再上傳。` });
+  const maxBytes = params.maxBytes ?? MAX_BYTES;
+  if (!sizeBytes || sizeBytes > maxBytes) throw fail("FILE_TOO_LARGE", { hint: `單檔上限為 ${(maxBytes / 1024 / 1024).toFixed(0)}MB，請壓縮後再上傳。` });
   const baseMime = mimeType.split(";")[0].trim().toLowerCase();
-  if (![...ALLOWED_MIME.image, ...ALLOWED_MIME.pdf].includes(baseMime)) throw fail("FILE_MIME_UNSUPPORTED", { message: `不支援的檔案類型：${baseMime}` });
+  const allowedMimes = (params.allow ?? ["image", "pdf"]).flatMap((key) => ALLOWED_MIME[key]);
+  if (!allowedMimes.includes(baseMime)) throw fail("FILE_MIME_UNSUPPORTED", { message: `不支援的檔案類型：${baseMime}` });
   const ext = extensionOf(filename);
   if (ext && !EXT_WHITELIST.has(ext)) throw fail("FILE_EXT_UNSUPPORTED", { message: `不支援的副檔名：.${ext}` });
   const storageKey = `${userId}/weekly/${new Date().toISOString().slice(0, 10)}/${randomToken(18)}${ext ? `.${ext}` : ""}`;

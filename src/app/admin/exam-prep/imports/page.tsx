@@ -14,6 +14,7 @@ type Details = { job: ImportJob; drafts: Draft[]; pages: Array<{ id: string; pag
 
 const labels: Record<string, string> = { uploaded: "等待處理", processing: "解析中", pending_review: "待人工審核", completed: "已完成", failed: "失敗", cancelled: "已取消" };
 const analysisLabels: Record<string, string> = { queued: "等待 AI", analyzing: "AI 分析中", completed: "分析完成", quality_failed: "品質未通過", failed: "分析失敗" };
+function contentTypeOf(file: File) { if (file.type) return file.type; if (/\.pdf$/i.test(file.name)) return "application/pdf"; if (/\.png$/i.test(file.name)) return "image/png"; if (/\.jpe?g$/i.test(file.name)) return "image/jpeg"; if (/\.webp$/i.test(file.name)) return "image/webp"; if (/\.md$/i.test(file.name)) return "text/markdown"; if (/\.json$/i.test(file.name)) return "application/json"; return "text/plain"; }
 
 export default function AdminExamPrepImportsPage() {
   const toast = useToast();
@@ -35,8 +36,17 @@ export default function AdminExamPrepImportsPage() {
   }
   async function upload(files: FileList | null) {
     if (!files?.length || !selectedActivityId) return;
-    const form = new FormData(); Array.from(files).forEach((file) => form.append("files", file)); setBusy(true);
-    try { await apiPost(`/admin/exam-prep/activities/${selectedActivityId}/imports`, form); toast.push("success", "考卷已加入背景解析"); await loadJobs(); }
+    const selectedFiles = Array.from(files);
+    setBusy(true);
+    try {
+      const uploadPlan = await apiPost<{ uploads: Array<{ objectId: string; uploadUrl: string; contentType: string }> }>(`/admin/exam-prep/activities/${selectedActivityId}/imports/upload-url`, { files: selectedFiles.map((file) => ({ filename: file.name, contentType: contentTypeOf(file), size: file.size })) });
+      await Promise.all(uploadPlan.uploads.map(async (uploadItem, index) => {
+        const response = await fetch(uploadItem.uploadUrl, { method: "PUT", headers: { "Content-Type": uploadItem.contentType }, body: selectedFiles[index] });
+        if (!response.ok) throw new Error(`${selectedFiles[index].name} 直傳失敗（${response.status}）`);
+      }));
+      await apiPost(`/admin/exam-prep/activities/${selectedActivityId}/imports/complete`, { files: uploadPlan.uploads.map((uploadItem, index) => ({ filename: selectedFiles[index].name, objectId: uploadItem.objectId, size: selectedFiles[index].size, contentType: uploadItem.contentType })) });
+      toast.push("success", `已直傳 ${selectedFiles.length} 份考卷，加入背景解析`); await loadJobs();
+    }
     catch (error) { toast.push("error", error instanceof Error ? error.message : "上傳失敗"); }
     finally { setBusy(false); }
   }
