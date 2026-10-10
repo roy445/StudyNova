@@ -238,5 +238,14 @@ export const learningCurriculum = {
   chemistry: { chapter: chemistryChapter, lessons: chemistryLessons },
   math: { chapter: mathChapter, lessons: mathLessons },
   history: { chapter: historyChapter, lessons: historyLessons },
-  physics: { chapter: { ...physicsChapter, slug: "ch1-4", title: "高一基礎物理 CH1–CH4", subtitle: "依教材順序完整整理物理學與人類生活、運動與力、熱、聲音四章。", sourcePages: "PDF 第 1–131 頁" }, lessons: [...physicsExtraLessons.slice(0, 3), ...physicsExtraLessons.slice(3, 7), ...physicsLessons, ...physicsExtraLessons.slice(7)] },
+  physics: (() => {
+    const lessons = [...physicsExtraLessons.slice(0, 3), ...physicsExtraLessons.slice(3, 7), ...physicsLessons, ...physicsExtraLessons.slice(7)];
+    const chapters = [
+      { ...physicsChapter, slug: "ch1", title: "CH1 物理學與人類生活", subtitle: "從物理學簡史、科學方法、量測到物理與科技。", sourcePages: "PDF 第 30–74 頁", lessons: lessons.filter((lesson) => lesson.number.startsWith("1-")) },
+      { ...physicsChapter, slug: "ch2", title: "CH2 運動與力", subtitle: "從位置、速度與加速度，建立牛頓運動定律、能量與動量觀念。", sourcePages: "PDF 第 75–131 頁", lessons: lessons.filter((lesson) => lesson.number.startsWith("2-")) },
+      { ...physicsChapter, slug: "ch3", title: "CH3 熱", subtitle: "從溫度、熱量與比熱，理解物態變化、熱傳播，以及冰箱與保溫等生活應用。", sourcePages: "PDF 第 1–14 頁", lessons: lessons.filter((lesson) => lesson.number.startsWith("3-")) },
+      { ...physicsChapter, slug: "ch4", title: "CH4 聲音", subtitle: "從波動、聲速、分貝、反射與共鳴理解聲音的物理。", sourcePages: "PDF 第 16–28 頁", lessons: lessons.filter((lesson) => lesson.number.startsWith("4-")) },
+    ] as const;
+    return { chapter: chapters[0], chapters, lessons };
+  })(),
 } as const;
