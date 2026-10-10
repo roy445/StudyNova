@@ -20,6 +20,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
   const quizGenerateCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
   const [genOpen, setGenOpen] = useState(autoGenerate);
   const [form, setForm] = useState({ subject: "英文", topic: "", materialId: "", sourceText: "", count: 5, difficulty: "normal", type: "single", timeLimitSec: 600 });
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [active, setActive] = useState<{ quiz: Quiz; questions: QuizQuestion[]; attemptId: string } | null>(null);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [remaining, setRemaining] = useState(0);
@@ -66,6 +67,16 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
     if (!confirmNovaSpend("AI 產生測驗", quizGenerateCost)) return;
     setBusy(true);
     try {
+      let materialId = form.materialId;
+      if (sourceFile) {
+        const materialForm = new FormData();
+        materialForm.append("title", `AI出題教材・${sourceFile.name}`);
+        materialForm.append("subject", form.subject);
+        materialForm.append("file", sourceFile);
+        const created = await apiPost<{ material: { id: string } }>("/materials", materialForm);
+        materialId = created.material.id;
+        await materials.reload();
+      }
       const payload: Record<string, unknown> = {
         subject: form.subject,
         topic: form.topic,
@@ -74,11 +85,12 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
         type: form.type,
         timeLimitSec: form.timeLimitSec,
       };
-      if (form.materialId) payload.materialId = form.materialId;
+      if (materialId) payload.materialId = materialId;
       else payload.sourceText = form.sourceText;
       const res = await apiPost<{ quiz: Quiz; generated: number }>("/quizzes/generate", payload);
       toast.push("success", `已產生 ${res.generated} 題`);
       setGenOpen(false);
+      setSourceFile(null);
       await list.reload();
     } catch (err) {
       toast.push("error", errorMessage(err));
@@ -289,6 +301,10 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
               ))}
             </Select>
           </Field>
+          <Field label="直接上傳檔案（選填）" hint="支援 PDF、TXT、Markdown 與圖片；上傳後會先保存到教材專區，再用來出題">
+            <input type="file" accept=".pdf,.txt,.md,image/*" onChange={(e) => { setSourceFile(e.target.files?.[0] ?? null); setForm({ ...form, materialId: "" }); }} className="w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2 text-xs" />
+            {sourceFile && <p className="mt-1 text-xs text-[#7dd3fc]">已選擇：{sourceFile.name}</p>}
+          </Field>
           {!form.materialId && (
             <Field label="教材內容" hint="至少 20 個字，AI 只會依此內容出題">
               <textarea
@@ -298,6 +314,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
               />
             </Field>
           )}
+          {!form.materialId && !sourceFile && form.sourceText.trim().length < 20 && <p className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs leading-5 text-amber-100">請上傳要出題的檔案、選擇既有教材，或先到「教材專區」上傳內容後再回來出題。</p>}
           <Button full loading={busy} onClick={generate}>
             產生測驗
           </Button>

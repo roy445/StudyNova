@@ -98,7 +98,7 @@ export const contentRoutes: RouteDef[] = [
       const user = ctx.requireUser();
       const form = await ctx.formData();
       const title = String(form.get("title") ?? "").slice(0, 120);
-      const subject = "英文";
+      const subject = String(form.get("subject") ?? "英文").trim().slice(0, 20) || "英文";
       const rawText = String(form.get("content") ?? "");
       const file = form.get("file");
 
@@ -108,7 +108,7 @@ export const contentRoutes: RouteDef[] = [
 
       const created = await db
         .insert(studyMaterials)
-        .values({ userId: user.userId, title, subject: "英文", kind: file instanceof File ? "pdf" : "text", status: "processing", content: sanitizeText(rawText) })
+        .values({ userId: user.userId, title, subject, kind: file instanceof File ? "pdf" : "text", status: "processing", content: sanitizeText(rawText) })
         .returning();
       const material = created[0];
       let storedObjectId: string | null = null;

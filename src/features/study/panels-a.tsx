@@ -18,6 +18,7 @@ export function MaterialsPanel() {
   const materialCost = quotas.data?.quotas.find((item) => item.feature === "material_organize")?.novaCost ?? null;
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("英文");
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -88,13 +89,14 @@ export function MaterialsPanel() {
     try {
       const fd = new FormData();
       fd.append("title", title);
-      fd.append("subject", "英文");
+      fd.append("subject", subject);
       fd.append("content", content);
       if (file) fd.append("file", file);
       await apiPost("/materials", fd);
       toast.push("success", "教材已上傳並完成文字擷取");
       setOpen(false);
       setTitle("");
+      setSubject("英文");
       setContent("");
       setFile(null);
       await reload();
@@ -190,7 +192,7 @@ export function MaterialsPanel() {
   return (
     <Card
       title="📚 我的教材"
-      subtitle="英文教材專區：支援 PDF、TXT、圖片與直接貼上文字，上傳後可讓 AI 整理英文重點、單字與題目"
+      subtitle="教材專區：支援各科 PDF、TXT、圖片與直接貼上文字，上傳後可交給 AI幫你出題"
       action={<Button size="sm" onClick={() => setOpen(true)}>＋ 新增教材</Button>}
     >
       <NovaCostNotice cost={materialCost} action="AI 整理教材" className="mb-3" />
@@ -241,10 +243,8 @@ export function MaterialsPanel() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="新增教材">
         <div className="space-y-3">
-          <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs text-cyan-100">此教材流程目前聚焦英文科目；其他科目請到解題專區或詢問 Novi。</div>
-          <Field label="標題" required>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：英文閱讀測驗／英文文法講義" />
-          </Field>
+          <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs text-cyan-100">可上傳 PDF、TXT、Markdown 或圖片；上傳後可直接提供給 AI幫你出。</div>
+          <div className="grid grid-cols-2 gap-3"><Field label="標題" required><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：物理第三章" /></Field><Field label="科目"><Select value={subject} onChange={(e) => setSubject(e.target.value)}>{SUBJECTS.map((item) => <option key={item}>{item}</option>)}</Select></Field></div>
           <Field label="檔案（PDF / TXT / 圖片）" hint="圖片與 PDF 會使用 AI 進行文字擷取，會消耗「教材整理」額度">
             <input
               type="file"

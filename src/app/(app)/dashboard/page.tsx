@@ -118,6 +118,13 @@ export default function DashboardPage() {
         </div>
       </Card>
 
+      <section aria-label="StudyNova 主打功能" className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <Link href="/study?tab=ai-generate" className="group col-span-2 flex items-center justify-between rounded-2xl border-2 border-violet-300/45 bg-[radial-gradient(circle_at_85%_15%,rgba(55,211,255,.25),transparent_35%),linear-gradient(135deg,rgba(124,92,255,.25),rgba(7,22,42,.92))] p-4 transition hover:-translate-y-0.5 hover:border-violet-200/80 sm:p-5"><div><Badge tone="violet">主打功能</Badge><h2 className="mt-2 text-xl font-black text-white sm:text-2xl">AI幫你出</h2><p className="mt-1 text-xs leading-5 text-slate-200 sm:text-sm">上傳教材或檔案，快速產生專屬測驗。</p></div><span className="text-5xl opacity-80 sm:text-6xl">✦</span></Link>
+        <Link href="/study?tab=ocr" className="group rounded-2xl border border-emerald-300/35 bg-emerald-300/[0.06] p-3 transition hover:-translate-y-0.5 hover:border-emerald-200/75 sm:p-4"><span className="text-3xl">▧</span><h3 className="mt-2 font-black">圖片 OCR</h3><p className="mt-1 text-xs leading-5 text-muted">拍照辨識講義與題目。</p></Link>
+        <Link href="/learning" className="group rounded-2xl border border-cyan-300/30 bg-cyan-300/[0.06] p-3 transition hover:-translate-y-0.5 hover:border-cyan-200/75 sm:p-4"><span className="text-3xl">📚</span><h3 className="mt-2 font-black">繼續學習</h3><p className="mt-1 text-xs leading-5 text-muted">回到線上課程與教材。</p></Link>
+        <Link href="/study?tab=quiz" className="group rounded-2xl border border-amber-300/30 bg-amber-300/[0.05] p-3 transition hover:-translate-y-0.5 hover:border-amber-200/75 sm:p-4"><span className="text-3xl">✓</span><h3 className="mt-2 font-black">練習與單字</h3><p className="mt-1 text-xs leading-5 text-muted">測驗、錯題與單字複習。</p></Link>
+      </section>
+
       {/* Novi greeting */}
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-col gap-3 bg-gradient-to-r from-[#7c5cff]/20 via-transparent to-[#37d3ff]/10 p-4 sm:flex-row sm:items-center sm:p-5">
