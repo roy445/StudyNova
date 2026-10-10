@@ -3400,6 +3400,92 @@ export const examPrepSubjects = pgTable(
   (t) => [uniqueIndex("exam_prep_subjects_activity_subject_uq").on(t.activityId, t.subject), index("exam_prep_subjects_activity_idx").on(t.activityId)],
 );
 
+export const examPrepImportJobs = pgTable(
+  "exam_prep_import_jobs",
+  {
+    id: id(),
+    activityId: uuid("activity_id").notNull().references(() => examPrepActivities.id, { onDelete: "cascade" }),
+    uploadedBy: uuid("uploaded_by").notNull().references(() => users.userId, { onDelete: "restrict" }),
+    filename: text("filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    objectId: uuid("object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    checksum: text("checksum").notNull().default(""),
+    status: text("status").notNull().default("uploaded"), // uploaded | processing | pending_review | completed | failed | cancelled
+    stage: text("stage").notNull().default("uploaded"), // upload | pages | ocr | question_split | ready | failed
+    progress: integer("progress").notNull().default(0),
+    pageCount: integer("page_count").notNull().default(0),
+    draftCount: integer("draft_count").notNull().default(0),
+    errorMessage: text("error_message").notNull().default(""),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_prep_import_jobs_activity_idx").on(t.activityId, t.createdAt), index("exam_prep_import_jobs_status_idx").on(t.status, t.updatedAt), index("exam_prep_import_jobs_uploader_idx").on(t.uploadedBy, t.createdAt)],
+);
+
+export const examPrepImportPages = pgTable(
+  "exam_prep_import_pages",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => examPrepImportJobs.id, { onDelete: "cascade" }),
+    pageNumber: integer("page_number").notNull(),
+    pageEnd: integer("page_end").notNull().default(0),
+    objectId: uuid("object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    extractedText: text("extracted_text").notNull().default(""),
+    ocrBlocks: jsonb("ocr_blocks").$type<Array<Record<string, unknown>>>().notNull().default([]),
+    width: integer("width"),
+    height: integer("height"),
+    status: text("status").notNull().default("ready"), // ready | needs_ocr | failed
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex("exam_prep_import_pages_job_page_uq").on(t.jobId, t.pageNumber), index("exam_prep_import_pages_job_idx").on(t.jobId, t.pageNumber)],
+);
+
+export const examPrepImportAssets = pgTable(
+  "exam_prep_import_assets",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => examPrepImportJobs.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").references(() => examPrepImportPages.id, { onDelete: "set null" }),
+    assetType: text("asset_type").notNull().default("image"), // image | figure | table | diagram
+    objectId: uuid("object_id").notNull().references(() => storageObjects.id, { onDelete: "cascade" }),
+    pageNumber: integer("page_number"),
+    bbox: jsonb("bbox").$type<{ x: number; y: number; width: number; height: number } | null>(),
+    label: text("label").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [index("exam_prep_import_assets_job_idx").on(t.jobId, t.pageNumber), index("exam_prep_import_assets_page_idx").on(t.pageId)],
+);
+
+export const examPrepQuestionDrafts = pgTable(
+  "exam_prep_question_drafts",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => examPrepImportJobs.id, { onDelete: "cascade" }),
+    activityId: uuid("activity_id").notNull().references(() => examPrepActivities.id, { onDelete: "cascade" }),
+    questionNumber: integer("question_number"),
+    pageStart: integer("page_start"),
+    pageEnd: integer("page_end"),
+    type: text("type").notNull().default("single"),
+    subject: text("subject").notNull().default("其他"),
+    stem: text("stem").notNull(),
+    options: jsonb("options").$type<string[]>().notNull().default([]),
+    answer: jsonb("answer").$type<string[]>().notNull().default([]),
+    explanation: text("explanation").notNull().default(""),
+    confidence: real("confidence").notNull().default(0),
+    sourceMetadata: jsonb("source_metadata").$type<Record<string, unknown>>().notNull().default({}),
+    status: text("status").notNull().default("needs_review"), // needs_review | approved | rejected
+    questionId: uuid("question_id").references(() => questions.id, { onDelete: "set null" }),
+    adminNote: text("admin_note").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_prep_question_drafts_job_idx").on(t.jobId, t.questionNumber), index("exam_prep_question_drafts_activity_idx").on(t.activityId, t.status), index("exam_prep_question_drafts_page_idx").on(t.jobId, t.pageStart)],
+);
+
 export const examHubWords = pgTable(
   "exam_hub_words",
   {

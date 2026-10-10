@@ -35,6 +35,7 @@ import { processAiBackgroundBatch } from "./ai-background";
 import { processPkBotJob } from "./pk-bot-engine";
 import { DAILY_KNOWLEDGE_SUBJECTS, generateDailyKnowledge, fingerprint } from "./daily-knowledge";
 import { publishScheduledRelease } from "./release-publisher";
+import { processExamPrepImport } from "./exam-prep-import";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -57,7 +58,8 @@ export type JobName =
   | "pk_bot_turn"
   | "data_retention"
   | "name_moderation_scan"
-  | "release_publish";
+  | "release_publish"
+  | "exam_prep_import";
 
 
 export type JobPayload = Record<string, unknown>;
@@ -78,6 +80,13 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     const scheduledAt = typeof payload.scheduledAt === "string" ? payload.scheduledAt : "";
     if (!releaseId || !scheduledAt) throw new Error("release_publish job requires releaseId and scheduledAt");
     return publishScheduledRelease(releaseId, scheduledAt);
+  },
+
+  async exam_prep_import(payload) {
+    const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
+    if (!jobId) throw new Error("缺少段考考卷匯入工作 ID");
+    const result = await processExamPrepImport(jobId);
+    return `段考考卷匯入 ${jobId}：${result.status}，產生 ${result.draftCount} 題草稿`;
   },
 
   async daily_tasks_refresh() {

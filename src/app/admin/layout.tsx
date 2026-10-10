@@ -51,6 +51,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/challenges", label: "挑戰題庫・挑戰管理", icon: "challenge" },
       { href: "/admin/online-pk", label: "線上 PK・賽場監控", icon: "challenge" },
       { href: "/admin/exam-prep", label: "段考衝刺活動", icon: "weekly" },
+      { href: "/admin/exam-prep/imports", label: "段考考卷匯入", icon: "weekly" },
     ],
   },
   {
