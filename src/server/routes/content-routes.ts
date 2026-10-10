@@ -33,9 +33,15 @@ import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
 import { subjectStrategy } from "../subject-strategies";
 import { naturalExamplePrompt } from "../vocabulary-quality";
-
+import { extractPdfTextPages } from "../pdf-question-extract";
 export async function extractText(mime: string, data: Buffer, userId: string, subject = "其他"): Promise<string> {
   if (mime.startsWith("text/") || mime === "application/json") return sanitizeText(data.toString("utf8"));
+  if (mime === "application/pdf") {
+    const pages = await extractPdfTextPages(data);
+    const textLayer = pages.map((text, index) => `[第 ${index + 1} 頁]\n${text}`).join("\n").trim();
+    if (textLayer.length >= 20) return sanitizeText(textLayer);
+    throw badRequest("這份 PDF 沒有可確認的完整文字層，請先到圖片 OCR 逐頁辨識後，再交給 AI幫你出題。");
+  }
   if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED", { hint: "此檔案需要 AI 視覺辨識。你可以改上傳純文字檔，或請管理員設定 AI Provider。" });
   const res = await runAi({
     feature: mime === "application/pdf" ? "material_pdf_extract" : "ocr",
@@ -48,7 +54,9 @@ export async function extractText(mime: string, data: Buffer, userId: string, su
     maxOutputTokens: 4000,
     temperature: 0.1,
   });
-  return sanitizeText(res.text);
+  const extracted = sanitizeText(res.text);
+  if (extracted.length < 20) throw badRequest("檔案文字擷取不足，無法確認已完整讀取教材；請改用圖片 OCR 或上傳具有文字層的 PDF。");
+  return extracted;
 }
 
 const visibility = z.enum(["private", "friends", "group", "link", "public"]);
@@ -116,12 +124,14 @@ export const contentRoutes: RouteDef[] = [
       try {
         if (file instanceof File) {
           const buf = Buffer.from(await file.arrayBuffer());
-          const mime = file.type || "application/octet-stream";
+          const extension = file.name.toLowerCase().match(/\.[a-z0-9]{1,8}$/)?.[0] ?? "";
+          const mime = file.type || ({ ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/markdown", ".json": "application/json" }[extension] ?? (extension === ".png" ? "image/png" : extension === ".jpg" || extension === ".jpeg" ? "image/jpeg" : "application/octet-stream"));
           const stored = await putObject({ userId: user.userId, filename: file.name, mimeType: mime, data: buf, allow: ["pdf", "text", "image"] });
           storedObjectId = stored.id;
           const kind = mime === "application/pdf" ? "pdf" : mime.startsWith("image/") ? "image" : "txt";
           if (kind !== "txt") await consumeFeature(user.userId, "material_organize");
           const text = await extractText(mime, buf, user.userId, subject);
+          if (text.trim().length < 20) throw badRequest("檔案文字擷取不足，請改用清晰圖片／PDF，或先到圖片 OCR 確認內容後再出題。");
           await db.insert(studyMaterialPages).values({ materialId: material.id, pageNumber: 1, text, objectId: stored.id });
           await db
             .update(studyMaterials)

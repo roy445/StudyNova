@@ -1,5 +1,6 @@
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { WorkerMessageHandler } from "pdfjs-dist/legacy/build/pdf.worker.mjs";
+import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api";
 import { createCanvas } from "@napi-rs/canvas";
 export type PdfTextChunk = { pageStart: number; pageEnd: number; text: string };
 export type PdfImagePage = { page: number; base64: string };
@@ -41,14 +42,7 @@ export async function extractPdfQuestionChunks(buffer: Buffer, maxCharsPerChunk 
   const workerGlobal = globalThis as typeof globalThis & { pdfjsWorker?: { WorkerMessageHandler: typeof WorkerMessageHandler } };
   workerGlobal.pdfjsWorker ??= { WorkerMessageHandler };
   const pdf = await getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false, isEvalSupported: false, disableFontFace: true }).promise;
-  const pages: string[] = [];
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const text = content.items.map((item) => "str" in item ? item.str : "").join(" ").replace(/\s+/g, " ").trim();
-    pages.push(text);
-    page.cleanup();
-  }
+  const pages = await extractPdfTextPagesFromDocument(pdf);
   const chunks: PdfTextChunk[] = [];
   let current = "";
   let pageStart = 1;
@@ -63,6 +57,24 @@ export async function extractPdfQuestionChunks(buffer: Buffer, maxCharsPerChunk 
   }
   if (current.trim()) chunks.push({ pageStart, pageEnd: pages.length, text: current });
   return chunks;
+}
+
+async function extractPdfTextPagesFromDocument(pdf: PDFDocumentProxy): Promise<string[]> {
+  const pages: string[] = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pages.push(content.items.map((item) => "str" in item ? item.str : "").join(" ").replace(/\s+/g, " ").trim());
+    page.cleanup();
+  }
+  return pages;
+}
+
+export async function extractPdfTextPages(buffer: Buffer): Promise<string[]> {
+  const workerGlobal = globalThis as typeof globalThis & { pdfjsWorker?: { WorkerMessageHandler: typeof WorkerMessageHandler } };
+  workerGlobal.pdfjsWorker ??= { WorkerMessageHandler };
+  const pdf = await getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false, isEvalSupported: false, disableFontFace: true }).promise;
+  return extractPdfTextPagesFromDocument(pdf);
 }
 
 /** Render scanned pages so a PDF without a text layer is still sent as a real image. */
