@@ -7,6 +7,11 @@ describe("quiz option diversity", () => {
     expect(normalizeQuizOption("ｄｉｆｆｉｃｕｌｔ")).toBe("difficult");
   });
 
+  it("does not throw when an AI field is missing", () => {
+    expect(normalizeQuizOption(undefined as unknown as string)).toBe("");
+    expect(normalizeQuestionStem(undefined as unknown as string)).toBe("");
+  });
+
   it("counts all options across the complete quiz and detects same-question duplicates", () => {
     const result = validateQuizOptionPool([
       { stem: "1", answer: ["difficult"], options: ["difficult", "easy", "simple", "hard"] },

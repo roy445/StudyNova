@@ -514,8 +514,8 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   throw fail("AI_ALL_UNAVAILABLE", { message, details: { category: lastCategory, reason: lastReason } });
 }
 
-export function extractJson<T>(raw: string, fallback: T): T {
-  const cleaned = raw
+export function extractJson<T>(raw: string | null | undefined, fallback: T): T {
+  const cleaned = String(raw ?? "")
     .replace(/^\s*```(?:json|javascript|js)?\s*/i, "")
     .replace(/\s*```\s*$/i, "")
     .trim();

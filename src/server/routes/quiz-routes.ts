@@ -38,7 +38,7 @@ type GeneratedQuestion = {
 };
 
 export function normalizeQuizOption(value: string): string {
-  return value.normalize("NFKC").trim().toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ");
+  return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ");
 }
 
 type NormalizedQuestion = { options: string[]; answer: string[]; stem: string };
@@ -97,7 +97,7 @@ export function validateEnglishQuizOptions(items: StrictEnglishQuestion[]) {
 }
 
 export function normalizeQuestionStem(value: string): string {
-  return value.normalize("NFKC").trim().toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ");
+  return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ");
 }
 
 export function filterDuplicateQuestions<T extends { stem: string; options: string[] }>(items: T[], reservedStems: Set<string> = new Set()) {

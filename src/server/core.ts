@@ -73,7 +73,7 @@ export const randomToken = (bytes = 32) => randomBytes(bytes).toString("base64ur
 export const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 export const slugToken = (len = 12) => randomBytes(32).toString("base64url").slice(0, len);
 export function fingerprint(...parts: string[]): string {
-  return sha256(parts.map((p) => p.replace(/\s+/g, " ").trim().toLowerCase()).join("|"));
+  return sha256(parts.map((p) => String(p ?? "").replace(/\s+/g, " ").trim().toLowerCase()).join("|"));
 }
 export const joinCode = () => {
   const b = randomBytes(6);
