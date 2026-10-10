@@ -56,6 +56,7 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const admin = ctx.requireUser();
       await activity(ctx.params.id);
+      if (!process.env.BLOB_READ_WRITE_TOKEN) throw fail("FILE_STORAGE_MISCONFIG", { message: "Vercel Blob 尚未連接到此 Vercel Project，請設定 BLOB_READ_WRITE_TOKEN 後重新部署。" });
       const body = await ctx.json(z.record(z.string(), z.unknown()));
       const result = await handleUpload({
         request: ctx.req,

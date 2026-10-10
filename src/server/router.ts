@@ -197,7 +197,7 @@ export async function handleApiRequest(req: Request, pathSegments: string[]): Pr
     else if (def.auth === "optional") user = (await getSession())?.user ?? null;
     if (user) void touchLastSeen(user.userId);
 
-    const versionExempt = def.path.startsWith("/auth") || def.path.startsWith("/releases") || def.path.startsWith("/admin/releases") || def.path.startsWith("/support") || def.path === "/health" || def.path === "/system/cron";
+    const versionExempt = def.path.startsWith("/auth") || def.path.startsWith("/releases") || def.path.startsWith("/admin/releases") || def.path.startsWith("/support") || def.path === "/health" || def.path === "/system/cron" || def.path === "/admin/exam-prep/activities/:id/imports/blob-upload" || def.path === "/admin/exam-prep/activities/:id/imports/blob-complete";
     if (user && !versionExempt) {
       const minimum = await minimumSupportedVersion();
       if (compareSemVer(minimum, "1.0.0") > 0) {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { upload as uploadBlob } from "@vercel/blob/client";
 import { useEffect, useState } from "react";
+import { APP_VERSION } from "@/lib/app-version";
 import { apiGet, apiPatch, apiPost, useApi } from "@/lib/api";
 import { Badge, Button, Card, EmptyState, Field, Select, useToast } from "@/components/ui";
 
@@ -40,7 +41,7 @@ export default function AdminExamPrepImportsPage() {
     const selectedFiles = Array.from(files);
     setBusy(true);
     try {
-      const uploaded = await Promise.all(selectedFiles.map((file) => uploadBlob(`exam-prep/${selectedActivityId}/${file.name}`, file, { access: "private", contentType: contentTypeOf(file), handleUploadUrl: `/api/v1/admin/exam-prep/activities/${selectedActivityId}/imports/blob-upload`, clientPayload: JSON.stringify({ activityId: selectedActivityId }), multipart: file.size > 50 * 1024 * 1024 })));
+      const uploaded = await Promise.all(selectedFiles.map((file) => uploadBlob(`exam-prep/${selectedActivityId}/${file.name}`, file, { access: "private", contentType: contentTypeOf(file), handleUploadUrl: `/api/v1/admin/exam-prep/activities/${selectedActivityId}/imports/blob-upload`, clientPayload: JSON.stringify({ activityId: selectedActivityId }), multipart: file.size > 50 * 1024 * 1024, headers: { "x-studynova-version": APP_VERSION } })));
       await apiPost(`/admin/exam-prep/activities/${selectedActivityId}/imports/blob-complete`, { files: uploaded.map((blob, index) => ({ filename: selectedFiles[index].name, pathname: blob.pathname, size: selectedFiles[index].size, contentType: contentTypeOf(selectedFiles[index]) })) });
       toast.push("success", `已直傳 ${selectedFiles.length} 份考卷，加入背景解析`); await loadJobs();
     }
