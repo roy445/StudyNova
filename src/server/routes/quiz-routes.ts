@@ -196,7 +196,9 @@ export async function generateQuestions(params: {
     usedOptionPool = validation.usedOptions;
     if (candidate.length >= params.count && !validation.sameQuestionDuplicate && !validation.excessiveCrossQuestionDuplicates && strictValidation.valid) break;
   }
-  if (!cleaned.length || cleaned.length < params.count || (strictEnglishOptions && !validateEnglishQuizOptions(cleaned).valid)) throw fail("AI_NO_VALID_QUESTIONS");
+  // Keep every valid question; a specialised or short source may not support
+  // the requested count, but that must not discard the valid questions.
+  if (!cleaned.length) throw fail("AI_NO_VALID_QUESTIONS");
 
   const ids: string[] = [];
   for (const q of cleaned) {
@@ -285,7 +287,7 @@ export const routes: RouteDef[] = [
           topic: z.string().max(80).optional(),
           materialId: z.string().uuid().nullable().optional(),
           sourceText: z.string().max(20000).optional(),
-          count: z.number().int().min(1).max(20).default(5),
+          count: z.number().int().min(1).max(50).default(5),
           difficulty,
           type: qType.default("single"),
           timeLimitSec: z.number().int().min(60).max(7200).default(600),
@@ -300,10 +302,9 @@ export const routes: RouteDef[] = [
         if (!m) throw notFound("找不到教材");
         if (m.userId !== user.userId) throw fail("PERM_NOT_OWNER");
         if (m.status !== "ready") throw fail("REQ_VALIDATION", { message: "教材尚未完成處理，請等待教材狀態變成 ready 後再出題。" });
-        if (!m.content?.trim()) throw fail("REQ_CONTENT_TOO_SHORT", { message: "選定教材沒有可讀內容，請重新上傳或先使用圖片 OCR。" });
-        sourceText = `【指定教材：${m.title}】\n【教材完整內容開始】\n${m.content}\n【教材完整內容結束】`;
+        sourceText = `【指定教材：${m.title}】\n【教材完整內容開始】\n${m.content?.trim() || m.summary?.trim() || m.title}\n【教材完整內容結束】`;
       }
-      if (sourceText.trim().length < 20) throw fail("REQ_CONTENT_TOO_SHORT");
+      if (!sourceText.trim()) throw fail("REQ_CONTENT_TOO_SHORT", { message: "請選擇教材或輸入出題內容。" });
       await consumeFeature(user.userId, "ai_practice");
       const policy = (await db.select().from(examModePolicies).where(and(eq(examModePolicies.mode, body.examMode), eq(examModePolicies.enabled, true))).limit(1))[0];
       if (!policy) throw fail("REQ_VALIDATION", { message: "找不到可用的考試模式" });
@@ -316,14 +317,21 @@ export const routes: RouteDef[] = [
       for (let round = 0; round < 4 && ids.length < body.count; round += 1) {
         const remaining = body.count - ids.length;
         const avoid = usedFingerprints.size ? `\n不可使用以下今日已出現題目指紋（必須重新設計不同題幹與答案）：${JSON.stringify([...usedFingerprints].slice(-300))}` : "";
-        const generated = await generateQuestions({ userId: user.userId, subject: body.subject, topic: body.topic ?? "", sourceText: `${sourceText}${avoid}`, count: remaining, difficulty: body.difficulty, type: body.type, level: body.educationLevel });
+        let generated: string[] = [];
+        try {
+          generated = await generateQuestions({ userId: user.userId, subject: body.subject, topic: body.topic ?? "", sourceText: `${sourceText}${avoid}`, count: remaining, difficulty: body.difficulty, type: body.type, level: body.educationLevel });
+        } catch {
+          // Continue to the next round/provider result; one empty model response
+          // must not discard questions already generated in earlier rounds.
+          continue;
+        }
         const generatedRows = generated.length ? await db.select({ id: questions.id, subject: questions.subject, stem: questions.stem, answer: questions.answer }).from(questions).where(inArray(questions.id, generated)) : [];
         for (const row of generatedRows) {
           const key = quizQuestionFingerprint(row);
           if (!usedFingerprints.has(key) && !ids.includes(row.id)) { usedFingerprints.add(key); ids.push(row.id); }
         }
       }
-      if (ids.length < body.count) throw fail("REQ_VALIDATION", { message: `今日可用的新題目不足：要求 ${body.count} 題，實際只產生 ${ids.length} 題。請換教材或明天再試。` });
+      if (!ids.length) throw fail("AI_NO_VALID_QUESTIONS", { message: "AI 暫時沒有產生可用題目，請稍後再試。" });
       const rows = await db
         .insert(quizzes)
         .values({
@@ -335,6 +343,7 @@ export const routes: RouteDef[] = [
           materialId: body.materialId ?? null,
           timeLimitSec: body.timeLimitSec,
           questionIds: ids,
+          expiresAt: new Date(Date.now() + 3 * 86_400_000),
         })
         .returning();
       const selectedRows = await db.select({ subject: questions.subject, stem: questions.stem, answer: questions.answer }).from(questions).where(inArray(questions.id, ids));
@@ -349,7 +358,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ subject: z.string().max(20).optional(), count: z.number().int().min(1).max(30).default(10) }));
+      const body = await ctx.json(z.object({ subject: z.string().max(20).optional(), count: z.number().int().min(1).max(50).default(10) }));
       const conds = [eq(wrongQuestions.userId, user.userId), isNull(wrongQuestions.resolvedAt)];
       if (body.subject) conds.push(eq(wrongQuestions.subject, body.subject));
       const rows = await db.select().from(wrongQuestions).where(and(...conds)).orderBy(asc(wrongQuestions.nextReviewAt)).limit(body.count);
@@ -364,6 +373,7 @@ export const routes: RouteDef[] = [
           source: "wrong",
           timeLimitSec: rows.length * 90,
           questionIds: rows.map((r) => r.questionId),
+          expiresAt: new Date(Date.now() + 3 * 86_400_000),
         })
         .returning();
       return { quiz: quiz[0] };
@@ -378,6 +388,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const quiz = (await db.select().from(quizzes).where(eq(quizzes.id, ctx.params.id)).limit(1))[0];
       if (!quiz) throw notFound("找不到測驗");
+      if (quiz.expiresAt && quiz.expiresAt <= new Date()) throw fail("REQ_VALIDATION", { message: "這份 AI 測驗已超過 3 天保存期限，請重新產生。" });
       if (quiz.userId !== user.userId && quiz.visibility === "private") throw forbidden();
       const qs = quiz.questionIds.length ? await db.select().from(questions).where(inArray(questions.id, quiz.questionIds)) : [];
       const ordered = quiz.questionIds.map((qid) => qs.find((q) => q.id === qid)).filter(Boolean);
@@ -413,6 +424,7 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const quiz = (await db.select().from(quizzes).where(eq(quizzes.id, ctx.params.id)).limit(1))[0];
       if (!quiz) throw notFound("找不到測驗");
+      if (quiz.expiresAt && quiz.expiresAt <= new Date()) throw fail("REQ_VALIDATION", { message: "這份 AI 測驗已超過 3 天保存期限，請重新產生。" });
       if (quiz.userId !== user.userId && quiz.visibility === "private") throw forbidden();
       const existing = (
         await db

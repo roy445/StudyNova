@@ -26,6 +26,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
   const [remaining, setRemaining] = useState(0);
   const [review, setReview] = useState<{ score: number; correct: number; total: number; items: ReviewItem[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
 
   const submit = useCallback(
     async (attemptId: string, duration: number) => {
@@ -66,6 +67,8 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
   async function generate() {
     if (!confirmNovaSpend("AI 產生測驗", quizGenerateCost)) return;
     setBusy(true);
+    setGenerationProgress(8);
+    const progressTimer = window.setInterval(() => setGenerationProgress((value) => Math.min(92, value + Math.ceil((100 - value) / 8))), 900);
     try {
       let materialId = form.materialId;
       if (sourceFile) {
@@ -88,13 +91,16 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
       if (materialId) payload.materialId = materialId;
       else payload.sourceText = form.sourceText;
       const res = await apiPost<{ quiz: Quiz; generated: number }>("/quizzes/generate", payload);
-      toast.push("success", `已產生 ${res.generated} 題`);
+      setGenerationProgress(100);
+      toast.push("success", `已產生 ${res.generated} 題；測驗保存 3 天，可直接開始或稍後再用`);
       setGenOpen(false);
       setSourceFile(null);
       await list.reload();
     } catch (err) {
       toast.push("error", errorMessage(err));
     } finally {
+      window.clearInterval(progressTimer);
+      window.setTimeout(() => setGenerationProgress(0), 500);
       setBusy(false);
     }
   }
@@ -187,8 +193,8 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
   return (
     <>
       <Card
-        title="📝 AI 測驗"
-        subtitle="依教材、章節、錯題與弱點出題，支援詞性辨識、多義選擇、多選、填空、是非與簡答"
+        title="AI 出題專區"
+        subtitle="查看 AI 測驗紀錄、成績解析與錯題重練；每份 AI 測驗保存 3 天"
         action={
           <div className="flex gap-1.5">
             <Button
@@ -288,7 +294,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
               </Select>
             </Field>
             <Field label="題數">
-              <Input type="number" min={1} max={20} value={form.count} onChange={(e) => setForm({ ...form, count: Number(e.target.value) })} />
+              <Input type="number" min={1} max={50} value={form.count} onChange={(e) => setForm({ ...form, count: Math.max(1, Math.min(50, Number(e.target.value))) })} />
             </Field>
           </div>
           <Field label="使用教材（選填）">
@@ -306,7 +312,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
             {sourceFile && <p className="mt-1 text-xs text-[#7dd3fc]">已選擇：{sourceFile.name}</p>}
           </Field>
           {!form.materialId && (
-            <Field label="教材內容" hint="至少 20 個字，AI 只會依此內容出題">
+            <Field label="教材內容" hint="AI 會依你提供的內容出題，不再以固定字數擋下請求">
               <textarea
                 value={form.sourceText}
                 onChange={(e) => setForm({ ...form, sourceText: e.target.value })}
@@ -314,7 +320,8 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
               />
             </Field>
           )}
-          {!form.materialId && !sourceFile && form.sourceText.trim().length < 20 && <p className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs leading-5 text-amber-100">請上傳要出題的檔案、選擇既有教材，或先到「教材專區」上傳內容後再回來出題。</p>}
+          {!form.materialId && !sourceFile && !form.sourceText.trim() && <p className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs leading-5 text-amber-100">請上傳要出題的檔案、選擇既有教材，或先到「教材專區」上傳內容後再回來出題。</p>}
+          {busy && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/10 p-3" role="status" aria-live="polite"><div className="flex items-center justify-between text-xs"><span>AI 正在分析教材並建立題目…</span><span>{generationProgress}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-black/30"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#8b5cf6] transition-all duration-700" style={{ width: `${generationProgress}%` }} /></div><p className="mt-1 text-[11px] text-muted">完成後可立即開始，或稍後從本區查看。</p></div>}
           <Button full loading={busy} onClick={generate}>
             產生測驗
           </Button>

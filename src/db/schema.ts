@@ -772,6 +772,7 @@ export const quizzes = pgTable(
     weekId: uuid("week_id"),
     timeLimitSec: integer("time_limit_sec").notNull().default(600),
     questionIds: jsonb("question_ids").$type<string[]>().notNull().default([]),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     visibility: text("visibility").notNull().default("private"),
     shareSlug: text("share_slug"),
     createdAt: created(),
