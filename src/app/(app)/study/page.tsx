@@ -11,7 +11,6 @@ import { FocusPanel, MyVocabularyPanel, QuickMemoryPanel, SentencesPanel, VoiceP
 import { learningSubjects } from "@/content/learning/ch1";
 
 const MORE_TOOLS = [
-  { key: "timeline", label: "學習足跡", icon: "◷", description: "查看自己的學習紀錄" },
   { key: "one-page", label: "考前一頁紙", icon: "▤", description: "把重點整理成一頁" },
   { key: "materials", label: "教材", icon: "▦", description: "管理與閱讀教材" },
   { key: "ocr", label: "圖片 OCR", icon: "▧", description: "從圖片辨識內容" },
@@ -20,17 +19,6 @@ const MORE_TOOLS = [
   { key: "focus", label: "專注計時", icon: "◷", description: "記錄專注學習時間" },
   { key: "notes", label: "筆記", icon: "▤", description: "整理自己的學習筆記" },
 ];
-
-function TimelinePanel() {
-  const [filter, setFilter] = useState("all");
-  const timeline = useApi<{ items: Array<{ id: string; type: string; kind: string; subject: string; title: string; minutes: number; occurredAt: string; source: string; detail: Record<string, unknown> }> }>(`/learning/timeline?type=${filter}`, [filter]);
-  const labels: Record<string, string> = { all: "全部", vocabulary: "單字", quiz: "測驗", wrong: "錯題", material: "教材", focus: "專注", ai: "AI", exam: "考試" };
-  return <Card title="🕘 我的學習足跡" subtitle="只顯示目前帳號自己的真實學習紀錄。" action={<Select value={filter} onChange={(e) => setFilter(e.target.value)} className="!w-auto !py-1.5 text-xs">{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select>}>
-    {timeline.loading && <Skeleton lines={5} />}
-    {!timeline.loading && !timeline.data?.items.length && <EmptyState icon="◷" title="還沒有學習足跡" hint="完成單字、測驗、教材閱讀或專注後，紀錄會自動出現在這裡。" />}
-    <div className="space-y-2">{timeline.data?.items.map((item) => <div key={`${item.source ?? "item"}-${item.id}`} className="glass-soft flex items-start gap-3 rounded-xl p-3"><div className="mt-0.5 shrink-0 text-xs tabular-nums text-muted">{new Date(item.occurredAt).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{item.title}</p><Badge tone="cyan">{labels[item.type] ?? item.subject}</Badge></div><p className="mt-1 text-xs text-muted">{item.subject}{item.minutes > 0 ? `・${item.minutes} 分鐘` : ""}</p></div></div>)}</div>
-  </Card>;
-}
 
 function OnePagePanel() {
   const toast = useToast();
@@ -52,7 +40,8 @@ function StudyInner() {
   const params = useSearchParams();
   const centerControl = useApi<{ status: "enabled" | "repairing" | "disabled"; message: string }>("/learning/center-control");
   const examHubs = useApi<{ hubs: Array<{ id: string; name: string; examNumber: string; closeAt: string | null }> }>("/exam-hubs/available");
-  const [tab, setTab] = useState(params.get("tab") === "plan" || params.get("tab") === "ai-generate" ? (params.get("tab") === "ai-generate" ? "quiz" : "timeline") : (params.get("tab") ?? "timeline"));
+  const requestedTab = params.get("tab");
+  const [tab, setTab] = useState(requestedTab === "ai-generate" ? "quiz" : requestedTab === "timeline" || requestedTab === "plan" || !requestedTab ? "quiz" : requestedTab);
   const [autoGenerate, setAutoGenerate] = useState(params.get("tab") === "ai-generate");
   const contentRef = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
@@ -94,7 +83,6 @@ function StudyInner() {
       {tab === "more" && <Card title="更多功能" subtitle="常用功能已放在上方，其他工具集中收在這裡。"><div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4">{MORE_TOOLS.map((tool) => <button type="button" key={tool.key} onClick={() => setTab(tool.key)} className="rounded-2xl border border-[var(--line)] bg-white/[.025] p-2.5 text-left transition hover:border-cyan-300/40 sm:p-3"><span className="text-xl sm:text-2xl">{tool.icon}</span><p className="mt-1.5 text-xs font-bold sm:mt-2 sm:text-sm">{tool.label}</p><p className="mt-1 text-[10px] leading-4 text-muted sm:text-xs">{tool.description}</p></button>)}</div></Card>}
 
       <div ref={contentRef} className={`scroll-mt-24 scroll-mb-24 pb-[calc(5rem+env(safe-area-inset-bottom))] ${tab === "words" || tab === "word-library" || tab === "my-vocabulary" || tab === "visual-notes" ? "study-vocabulary-fullbleed" : ""}`}>
-        {tab === "timeline" && <TimelinePanel />}
         {tab === "online-courses" && <OnlineCoursesPanel />}
         {tab === "one-page" && <OnePagePanel />}
         {tab === "materials" && <MaterialsPanel />}
