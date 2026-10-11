@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { db } from "@/db";
-import { examPrepActivities, examPrepSubjects, questions, quizzes, userSettings } from "@/db/schema";
+import { examPrepActivities, examPrepSubjects, questions, quizAttempts, quizzes, userSettings, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 
@@ -126,6 +126,28 @@ export const routes: RouteDef[] = [
       const existing = (await db.select().from(quizzes).where(and(eq(quizzes.userId, user.userId), eq(quizzes.source, `exam_prep:${ctx.params.id}`))).orderBy(desc(quizzes.createdAt)).limit(1))[0];
       const quiz = existing ?? (await db.insert(quizzes).values({ userId: user.userId, title: result.activity.name, subject: result.subjects.map((subject) => subject.subject).join("、") || "綜合", difficulty: "exam", source: `exam_prep:${ctx.params.id}`, timeLimitSec: Math.max(600, bankQuestions.length * 90), questionIds: bankQuestions.map((question) => question.id), expiresAt: result.activity.closeAt ?? new Date(Date.now() + 30 * 86_400_000) }).returning())[0];
       return { quizId: quiz.id, questionCount: quiz.questionIds.length, title: quiz.title };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/exam-prep/:id/leaderboard",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const activity = (await db.select({ id: examPrepActivities.id, name: examPrepActivities.name }).from(examPrepActivities).where(eq(examPrepActivities.id, ctx.params.id)).limit(1))[0];
+      if (!activity) throw notFound("找不到段考衝刺活動");
+      const rows = await db.select({
+        userId: quizAttempts.userId,
+        displayName: users.displayName,
+        novaId: users.novaId,
+        attempts: sql<number>`count(*)::int`,
+        bestScore: sql<number>`max(${quizAttempts.score})::float`,
+        bestCorrect: sql<number>`max(${quizAttempts.correctCount})::int`,
+        bestTotal: sql<number>`max(${quizAttempts.total})::int`,
+        latestSubmittedAt: sql<string | null>`max(${quizAttempts.submittedAt})`,
+      }).from(quizAttempts).innerJoin(quizzes, eq(quizzes.id, quizAttempts.quizId)).innerJoin(users, eq(users.userId, quizAttempts.userId)).where(and(eq(quizzes.source, `exam_prep:${ctx.params.id}`), eq(quizAttempts.status, "submitted"))).groupBy(quizAttempts.userId, users.displayName, users.novaId).orderBy(desc(sql`max(${quizAttempts.score})`), desc(sql`max(${quizAttempts.correctCount})`), asc(sql`min(${quizAttempts.submittedAt})`)).limit(100);
+      const ranking = rows.map((row, index) => ({ rank: index + 1, ...row, isMe: row.userId === user.userId }));
+      return { activity, ranking, me: ranking.find((row) => row.isMe) ?? null };
     },
   }),
   route({
