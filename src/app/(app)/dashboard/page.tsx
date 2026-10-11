@@ -52,6 +52,7 @@ type Dashboard = {
 };
 
 const TREND_LABEL = { up: "↗ 上升", down: "↘ 下降", flat: "→ 持平", volatile: "↕ 波動" };
+const studentTitle = (value: string) => value.replace(/^\s*\d{3,4}學年度\s*/, "");
 
 export default function DashboardPage() {
   const toast = useToast();
@@ -63,6 +64,7 @@ export default function DashboardPage() {
   const alerts = useApi<{ alerts: Array<{ id: string; title: string; body: string; evidence: Record<string, unknown> }>; enabled: boolean }>("/ai/alerts");
   const patterns = useApi<{ patterns: Array<{ subject: string; reason: string; count: number; questionCount: number; evidence: string }>; enoughData: boolean }>("/learning/error-patterns");
   const examHubs = useApi<{ hubs: Array<{ id: string; name: string; examNumber: string; closeAt: string | null }> }>("/exam-hubs/available");
+  const examPrep = useApi<{ activities: Array<{ id: string; name: string; closeAt: string | null; effectiveStatus: string; subjects: Array<{ subject: string }> }> }>("/exam-prep/available");
   const examPolicies = useApi<{ policies: Array<{ id: string; schoolName: string; educationLevel: string; grade: number; term: string; examName: string; examDate: string }> }>("/exam-date-policies");
   const [appealExam, setAppealExam] = useState<Dashboard["upcomingExams"][number] | null>(null);
   const [appealDate, setAppealDate] = useState("");
@@ -110,6 +112,7 @@ export default function DashboardPage() {
       )}
 
       {examHubs.data?.hubs.length ? <Link href={`/exam-hubs/${examHubs.data.hubs[0].id}`} className="group block overflow-hidden rounded-[2rem] border-2 border-[#ffc857]/70 bg-[radial-gradient(circle_at_88%_15%,rgba(255,200,87,.34),transparent_34%),linear-gradient(135deg,rgba(52,27,72,.98),rgba(8,28,58,.98))] p-5 shadow-[0_0_38px_rgba(255,200,87,.2)] transition hover:-translate-y-0.5 hover:shadow-[0_0_55px_rgba(255,200,87,.32)] sm:p-7"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><Badge tone="gold">限時段考考題專區</Badge><Badge tone="rose">現在開放</Badge></div><h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">{examHubs.data.hubs[0].name}</h2><p className="mt-1 text-sm text-slate-200">{examHubs.data.hubs[0].examNumber}・直接開始計時作答，完成後保存成績與使用紀錄。</p></div><span className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#ffc857] to-[#ff9f43] px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_24px_rgba(255,200,87,.42)]">快速進入 →</span></div></Link> : null}
+      {examPrep.data?.activities.filter((activity) => activity.effectiveStatus === "open").slice(0, 1).map((activity) => <Link key={activity.id} href={`/exam-prep/${activity.id}`} className="group block overflow-hidden rounded-[2rem] border-2 border-cyan-300/70 bg-[radial-gradient(circle_at_88%_15%,rgba(124,92,255,.42),transparent_34%),linear-gradient(135deg,rgba(12,43,76,.98),rgba(24,18,58,.98))] p-5 shadow-[0_0_42px_rgba(55,211,255,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_0_65px_rgba(124,92,255,.38)] sm:p-7"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><Badge tone="cyan">限時段考刷題</Badge><Badge tone="violet">排行榜進行中</Badge></div><h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">{studentTitle(activity.name)}</h2><p className="mt-1 text-sm text-slate-200">立即開始計時作答，答案自動保存；完成後和同學一起看排名。</p><div className="mt-3 flex flex-wrap gap-2 text-xs text-cyan-100">{activity.subjects.map((subject) => <span key={subject.subject} className="rounded-full bg-white/10 px-2.5 py-1">{subject.subject}</span>)}{activity.closeAt && <span className="rounded-full bg-rose-400/15 px-2.5 py-1 text-rose-100">限時至 {new Date(activity.closeAt).toLocaleDateString("zh-TW")}</span>}</div></div><span className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-cyan-300 to-violet-400 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_28px_rgba(55,211,255,.5)]">開始刷題 →</span></div></Link>)}
 
       <Card className="!overflow-hidden !p-0 border-cyan-300/30 bg-[radial-gradient(circle_at_90%_15%,rgba(55,211,255,.24),transparent_32%),linear-gradient(115deg,rgba(20,25,65,.96),rgba(7,22,42,.96))]">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
