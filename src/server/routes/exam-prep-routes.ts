@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lte, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { db } from "@/db";
-import { examPrepActivities, examPrepSubjects, questions, quizAttempts, quizzes, userSettings, users } from "@/db/schema";
+import { answers, examPrepActivities, examPrepSubjects, questions, quizAttempts, quizzes, userSettings, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 
@@ -159,6 +159,68 @@ export const routes: RouteDef[] = [
       const activities = await db.select().from(examPrepActivities).orderBy(desc(examPrepActivities.createdAt));
       const subjects = activities.length ? await db.select().from(examPrepSubjects).where(or(...activities.map((row) => eq(examPrepSubjects.activityId, row.id)))) : [];
       return { timezone: "Asia/Taipei", activities: activities.map((activity) => ({ ...activity, effectiveStatus: effectiveStatus(activity), subjects: subjects.filter((subject) => subject.activityId === activity.id) })) };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/exam-prep/analytics",
+    auth: "admin",
+    handler: async (ctx) => {
+      const selectedId = ctx.query.get("activityId") || null;
+      const activities = await db.select({ id: examPrepActivities.id, name: examPrepActivities.name, examName: examPrepActivities.examName, status: examPrepActivities.status, openAt: examPrepActivities.openAt, closeAt: examPrepActivities.closeAt }).from(examPrepActivities).orderBy(desc(examPrepActivities.createdAt));
+      const scope = selectedId ? activities.filter((activity) => activity.id === selectedId) : activities;
+      if (selectedId && !scope.length) throw notFound("找不到段考衝刺活動");
+      const sourceFilter = selectedId ? eq(quizzes.source, `exam_prep:${selectedId}`) : like(quizzes.source, "exam_prep:%");
+      const rows = await db
+        .select({ activityId: examPrepActivities.id, activityName: examPrepActivities.name, quizId: quizzes.id, attemptId: quizAttempts.id, attemptStatus: quizAttempts.status, score: quizAttempts.score, userId: quizAttempts.userId, questionId: questions.id, subject: questions.subject, stem: questions.stem, options: questions.options, answer: questions.answer, response: answers.response, isCorrect: answers.isCorrect })
+        .from(quizAttempts)
+        .innerJoin(quizzes, eq(quizzes.id, quizAttempts.quizId))
+        .innerJoin(examPrepActivities, eq(quizzes.source, sql`'exam_prep:' || ${examPrepActivities.id}`))
+        .leftJoin(answers, eq(answers.attemptId, quizAttempts.id))
+        .leftJoin(questions, eq(questions.id, answers.questionId))
+        .where(and(sourceFilter, selectedId ? eq(examPrepActivities.id, selectedId) : undefined));
+
+      const submitted = rows.filter((row) => row.attemptStatus === "submitted");
+      const attemptMap = new Map<string, { userId: string; score: number }>();
+      for (const row of rows) if (!attemptMap.has(row.attemptId)) attemptMap.set(row.attemptId, { userId: row.userId, score: Number(row.score ?? 0) });
+      const submittedAttemptIds = new Set(submitted.map((row) => row.attemptId));
+      const participantIds = new Set(rows.map((row) => row.userId));
+      const subjectMap = new Map<string, { subject: string; answered: number; correct: number; questions: Set<string> }>();
+      const questionMap = new Map<string, { questionId: string; subject: string; stem: string; options: string[]; answer: string[]; answered: number; correct: number; selections: Map<string, number> }>();
+      for (const row of submitted) {
+        if (!row.questionId) continue;
+        const subject = row.subject || "其他";
+        const stats = subjectMap.get(subject) ?? { subject, answered: 0, correct: 0, questions: new Set<string>() };
+        stats.answered += 1;
+        stats.correct += row.isCorrect ? 1 : 0;
+        stats.questions.add(row.questionId);
+        subjectMap.set(subject, stats);
+        const q = questionMap.get(row.questionId) ?? { questionId: row.questionId, subject, stem: row.stem || "", options: row.options ?? [], answer: row.answer ?? [], answered: 0, correct: 0, selections: new Map<string, number>() };
+        q.answered += 1;
+        q.correct += row.isCorrect ? 1 : 0;
+        for (const selected of row.response ?? []) q.selections.set(String(selected), (q.selections.get(String(selected)) ?? 0) + 1);
+        questionMap.set(row.questionId, q);
+      }
+      const normalize = (value: string) => value.trim().toLowerCase().replace(/[。.、，,：:；;（）()\s]+/g, "");
+      const optionAnalysis = [...questionMap.values()].map((q) => ({
+        questionId: q.questionId,
+        subject: q.subject,
+        stem: q.stem,
+        answered: q.answered,
+        accuracy: q.answered ? Math.round((q.correct / q.answered) * 1000) / 10 : 0,
+        options: q.options.map((text, index) => {
+          const direct = q.selections.get(String(text)) ?? 0;
+          const letter = q.selections.get(String.fromCharCode(65 + index)) ?? 0;
+          const ordinal = q.selections.get(String(index)) ?? q.selections.get(String(index + 1)) ?? 0;
+          const selected = direct || letter || ordinal;
+          return { label: String.fromCharCode(65 + index), text, selected, probability: q.answered ? Math.round((selected / q.answered) * 1000) / 10 : 0, correct: q.answer.some((answer) => normalize(answer) === normalize(text)) };
+        }),
+      })).sort((a, b) => a.accuracy - b.accuracy);
+      const scores = [...attemptMap.entries()].filter(([attemptId]) => submittedAttemptIds.has(attemptId)).map(([, attempt]) => attempt);
+      const totalCorrect = submitted.reduce((sum, row) => sum + (row.isCorrect ? 1 : 0), 0);
+      const totalAnswered = submitted.length;
+      const summary = { attempts: attemptMap.size, submittedAttempts: submittedAttemptIds.size, participants: participantIds.size, answerRecords: totalAnswered, correctAnswers: totalCorrect, accuracy: totalAnswered ? Math.round((totalCorrect / totalAnswered) * 1000) / 10 : 0, averageScore: scores.length ? Math.round((scores.reduce((sum, item) => sum + item.score, 0) / scores.length) * 10) / 10 : 0, completionRate: attemptMap.size ? Math.round((submittedAttemptIds.size / attemptMap.size) * 1000) / 10 : 0 };
+      return { activities, selectedActivityId: selectedId, selectedActivities: scope, summary, subjects: [...subjectMap.values()].map((row) => ({ subject: row.subject, questionCount: row.questions.size, answered: row.answered, correct: row.correct, accuracy: row.answered ? Math.round((row.correct / row.answered) * 1000) / 10 : 0 })).sort((a, b) => b.answered - a.answered), questions: optionAnalysis };
     },
   }),
   route({
