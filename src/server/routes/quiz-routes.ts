@@ -32,8 +32,8 @@ type GeneratedQuestion = {
   stem?: string;
   question?: string;
   questionText?: string;
-  options?: string[];
-  choices?: string[];
+  options?: unknown;
+  choices?: unknown;
   answer?: string[] | string;
   correctAnswer?: string[] | string | number;
   correct?: string[] | string | number;
@@ -44,6 +44,20 @@ type GeneratedQuestion = {
 
 export function normalizeQuizOption(value: string): string {
   return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ");
+}
+
+/** Accept Gemini string arrays, labelled objects, and option objects. */
+export function normalizeQuestionOptions(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => {
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (item && typeof item === "object") {
+      const record = item as Record<string, unknown>;
+      return String(record.text ?? record.value ?? record.content ?? record.option ?? record.label ?? "").trim();
+    }
+    return "";
+  }).filter(Boolean);
+  if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).map((item) => String(item ?? "").trim()).filter(Boolean);
+  return [];
 }
 
 type NormalizedQuestion = { options: string[]; answer: string[]; stem: string };
@@ -128,7 +142,7 @@ function cleanGeneratedQuestions(raw: GeneratedQuestion[], topic: string): Clean
   return raw.map((q) => {
     const type = qType.safeParse(q.type ?? "single").success && q.type !== "mixed" ? (q.type as string) : "single";
     const stem = String(q.stem ?? q.question ?? q.questionText ?? "").trim();
-    const options = (Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : []).map(String).map((item) => item.trim()).filter(Boolean);
+    const options = normalizeQuestionOptions(q.options ?? q.choices);
     const rawAnswer = q.answer ?? q.correctAnswer ?? q.correct;
     const answerValues = Array.isArray(rawAnswer) ? rawAnswer : rawAnswer === undefined || rawAnswer === null || rawAnswer === "" ? [] : [rawAnswer];
     const answerArr = answerValues.map((value) => {
@@ -409,7 +423,7 @@ export const routes: RouteDef[] = [
           id: q!.id,
           type: q!.type,
           stem: q!.stem,
-          options: q!.options,
+          options: normalizeQuestionOptions(q!.options),
           subject: q!.subject,
           difficulty: q!.difficulty,
           metadata: q!.metadata,

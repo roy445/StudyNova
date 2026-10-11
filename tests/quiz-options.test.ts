@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterDuplicateQuestions, normalizeQuestionStem, normalizeQuizOption, validateEnglishQuizOptions, validateQuizOptionPool } from "../src/server/routes/quiz-routes";
+import { filterDuplicateQuestions, normalizeQuestionOptions, normalizeQuestionStem, normalizeQuizOption, validateEnglishQuizOptions, validateQuizOptionPool } from "../src/server/routes/quiz-routes";
 
 describe("quiz option diversity", () => {
   it("normalizes case, whitespace, punctuation, and full-width text", () => {
@@ -10,6 +10,11 @@ describe("quiz option diversity", () => {
   it("does not throw when an AI field is missing", () => {
     expect(normalizeQuizOption(undefined as unknown as string)).toBe("");
     expect(normalizeQuestionStem(undefined as unknown as string)).toBe("");
+  });
+
+  it("normalizes string, labelled, and object-shaped single-choice options", () => {
+    expect(normalizeQuestionOptions(["A", { label: "B", text: "第二個選項" }, { value: "C" }])).toEqual(["A", "第二個選項", "C"]);
+    expect(normalizeQuestionOptions({ A: "甲", B: "乙", C: "丙" })).toEqual(["甲", "乙", "丙"]);
   });
 
   it("counts all options across the complete quiz and detects same-question duplicates", () => {
