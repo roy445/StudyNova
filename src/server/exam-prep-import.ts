@@ -15,7 +15,10 @@ async function updateJob(jobId: string, values: Partial<typeof examPrepImportJob
 }
 
 function subjectFromName(name: string) {
+  if (/數學\s*[AB]|數學Ａ|數學Ｂ/i.test(name)) return name.match(/B|Ｂ/i) ? "數學 B" : "數學 A";
   if (/數學|數學科|math/i.test(name)) return "數學";
+  if (/自然|科學|science/i.test(name)) return "自然";
+  if (/社會|social/i.test(name)) return "社會";
   if (/化學|chem/i.test(name)) return "化學";
   if (/物理|phys/i.test(name)) return "物理";
   if (/英文|英語|english/i.test(name)) return "英文";

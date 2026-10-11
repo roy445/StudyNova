@@ -1,0 +1,6739 @@
+[
+  {
+    "source_page": 2,
+    "subject": "數學 A",
+    "question_number": 1,
+    "type": "單選",
+    "stem": "如右圖，Γ為△ABC之外接圓，若 BC = 3 且過 B、C 之兩切線夾 120°，則圓 Γ 之半徑為何？（見右圖）",
+    "options": [
+      "√3",
+      "3",
+      "2√3",
+      "4",
+      "6"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-002"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 2,
+      "page_end": 2,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 2,
+    "subject": "數學 A",
+    "question_number": 2,
+    "type": "單選",
+    "stem": "滿足不等式 |3x − k| ≤ 2x 的實數 x 所形成的區間長度為 10，則 k 值為何？",
+    "options": [
+      "25",
+      "25/2",
+      "8",
+      "12",
+      "25/3"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.98,
+    "asset_ids": [
+      "110-page-002"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 2,
+      "page_end": 2,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 2,
+    "subject": "數學 A",
+    "question_number": 3,
+    "type": "單選",
+    "stem": "根據實驗統計，某種細菌繁殖，其數量每 20 分鐘會擴增為原來的 3 倍，假設實驗室的培養皿一開始有此細菌 1000 隻，試問 10 小時 20 分後和 10 小時後的細菌數相差數量最接近下列哪一個選項？",
+    "options": [
+      "10^15",
+      "10^16",
+      "10^17",
+      "10^18",
+      "10^19"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-002"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 2,
+      "page_end": 2,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 3,
+    "subject": "數學 A",
+    "question_number": 4,
+    "type": "single choice",
+    "stem": "將 2 個男生 6 個女生依 3 人、3 人、2 人分成三組做實驗，則 2 個男生分到不同組的機率為下列何者？",
+    "options": [
+      "2/3",
+      "3/4",
+      "4/5",
+      "5/6",
+      "6/7"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-003"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 3,
+      "page_end": 3,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 3,
+    "subject": "數學 A",
+    "question_number": 5,
+    "type": "single choice",
+    "stem": "如右圖，坐標平面上正方形 ABCD，其中對角線 AC 的斜率為 3，則 AB 的斜率為下列何者？",
+    "options": [
+      "1/5",
+      "1/4",
+      "1/3",
+      "1/2",
+      "2/3"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-003"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 3,
+      "page_end": 3,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 3,
+    "subject": "數學 A",
+    "question_number": 6,
+    "type": "multiple selection",
+    "stem": "設函數 f(x) = 2√3 cos( x - π/3 ) + 4 cos( x + π/2 )，其中 x 為任意實數，試選出正確的選項。",
+    "options": [
+      "f(1) > 0",
+      "f(x) 的最大值為 2√7",
+      "y = f(x) 圖形對稱於直線 x = π/3",
+      "f(x) + 3 = 0 的解有無限多個",
+      "y = f(x) 與 y = x^2 + 2 兩圖形無交點"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-003"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 3,
+      "page_end": 3,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 4,
+    "subject": "數學 A",
+    "question_number": 7,
+    "type": "多選題",
+    "stem": "已知三次函數 y = f(x) = -2x^3 + 6x^2 - 2，則試問下列哪些選項是正確的？",
+    "options": [
+      "(1) y = f(x) 的廣域特徵近似於 y = -2x^3",
+      "(2) y = f(x) 在 x = 1 處的局部特徵近似於 y = 6x + 2",
+      "(3) f(0.999) ≈ 7.994",
+      "(4) f(3 + 5√7) + f(-1 - 5√7) = 4",
+      "(5) 若 L 為過 (1, f(1)) 之水平線，則 L 與 y = f(x) 必有三個交點"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-004"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 4,
+      "page_end": 4,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 4,
+    "subject": "數學 A",
+    "question_number": 8,
+    "type": "多選題",
+    "stem": "設 a、b 為兩正實數，且 a > b。已知 log_{1.5} a、log_{1.5} 110、log_{1.5} b 三數依序成等差數列。試選出正確選項。",
+    "options": [
+      "(1) a、110、b 三數依序成等比數列",
+      "(2) log_{1.5} (1911 + a)、log_{1.5} 2021、log_{1.5} (1911 + b) 三數依序成等差數列",
+      "(3) log_{2.25} a^3、log_{2.25} 110^3、log_{2.25} b^3 三數依序成等差數列",
+      "(4) a + b > 220",
+      "(5) log_{1.5} (a + b) - log_{1.5} 110 > 2"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-004"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 4,
+      "page_end": 4,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 4,
+    "subject": "數學 A",
+    "question_number": 9,
+    "type": "多選題",
+    "stem": "如右圖所示，坐標平面上 A(4,3) 為圓 Γ 上一點，原點 O 為 Γ 的圓心。若 B 為圓 Γ 上之動點，且 →BC = →OA，則下列哪些敘述是正確的？",
+    "options": [
+      "(1) →OC 必平分 →OA 與 →OB 的夾角",
+      "(2) |→OC| 的值可能為 √110",
+      "(3) 若 C 在 y 軸正向上，則 C 落在圓 Γ 的內部",
+      "(4) 若 C(a,b) 在圓 Γ 上，則 ab < 0",
+      "(5) 若 C(a,b)，則 a 之最小值為 -1"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-004"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 4,
+      "page_end": 4,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 5,
+    "subject": "數學 A",
+    "question_number": 10,
+    "type": "多選",
+    "stem": "某班的 50 名學生參加一項考試，考題共有 100 題，全為 5 選 1 的單選題，計分法有 X、Y 兩種：X 分數的計算方式為每題答對得 1 分，答錯得 (−1/4) 分，不作答則該題不給分也不扣分；Y 分數的計算方式為每題答對得 1 分，答錯得 0 分，不作答則該題給 1/5 分。若學生兩種分數的相關係數為 r，則下列敘述哪些是正確的？",
+    "options": [
+      "(1) 全班 X 分數的算術平均數不可能大於 Y 分數的算術平均數",
+      "(2) 任意兩學生 X 分數之差的絕對值不可能大於 Y 分數之差的絕對值",
+      "(3) 同一學生用 Y 分數的全班排名優於用 X 分數的全班排名",
+      "(4) 全班 X 分數的標準差不可能小於 Y 分數的標準差",
+      "(5) 0.7 < |r| < 1"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 5,
+      "page_end": 5,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 5,
+    "subject": "數學 A",
+    "question_number": 11,
+    "type": "多選",
+    "stem": "凸四邊形 ABCD 中，AB = 20、BC = 21、CD = 5、tan ∠ABC = 3/4，請選出正確的選項。",
+    "options": [
+      "(1) AC = 13",
+      "(2) 若 A、B、C、D 四點共圓，則 AD = 4√10 − 4",
+      "(3) 若四邊形 ABCD 為梯形，則 cos ∠BCD = −3/5",
+      "(4) AD 可能為 8",
+      "(5) AD < 2√61"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 5,
+      "page_end": 5,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 6,
+    "subject": "數學 A",
+    "question_number": 13,
+    "type": "short_answer",
+    "stem": "已知坐標平面上有一個圓 x^2 + y^2 + 2y - 1 = 0 與兩條直線 L1 : 3x - 4y = h, L2 : 3x - 4y = k，已知這個圓與兩條直線分別交於 A, B 兩點及 C, D 兩點；若 A, B, C, D 恰好形成一個正方形，則 h + k = ____。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-006"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 6,
+      "page_end": 6,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 6,
+    "subject": "數學 A",
+    "question_number": 14,
+    "type": "short_answer",
+    "stem": "已知三次函數 f(x) 圖形對稱於點 (3,1)，且 f(x) 除以 x^2 - 3x + 2 的餘式為 14x - 17，則 (x+4)f(x) 除以 x - 6 的餘式為 ____。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-006"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 6,
+      "page_end": 6,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 6,
+    "subject": "數學 A",
+    "question_number": 15,
+    "type": "short_answer",
+    "stem": "小明班上舉辦同樂會摸彩，規則如下：摸彩箱中有 2 顆紅球、3 顆黃球與 4 顆白球，每顆球被取到的機率相等。參加摸彩的人每次取一球依序從摸彩箱中取出三顆球(取後不放回)。若取出的三球恰為同一種顏色則可得 300 元；若取出的三球恰有兩種顏色則可得 30 元；若取出的三球恰為三種顏色，則得 70 元。則小明參加此摸彩活動一次可得獎金的期望值為 ____ 元。(化為最簡分數)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-006"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 6,
+      "page_end": 6,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 6,
+    "subject": "數學 A",
+    "question_number": 16,
+    "type": "short_answer",
+    "stem": "若 a, b, c, d 都是實數，且 a^2 + b^2 = 4，(c+6)^2 + (d+8)^2 = 16，則 | a  c |\\n                                                 | b  d | 的最大值為 ____。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-006"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 6,
+      "page_end": 6,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 6,
+    "subject": "數學 A",
+    "question_number": 17,
+    "type": "short_answer",
+    "stem": "某間教室的座位安排如右圖，四列三行編號 1 至 12 的 12 個座位，甲、乙、丙三人選坐三個完全相鄰的座位，相鄰者可以左右相鄰或前後相鄰，例如可以選坐 1、2、3 或 1、2、4 或 1、4、7，但 1、4、8 不行，因位置 4、8 不相鄰。試問此三人的座位安排有 ____ 種方法。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-006"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 6,
+      "page_end": 6,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 7,
+    "subject": "數學 A",
+    "question_number": 18,
+    "type": "single-choice",
+    "stem": "若一次購買 5 天用量的口罩熔噴布，則直到這批熔噴布用完所須支付的保管費為何？(單選題，4 分)\n背景：某口罩生產工廠定期購買口罩熔噴布來生產口罩，已知該廠每天需要用熔噴布 500 公斤，每公斤熔噴布價格為 600 元，熔噴布到貨當日即會用掉 500 公斤，未用完的熔噴布須支付倉儲保管費，每天保管費用為每 100 公斤 90 元 (若未滿 100 公斤，則以 100 公斤計費)，且購買熔噴布每次須支付行政處理費 3600 元。",
+    "options": [
+      "(1) 2250 元",
+      "(2) 3150 元",
+      "(3) 4500 元",
+      "(4) 5400 元",
+      "(5) 6750 元"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 7,
+      "page_end": 7,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 7,
+    "subject": "數學 A",
+    "question_number": 19,
+    "type": "non-choice",
+    "stem": "若一次購買 x 天用量的口罩熔噴布，則直到這批熔噴布用完，平均每天支付費用為何？(試以 x 表示)(非選擇題，5 分)\n(背景同第18題：每天用量 500 公斤；每公斤價格 600 元；到貨當日即用掉 500 公斤；未用完者每日倉儲保管費為每 100 公斤 90 元，未滿 100 公斤以 100 公斤計；每次購買行政處理費 3600 元。)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 7,
+      "page_end": 7,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 7,
+    "subject": "數學 A",
+    "question_number": 20,
+    "type": "non-choice",
+    "stem": "試問該口罩工廠應該多少天購買一次口罩熔噴布，才能使平均每天天支付費用最少？(非選擇題，6 分)\n(背景同第18題。)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 7,
+      "page_end": 7,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 18,
+    "subject": "自然",
+    "question_number": 1,
+    "type": "single-choice",
+    "stem": "孟德爾以豌豆為材料進行實驗後，得到兩大定律，分別為分離律與獨立分配律，相關敘述如下：\n甲、一個性狀由兩個遺傳因子控制，遺傳因子分為顯性與隱性兩種。\n乙、當顯性遺傳因子與隱性遺傳因子同時出現時，個體表現顯性表徵。\n丙、形成配子時，成對遺傳因子會分離至不同的配子中。\n丁、形成配子時，一對遺傳因子的分離不影響其他對等位基因的分離。\n戊、形成配子時，不同對的遺傳因子會自由組合至同一配子中。\n哪些敘述屬於分離律的內容？",
+    "options": [
+      "(A) 甲乙丙",
+      "(B) 甲乙丙丁",
+      "(C) 甲乙戊",
+      "(D) 甲乙丙戊",
+      "(E) 乙丙丁"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-018"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 18,
+      "page_end": 18,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 18,
+    "subject": "自然",
+    "question_number": 2,
+    "type": "multiple-response (choose 3)",
+    "stem": "西元2019年末爆發全球性的瘟疫 COVID-19，科學家將其病原體命名為 SARS-CoV-2（如圖1），請根據此圖回答下列問題：\n下列關於 SARS-CoV-2 的敘述，哪些正確？（應選 3 項）",
+    "options": [
+      "(A) 甲構造含有磷脂質",
+      "(B) 此病原體內可找到兩種核酸",
+      "(C) 分析此病原體的核酸成分具有尿嘧啶",
+      "(D) 此病原體與宿主細胞具有專一性",
+      "(E) 此病原體在分類上屬於原核生物界"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-018"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 18,
+      "page_end": 18,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 18,
+    "subject": "自然",
+    "question_number": 3,
+    "type": "single-choice",
+    "stem": "臺灣目前可供施打的疫苗分為 mRNA 疫苗（如莫德納與輝瑞）與病毒載體疫苗（如 AZ），其中病毒載體疫苗是在腺病毒中放入棘蛋白的 DNA，兩種疫苗的目的都是希望在人體中產生棘蛋白，刺激白血球產生抗體，使人體具有免疫力。關於這兩種疫苗進入人體後製造棘蛋白過程的敘述，下列何者正確？",
+    "options": [
+      "(A) 注射莫德納疫苗後僅需經過轉錄作用就可以製造棘蛋白",
+      "(B) AZ 疫苗不須進入人體細胞的細胞核即可以製造出棘蛋白",
+      "(C) 兩種疫苗在製造棘蛋白的過程都需要核糖體",
+      "(D) 根據高中課程，兩種疫苗中的轉錄比較穩定的是 mRNA 疫苗",
+      "(E) 若注射兩種疫苗後皆可製造出相同的棘蛋白，則 AZ 疫苗中的 DNA 可使用 DNA 聚合酶製造出莫德納疫苗中的 mRNA"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-018"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 18,
+      "page_end": 18,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 19,
+    "subject": "自然",
+    "question_number": 4,
+    "type": "multiple response (應選 2 項)",
+    "stem": "承上題，病毒載體疫苗為利用重組 DNA 技術製作；比較特別的是第一步驟先將 RNA 反轉錄為 DNA，關於此疫苗內含的重組 DNA 接下來的製作方式，下列敘述哪些正確？（應選 2 項）",
+    "options": [
+      "(A) 利用限制酶將目標基因剪下",
+      "(B) 載體使用細菌的質體",
+      "(C) 也可以使用 RNA 作為載體",
+      "(D) 用另一種限制酶剪開載體",
+      "(E) 使用 DNA 連接酶連接載體與目標基因"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-019"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 19,
+      "page_end": 19,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 19,
+    "subject": "自然",
+    "question_number": 5,
+    "type": "single choice",
+    "stem": "已知載物臺（物鏡）測微器上將 1 mm 等分為 100 格。某生在進行顯微測量時，視野所見部分如圖 2，其中甲測微器的刻度會在轉動粗調節輪時變模糊，乙測微器則不會。若使用此倍率觀察水中小生物，測量到生物的長度占測微器刻度的 2 格，則此生物的實際長度為何？",
+    "options": [
+      "(A) 80 μm",
+      "(B) 50 μm",
+      "(C) 40 μm",
+      "(D) 20 μm",
+      "(E) 5 μm"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-019"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 19,
+      "page_end": 19,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 19,
+    "subject": "自然",
+    "question_number": 6,
+    "type": "multiple response (應選 3 項)",
+    "stem": "關於拉馬克與達爾文文的演化學說，下列哪些是兩學說觀念相同的地方？（應選 3 項）",
+    "options": [
+      "(A) 生物的形態或構造會改變",
+      "(B) 生物的形態或構造是因為適應環境變化而改變",
+      "(C) 生物的特徵會傳遞給下一代",
+      "(D) 存活下來的個體具有生存上的優勢",
+      "(E) 皆由長頸鹿而有所啟發"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.93,
+    "asset_ids": [
+      "110-page-019"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 19,
+      "page_end": 19,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 19,
+    "subject": "自然",
+    "question_number": 7,
+    "type": "single choice",
+    "stem": "減數分裂過程中，細胞會經歷兩次分裂，有關這兩次分裂的比較，下列何者正確？",
+    "options": [
+      "(A) 兩次分裂皆會複製染色體",
+      "(B) 第一次分裂之後染色體套數會減半，第二次分裂前後套數不變",
+      "(C) 第一次分裂為姐妹染色分離，第二次分裂為同源染色體分離",
+      "(D) 四分體在第二次分裂之後才會消失",
+      "(E) 兩次分裂前後，染色體的數量都減半"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [
+      "110-page-019"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 19,
+      "page_end": 19,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 19,
+    "subject": "自然",
+    "question_number": 8,
+    "type": "multiple response (應選 2 項)",
+    "stem": "下列有關細胞構造與功能的敘述，哪些正確？（應選 2 項）",
+    "options": [
+      "(A) 細胞膜上供辨識的醣類位於細胞內側",
+      "(B) 細胞核的核膜共有四層磷脂質",
+      "(C) DNA 可在細胞核、粒線體與葉綠體中發現",
+      "(D) 當細胞器老舊需要分解時，會送至液泡分解",
+      "(E) 若失去中心體，就無法製造紡錘絲"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.94,
+    "asset_ids": [
+      "110-page-019"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 19,
+      "page_end": 19,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 19,
+    "subject": "自然",
+    "question_number": 9,
+    "type": "single choice",
+    "stem": "無論是原核生物或是真核生物都能進行光合作用與有氧呼吸，但因為原核生物缺乏胞器，故有些微的差異，下列敘述何者正確？",
+    "options": [
+      "(A) 原核生物的光合作用場所位於葉綠體中",
+      "(B) 真核生物的光反應產物為葡萄糖",
+      "(C) 真核生物有氧呼吸產生的 ATP 遠比原核生物多",
+      "(D) 原核生物與真核生物皆在細胞質中分解葡萄糖",
+      "(E) 真核生物的光合作用與有氧呼吸皆有反應發生在細胞質"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [
+      "110-page-019"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 19,
+      "page_end": 19,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 20,
+    "subject": "自然",
+    "question_number": 10,
+    "type": "multiple choice (choose 2)",
+    "stem": "化學品全球調和制度（Globally Harmonized System of Classification and Labelling of Chemicals，縮寫為 GHS）是聯合國為降低化學品對勞工與使用者健康危害與環境污染，並減少跨國貿易障礙，所主導推行的化學品分類與標示系統。GHS 標示圖形與說明如圖 3：\n\n（圖示若干 GHS 圖形，包含：水環境危害物質、爆炸性物質、加壓氣體、急毒性物質、腐蝕性物質、刺激性或過敏性等其他毒性危害物質、氧化性物質、易燃性物質、特定毒性危害物質）\n\n根據 GHS 制度，一氧化碳的圖形除了標示（特定毒性危害物質）之外，請問還需要標示哪些呢？（應選 2 項）",
+    "options": [
+      "(A) 氧化性物質（圖示：圓圈上有火焰）",
+      "(B) 易燃性物質（圖示：火焰）",
+      "(C) 爆炸性物質（圖示：爆裂的炸彈）",
+      "(D) 急毒性物質（圖示：骷髏頭）",
+      "(E) 水環境危害物質（圖示：樹與魚）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-020"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 20,
+      "page_end": 20,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 20,
+    "subject": "自然",
+    "question_number": 11,
+    "type": "multiple choice (single answer)",
+    "stem": "廣用指示劑一般用來指示溶液的酸鹼性，其試劑配方是由酚酞、溴酚藍（影像文字可能為「溴瑞香草酚藍」，字詞有不確定）、甲基紅、百里酚藍等指示劑混合而成。已知各種指示劑的 pH 值變色範圍與酸鹼型顏色如表 1（表中列有酚酞、溴酚藍、甲基紅、百里酚藍等指示劑及其酸型顏色、pH 變色範圍、鹼型顏色）。請問廣用指示劑在 pH = 4、7 及 11 的顏色各為何？（pH = 4，pH = 7，pH = 11）",
+    "options": [
+      "(A) (紅，綠，藍)",
+      "(B) (橙，綠，紫)",
+      "(C) (黃，藍，紫)",
+      "(D) (橙，藍，紫)",
+      "(E) (紅，藍，綠)"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.78,
+    "asset_ids": [
+      "110-page-020"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 20,
+      "page_end": 20,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 21,
+    "subject": "自然",
+    "question_number": 12,
+    "type": "multiple response",
+    "stem": "12. 化學實驗室的實驗器材設計具有巧思，例如：錐形瓶的設計是瓶口小、底部寬大，可方便搖晃瓶身使溶液混合均勻、不易灑出溶液，而常作為滴定的器材之一。在熔點測定的實驗，常使用均熱管（Thiele tube），其實驗裝置如圖4。關於此實驗裝置的敘述，哪些正確？（應選3項）",
+    "options": [
+      "(A) 由圖4所見，加熱過程中，矽油的流動方向為順時針方向",
+      "(B) 由圖4所見，加熱過程中，矽油的流動方向為逆時針方向",
+      "(C) 均熱管是利用增加矽油流動循環使溫度均勻緩慢上升",
+      "(D) 可以移動本生燈加熱點的位置至溫度計正下方，不影響實驗結果",
+      "(E) 樣品位置要靠近溫度計的底部，才能量測到比較準確的熔點"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-021"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 21,
+      "page_end": 21,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 21,
+    "subject": "自然",
+    "question_number": 13,
+    "type": "multiple response",
+    "stem": "13. 沈括著作的《夢溪筆談》中提到：「信州鉛山縣有苦泉，流以為溝。提其水煎之，則成膏礬。烹膏礬則成銅；蒸膏礬鐵釜，久之亦化為銅。」【譯文】信州鉛山縣有個苦泉，在山間形成水溝。舀出泉水來蒸煮濃縮就成了膏礬，膏礬再加熱就能生成銅；蒸膏礬的鐵鍋用久了也變成了銅。文章內容提到的膏礬為五水合硫酸銅（CuSO4･5H2O）。根據文章內容，下列敘述，哪些正確？（原子量：Fe=56，Cu=64；應選2項）",
+    "options": [
+      "(A) 因為鹼性物質有苦澀味，所以苦泉一定是鹼所造成的",
+      "(B) 膏礬在蒸乾後可以得到白色的硫酸銅粉末",
+      "(C) 熬膏礬的鐵鍋發生的反應式如下：2H2O + 2CuSO4 → Cu + O2 + 2H2SO4",
+      "(D) 熬膏礬的鐵鍋發生了酸鹼反應",
+      "(E) 熬過膏礬的鐵鍋比原本的重"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-021"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 21,
+      "page_end": 21,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 22,
+    "subject": "自然",
+    "question_number": 14,
+    "type": "single-choice",
+    "stem": "如果以立方體原子模型表示二氧化碳（CO2），其表示方式應為下列何者？",
+    "options": [
+      "(A) [立方體結構圖 A，見卷面圖示]",
+      "(B) [立方體結構圖 B，見卷面圖示]",
+      "(C) [立方體結構圖 C，見卷面圖示]",
+      "(D) [立方體結構圖 D，見卷面圖示]",
+      "(E) [立方體結構圖 E，見卷面圖示]"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [
+      "110-page-022"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 22,
+      "page_end": 22,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 22,
+    "subject": "自然",
+    "question_number": 15,
+    "type": "multiple-choice (選2項)",
+    "stem": "路易斯認為下列哪些分子因為具有奇數個未共享的電子數，造成結構不穩定（即為自由基）？（應選2項）",
+    "options": [
+      "(A) NO",
+      "(B) BF3",
+      "(C) SF6",
+      "(D) N2O",
+      "(E) NO2"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-022"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 22,
+      "page_end": 22,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 22,
+    "subject": "自然",
+    "question_number": 16,
+    "type": "multiple-choice (選2項)",
+    "stem": "下列關於油脂的敘述，哪些正確？（應選2項）",
+    "options": [
+      "(A) 不同種類的油脂都有固定的沸點",
+      "(B) 可以利用皂化價推算出油脂的平均分子量",
+      "(C) 一般而言，油脂的不飽和度愈高，其熔點亦愈高",
+      "(D) 可以利用氫化過程將油脂的不飽和度降低，故氫化油中所含的反式脂肪不具有 C=C 的結構",
+      "(E) 油脂經過高溫烹煮之後，容易酸敗，故碘價是用來檢測油品是否酸敗的項目"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-022"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 22,
+      "page_end": 22,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 22,
+    "subject": "自然",
+    "question_number": 17,
+    "type": "single-choice",
+    "stem": "固體皂是由油脂和「氫氧化鈉」結合，而液體皂是由油脂和「氫氧化鉀」結合，透過皂化反應的過程得到我們熟知的界面活性劑。已知椰子油的皂化價為 266，若想要用 1000 克的椰子油來製作固體肥皂，則需要準備多少克的氫氧化鈉來進行反應？",
+    "options": [
+      "(A) 26.6",
+      "(B) 157",
+      "(C) 190",
+      "(D) 266",
+      "(E) 372"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-022"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 22,
+      "page_end": 22,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 22,
+    "subject": "自然",
+    "question_number": 18,
+    "type": "single-choice",
+    "stem": "已知橄欖油的平均分子量為 889、碘價為 85，則平均每個橄欖油分子結構中大約含有多少個 C=C 結構？",
+    "options": [
+      "(A) 2",
+      "(B) 3",
+      "(C) 5",
+      "(D) 6",
+      "(E) 8"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-022"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 22,
+      "page_end": 22,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 23,
+    "subject": "自然",
+    "question_number": 19,
+    "type": "multiple choice (choose 2)",
+    "stem": "有一跳傘員阿瘦的質量為 60 kg，傘包質量為 20 kg。當他從 500 m 高空跳下時，令方向向下為正，其速度 (v) — 時間 (t) 關係圖如圖 7 所示。若軌跡可視為一鉛直線，跳傘後經過一段時間，速度會趨近於定值，此速度稱為終端速度。阿瘦跳傘時的終端速度量值約為 6 m/s。下列敘述，哪些正確？(應選 2 項)",
+    "options": [
+      "(A) 開傘時間約為第 4 s",
+      "(B) 開傘時間約為第 6 s",
+      "(C) 跳傘期間，阿瘦所受的重力不可能大於空氣阻力",
+      "(D) 由高空跳下到達終端速度前，阿瘦所受的空氣阻力愈來愈大",
+      "(E) 由高空跳下到達終端速度前，阿瘦所受的空氣阻力先變大再變小"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-023"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 23,
+      "page_end": 23,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 23,
+    "subject": "自然",
+    "question_number": 20,
+    "type": "multiple choice (single answer)",
+    "stem": "已知跳傘員跳傘期間所受空氣阻力力量值與速度的平方成正比，若另一跳傘員阿胖的質量為 80 kg，則其跳傘時的終端速度量值約為多少 m/s？",
+    "options": [
+      "(A) 6.7",
+      "(B) 7.5",
+      "(C) 8.0",
+      "(D) 9.4",
+      "(E) 10.6"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-023"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 23,
+      "page_end": 23,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 23,
+    "subject": "自然",
+    "question_number": 21,
+    "type": "multiple choice (choose 2)",
+    "stem": "如圖 8 所示，在 x-z 平面上有一矩形線圈，其幾何中心位於坐標的原點；若空間中有方向指向 +y 的均勻磁場，則下列哪些操作會使線圈產生感應電流？(應選 2 項)",
+    "options": [
+      "(A) 使線圈以 x 軸為轉軸旋轉",
+      "(B) 使線圈以 y 軸為轉軸旋轉",
+      "(C) 使線圈以 z 軸為轉軸旋轉",
+      "(D) 使線圈朝 + y 方向等速運動",
+      "(E) 使線圈朝 + z 方向加速運動"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-023"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 23,
+      "page_end": 23,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 23,
+    "subject": "自然",
+    "question_number": 22,
+    "type": "multiple choice (choose 2)",
+    "stem": "有一天貝小芳在上課的時候聽到物理老師講解都卜勒效應，於是將研究都卜勒效應作為她自主學習的題目。貝小芳使用手機測量頻率的 APP 實作，她站在廣場上固定一點，請爸爸開車向右等速前進沿一條線段依次通過甲、乙、丙各點，並且一邊鳴喇叭。如圖 9 所示，線段內丁與車子運動軌跡垂直，長度為 10 m；車子軌跡上甲、乙、丙各點的距離皆為 10 m。車子、貝小芳皆靜止不動時，貝小芳測得喇叭的頻率為 f0。已知當沿著聲源與觀察者連線方向上速度分量愈大，觀察者測得的頻率與聲源所發出聲波的頻率差異愈大。下列敘述，哪些是正確的？(應選 2 項)",
+    "options": [
+      "(A) 車子在甲處，貝小芳測得喇叭的頻率大於 f0",
+      "(B) 車子在甲處，爸爸在車內聽到喇叭的頻率大於 f0",
+      "(C) 車子在甲處與乙處，貝小芳測得喇叭的頻率甲處大於乙處",
+      "(D) 車子在甲處與乙處，貝小芳測得喇叭的頻率甲處等於乙處",
+      "(E) 車子在甲處與乙處，貝小芳測得喇叭的頻率甲處小於乙處"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-023"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 23,
+      "page_end": 23,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 24,
+    "subject": "自然",
+    "question_number": 23,
+    "type": "multiple response",
+    "stem": "馬小威搭乘百貨公司的電扶梯上樓，我們可以將其視為馬小威站在一平臺上，等速向右上方移動，示意圖如圖 10 所示。下列敘述，哪些正確？（應選 2 項）",
+    "options": [
+      "(A) 平臺給馬小威的正向力量值大於重力量值",
+      "(B) 平臺給馬小威的正向力量值等於重力量值",
+      "(C) 平臺給馬小威的摩擦力向右",
+      "(D) 平臺給馬小威的摩擦力向左",
+      "(E) 平臺沒有給馬小威摩擦力"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-024"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 24,
+      "page_end": 24,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 24,
+    "subject": "自然",
+    "question_number": 24,
+    "type": "single choice",
+    "stem": "題組（24、25）：\n關於核能的議題在台灣一直爭執不休，其中核廢料儲放更是一大難題。愛小妞在高中物理上了核能的單元，對核能議題感到興趣，所以想要從高中物理課本所學到的知識嘗試去估算若一個人一生的家庭用電皆為核電，會產生多少的核廢料？愛小妞為簡化問題先只討論核燃料的部分，以下列條件估算：「假設一個人一個月的平均家庭用電為 100 度電，平均壽命為 80 歲。核燃料的成分當中，^235_92U 的質量占 3%，使用過的核燃料全部變成核廢料。而 1 kg 的 ^235_92U 進行核分裂反應質量約減少 0.8 g。」\n24. 按照上文所述條件去估算若一個人一生的家庭用電皆為核電，僅考慮核燃料部分，大約會產生多少核廢料？（光速 c = 3x10^8 m/s）",
+    "options": [
+      "(A) 4x10^-6 g",
+      "(B) 4x10^-3 g",
+      "(C) 5 g",
+      "(D) 1.6x10^2 g",
+      "(E) 1.6x10^4 g"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [
+      "110-page-024"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 24,
+      "page_end": 24,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 24,
+    "subject": "自然",
+    "question_number": 25,
+    "type": "single choice",
+    "stem": "（同上題組）\n25. 核分裂能產生巨大的能量，主要由哪一種基本交互作用來解釋？",
+    "options": [
+      "(A) 強交互作用",
+      "(B) 弱交互作用",
+      "(C) 電磁交互作用",
+      "(D) 重力交互作用",
+      "(E) 熱交互作用"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-024"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 24,
+      "page_end": 24,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 24,
+    "subject": "自然",
+    "question_number": 26,
+    "type": "single choice",
+    "stem": "題組（26、27）：\n如圖 11 所示，由紅、黃、紫三種單色光混合而成的光束，自水中射向空氣，色散成甲、乙、丙三道單色光。色散的成因為不同顏色的光在水中的速度不同，且已知光在水中的速度快慢為紅 > 黃 > 紫。26. 關於甲、乙、丙三道單色光在水中的速度之敘述，何者正確？",
+    "options": [
+      "(A) 甲最快",
+      "(B) 乙最快",
+      "(C) 丙最快",
+      "(D) 一樣快",
+      "(E) 無法分辨"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-024"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 24,
+      "page_end": 24,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 24,
+    "subject": "自然",
+    "question_number": 27,
+    "type": "multiple response",
+    "stem": "（同上題組）\n27. 已知乙光束照射在某金屬上會發生光電效應，請問下列敘述哪些正確？（應選 2 項）",
+    "options": [
+      "(A) 甲光束照射在同一金屬上，必定會發生光電效應",
+      "(B) 甲光束照射在同一金屬上，必定不會發生光電效應",
+      "(C) 甲光束照射在同一金屬上，可能會也可能不會發生光電效應",
+      "(D) 丙光束照射在同一金屬上，必定會發生光電效應",
+      "(E) 丙光束照射在同一金屬上，可能會也可能不會發生光電效應"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-024"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 24,
+      "page_end": 24,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 25,
+    "subject": "自然",
+    "question_number": 28,
+    "type": "multiple choice",
+    "stem": "圖12為獵戶座和其鄰近星座的位置圖，圖中可見數顆亮星和不規則天體（如薔薇星雲、M42、NGC1637等），這些亮星和天體旁有其基本資料，其中 M 為絕對星等，m 為視星等。而恆星的光度與其球狀的「表面積」成正比，並且與其「表面溫度四次方」成正比。依圖中資訊判斷下列推論何者正確？",
+    "options": [
+      "(A) 獵戶座七顆亮星皆屬同一個參宿星團，形成時間相近，與地球的距離也都差不多遠",
+      "(B) 金牛座的畢宿五與參宿七因屬不同星座，所以與地球的距離就不一樣遠",
+      "(C) 獵戶座裡的七顆亮星以參宿七最亮，故其距離地球較其餘六顆近許多",
+      "(D) 薔薇星雲較 M42 暗很多，故 M42 應在銀河系之內，而薔薇星雲在銀河系之外",
+      "(E) NGC1637 是一個星系，所以它不是銀河系裡的成員"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-025"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 25,
+      "page_end": 25,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 25,
+    "subject": "自然",
+    "question_number": 29,
+    "type": "multiple choice (choose 2)",
+    "stem": "承上題，依圖中資料比較畢宿五、參宿四和參宿七這三顆亮星的各項性質，下列敘述哪些正確？（應選 2 項）",
+    "options": [
+      "(A) 三者的表面溫度由高至低為：參宿四、畢宿五、參宿七",
+      "(B) 三者的發光強度由高至低為：畢宿五、參宿四、參宿七",
+      "(C) 三者看起來的明亮程度由高至低為：參宿四、參宿七、畢宿五",
+      "(D) 三者與地球的距離由遠而近為：參宿七、參宿四、畢宿五",
+      "(E) 三者的體積以參宿四最大"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.87,
+    "asset_ids": [
+      "110-page-025"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 25,
+      "page_end": 25,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 26,
+    "subject": "自然",
+    "question_number": 30,
+    "type": "multiple choice",
+    "stem": "30. 獵戶座參宿四的亮度在 2019 年 10 月到 2020 年 4 月之間發生驚人的變暗事件，約於 2020 年初下降至其平均亮度的 40% 左右。因為參宿四是一顆正邁向死亡的恆星，因此不少天文愛好者抱著既期待又怕受傷害的興奮心情，認為這可能預示了它即將發生超新星爆炸。不過在之後的幾個月裡，參宿四的亮度又開始恢復（如圖 13，顯示了 2010 年以來亮度的變化），甚至達到 0.4 星等。經過天文學家的研究，認為參宿四此次的變暗事件極可能是其南半球的冷斑和塵埃雲遮蔽所致，各項研究結果似乎都排除了超新星爆炸的可能。依圖文判斷，下列關於參宿四的敘述，哪些正確？（應選 2 項）",
+    "options": [
+      "(A) 參宿四的亮度在 2020 年初降到最暗，星等值達 2.0",
+      "(B) 參宿四在 2018 年以前的亮度一直維持在 0.5 星等不變",
+      "(C) 每年都有一段時間無參宿四的觀測資料，是因為參宿四被其他恆星遮掩而看不清其身影",
+      "(D) 在 2019～2020 年間大變暗事件之前，參宿四的亮度約略有週期性的變化",
+      "(E) 從 2020 年中旬至 2021 年中旬，參宿四的亮度似乎較 2019～2020 年間大變暗之前略低"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-026"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 26,
+      "page_end": 26,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 27,
+    "subject": "自然",
+    "question_number": 31,
+    "type": "single choice",
+    "stem": "從2020年底到2021年春季，臺灣正經歷幾十年來最嚴重的乾旱，特別是中南部地區。還好5月底開始，一波波的梅雨不僅讓各地陸續解除限水危機，也讓各水庫的蓄水量逐漸轉為黃燈、甚至是綠燈。關於梅雨季節的天氣型態，下列哪一觀測的圖示，最能代表典型的梅雨狀態？",
+    "options": [
+      "(A) 紅外線衛星雲圖",
+      "(B) 可見光衛星雲圖",
+      "(C) 風向風速分布圖",
+      "(D) 雷達回波圖",
+      "(E) 日累積雨量圖"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [
+      "110-page-027"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 27,
+      "page_end": 27,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 28,
+    "subject": "自然",
+    "question_number": 32,
+    "type": "multiple-choice (single correct)",
+    "stem": "臺灣位於板塊聚合的環境，不僅地震多且容易造成災害。依震央的分布和板塊架構，習慣上把臺灣地區的地震分布區分成東北部地震帶、東部地震帶和西部地震帶。在東北部地震帶的區域內，除了菲律賓板塊在琉球海溝處向北隱沒造成許多地震外，還有沖繩海槽張裂活動造成的地震。圖14為臺灣東北部地區自2020年底至2021年4月發生較大的四次地震資料，宜蘭外海灰色區域為沖繩海槽，南側為琉球島弧，琉球海溝則位於圖幅下緣之外。依圖內資訊判斷，下列敘述何者正確？",
+    "options": [
+      "A. 宜蘭測站距離乙地震較花蓮測站近，故宜蘭測站測得乙地震的規模會較花蓮測站測得的規模大",
+      "B. 甲地震規模較乙地震大，所以甲地震的 P 波和 S 波到達宜蘭測站的時間差，會較乙地震的 P 波和 S 波到達宜蘭測站的時間差大",
+      "C. 乙地震在宜蘭造成的震度較甲地震在宜蘭造成的震度大",
+      "D. 若不考量岩性和密度的差異，甲地震的 P 波傳到宜蘭測站所需的時間較丁地震的 P 波傳遞所需的時間短一些",
+      "E. 甲地震在宜蘭測站和臺北測站產生地動程度的差異，會較丁地震產生地動程度的差異小"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-028"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 28,
+      "page_end": 28,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 28,
+    "subject": "自然",
+    "question_number": 33,
+    "type": "multiple-choice (single correct)",
+    "stem": "承上題，下列關於此四地震成因的探討，何者的推論較為正確？",
+    "options": [
+      "A. 因為甲地震震央位於沖繩海槽的位置，故甲地震應為沖繩海槽活動所造成",
+      "B. 乙地震遠離琉球海溝，且震源深度較深，故應與板塊聚合作用無關",
+      "C. 丙地震震源深度雖較淺，但規模不小，且為逆斷層錯動所形成的地震，故應為板塊擠壓所形成的地震",
+      "D. 由於菲律賓板塊向北隱沒，故離琉球海溝最遠的丁地震，應為隱沒的板塊內部所形成的地震",
+      "E. 甲地震規模較大，又為逆斷層活動所形成的地震，故應為沖繩海槽活動所造成"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-028"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 28,
+      "page_end": 28,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 29,
+    "subject": "自然",
+    "question_number": 34,
+    "type": "multiple response (choose 3)",
+    "stem": "34. 不同路徑的颱風對臺灣影響的區域不盡相同，而部分颱風在侵臺後，甚至會再引進所謂的「西南氣流」，造成中南部地區大量降水，形成水患。圖15為五種侵臺颱風的路徑圖，請問圖中的哪些路徑最容易引進西南氣流？（應選3項）",
+    "options": [
+      "(A) 路徑 1",
+      "(B) 路徑 2",
+      "(C) 路徑 3",
+      "(D) 路徑 4",
+      "(E) 路徑 5"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-029"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 29,
+      "page_end": 29,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 29,
+    "subject": "自然",
+    "question_number": 35,
+    "type": "multiple choice (single answer)",
+    "stem": "35. 圖16為某日的地面天氣圖，若左上角的高壓推移方向與速度不變，依天氣圖中的資訊，推測12小時後臺中氣象測站觀測的天氣資料，在天氣圖上的標示最可能為下列何種狀態？",
+    "options": [
+      "(A) 圖示為左下的小站要素圖，旁標示：14    169    +11    （有勾記號）；站位下方數字 14",
+      "(B) 圖示為小站要素圖，旁標示：20    015    -14    （有倒三角旗記號）；站位下方數字 17",
+      "(C) 圖示為小站要素圖，旁標示：12    235    -17    （有箭頭記號）；站位下方數字 11",
+      "(D) 圖示為小站要素圖，旁標示：16    985    +9    （有勾記號）；站位下方數字 15",
+      "(E) 圖示為小站要素圖，旁標示：21    188    +32    （有勾記號）；站位下方數字 20"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.72,
+    "asset_ids": [
+      "110-page-029"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 29,
+      "page_end": 29,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 30,
+    "subject": "自然",
+    "question_number": 36,
+    "type": "multiple_choice_multi_answer",
+    "stem": "聖嬰和反聖嬰現象 (ENSO) 是年際間最容易出現的氣候異常，目前科學家可以利用太平洋東西兩側氣壓場的變化或直接監測太平洋海面溫度的異常變化，來判斷該年度 ENSO 的狀態。圖 17 為 2014 年以來監測太平洋南北緯 5 度之間，西經 120 度到 170 度間（約為太平洋中央區域赤道附近）海域表面水溫的異常狀態。與過去 30 年（1991 年到 2020 年）的平均值來比較，若連續 5 個月的追蹤異常值都超過 +0.5 °C 以上者，該年度視為聖嬰年；若連續 5 個月的追蹤異常值都低於 -0.5 °C 者，則為反聖嬰年。請由圖示內容判斷下列推論哪些有誤？（應選 2 項）",
+    "options": [
+      "A. 2020 年底應為反聖嬰年",
+      "B. 2018 年底太平洋赤道附近的東風較 2020 年底強勁",
+      "C. 2015 年底太平洋東側海域氣壓較平常低許多，西側海域則變高許多",
+      "D. 2020 年底太平洋東側的湧升流較 2020 年初旺盛，營養鹽較為豐富",
+      "E. 2015 年底太平洋西側斜溫層出現的深度較 2021 年初深許多"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-030"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 30,
+      "page_end": 30,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 31,
+    "subject": "自然",
+    "question_number": 37,
+    "type": "multiple choice (multiple answer, 3 項)",
+    "stem": "根據本文，下列哪些屬於分子標記或可改變染色體結構，進而調控基因表現？（應選 3 項）（2分）",
+    "options": [
+      "(A) DNA 序列中插入一個含氨酸基",
+      "(B) DNA 甲基化",
+      "(C) 修飾組蛋白",
+      "(D) 非編碼 RNA",
+      "(E) 重組 DNA"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [
+      "110-page-031"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 31,
+      "page_end": 31,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 31,
+    "subject": "自然",
+    "question_number": 38,
+    "type": "constructed response (繪製遺傳譜系圖)",
+    "stem": "依文章中畫線部分的敘述，若第一子代（F1）與第二子代（F2）皆以一公一母的小鼠作為代表，繪製遺傳譜系圖。（○表示正常雌鼠、□表示正常雄鼠、● □ 表示精神與行為異常，◐ ▥ 表示精神與行為輕微異常） （4分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-031"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 31,
+      "page_end": 31,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 31,
+    "subject": "自然",
+    "question_number": 39,
+    "type": "multiple choice (single answer)",
+    "stem": "弓形蟲所造成的 F1 小鼠表觀遺傳，較類似於下列何種遺傳？（2分）",
+    "options": [
+      "(A) 體染色體顯性遺傳",
+      "(B) 體染色體隱性遺傳",
+      "(C) X 染色體顯性遺傳",
+      "(D) X 染色體隱性遺傳",
+      "(E) Y 染色體遺傳"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [
+      "110-page-031"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 31,
+      "page_end": 31,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 31,
+    "subject": "自然",
+    "question_number": 40,
+    "type": "multiple choice (single answer, requires calculation)",
+    "stem": "在室溫下，重量百分率濃度為 16.0% 的硫酸銅溶液相當於多少的體積莫耳濃度（M）？（2分）（式量：CuSO4 = 160）",
+    "options": [
+      "(A) 0.8",
+      "(B) 1.0",
+      "(C) 1.2",
+      "(D) 1.4",
+      "(E) 1.6"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-031"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 31,
+      "page_end": 31,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 31,
+    "subject": "自然",
+    "question_number": 41,
+    "type": "constructed response (圖表繪製與簡答)",
+    "stem": "(1) 以 95% 酒精用量為橫坐標、硫酸銅沉澱高度為縱坐標作圖，並用適當線條將數據點連接起來。（2分）\n(2) 依作圖說明為何加入酒精到一定量之後，硫酸銅沉澱增加量會趨緩呢？（用 30 字以內說明）（1分）\n\n（表中相關數據：每試管硫酸銅溶液用量均為 5.0 mL；95% 酒精用量 (mL) 分別為 2.0、4.0、6.0、8.0、10.0、12.0、14.0、16.0；硫酸銅沉澱高度 (mm) 分別為 0、5.2、11.8、18.2、24.0、28.4、30.2、30.2。）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.93,
+    "asset_ids": [
+      "110-page-031"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 31,
+      "page_end": 31,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 32,
+    "subject": "自然",
+    "question_number": 42,
+    "type": "簡答",
+    "stem": "尤達大師告訴賽斯硝酸銅在汽油中的溶解度極差，因此賽斯想用汽油取代95%酒精重複上述的實驗。請推測此實驗結果會與原本的實驗結果相似嗎？為什麼？（用15字以內說明）（3分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [
+      "110-page-032"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 32,
+      "page_end": 32,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 32,
+    "subject": "自然",
+    "question_number": 43,
+    "type": "簡答",
+    "stem": "有一班級其探究與實作的題目為紙蜻蜓，紙蜻蜓形狀類似竹蜻蜓，由葉片與柄的部分組成，材質為紙，示意圖如圖18所示。甲組同學題目為：「紙蜻蜓材質對於落地時間的影響」，於是選用了雲彩紙、影印紙、再生紙、廣告紙，以相同的形狀做成紙蜻蜓，並以相同高度、相同方式釋放，記錄落地時間。老師看了他們的實驗設計，告訴甲組同學：「你們改變的變因不只有材質而已，如果你們想要操縱變因只有一項，需要改變你們的實驗設計。」請問甲組同學還需要控制哪一項變因？（2分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [
+      "110-page-032"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 32,
+      "page_end": 32,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 32,
+    "subject": "自然",
+    "question_number": 44,
+    "type": "單選",
+    "stem": "乙組同學要討論的是：「柄尾的形狀對於落地時間的影響」，圖19為四種不同形狀的柄尾。除柄尾形狀外，其他變因皆控制使其相同。表3是乙組同學將4組紙蜻蜓從高度2 m處釋放的實驗數據，請問下列哪個圖比較適合表示他們的實驗數據？（3分）\n\n表3\n組別 1 2 3 4\n平均落地時間(s) 1.42 1.63 1.52 1.49",
+    "options": [
+      "(A) 散佈圖（圖中為各組時間點之散佈）",
+      "(B) 折線圖（各組平均時間以點連線呈現）",
+      "(C) 圓餅圖（以百分比方式呈各組）",
+      "(D) 雷達圖（多變項雷達圖表示）",
+      "(E) 長條圖（以長條表示各組平均時間）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-032"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 32,
+      "page_end": 32,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 33,
+    "subject": "自然",
+    "question_number": 45,
+    "type": "multiple choice",
+    "stem": "乙組同學討論的是：「紙蜻蜓重量與落地時間的關係」，除紙蜻蜓重量外，其他變因皆控制使其相同。表4 是他們將不同重量的紙蜻蜓從相同高度處釋放的實驗數據。請問從他們的實驗數據所做推論，下列何者最為恰當？（3分）\n\n表4\n紙蜻蜓重量（g w）\n1.4　1.5　1.6　1.7　1.8\n平均落地時間（s）\n1.8　1.7　1.6　1.5　1.4",
+    "options": [
+      "(A) 紙蜻蜓的重量與落地時間成正相關且成正比",
+      "(B) 紙蜻蜓的重量與落地時間成負相關且成反比",
+      "(C) 紙蜻蜓的重量與落地時間成正相關但不成正比",
+      "(D) 紙蜻蜓的重量與落地時間成負相關但不成反比",
+      "(E) 紙蜻蜓的重量與落地時間無顯著關係"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.72,
+    "asset_ids": [
+      "110-page-033"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 33,
+      "page_end": 33,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 34,
+    "subject": "自然",
+    "question_number": 46,
+    "type": "multiple choice",
+    "stem": "若由甲位置（南緯 15 度）以溫鹽深儀（CTD）垂降 4000 公尺深，所測得的鹽度隨深度分布，應為下列何者？（2 分）",
+    "options": [
+      "（A）（見圖 A；圖示橫軸：鹽度 (‰) 33 34 35 36 37；縱軸：深度（公尺）0, 1000, 2000, 3000, 4000）",
+      "（B）（見圖 B；圖示橫軸：鹽度 (‰) 33 34 35 36 37；縱軸：深度（公尺）0, 1000, 2000, 3000, 4000）",
+      "（C）（見圖 C；圖示橫軸：鹽度 (‰) 33 34 35 36 37；縱軸：深度（公尺）0, 1000, 2000, 3000, 4000）",
+      "（D）（見圖 D；圖示橫軸：鹽度 (‰) 33 34 35 36 37；縱軸：深度（公尺）0, 1000, 2000, 3000, 4000）",
+      "（E）（見圖 E；圖示橫軸：鹽度 (‰) 33 34 35 36 37；縱軸：深度（公尺）0, 1000, 2000, 3000, 4000）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.67,
+    "asset_ids": [
+      "110-page-034"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 34,
+      "page_end": 34,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 34,
+    "subject": "自然",
+    "question_number": 47,
+    "type": "short answer",
+    "stem": "承上題，請說明甲地點在深度 400 公尺以下的海水，鹽度有較明顯偏高或偏低變化的原因？（2 分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.72,
+    "asset_ids": [
+      "110-page-034"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 34,
+      "page_end": 34,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 34,
+    "subject": "自然",
+    "question_number": 48,
+    "type": "short answer (two parts)",
+    "stem": "海水的溫鹽圖是分析海水水團簡單且有效的方法。利用溫鹽深儀（CTD）測得不同深度海水的溫度和鹽度，再以溫度和鹽度來作圖，即可得海水的溫鹽曲線以進行比較或分析。若圖 20 中的甲位置為同一次測出的溫度和鹽度資料，請回答下列問題：\n(1) 請於答題卷的溫鹽圖中，畫出甲位置海水的溫鹽分布曲線。（表層海水易受短時間天氣變化的影響，故只需繪出 20°C 以下的溫鹽曲線） （2 分）\n(2) 比較圖 21（三大洋海水溫鹽曲線分布範圍），判斷甲處為哪一大洋的海水。 （2 分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.72,
+    "asset_ids": [
+      "110-page-034"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 34,
+      "page_end": 34,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 35,
+    "subject": "自然",
+    "question_number": 49,
+    "type": "single-choice",
+    "stem": "下列有關在分欄飼養的蛋雞場生產的雞蛋之敘述，何者正確？（2分）",
+    "options": [
+      "(A)此雞蛋放太久沒吃會發育成小雞",
+      "(B)此雞蛋為單倍染色體構造",
+      "(C)蛋黃是細胞核",
+      "(D)蛋殼內、外膜是細胞膜",
+      "(E)繫帶相當於人類的臍帶，可輸送養分給胚胎"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-035"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 35,
+      "page_end": 35,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 36,
+    "subject": "自然",
+    "question_number": 50,
+    "type": "作圖/簡答",
+    "stem": "提示一：雞的體細胞有39對染色體，其中1對為性染色體；公雞的染色體為76 + ZZ，母雞的染色體為76 + ZW。（圖24僅以2對體染色體與1對性染色體示意）。\n提示二：已知母雞的初級卵母細胞完成減數分裂 I 後，需要受精才能完成減數分裂 II。\n按照上述提示，請就圖24示意圖畫出雞蛋的染色體。(4分)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-036"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 36,
+      "page_end": 36,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 36,
+    "subject": "自然",
+    "question_number": 51,
+    "type": "多選題(請選3項)",
+    "stem": "下列關於實驗(一)的敘述，哪些正確？（應選3項）（2分）",
+    "options": [
+      "(A) 蛋殼會燻黑是因為空氣中的二氧化碳轉變為碳微粒附著在蛋殼上",
+      "(B) 蛋殼會燻黑是因為蠟燭燃燒不完全產生的碳微粒附著在蛋殼上",
+      "(C) 燻黑的蛋殼表面會有蠟蒸氣附著形成的蠟層，故水不易附著在蛋殼上",
+      "(D) 燻黑的蛋殼上有奈米級碳粒，故具有疏水性",
+      "(E) 蓮葉的疏水性與自我潔淨現象，是因為表面具有奈米結構"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-036"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 36,
+      "page_end": 36,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 36,
+    "subject": "自然",
+    "question_number": 52,
+    "type": "簡答（兩小題）",
+    "stem": "(1) 已知蛋殼的主要成分為碳酸鈣，則實驗(二)中蛋殼與鹽酸的反應是屬於氧化還原反應、酸鹼中和反應，還是沉澱反應？（2分）\n(2) 試寫出碳酸鈣與鹽酸反應的化學反應式。（須標示物質狀態）（2分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.87,
+    "asset_ids": [
+      "110-page-036"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 36,
+      "page_end": 36,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 36,
+    "subject": "自然",
+    "question_number": 53,
+    "type": "選擇題",
+    "stem": "空氣產生垂直運動的過程因不與外界產生熱量交換，因此又稱為「絕熱過程」。已知未飽和空氣塊每上升（下降）1 公里，溫度下降（上升）10°C；飽和空氣塊每上升（下降）1 公里，溫度下降（上升）6°C。請試算雲頂溫度在 -111°C 處，其雲底的溫度約為幾°C？（2分）",
+    "options": [
+      "(A) 89",
+      "(B) 25",
+      "(C) 9",
+      "(D) -6",
+      "(E) -91"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.89,
+    "asset_ids": [
+      "110-page-036"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 36,
+      "page_end": 36,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 37,
+    "subject": "自然",
+    "question_number": 54,
+    "type": "短答題",
+    "stem": "圖26為不同人造衛星搭載之儀器量測的風暴雲頂溫度，其中 AGRI、AHI FD、ABI 因持續觀測該風暴，因此可得到時間上連續的溫度變化；而 SLSTR、VIIRS-M、MODIS、VIIRS-I、AVHRR 則會在不同時間點接近該風暴時，記錄當時溫度。圖26中記錄之時間為 12 月 29 日上午 4：00 至 12 月 30 日上午 4：00（UTC 時間），依據此圖，請問何者為量測到 −111℃的儀器？（2 分）且何時間為該風暴達到強度最強的時間點？（2 分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.3,
+    "asset_ids": [
+      "110-page-037"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 37,
+      "page_end": 37,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 37,
+    "subject": "自然",
+    "question_number": 55,
+    "type": "多選題（應選 2 項）",
+    "stem": "關於偵測地球的陸地與海洋上空之大氣狀況中的可見光、紅外線、微波，下列敘述哪些正確？（應選 2 項）（2 分）",
+    "options": [
+      "(A) 在相同的大氣中，可見光、紅外線、微波三者之波長相等",
+      "(B) JPSS 量測到來自地球大氣層與地表的微波輻射強度可能不同",
+      "(C) 微波由地球表面穿過大氣層到被 JPSS 接收的過程中，微波的頻率不會改變",
+      "(D) 偵測時是由 JPSS 向地球發出可見光、紅外線、微波等電磁波，再偵測反射訊號",
+      "(E) JPSS 是偵測由地球內部自發的可見光、紅外線、微波等電磁波變化，作為氣象預報與監控"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-037"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 37,
+      "page_end": 37,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 37,
+    "subject": "自然",
+    "question_number": 56,
+    "type": "計算題",
+    "stem": "已知地球半徑約為 6400 公里，而繞地球之同步衛星離地面的高度需維持約在 36000 公里，其週期約為 24 小時。試估算 JPSS 繞地球運轉時，離地面的高度約為何？（取 √196 ≒ 5.8） （4 分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-037"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 37,
+      "page_end": 37,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 1,
+    "type": "multiple choice",
+    "stem": "Due to his excellent academic performance, Sam went to his ideal university on a ______.",
+    "options": [
+      "(A) harmony",
+      "(B) publication",
+      "(C) foundation",
+      "(D) scholarship"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 2,
+    "type": "multiple choice",
+    "stem": "The new album sold pretty well. It is ______ unavailable in any store.",
+    "options": [
+      "(A) currently",
+      "(B) miserably",
+      "(C) improperly",
+      "(D) sufficiently"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 3,
+    "type": "multiple choice",
+    "stem": "You may feel ______ after taking the pills, so you can take a nap if you want.",
+    "options": [
+      "(A) desirable",
+      "(B) vague",
+      "(C) temporary",
+      "(D) drowsy"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 4,
+    "type": "multiple choice",
+    "stem": "To make a ______ decision, one must stay informed and think critically.",
+    "options": [
+      "(A) sensible",
+      "(B) technical",
+      "(C) liberal",
+      "(D) vacant"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 5,
+    "type": "multiple choice",
+    "stem": "With a seating ______ of up to 2,500 people, the concert hall can take in a large audience.",
+    "options": [
+      "(A) circumstance",
+      "(B) capacity",
+      "(C) operation",
+      "(D) signature"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 6,
+    "type": "multiple choice",
+    "stem": "The improved equipment has made the results of the experiment more ______ and reliable.",
+    "options": [
+      "(A) primary",
+      "(B) crunchy",
+      "(C) accurate",
+      "(D) wicked"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 7,
+    "type": "multiple choice",
+    "stem": "______ is important for efficient self-learning. Those with more self-control can produce better learning results.",
+    "options": [
+      "(A) Modesty",
+      "(B) Interference",
+      "(C) Discipline",
+      "(D) Reception"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 8,
+    "type": "multiple choice",
+    "stem": "The tax reform has ______ a heated debate across the country. It's almost an everyday topic of conversation.",
+    "options": [
+      "(A) minimized",
+      "(B) sparked",
+      "(C) hooked",
+      "(D) endured"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 9,
+    "type": "multiple choice",
+    "stem": "Kevin never ______ from challenges. He is willing to take risks and try new things.",
+    "options": [
+      "(A) shrinks",
+      "(B) wanders",
+      "(C) suppresses",
+      "(D) loosens"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 46,
+    "subject": "英文",
+    "question_number": 10,
+    "type": "multiple choice",
+    "stem": "The children ______ when Ms. Wu made a funny face while telling the story.",
+    "options": [
+      "(A) implied",
+      "(B) twisted",
+      "(C) fetched",
+      "(D) giggled"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 46,
+      "page_end": 46,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 11,
+    "type": "multiple choice",
+    "stem": "題幹於前一頁，未出現在此掃描頁。",
+    "options": [
+      "(A) by means of",
+      "(B) for the sake of",
+      "(C) in line with",
+      "(D) with a view to"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 12,
+    "type": "multiple choice",
+    "stem": "題幹於前一頁，未出現在此掃描頁。",
+    "options": [
+      "(A) leaked",
+      "(B) devoted",
+      "(C) edited",
+      "(D) charged"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 13,
+    "type": "multiple choice",
+    "stem": "題幹於前一頁，未出現在此掃描頁。",
+    "options": [
+      "(A) measures",
+      "(B) advances",
+      "(C) contents",
+      "(D) extensions"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 14,
+    "type": "multiple choice",
+    "stem": "In the passage: \"...filtered images can ____14____ one's self-esteem.\"",
+    "options": [
+      "(A) lend a hand to",
+      "(B) fall victim to",
+      "(C) lose control of",
+      "(D) take a toll on"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 15,
+    "type": "multiple choice",
+    "stem": "In the passage: \"These filtered selfies often present ____15____ appearance...\"",
+    "options": [
+      "(A) separate",
+      "(B) abstract",
+      "(C) unattainable",
+      "(D) profitable"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 16,
+    "type": "multiple choice",
+    "stem": "In the passage: \"In 2021, NASA's exploring robot Perseverance Mars is set to collect its first-ever sample of Martian rock at the Jezero Crater. ____16____ NASA embarking on a series of rover missions this year, Perseverance landed on Mars to dig a patch of crater floor that may contain Jezero's most ancient layers of bedrock.\"",
+    "options": [
+      "(A) As",
+      "(B) For",
+      "(C) Since",
+      "(D) With"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 17,
+    "type": "multiple choice",
+    "stem": "In the passage: \"____17____ will take Perseverance quite a few days to complete its first sampling, as it must receive instructions from far-away Earth while relying on the most sophisticated and capable mechanism ever to be sent into space — the Sampling and Caching System.\"",
+    "options": [
+      "(A) There",
+      "(B) What",
+      "(C) One",
+      "(D) It"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 18,
+    "type": "multiple choice",
+    "stem": "In the passage: \"One key ____18____ for Perseverance's mission on Mars is to search for signs of ancient microbial life.\"",
+    "options": [
+      "(A) objective",
+      "(B) category",
+      "(C) slaughter",
+      "(D) abandonment"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 19,
+    "type": "multiple choice",
+    "stem": "In the passage: \"The rover will facilitate the study of the planet's geology and past climate, ____19____ the way for future exploration of the Red Planet.\"",
+    "options": [
+      "(A) pave",
+      "(B) by paving",
+      "(C) paving",
+      "(D) having paved"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 47,
+    "subject": "英文",
+    "question_number": 20,
+    "type": "multiple choice",
+    "stem": "In the passage: \"According to scientists, while the rocks located in Jezero are not perfect time capsules for organics, they have been around since the formation of the crater. ____20____, they are incredibly valuable to fill gaps in the geologic understanding of this region...\"",
+    "options": [
+      "(A) However",
+      "(B) As a result",
+      "(C) In contrast",
+      "(D) Otherwise"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 47,
+      "page_end": 47,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 23,
+    "type": "multiple choice",
+    "stem": "As the thief diminished her stock, the elderly woman was getting _____.",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 24,
+    "type": "multiple choice",
+    "stem": "When only one _____ in the bag, she wondered what he would do.",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 25,
+    "type": "multiple choice",
+    "stem": "He offered her half, as he ate the other. The woman _____ it from him, trying to utter some words but in vain.",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 26,
+    "type": "multiple choice",
+    "stem": "She couldn't believe the rude guy had the _____ to do this without even any sign of gratitude!",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 27,
+    "type": "multiple choice",
+    "stem": "The woman opened her eyes wide and was ready to give this thief a good _____.",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 28,
+    "type": "multiple choice",
+    "stem": "Yet at that moment, her flight was called. So she decided to turn _____ to the man, gathered her belongings and headed to the gate.",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 29,
+    "type": "multiple choice",
+    "stem": "As she reached in her baggage, she _____ with surprise: there was her bag of cookies, in front of her eyes.",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 30,
+    "type": "multiple choice",
+    "stem": "It occurred to the woman that she had never opened her bag of cookies and _____ that the cookies on the seat were hers.",
+    "options": [
+      "(A) ownership",
+      "(B) gasped",
+      "(C) assumed",
+      "(D) blind",
+      "(E) lecture",
+      "(F) snatched",
+      "(G) bold",
+      "(H) nerve",
+      "(I) furious",
+      "(J) remained"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 31,
+    "type": "multiple choice",
+    "stem": "The mixture of gold and mercury is then further heated to a temperature that will vaporize the mercury, leaving behind the gold. ____ (31)",
+    "options": [
+      "(A) For small, regional businesses, mercury is the most cost-efficient and easiest option to separate gold.",
+      "(B) Common symptoms are tremors, memory loss, headaches, and loss of motor skills.",
+      "(C) Mercury can also find its way into soil and water if it contaminates other waste materials that are carelessly discarded.",
+      "(D) While this process doesn't result in gold that is 100% pure, it does get rid of the majority of impurities."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 32,
+    "type": "multiple choice",
+    "stem": "Even if some equipment is used to catch the vapor, some still can get into the atmosphere. ____ (32) Mercury vapor negatively impacts the human body, including the nervous, digestive, and immune systems.",
+    "options": [
+      "(A) For small, regional businesses, mercury is the most cost-efficient and easiest option to separate gold.",
+      "(B) Common symptoms are tremors, memory loss, headaches, and loss of motor skills.",
+      "(C) Mercury can also find its way into soil and water if it contaminates other waste materials that are carelessly discarded.",
+      "(D) While this process doesn't result in gold that is 100% pure, it does get rid of the majority of impurities."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 33,
+    "type": "multiple choice",
+    "stem": "These health effects can be felt from breathing in, ingesting, or even just physical contact with mercury. ____ (33)",
+    "options": [
+      "(A) For small, regional businesses, mercury is the most cost-efficient and easiest option to separate gold.",
+      "(B) Common symptoms are tremors, memory loss, headaches, and loss of motor skills.",
+      "(C) Mercury can also find its way into soil and water if it contaminates other waste materials that are carelessly discarded.",
+      "(D) While this process doesn't result in gold that is 100% pure, it does get rid of the majority of impurities."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 48,
+    "subject": "英文",
+    "question_number": 34,
+    "type": "multiple choice",
+    "stem": "Although large companies do not use mercury in gold mining, some small-scale and illegal gold mining operations still do. ... ____ (34)",
+    "options": [
+      "(A) For small, regional businesses, mercury is the most cost-efficient and easiest option to separate gold.",
+      "(B) Common symptoms are tremors, memory loss, headaches, and loss of motor skills.",
+      "(C) Mercury can also find its way into soil and water if it contaminates other waste materials that are carelessly discarded.",
+      "(D) While this process doesn't result in gold that is 100% pure, it does get rid of the majority of impurities."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 48,
+      "page_end": 48,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 49,
+    "subject": "英文",
+    "question_number": 35,
+    "type": "multiple choice",
+    "stem": "What is this passage mainly about?",
+    "options": [
+      "(A) The importance of insurance.",
+      "(B) The comparison of insurance.",
+      "(C) The development of insurance.",
+      "(D) The benefits of insurance."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 49,
+      "page_end": 49,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 49,
+    "subject": "英文",
+    "question_number": 36,
+    "type": "multiple choice",
+    "stem": "Which of the following statements is NOT true?",
+    "options": [
+      "(A) The Code of Hammurabi recorded the first insurance activities in Babylon.",
+      "(B) Merchants in Babylonian times were allowed to get loans for shipment.",
+      "(C) The first case of life and health insurance turned up around the 7th century BC.",
+      "(D) In Greek times, the government paid family members of a dead person for funerals."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 49,
+      "page_end": 49,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 50,
+    "subject": "英文",
+    "question_number": 37,
+    "type": "multiple-choice",
+    "stem": "What has caused cargo insurance to rise in the 17th century in London?",
+    "options": [
+      "(A) The booming trade industry.",
+      "(B) The increase of rich people.",
+      "(C) The demand for ship construction.",
+      "(D) The expansion of the city."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 50,
+      "page_end": 50,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 50,
+    "subject": "英文",
+    "question_number": 38,
+    "type": "multiple-choice",
+    "stem": "What did Nicholas Barbon and Benjamin Franklin have in common?",
+    "options": [
+      "(A) They both survived a disastrous fire in their time.",
+      "(B) They started their own fire insurance companies.",
+      "(C) They were considered the fathers of modern insurance.",
+      "(D) They improved the procedures of firefighting."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 50,
+      "page_end": 50,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 50,
+    "subject": "英文",
+    "question_number": 39,
+    "type": "multiple-choice",
+    "stem": "Which of the following best shows the organization of the passage?",
+    "options": [
+      "(A) Background — Method — Result",
+      "(B) Theory — Development — Comparison",
+      "(C) Problem — Solution — Reason",
+      "(D) Introduction — Argument — Advice"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 50,
+      "page_end": 50,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 51,
+    "subject": "英文",
+    "question_number": 40,
+    "type": "multiple-choice",
+    "stem": "What is the main finding of the Penn State research team?",
+    "options": [
+      "(A) Wolbachia is effective in controlling the reproduction of the dengue virus.",
+      "(B) Mosquitoes having either the dengue virus or Wolbachia are less tolerant of heat.",
+      "(C) The transmission of the dengue virus is passed around mostly by Aedes aegypti.",
+      "(D) It takes a temperature of 42°C for a mosquito to be immobilized."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 51,
+      "page_end": 51,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 51,
+    "subject": "英文",
+    "question_number": 41,
+    "type": "multiple-choice",
+    "stem": "Which of the following statements is true about Wolbachia?",
+    "options": [
+      "(A) Wolbachia is a beneficial bacterium found in mosquitoes.",
+      "(B) The dengue virus is able to kill Wolbachia at low temperatures.",
+      "(C) Wolbachia tends to make a mosquito unable to move.",
+      "(D) A mosquito is likely to receive Wolbachia from its parents."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 51,
+      "page_end": 51,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 51,
+    "subject": "英文",
+    "question_number": 42,
+    "type": "multiple-choice",
+    "stem": "According to the passage, why might dengue fever cases be reduced in hotter regions?",
+    "options": [
+      "(A) The dengue virus reproduces much faster with heat.",
+      "(B) The number of mosquitoes is likely to drop.",
+      "(C) The heat will lower the activity of the dengue virus.",
+      "(D) The dengue virus will fail to spread throughout a mosquito’s body."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 51,
+      "page_end": 51,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 51,
+    "subject": "英文",
+    "question_number": 43,
+    "type": "multiple-choice",
+    "stem": "According to this passage, why is a djembe usually made from Lenge trees?",
+    "options": [
+      "(A) The tree bark is more flexible.",
+      "(B) There are spirits in the trees.",
+      "(C) The drums can make stronger sounds.",
+      "(D) The trees are common in West Africa."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 51,
+      "page_end": 51,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 52,
+    "subject": "英文",
+    "question_number": 44,
+    "type": "multiple choice",
+    "stem": "What is the purpose of the second paragraph?",
+    "options": [
+      "(A) To teach the reader how to make a djembe.",
+      "(B) To introduce how to make sounds with a djembe.",
+      "(C) To stress the importance of a djembe as an instrument.",
+      "(D) To compare the sounds of a djembe to those of other drums."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 52,
+      "page_end": 52,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 52,
+    "subject": "英文",
+    "question_number": 45,
+    "type": "multiple choice",
+    "stem": "According to this passage, which of the following is true about a griot?",
+    "options": [
+      "(A) Griots were people who passed down knowledge",
+      "(B) The social position of griots was low despite their importance.",
+      "(C) Griots were worshipped as a spiritual and cultural symbol.",
+      "(D) Only those chosen by the king could become griots."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 52,
+      "page_end": 52,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 52,
+    "subject": "英文",
+    "question_number": 46,
+    "type": "multiple choice",
+    "stem": "What does “kaleidoscopic” most likely mean in the last paragraph?",
+    "options": [
+      "(A) Pleasant.",
+      "(B) Loud.",
+      "(C) Fast.",
+      "(D) Shifting."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 52,
+      "page_end": 52,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 53,
+    "subject": "英文",
+    "question_number": 47,
+    "type": "multiple choice",
+    "stem": "47. What is the best title for this passage? (2 分)",
+    "options": [
+      "(A) Franz Boas: A Hero against Racism",
+      "(B) Cultural Relativism: An Idea that Changed the World",
+      "(C) A Legendary Figure in Anthropology",
+      "(D) The Crossroads of Museums, Culture, and Humanity"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 53,
+      "page_end": 53,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 53,
+    "subject": "英文",
+    "question_number": 48,
+    "type": "multiple choice",
+    "stem": "48. According to this passage, why is Boas considered the “Father of American Anthropology?” (2 分)",
+    "options": [
+      "(A) He made extraordinary discoveries of ancient cultural artifacts.",
+      "(B) He trained many of the scholars in the field of anthropology.",
+      "(C) He worked as the head of the American Museum of Natural History.",
+      "(D) He established the first department of anthropology in the U.S."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 53,
+      "page_end": 53,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 53,
+    "subject": "英文",
+    "question_number": 49,
+    "type": "multiple choice",
+    "stem": "49. Why are “apples and oranges” mentioned in the last paragraph? (2 分)",
+    "options": [
+      "(A) To explain that cultures are not the same by nature.",
+      "(B) To demonstrate how cultures are inter-related.",
+      "(C) To show the opposition against racism.",
+      "(D) To stress the importance of imagination."
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 53,
+      "page_end": 53,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 53,
+    "subject": "英文",
+    "question_number": 50,
+    "type": "short answer",
+    "stem": "50. What does “such practice” refers to in the second paragraph? (2 分)\nIt refers to ____________________________.",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 53,
+      "page_end": 53,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 53,
+    "subject": "英文",
+    "question_number": 51,
+    "type": "short answer",
+    "stem": "51. The sentences in the last paragraph are numbered ① to ⑦. Which sentence best indicates the author's attitude toward Boas? Write down the NUMBER of the sentence on the answer sheet. (2 分)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 53,
+      "page_end": 53,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 54,
+    "subject": "英文",
+    "question_number": 1,
+    "type": "translation",
+    "stem": "中譯英（請將以下中文句子譯成正確、通順、達意的英文，並將答案寫在「答題卷」上。每題4分。）\n1. 現今，愈來愈多的人重視居家布置，而其中最受歡迎的項目就是室內植栽。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 54,
+      "page_end": 54,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 54,
+    "subject": "英文",
+    "question_number": 2,
+    "type": "translation",
+    "stem": "中譯英（請將以下中文句子譯成正確、通順、達意的英文，並將答案寫在「答題卷」上。每題4分。）\n2. 有些綠色植物甚至更可以淨化空氣，不知不覺中改善我們的健康。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 54,
+      "page_end": 54,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 54,
+    "subject": "英文",
+    "question_number": 3,
+    "type": "writing",
+    "stem": "英文作文（占20分）\n說明：1. 依提示在「答題卷」上寫一篇英文作文。2. 文長至少120個單詞（words）。\n提示：分工合作是現代人被期待發展的軟實力，請寫一篇英文作文，第一段說明你認為分工合作的好處（或壞處）有哪些。第二段則舉例描述自己或他人團體合作的經驗來支持你的看法。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 54,
+      "page_end": 54,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 58,
+    "subject": "英文",
+    "question_number": 40,
+    "type": "multiple choice",
+    "stem": "實驗研究團隊的主要發現是什麼？",
+    "options": [
+      "(A) 沃爾巴克氏菌可以有效控制登革熱病毒的繁殖。",
+      "(B) 攝入有登革熱病毒或沃爾巴克氏菌的蚊都會減少耐熱度。",
+      "(C) 登革熱病毒主要靠蚊子及蚊咬傳播。",
+      "(D) 要讓蚊子靜止不動必須受到 42℃ 的溫度。"
+    ],
+    "answer": [
+      "B"
+    ],
+    "explanation": "解析：根據第二段第四行的內容可以知道，不論是登革熱病毒或沃爾巴克氏菌都會對蚊子的耐熱度造成影響。(A)、(D)為已知事實，並非該團隊之發現。故選(B)。",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-058"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 58,
+      "page_end": 58,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 58,
+    "subject": "英文",
+    "question_number": 41,
+    "type": "multiple choice",
+    "stem": "關於沃爾巴克氏菌，以下何者敘述正確？",
+    "options": [
+      "(A) 沃爾巴克氏菌是在蚊子體內找到的有益細菌。",
+      "(B) 登革熱病毒能夠在低溫殺死沃爾巴克氏菌。",
+      "(C) 沃爾巴克氏菌通常會讓蚊子無法移動。",
+      "(D) 蚊子有可能會從他的父母那裡得到沃爾巴克氏菌。"
+    ],
+    "answer": [
+      "D"
+    ],
+    "explanation": "解析：第一段第二行有提到沃爾巴克氏菌會遺傳給下一代，故選(D)。",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-058"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 58,
+      "page_end": 58,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 58,
+    "subject": "英文",
+    "question_number": 42,
+    "type": "multiple choice",
+    "stem": "根據文章內容，為何較熱地區的登革熱案例會減少？",
+    "options": [
+      "(A) 登革熱病毒在高溫下會變得衰弱且易死。",
+      "(B) 蚊子的數量會因此下降。",
+      "(C) 熱量會使登革熱病毒的活動力下降。",
+      "(D) 登革熱病毒無法在蚊子的身體中傳播。"
+    ],
+    "answer": [
+      "B"
+    ],
+    "explanation": "解析：第四段第三行提到溫度上升雖然會使登革熱病毒的繁殖變慢，但也因為會使蚊子的生存率下降使傳播得以控制，故選(B)。",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-058"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 58,
+      "page_end": 58,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 58,
+    "subject": "英文",
+    "question_number": 43,
+    "type": "multiple choice",
+    "stem": "根據文章，為什麼非洲鼓通常會以 Lenge 樹製成？",
+    "options": [
+      "(A) 樹皮比較彈性。",
+      "(B) 樹中有霉菌。",
+      "(C) 這種鼓可以製造較強的聲音。",
+      "(D) 這種樹在非洲很常見。"
+    ],
+    "answer": [
+      "C"
+    ],
+    "explanation": "解析：根據文章，第一段第四行可以看到 Lenge 樹使非洲鼓的聲音較為強烈，故選(C)。",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-058"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 58,
+      "page_end": 58,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 58,
+    "subject": "英文",
+    "question_number": 44,
+    "type": "multiple choice",
+    "stem": "第二段的目的為何？",
+    "options": [
+      "(A) 教導讀者如何製作非洲鼓。",
+      "(B) 介紹如何使用非洲鼓製造聲音。",
+      "(C) 強調非洲鼓作為一種樂器的重要性。",
+      "(D) 比較非洲鼓和其他鼓的聲音差別。"
+    ],
+    "answer": [
+      "B"
+    ],
+    "explanation": "解析：第二段分別對非洲鼓三種主要聲音的敲擊方式做介紹，所以應選(B)。",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-058"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 58,
+      "page_end": 58,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 58,
+    "subject": "英文",
+    "question_number": 45,
+    "type": "multiple choice",
+    "stem": "根據文章，以下何者關於葛里歐是正確的？",
+    "options": [
+      "(A) 葛里歐是將知識傳下去的人。",
+      "(B) 葛里歐雖然很重要但地位很低。",
+      "(C) 葛里歐被以精神和文化象徵崇拜。",
+      "(D) 只有被國王所選中的人才可以成為葛里歐。"
+    ],
+    "answer": [
+      "A"
+    ],
+    "explanation": "解析：第三段倒數第二行提到葛里歐會將歷史、文化與宗教知識傳承給後代，故選(A)。(C)是指非洲鼓本身，(B)、(D)未被提及。",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-058"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 58,
+      "page_end": 58,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 58,
+    "subject": "英文",
+    "question_number": 46,
+    "type": "multiple choice",
+    "stem": "最後一段的 kaleidoscopic 最可能是什麼意思？",
+    "options": [
+      "(A) 令人愉快的",
+      "(B) 大量的",
+      "(C) 快速的",
+      "(D) 不斷變化的"
+    ],
+    "answer": [
+      "D"
+    ],
+    "explanation": "解析：後面一句話提到鼓手會改變節奏以改變歌曲，而舞者和其他演奏者也會跟著節拍改變，所以這裡選與 shifting 意義相近的(D)。",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-058"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 58,
+      "page_end": 58,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 61,
+    "subject": "國文",
+    "question_number": 1,
+    "type": "single-choice",
+    "stem": "下列「　」內之字，讀音完全相同的是：",
+    "options": [
+      "(A)「髦」鬧有傑氣／「苦」帝饗簪／「䖵」齒之年",
+      "(B)眠「背」之怨必以報／「貝」擲王公／露「賁」薮野",
+      "(C)夢花滿水半「篤」強／食野之「莧」／「綸」冠素紗",
+      "(D)十年蹶「翹」將懷遠／笑容可「掬」／黃「糟」毒素"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 61,
+      "page_end": 61,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 61,
+    "subject": "國文",
+    "question_number": 2,
+    "type": "single-choice",
+    "stem": "下列各組「　」內的字，字義相同的選項是：",
+    "options": [
+      "(A)使民「復」結綬而用之／克己「復」禮為仁",
+      "(B)男有分，女有「歸」／太守「歸」而賓客從也",
+      "(C)計之詳矣，「辛」無疑焉／寧以義死，不苟「幸」生",
+      "(D)「去」之五里，洄為鹽場／余時為桃花所戀，竟不忍「去」湖上"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 61,
+      "page_end": 61,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 61,
+    "subject": "國文",
+    "question_number": 3,
+    "type": "single-choice",
+    "stem": "下列文句，錯別字最多的是：",
+    "options": [
+      "(A)他在工作崗位上盡忠職守，雖然自稱力有未侶；但整體表現暇不掩瑜，深受下屬敬重",
+      "(B)頑禮子弟往往自恃家業，揮金如土，坐吃山空，落得捉刀見肘的處境，令人不勝唏噓",
+      "(C)全臺三級警戒期間，仍有 KTV 業者以身事法、私下營業，甚至以各種謊言文過拙非，令人不恥",
+      "(D)詐騙集團屢次巧用各種名目手段，利誘威脅被害人，謀取不義之財，恆惡不逯，受難者難以計數"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 61,
+      "page_end": 61,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 61,
+    "subject": "國文",
+    "question_number": 4,
+    "type": "single-choice",
+    "stem": "明代思想家王守仁曾因上疏彈劾宦官劉瑾而遭貶為貴州龍場驛丞，期間目睹陌生史目主僕父子三人客死異鄉，出於惻隱之心為之殯葬並書祭文。請閱讀下文並判斷文意：\n\n（文前段落節錄）……焉或繼焉五斗而來，則宜欣然就道，胡為乎吾手希望見厥容變然，羞不足甚者？夫衡冒霧鬱，披披襟裳，行若峰巔，飽渴勞頓，筋骨疲憊，而又瘧瘍侵其外，憂懼攻其中，其能以無死乎？……嗚呼傷哉！綿不隔歲，幽崖之孤成群，陰雲之馳如車輪，亦必能葬而令安，不致久暴震蠲。爾既已無知，然吾何能違心乎？自吾去父母鄉國而來此，三年矣，歷嘗病而苟能自全，以吾未嘗一日之歲感恤心。今悲傷若此，是吾為爾者處之，吾不宜復為爾恥矣。",
+    "options": [
+      "(A)作者認為該史目貧財好利死有餘辜",
+      "(B)文中實為借他人杯酒濺自己心中愧疚",
+      "(C)文章展現作者達觀豁達之思想，崇尚天葬",
+      "(D)文意處處昭顯崇尚儒家之禮，重情重義，忽略形式"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 61,
+      "page_end": 61,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 62,
+    "subject": "國文",
+    "question_number": 5,
+    "type": "multiple choice",
+    "stem": "應用文中的書信用語，必須配合寫信人與收信人的身分及關係。請依下列各組人物的關係，選出正確的書信用語：",
+    "options": [
+      "(A) 王生寫信給劉山道士，可以自稱為「受業」表達師生關係",
+      "(B) 李靖寫信給虞肅客，在信末問候語可用「順問、近好」表達親近",
+      "(C) 賈寶玉寫信給賈母，在信封啟封詞上可用「恭啟」表達孺慕之情",
+      "(D) 玉山歌仔戲團的秀潔寫信給金發伯，在提稱語上可用「大鑒」表達敬意"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 62,
+      "page_end": 62,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 62,
+    "subject": "國文",
+    "question_number": 6,
+    "type": "multiple choice",
+    "stem": "下列是《史記．老莊申韓列傳》中的一段文字，請依文意選出排列順序最恰當的選項：\n楚威王開莊周賓，使使厚幣迎之，許以為相。莊周笑謂楚使者曰：\n甲、子獨不見郊祭之禮乎？\n乙、千金，重利；卿相，尊位也。\n丙、亞去，無汝我。\n丁、當是之時，雖欲為孤豚，豈可得乎？\n戊、養食之數歲，衣以文綺，以入大廟。\n己、我寧畜汝溺之中自快，無為有國者所羨，終身不仕，以快吾志焉。",
+    "options": [
+      "(A) 甲乙丙丁戊己",
+      "(B) 乙甲戊丁丙己",
+      "(C) 己甲乙丁戊丙",
+      "(D) 戊乙丙己丁甲"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 62,
+      "page_end": 62,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 62,
+    "subject": "國文",
+    "question_number": 7,
+    "type": "multiple choice",
+    "stem": "閱讀下文，最適合填入□□□□□內的詞語依序是：\n「寡婦王國」救了這些。\n試死神之助而延續國祚的「女人國」內轉兩名男子，不過因其人微言輕，一直處於弱勢，朝綱政令還是由女人手上。我一請允許我收一收話頭，自幼耳濡目染，跟著女皇們□□□□，決戰千里，十五歲即翔翼豐盈，單騎離鄉闖蕩天下，慣然有尋兒覓士、據地稱王之志。一路盡無人煙，披星戴月，遇水架橋，逢山開路，只學會全套獨立自主、開疆拓土，沒機會留習傳統的自男性觀點以枝而出的那一套「女性論」。往下發展，事態愈來愈嚴重，貌似期明能告，可是不曉得怎麼跟異性打交道；我的性格只適合帶刀帶劍，不適合□□□□。」（節錄自簡媜《微霧的樹林．寂然草》）",
+    "options": [
+      "(A) 策路藍練／慧質蘭心",
+      "(B) 運籌帷幄／學究齋眉",
+      "(C) 策路藍練／學究齋眉",
+      "(D) 運籌帷幄／慧質蘭心"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 62,
+      "page_end": 62,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 62,
+    "subject": "國文",
+    "question_number": 8,
+    "type": "multiple choice",
+    "stem": "清代張潮累積多年讀書經驗，以為經史子集四種分類的書，各有其適宜的閱讀時機。下列選項中的書籍類別，符合其「春／夏／秋／冬」閱讀選擇觀點的是：",
+    "options": [
+      "(A) 《詩經》／《左傳》／《莊子》／《杜工部集》",
+      "(B) 《杜工部集》／《戰國策》／《莊子》／《詩經》",
+      "(C) 《三國志》／《左傳》／《世說新語》／《道德經》",
+      "(D) 《世說新語》／《三國志》／《戰國策》／《周易》"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 62,
+      "page_end": 62,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 63,
+    "subject": "國文",
+    "question_number": 9,
+    "type": "multiple choice",
+    "stem": "甲、乙二詩文句詮釋最恰當的是：",
+    "options": [
+      "(A) 甲詩「男嬉女笑出真樂，此風直在義皇前」，「義皇」即前文所提到的「士官通事」，由此可見漢人官吏在原住民部落的權勢地位極高",
+      "(B) 甲詩中的「有室徒悲如聲懷」、「昔日千豚今一鰲」均在描寫原住民生活貧困的處境",
+      "(C) 乙詩「華路芒蔟茂」、「輕耕耘敗側」，皆反應出原住民對農事工作的疏懶",
+      "(D) 乙詩「與夫吸早煙，乞與紛爭先」描寫原住民、乞丐與夫妻相吸早煙的畫面"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.66,
+    "asset_ids": [
+      "110-page-063"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 63,
+      "page_end": 63,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 63,
+    "subject": "國文",
+    "question_number": 10,
+    "type": "multiple choice",
+    "stem": "有關甲、乙二詩的寫作筆法，下列敘述最為適切的是：",
+    "options": [
+      "(A) 甲詩採先敘後議的筆法，先敘原住民節慶時的歡快場景，再提出對原住民漢化的省思與同情",
+      "(B) 乙詩的景物空間變化為由近而遠，先概述原住民漢化的狀況，再細說作者偶遇原住民的互動情景",
+      "(C) 甲、乙詩皆以「漢化看人」為主要敘事視角，描寫原住民漢化背後不可言說的無奈",
+      "(D) 甲、乙詩皆以激問法作結，拋出對族群處境的質疑，由此可見舊時代的知識分子習慣以高一等的姿態看待漢化原住民"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [
+      "110-page-063"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 63,
+      "page_end": 63,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 64,
+    "subject": "國文",
+    "question_number": 11,
+    "type": "multiple choice",
+    "stem": "11. 右圖為歸結甲文中《國富論》理論的循環圖，下列選項中文句的思想概念，與 (a) 最相近的是：",
+    "options": [
+      "(A) 宮中府中，俱為一體，陳訟或否，不宜異同",
+      "(B) 貧患其棄於地也，不必藏於己；力惡其不出於身也，不必為己",
+      "(C) 取之無禁，用之不竭，是造物者之無盡藏也，而吾與子之所共食",
+      "(D) 問：「於斯二者何先？」曰：「去食。自古皆有死，民無信不立。」"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-064"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 64,
+      "page_end": 64,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 64,
+    "subject": "國文",
+    "question_number": 12,
+    "type": "multiple choice",
+    "stem": "12. 關於甲、乙文的解釋，下列敘述最為相近的是：",
+    "options": [
+      "(A) 乙文中「富好行其德」一句，即是甲文中「我獲利就是你獲利」的表現",
+      "(B) 范蠡為甲文「民間企業的獲利正是社會整體財富和繁榮的基礎」的代表",
+      "(C) 計然與范蠡的言行可說是甲文中「從經濟的角度，也包括道德和政治的角度」的表現",
+      "(D) 「積者之理，務完物，無息帶」其意同於「人類全體財富的基礎，就在於希望增加個人利潤的自私心理」"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-064"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 64,
+      "page_end": 64,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 65,
+    "subject": "國文",
+    "question_number": 13,
+    "type": "multiple choice",
+    "stem": "依據上文，下列闡釋正確的是：",
+    "options": [
+      "A) 「後值傾覆，受任於敗軍之際，奉命於危難之間，爾來二十一年矣」，謂自自帝城託孤至今已二十一年",
+      "B) 「受命以來，夙夜憂歎，恐託付不效，以傷先帝之明」，自言只有竭盡心力輔佐後主，完成先帝所託，才不辜負先帝的知人之明",
+      "C) 「至於斟酌損益，進盡忠言，則攸之、禕、允之任也」，謂權衡國家的經濟狀況，再盡忠職責，是攸之、禕、允的責任",
+      "D) 「陛下亦宜自課，以諮諏善道，察納雅言，深追先帝遺詔」，謂陛下也應該督促自我功課，莫忘記先帝遺囑：「勉之，勉之！勿以惡小而為之，勿以善小而不為。」惟賢惟德，能服於人"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 65,
+      "page_end": 65,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 65,
+    "subject": "國文",
+    "question_number": 14,
+    "type": "multiple choice",
+    "stem": "《出師表》一文為臣下進呈君上的奏章，因此表達想法時必須掌握應用文的「謙遜原則」，依據上文，最符合「謙遜原則」的是：",
+    "options": [
+      "A) 三顧臣於草廬之中，諸臣以當世之事",
+      "B) 由是感激，遂許先帝以驅馳",
+      "C) 先帝知臣謹慎，故臨崩寄臣以大事",
+      "D) 據除殘凶，興復漢室，還於舊都"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 65,
+      "page_end": 65,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 65,
+    "subject": "國文",
+    "question_number": 15,
+    "type": "multiple choice",
+    "stem": "《三國志》作者陳壽對孔明的評語是：「然亮才，於治戎為長，奇謀為短，理民之幹，優於將略。」、「連年動眾，未能成功，蓋應變將略，非其所長欤！」下列文句，與陳壽對孔明的評語不謀而合的是：",
+    "options": [
+      "A) 臣本布衣，躬耕於南陽，苟全性命於亂世，不求聞達於諸侯",
+      "B) 先帝知臣謹慎，故臨崩寄臣以大事也",
+      "C) 故五月渡瀘，深入不毛。今南方已定，兵甲已足，當斷率三軍，北定中原",
+      "D) 庶竭駑鈍，攘除姦凶，興復漢室，還於舊都"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 65,
+      "page_end": 65,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 66,
+    "subject": "國文",
+    "question_number": 16,
+    "type": "multiple_choice",
+    "stem": "甲文中孔子見到陽貨就「卻行，白汗交流」的原因最可能是：",
+    "options": [
+      "A) 陽虎善辯且多進讒言搬弄是非，以此中傷他人",
+      "B) 陽虎常送美酒、佳餚賂賄他人，使人廉潔受損",
+      "C) 陽虎流連女色，不務正業，君子不齒與之交往",
+      "D) 陽虎是勇士，雖對國家有功但個性暴躁難以親近"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 66,
+      "page_end": 66,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 66,
+    "subject": "國文",
+    "question_number": 17,
+    "type": "multiple_choice",
+    "stem": "下列語句對於語言的態度與甲文最不相同的是：",
+    "options": [
+      "A) 孔子：巧言令色，鮮矣仁",
+      "B) 老子：信言不美，美言不信",
+      "C) 荀子：王者之制名，名定而實辨",
+      "D) 孟子：鼓舌知其所藏，淫辯知其所陷"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.72,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 66,
+      "page_end": 66,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 66,
+    "subject": "國文",
+    "question_number": 18,
+    "type": "multiple_choice",
+    "stem": "根據甲、乙二文敘述，對於下列活動二文作者最可能的態度是：",
+    "options": [
+      "A) 支持歌唱選秀年度購物頻道推銷員獎",
+      "B) 支持百貨業周年慶舉辦國際美酒評比",
+      "C) 反對學辦展現自我競能極限的鐵人競賽",
+      "D) 反對時尚界採用過度減肥的紙片人模特兒"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.78,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 66,
+      "page_end": 66,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 67,
+    "subject": "國文",
+    "question_number": 19,
+    "type": "multiple choice",
+    "stem": "讀過甲文，下列敘述符合作者想法的是：",
+    "options": [
+      "(A) 乾燥的食材需煎炒；清浮的食材宜煮湯",
+      "(B) 烹調食物需清濁相輔，柔剛互用，方有和合之妙",
+      "(C) 蔥、韭、茴香、新蒜宜搭葷食；芹菜、百合、刀豆合於人素",
+      "(D) 牛羊味厚，適合獨食；蝦蟹殼重，需相混煮"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 67,
+      "page_end": 67,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 68,
+    "subject": "國文",
+    "question_number": 20,
+    "type": "multiple choice",
+    "stem": "乙文中，曾先生對各種滋味的評論，敘述正確的是：",
+    "options": [
+      "(A) 辣之於味最高最純，是王者專用調味，不時提醒王者君子自重之道",
+      "(B) 甜則是后妃最愛之味，最解辣，最宜人，象徵淑女之德，不可露骨",
+      "(C) 苦味乃眾生之味，是味之隱逸者，如晚秋之菊、冬雪之梅",
+      "(D) 鹹則最易化舌，入口便覺，看似最尋常不過，但在尋常之中，往往有最不尋常之處"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-068"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 68,
+      "page_end": 68,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 68,
+    "subject": "國文",
+    "question_number": 21,
+    "type": "multiple choice",
+    "stem": "選項中《紅樓夢》節錄文字與甲、乙二文觀點最不能呼應的是：",
+    "options": [
+      "(A) 【節錄文字】你把總下來的茄子，把皮剝了，只要淨肉，切成碎丁子，用雞油炸了，再用雞肉膿子合香菇、新筍、蘑菇、五香豆腐乾子、各色乾果子，都切成丁兒，拿雞湯煨乾，將香油一收，外加糊油一拌，盛在瓷罐子裡，封嚴。要吃時拿出來，用炒的雞爪子一拌，就是了。（第41回）【甲、乙觀點】亦有交互見功者，炒蔬菜，用素油，炒素菜，用蔥油是也。",
+      "(B) 【節錄文字】寶玉笑道：「也倒不想什麼吃，倒是那一回做的那小荷葉兒小蓮蓬兒的湯還好些。」……鳳姐兒也不等人說話，便笑道：「姑娘不知道，這是舊年備辦的時候兒，他們拌的法兒。不知弄什麼麵印出來，借點薑荷葉的清香，金釵若好湯……」說著，接過來遞與偕婦人，吩咐廚房，立刻拿幾隻雞，另外添了東西，做十碗湯來。（第35回）【甲、乙觀點】辣甜鹹苦是四主味，屬正；酸澀脹沖是四賊味，屬偏。偏不能勝正而實不能奪主，主菜必以正味出之，而小菜則多偏味。",
+      "(C) 【節錄文字】我和我哥可說，要他幾隻糟裡卜極大的鹹蠔來（清蒸），再在鍋子裡取上幾攤好酒來，再備四五果果菜、器又又省事，又大家熱鬧呢？……平兒早剝了幾黃子送來。鳳姐道：「多倒些薑醋（來蘸）。」（第37回）【甲、乙觀點】此類物者味甚厚，力量甚大，而流弊亦甚多，用五味調和，全力治之，方能取其長而去其弊。何暇捨其本題，別生枝節乎？",
+      "(D) 【節錄文字】（用過早膳之後）一時只見了頭你兩來尋問點心，……這盒內是兩樣菜食：一樣是糯粉柱花糕，一樣是松籽雞油捲。那盒內是兩樣炸的：一樣是只有一寸來大的小餡兒，買母因問：「什麼餡子？」婆子們答回：「是蠶寶的。」買母驚了，變眉說道：「這回子油腸腸的，誰吃這個！」又看那一樣是奶油炸的各色小麵果子，也不喜歡。（第41回）【甲、乙觀點】度客食飽，則覺困乏，須用辛辣以振動之；應客酒多，則胃疲矣，須用酸甘以提振之。"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [
+      "110-page-068"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 68,
+      "page_end": 68,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 68,
+    "subject": "國文",
+    "question_number": 22,
+    "type": "multiple choice",
+    "stem": "若曾先生為宴校排席，便樂園廚子為此席準備了數道菜色。下列排序組合最有可能深獲曾先生與袁秋青賓的菜單是：\n（卷面列有主菜與小菜供選，並以五道上菜順序排列組合如下）",
+    "options": [
+      "(A) 上菜順序：第一道菜 新蒸甲魚湯；第二道菜 脆皮烤鴨；第三道菜 皮蛋豆腐；第四道菜 百合燉雞柳；第五道菜 辣炒小魚乾",
+      "(B) 上菜順序：第一道菜 魚翅蟹粉羹；第二道菜 海參燴冬菇；第三道菜 百合燉雞柳；第四道菜 濃蜜黃蘿蔔；第五道菜 皮蛋豆腐",
+      "(C) 上菜順序：第一道菜 醬湯小黃瓜；第二道菜 水炒辣肥腸；第三道菜 魚翅蟹粉羹；第四道菜 辣炒小魚乾；第五道菜 玉蔥煎羊排",
+      "(D) 上菜順序：第一道菜 脆皮烤鴨；第二道菜 醬湯小黃瓜；第三道菜 玉蔥煎羊排；第四道菜 海參燴冬菇；第五道菜 新蒸甲魚湯"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-068"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 68,
+      "page_end": 68,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 69,
+    "subject": "國文",
+    "question_number": 23,
+    "type": "multiple choice",
+    "stem": "依據甲文，有關廚丁「解牛」的說明，最適當的是：",
+    "options": [
+      "(A) 解牛時能配合《桑林》《經首》樂舞節奏進行，從容優雅",
+      "(B) 立身處世在道而行，克制感官物質享受，才能提升技術",
+      "(C) 透過反覆操作、勤奮練習，終能達致器骨貫通，游刃有餘",
+      "(D) 用志不分、戒慎恐懼，放慢腳步，雖遇困境亦能找到出路"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 69,
+      "page_end": 69,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 69,
+    "subject": "國文",
+    "question_number": 24,
+    "type": "multiple choice",
+    "stem": "下列敘述，不符合乙文觀點的是：",
+    "options": [
+      "(A) 人面對牛的態度亦可用於指涉「個人」、「面對」、「社會」的自處之道",
+      "(B) 依據文中第二點，「所見無非全牛」可視作「人牛對立」的階段",
+      "(C) 藝術家藉由技藝、情意到「驚喜」的變化，表達對藝術的審美觀",
+      "(D) 「以無厚入有間」啟迪人們處世應遵循保護性規律，不可強行妄為"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.78,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 69,
+      "page_end": 69,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 69,
+    "subject": "國文",
+    "question_number": 25,
+    "type": "multiple choice",
+    "stem": "根據甲、乙二文，文惠君說「善哉！吾聞廚丁之言，得養生焉。」最有可能的原因是：",
+    "options": [
+      "(A) 文惠君肯定廚丁的精湛技藝，從中領會出調理自身與治國之要",
+      "(B) 廚丁示範了如樂舞般的用刀技術，符合文惠君期待的養生之理",
+      "(C) 文惠君問「技」，廚丁答以「道」，可知「道」才是養生之關鍵",
+      "(D) 廚丁多年不換刀，可推得「工欲善其事，必先利其器」的養生方法"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.82,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 69,
+      "page_end": 69,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 70,
+    "subject": "國文",
+    "question_number": 26,
+    "type": "多選",
+    "stem": "下列各組文句「　」內的詞，意義前後相異的是：",
+    "options": [
+      "(A) 昔者，仲尼「與」於蜀賈／失其所「與」，不知",
+      "(B) 河海不擇細流，故能「就」其深／「就」有道而正焉，可為好學而已",
+      "(C) 見漁人，乃大驚，問所「從」來／惑而不「從」師，其為惑也終不解矣",
+      "(D) 人知之者，「其」謂與狊升之蛙何異／孝弟也者，「其」為仁之本與",
+      "(E) 他人「見」問，固不言，見之問，則無隱耳／眾人皆醉我獨醒，是以「見」放"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.65,
+    "asset_ids": [],
+    "review_status": "needs_manual_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 70,
+      "page_end": 70,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 70,
+    "subject": "國文",
+    "question_number": 27,
+    "type": "多選",
+    "stem": "下列文句畫底線處的成語，運用不恰當的是：",
+    "options": [
+      "(A) 上失其道民散久矣，為了生計觸犯法，罪不容誅啊",
+      "(B) 政客發言總是金聲玉振，雄辯滔滔，牽動著政治風向",
+      "(C) 賣姨丈高齡九十身體硬朗，子孫滿堂，堪稱福壽全歸",
+      "(D) 在謾莫如深的他面前，你別想探知任何人的八卦隱私",
+      "(E) 面對愛情她首鼠兩端，遊走在舊愛新歡間，洋洋自得"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.5,
+    "asset_ids": [],
+    "review_status": "needs_manual_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 70,
+      "page_end": 70,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 70,
+    "subject": "國文",
+    "question_number": 28,
+    "type": "多選",
+    "stem": "閱讀下列甲、乙詩文，關於文意敘述正確的選項是：\n\n甲、步隨流水覓深源，行到源頭卻悵然。\n    始信真源行不到，倚徐隨處弄潺潺。（朱熹〈偶題〉）\n\n乙、萬山不許一溪奔，擠得溪聲日夜喧。\n    到得前頭山腳盡，堂堂溪水出前村。（楊萬里〈桂源鋪〉）",
+    "options": [
+      "(A) 兩首詩皆以流水寄寓生活哲思，擷取生活觀察，展現宋詩主理之特性",
+      "(B) 甲詩透過「步隨流水覓深源」描述尋訪水源的過程，以此展現問學之殷切精神",
+      "(C) 乙詩透過「擠得溪聲日夜喧」刻畫溪水日夜喧騰，生發「逝者如斯，不曾往矣」的慨嘆",
+      "(D) 兩首皆用流水特性，甲詩以「溯源」揭示追本溯源為治學的不變途徑，乙詩以「流水出村」比喻奔騰不止的時代巨浪",
+      "(E) 結尾顯出新意，甲詩點出「尋源探真」未必有所窮盡，隨遇亦有可得；乙詩指出一旦時機成熟即使萬山阻擋的「流水」也必蓄積成勢"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [],
+    "review_status": "needs_manual_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 70,
+      "page_end": 70,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 70,
+    "subject": "國文",
+    "question_number": 29,
+    "type": "多選",
+    "stem": "下列關於中文「詩歌」的流變與發展，敘述適當的是：",
+    "options": [
+      "(A) 《詩經》為先秦北方平民文學之代表，開後世寫實文學先河，寓含「興觀群怨」的社會功能，為詩之祖、集部之首",
+      "(B) 唐詩與宋詩各有所千秋，氣象不同；唐詩以韻勝，美在情離，以抒情化為特徵；宋詩以意勝，美在氣骨，以議論化為特色",
+      "(C) 樂府由古詩演變而來，產生於兩漢，轉變於唐代，由東朝詞抒情曲《樂府詩集》為大成",
+      "(D) 古詩十九首為東漢末期作品，被稱為「五言之冠冕」，以多敘事、具邊塞勵志風格，反映中下層知識分子的生活，內容描繪亂世之下「遊子他鄉」、「死生新故」之感",
+      "(E) 古詩稱為魏晉、南北朝的詩歌代表，實則「詠史」與「詠懷」託古以抒懷，抒寫懷才不遇；東晉陶淵明詩風質樸、真摯作詩，被譽為「田園詩人之祖」，鐘嶸列為「上品」"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [],
+    "review_status": "needs_manual_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 70,
+      "page_end": 70,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 71,
+    "subject": "國文",
+    "question_number": 30,
+    "type": "multiple choice",
+    "stem": "30. 以下表格中各人物行為的問題，適合以此則寓言相勸的是：\n\n河之魚，有豚其名者，游於橋間而觸其柱，不知遠去。怠其柱之觸已也，則張頤植疑，怒腹而浮於水，久之莫動。飛鴻過而獵之，磯其腹而食之。好游而不知止，因游以觸物，而不知罪已，乃妄肆其念，至於淹腹而死，可悲也夫！（蘇軾〈河魚說〉）\n\n（表格列示人物與行為，請選出最適合以此寓言相勸者）",
+    "options": [
+      "(A) 花花　投機取巧，不肯腳踏實地努力，妄想一步登天",
+      "(B) 毛毛　自我中心，認為自己永遠是對的，每當和他人發生衝突，錯的一定是別人",
+      "(C) 泡泡　火爆脾氣，不知反省，總是不顧一切的大發脾氣，玉石俱焚也無所謂",
+      "(D) 魔人啾啾　因為家境富裕，父母社會地位高，總以欺負弱小為樂",
+      "(E) 尤教授　凡事追根究柢，勤學誠懇，但卻因不知變通常弄巧成拙"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-071"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 71,
+      "page_end": 71,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 71,
+    "subject": "國文",
+    "question_number": 31,
+    "type": "multiple choice",
+    "stem": "31. 閱讀本詩，並判斷下列所述正確的是：\n\n我居北海君南海，寄雁傳書謝不能。桃李春風一杯酒，江湖夜雨十年燈。\n持家但有四立壁，治病不辭三折肱。想得讀書頭已白，隔溪猿哭瘡煙藤。\n\n（黃庭堅〈寄黃幾復〉）",
+    "options": [
+      "(A) 「我居北海君南海，寄雁傳書謝不能。」其中化用了蘇武「雁足傳書」以及「雁到衡陽而止」的小故事，為江西詩派之「不易其意而造其語、寬人其意而形容之」之「奪胎換骨法」",
+      "(B) 「桃李春風一杯酒，江湖夜雨十年燈。」此聯兩句相互對照。上下句所寫是別後十年的今與昔之對照；江湖與京城相對，正是樂與哀的對照；歡會極其短促，而飄泊極其漫長，倍添蕭索。張某評之為「奇語」，並非偶然",
+      "(C) 「持家但有四立壁，治病不辭三折肱。」從持家、治病表現黃幾復清正廉潔。弦外之音是：他已經有政績，顯露了治國救民的才幹，為什麼還不重用，老要他在下面操勞呢？",
+      "(D) 「想得讀書頭已白，隔溪猿哭瘡煙藤。」在作者的想像裡，十年前在京城的桃李春風中把酒暢談理想的朋友，如今已白髮蒼蒼，卻仍然從前那樣好學不倦；他讀書頭已白卻還只在潛濟做一個隱者。作者不平之鳴、惋惜之意，皆蘊含其中",
+      "(E) 此詩藉黃幾復屢正、幹練、好學，而對其遭老不得志的處境，深表憐惜。除抒發思念友人的殷殷之情外，還寄寓對友人懷才不遇的不平與慨嘆。情真意厚，感人至深。而在用比興、以故為新、運古於今、平仄抑揚等方面，又都表現出黃詩的特色，可視為黃庭堅的代表作"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.93,
+    "asset_ids": [
+      "110-page-071"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 71,
+      "page_end": 71,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 71,
+    "subject": "國文",
+    "question_number": 32,
+    "type": "multiple choice",
+    "stem": "32. 以下甲、乙、丙三首新詩歌詠的對象都是古時文壇的大家，請選出說明正確的選項：\n\n（以下為卷面上列出的三首短詩，原文掃描在卷面；參見卷面）",
+    "options": [
+      "(A) 甲、乙、丙三首所歌詠的對象都有李白",
+      "(B) 甲詩中提及的人物有名列唐宋八大家之列者",
+      "(C) 乙詩中所歌詠的對象與「世上蕩漾、詩中聖哲、民間疾苦、筆底激濁」所指的是同一人",
+      "(D) 丙詩歌詠的對象曾作詩稱讚乙詩中的主角「筆落驚風雨，詩成泣鬼神」",
+      "(E) 甲詩中「溺水的大夫」指的是屈原"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [
+      "110-page-071"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 71,
+      "page_end": 71,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 72,
+    "subject": "國文",
+    "question_number": 33,
+    "type": "單選題",
+    "stem": "33. 根據甲文，選出解讀正確的選項：(單選題，2分)",
+    "options": [
+      "A) 作者認為溫庭筠被稱為「詞家鼻祖」，是因為其「西崑體」的風格影響宋詞甚大",
+      "B) 作者以清人的注釋資料為據，說明溫庭筠詩中的「杜陵」就是「漢家皇陵」，便直接推論出溫庭筠此行的目的是為了科舉",
+      "C) 作者認為溫庭筠「客行悲故鄉」，是因為「雞聲茅店月，人跡板橋霜」的客行風景與故鄉的景致相似，因而觸景傷情",
+      "D) 作者為了杜陵夢不斷在人生道路上躊躇，就算眼前競爭者眾多，但他自比大雁，顯現十足的自信"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [],
+    "review_status": "needs_manual_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 72,
+      "page_end": 72,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 73,
+    "subject": "國文",
+    "question_number": 34,
+    "type": "multiple-choice",
+    "stem": "34.「列錦」又稱「列景」，是將幾個名詞或名詞性短語排列起來，組織連綴成句，句子再組接成詩文，如同電影鏡頭由一個個「特寫」經由「定向量景」組合成畫面，由畫面來間接敘事造情；如「雞聲茅店月，人跡板橋霜」。以下選項非列錦修辭的是：（單選題，2分）",
+    "options": [
+      "A) 黃梅時節家家雨，青草池塘處處蛙（趙師秀〈約客〉）",
+      "B) 桃李春風一杯酒，江湖夜雨十年燈（黃庭堅〈寄黃幾復〉）",
+      "C) 休問梁園舊塞客，茂陵秋雨病相如（李商隱〈寄令狐郎中〉）",
+      "D) 樓船夜雪瓜洲渡，鐵馬秋風大散關（陸游〈書憤〉）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [
+      "110-page-073"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 73,
+      "page_end": 73,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 73,
+    "subject": "國文",
+    "question_number": 35,
+    "type": "short-answer",
+    "stem": "35. 甲、乙二文皆運用人物來表達自身期許，請同學根據文章及所學，分別闡述兩位作者的理想。（每格3分，共6分）\n\n（表格內容）\n作品                寫意\n溫庭筠〈商山早行〉   ①透過司馬相如的典故，表達此行是為了實現__________的理想。（作答字數：30字內）\n張孝德和〈畫菊自序〉 ②透過李白跟蔡___的事蹟，表達自己立志效法兩人能創作出__________。（作答字數：30字內）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.72,
+    "asset_ids": [
+      "110-page-073"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 73,
+      "page_end": 73,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 74,
+    "subject": "國文",
+    "question_number": 36,
+    "type": "單選題",
+    "stem": "下列敘述，較符合文中所描述的清末旗袍樣式的是：(單選題，2分)",
+    "options": [
+      "A) 腰身窄小，領口縮短，袖不過肘，下擺成弧形",
+      "B) 裁製採用直線型，胸、肩、腰、臀完全平直，使女性身體的曲線毫不外露",
+      "C) 開襟或半開襟形式，立領盤紐，無袖或短袖，收腰，裙片側開衩",
+      "D) 短下擺荷葉邊旗袍式上衣，七分袖鑲黑紗，下身著丹寧寬褲"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-074"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 74,
+      "page_end": 74,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 74,
+    "subject": "國文",
+    "question_number": 37,
+    "type": "單選題",
+    "stem": "關於本文的說明，敘述正確的是：(單選題，2分)",
+    "options": [
+      "A) 清代藉由服飾展現中國婦女特出的美德，象徵高舉旗幟的精神，故將此服飾稱之為「旗袍」",
+      "B) 1930 年代，因受西方服飾文化及外國衣料大量進口的影響，穿旗袍的風氣銳減，旗袍款式也因而變得樸素、少有變化",
+      "C) 旗袍原為女性普遍的穿著，後已轉變成在正式或國際性的場合才穿著的特殊服裝",
+      "D) 因女性意識的高漲，旗袍線條由曲線畢露轉變成寬鬆舒適，有宣告女性掙脫傳統父權文化枷鎖的意涵"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-074"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 74,
+      "page_end": 74,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 74,
+    "subject": "國文",
+    "question_number": 38,
+    "type": "問答 (表格填充)",
+    "stem": "旗袍原本雖為中國的民族傳統服飾，但在臺灣的流行服飾史上仍占有一席之地，曾經有三次風行、轉變，主要流行款式亦不相同，依次整理成下列表格，請依據引文所述，在表格中填進適當答案。(1)(2)各占2分，(3)占4分，共8分。(作答字數：(1)(2)各20字內，(3)30字以內)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-074"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 74,
+      "page_end": 74,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 81,
+    "subject": "社會",
+    "question_number": 1,
+    "type": "single-choice",
+    "stem": "我國的總統與行政院院長皆為實權行政官員，請問有關兩者與立法院之互動關係，何者正確？",
+    "options": [
+      "(A) 行政院院長須受立法院質詢並對之為施政報告，取得立法院信任",
+      "(B) 行政院被立法院倒閣時，可呈請總統解散立法院，總統也得拒絕",
+      "(C) 總統任命行政院院長不須經立法院同意，但須由行政院院長副署",
+      "(D) 立法委員組成立法院當中多數黨之黨主席，即應為行政院之院長"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 81,
+      "page_end": 81,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 81,
+    "subject": "社會",
+    "question_number": 2,
+    "type": "single-choice",
+    "stem": "變性網紅「阿腰」假懷孕風波引發社會關注，她最終承認自己沒有懷孕，並跟所有人道歉。該管衛生局表示，阿腰散布謠言，倘足以影響公共之安寧，即構成《社會秩序維護法》之處罰要件，不因阿腰道歉而阻卻。請問根據上文判斷，下列相關法律分析何者正確？",
+    "options": [
+      "(A) 此事件係屬刑事案件，因此適用偵查程序不公開原則而由檢察官偵辦",
+      "(B) 散布假訊息若沒有造成任何危害也無關法，不屬言論自由而不受保護",
+      "(C) 若有人在網路論壇上罵阿腰「死人妖」，則可能違反《性騷擾防治法》",
+      "(D) 該管衛生局調查此事件，阿腰應該配合，但若不服處置得向法院訴願"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 81,
+      "page_end": 81,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 81,
+    "subject": "社會",
+    "question_number": 3,
+    "type": "single-choice",
+    "stem": "小華某年元旦隔日收到在網路上向李四私人購買的影片 DVD，李四再三保證商品無瑕疵並約定「貨品既出，概不退貨」，不料小華看完後發現劇情不佳，且不喜歡 DVD 的設計，於是在同年 1 月 8 日依《消費者保護法》向賣家要求退貨，但遭拒絕，請問何者拒絕退貨之理由正確？",
+    "options": [
+      "(A) 因已超過七天猶豫期，故李四可以拒絕退貨",
+      "(B) 具有著作權之貨品本來即不得主張七天猶豫期",
+      "(C) 李四並非企業經營者，不適用《消費者保護法》",
+      "(D) 小華一經下訂即同意契約規定且放棄退貨權利"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 81,
+      "page_end": 81,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 81,
+    "subject": "社會",
+    "question_number": 4,
+    "type": "single-choice",
+    "stem": "小美與小花同為某大校高三同學，兩人相戀並約定成年後，不顧家人反對將至戶政機關登記結婚，不料結婚登記後，小花家人憤怒斷絕與小花之親屬關係，婚後某日小花被阿男性侵而懷孕，最終生下小明，而小花之父母抑鬱而終並留有 200 萬遺產。請問有關上述案例的法律分析，何者較為正確？",
+    "options": [
+      "(A) 小明為小花之婚生子女，而生父阿男為小明之直系血親",
+      "(B) 小花因已與其父母失親屬關係，因此不得主張繼承權",
+      "(C) 小明為小花之親生子，因此也可主張繼承權利",
+      "(D) 同性婚姻亦受法律承認，但小明並非小美之婚生子女"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 81,
+      "page_end": 81,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 82,
+    "subject": "社會",
+    "question_number": 5,
+    "type": "multiple_choice",
+    "stem": "5. 2021 年新冠肺炎疫情升溫，中央流行疫情指揮中心 5 月中公布臺灣新增 185 例確定病例，分別為 180 例本土及 5 例境外移入，本土案例遍布北中南各地。請問下列何種政府作為可能違背法治國精神？",
+    "options": [
+      "A) 對於違反防疫規定者一律處以最高罰鍰",
+      "B) 立法院修法加重違反防疫規定者之處罰",
+      "C) 政府對於散布確診身分資訊者進行處罰",
+      "D) 監察院彈劾不願配合防疫規定並有行政違失之公務員"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-082"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 82,
+      "page_end": 82,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 82,
+    "subject": "社會",
+    "question_number": 6,
+    "type": "multiple_choice",
+    "stem": "6. 原住民獵人王光祿上山狩獵遭法院判處有期徒刑，王光祿進行上訴，最終最高法院合議庭法官聲請釋憲並暫停審理。司法院釋字第 803 號解釋，宣告《野生動物保育法》第 21 條之 1 的事先管制、《槍砲彈藥刀械管制條例》限制獵人僅能使用自製獵槍之規定「全部合憲」，另針對《原住民族基於傳統文化及祭儀需要獵捕宰殺利用野生動物管理辦法》（簡稱《原民獵捕動物辦法》）關於突發性狩獵 5 日的申請期限，以及事先載明狩獵動物之種類、數量之規定違反比例原則，宣告立即不再適用。請問有關上述內容以及原住民族文化權之相關敘述何者正確？",
+    "options": [
+      "A) 原住民有狩獵權利，屬於其生活文化權利之一部分而不得受到干預",
+      "B) 原住民販賣野生動物也視為其現代生活文化權，因此法律亦須保障",
+      "C) 原住民族狩獵時使用之獵槍仍以自製武器為限，否則仍違反法律",
+      "D) 《野生動物保育法》與《原民獵捕動物辦法》皆為立法院三讀通過"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-082"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 82,
+      "page_end": 82,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 82,
+    "subject": "社會",
+    "question_number": 7,
+    "type": "multiple_choice",
+    "stem": "7. 警察巡邏時，發現某乙涉嫌偷竊（非告訴乃論之罪）路人某丙財物，並進行盤查，某乙坦承犯罪並以兩倍金額歸還某丙並獲得原諒。請問下列何種警察作為較不符法定程序？",
+    "options": [
+      "A) 仍以現行犯身分逮捕歸案並送交檢察官",
+      "B) 繼續進行搜身確認是否還有其他人受害",
+      "C) 可以以犯罪嫌疑人之稱呼而不以被告稱之",
+      "D) 告知某乙可以聘請律師並且可保持緘默"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-082"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 82,
+      "page_end": 82,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 82,
+    "subject": "社會",
+    "question_number": 8,
+    "type": "multiple_choice",
+    "stem": "8. 2021 年 6 月，某上市場爆發新冠疫情群聚感染事件，攤商生意一落千丈，該市場部分人士認為該區所選出的區域立法委員（表一）在疫情爆發後沒有積極爭取權益，而這一番指責在網路上引發眾多之迴響，該事件也在當地人的群組裡引發激烈討論，下列討論的內容何者正確？ 表一：號次　候選人　性別　政黨　得票數　當選標記 1　林Ｏ方　男　中國國民黨　76,079 6　林Ｏ佐　男　時代力量　82,650",
+    "options": [
+      "A) 小 A：林委員是現任區域立法委員，若是不分區立法委員，選民就不能罷免",
+      "B) 小強：該地區的選民可以依照《公民投票法》相關規定，對林委員提出罷免",
+      "C) 小林：若是順利通過罷免，將由第二高票的國民黨候選人遞補立法委員資格",
+      "D) 小剛：選民也可以要求林委員所屬政黨開除其黨籍，使其喪失立法委員身分"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [
+      "110-page-082"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 82,
+      "page_end": 82,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 83,
+    "subject": "社會",
+    "question_number": 9,
+    "type": "multiple-choice",
+    "stem": "根據報載：「2021 年 7 月，位在高雄的行政院南部聯合服務中心執行長遭人檢舉，其在疫情期間疑似違反防疫規定與朋友聚餐，該事件立即引發各方檢討聲浪，由於該執行長係由行政院院長任命，院長也立即出面表示將深刻檢討，執行長本人出面表示只有到場致意，並未參與聚餐，過程中完全合乎防疫規定，但為此造成各界誤解已向長官請辭。」該事件在網路上引起討論，下列網友的說法何者正確？",
+    "options": [
+      "A) 依據報導內容判斷，該執行長應該屬於政務官",
+      "B) 依政府課責的精神，應由高雄市議會進行監督",
+      "C) 若執行長請辭獲准，屬於承擔法律責任的展現",
+      "D) 若調查後違規屬實，應移送監察院公懲會懲戒"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.89,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 83,
+      "page_end": 83,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 83,
+    "subject": "社會",
+    "question_number": 10,
+    "type": "multiple-choice",
+    "stem": "2021 年 5 月，國內發生突發性的大停電，全臺數百萬用戶無電可用，台電表示因全臺缺水，導致部分藉由水力發電的備載電力無法啟動，該事件使核四廠是否應該投入運轉的議題再度被討論，擁核團體主張應以公民投票方式決定核四的去留，下列關於公民投票的說明何者正確？",
+    "options": [
+      "A) 總統應以國家元首之尊，提出核四公民投票案",
+      "B) 行政院可以經立法院同意後，提出公民投票案",
+      "C) 若執政黨堅持反核，擁核團體將發動公民投票罷免總統與行政院長",
+      "D) 依據《公民投票法》規定，只要獲得全國選舉人總數十分之一支持即可通過"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 83,
+      "page_end": 83,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 83,
+    "subject": "社會",
+    "question_number": 11,
+    "type": "multiple-choice",
+    "stem": "胖虎與大雄約定好一人出 200 元共同購買最新一期的《快樂月刊漫畫》，並口頭約定這個月由胖虎先看，看完後再轉交給大雄，並由大雄代為保管。不料，胖虎看完後，便轉手將該本漫畫低價販售給心儀的對象靜香。請問關於這本《快樂月刊漫畫》所涉之購買及處分行為，下列選項何者符合我國《民法》的規定？",
+    "options": [
+      "A) 由於胖虎與大雄僅口頭約定無書面契約，故雙方契約並無效力",
+      "B) 大雄可主張胖虎違反誠信信用原則，但不能對其主張債權請求",
+      "C) 胖虎單方違反契約，便不具有該書的所有權，故無權轉賣漫畫",
+      "D) 胖虎未經大雄同意逕自賣出漫畫，已侵及大雄對此書的所有權"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 83,
+      "page_end": 83,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 84,
+    "subject": "社會",
+    "question_number": 12,
+    "type": "multiple choice",
+    "stem": "針對上文的情境描述，判斷我國教育在疫情影響下出現哪一項科技風險？",
+    "options": [
+      "(A) 假訊息傳播的資訊風險",
+      "(B) 個資被外洩的資安風險",
+      "(C) 資訊近用權與數位落差",
+      "(D) 通訊設備市場壟斷危機"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.92,
+    "asset_ids": [
+      "110-page-084"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 84,
+      "page_end": 84,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 84,
+    "subject": "社會",
+    "question_number": 13,
+    "type": "multiple choice",
+    "stem": "近年來，資訊與通訊科技改變人類資訊獲取與溝通的方式，數位民主（digital democracy）、電子治理（e-governance）等相關議題儼然成為新世代政府追逐管理效率，甚至為民主課責的重要途徑。下列哪一種政府政策最可能有效解決上述所呈現的問題？",
+    "options": [
+      "(A) 加強公共宣導以提高民眾對資訊科技的使用率",
+      "(B) 調高臺灣民眾上網與使用數位科技的基本費用",
+      "(C) 健全政府公開資訊的揭露制度以取得民眾信任",
+      "(D) 建立公共資訊中心以解決不同需求的量能問題"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.93,
+    "asset_ids": [
+      "110-page-084"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 84,
+      "page_end": 84,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 84,
+    "subject": "社會",
+    "question_number": 14,
+    "type": "multiple choice",
+    "stem": "某一族群因在19世紀中葉與清朝政府有一連串的對抗，迫使他們逐漸遷移到別的地方，但其生活習慣保留了晚清時期中國西北民間的風俗習慣，語言也夾雜了漢語方言。從歷史的脈絡來看，這個族群應是下列何者？",
+    "options": [
+      "(A) 中亞地區的東干族",
+      "(B) 延邊地區的朝鮮族",
+      "(C) 馬來亞的峇峇娘惹",
+      "(D) 越南地區的明鄉人"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-084"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 84,
+      "page_end": 84,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 84,
+    "subject": "社會",
+    "question_number": 15,
+    "type": "multiple choice",
+    "stem": "圖一的漫畫是在敘述臺灣的時事發展，其內容是曾有來自中國大陸各省中央民意代表在臺灣的情形。請問關於此一現象的背景解讀何者正確？",
+    "options": [
+      "(A) 應臺灣文化協會邀請，支持臺灣議會設置請願運動",
+      "(B) 結合臺灣地方自治聯盟，積極爭取民意代表選舉人數",
+      "(C) 根據《動員戡亂時期臨時條款》授權總統調整中央民意代表任期",
+      "(D) 結合「一國兩制」，保障兩岸的民意代表人數與意見參與"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.89,
+    "asset_ids": [
+      "110-page-084"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 84,
+      "page_end": 84,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 84,
+    "subject": "社會",
+    "question_number": 16,
+    "type": "multiple choice",
+    "stem": "大雄在論文中引用了以下的參考書目：「《一統路程圖記》」、「《商稅一覽》」、「《水陸路程》」以及《徽州至廣東路程》、《徽州下水路程歌》、《杭州上水路程歌》、《商賈便覽》。請問該論文的主題最可能是下列何者？",
+    "options": [
+      "(A) 明清陸路運輸的發展與改善",
+      "(B) 明清時期商人的活動與交通",
+      "(C) 明清商幫興起的出現與沒落",
+      "(D) 明清商人行會組織的形成與發展"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-084"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 84,
+      "page_end": 84,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 85,
+    "subject": "社會",
+    "question_number": 17,
+    "type": "multiple choice",
+    "stem": "某項政策的目的在於「維護分區統治，實行民族隔離政策」、「保全根據地，不為外族人所占有」，實施方式是修建邊境線，用土堆成寬、高各三尺的土堤，堤上每隔五尺插柳條三株，柳條粗四寸，高六尺，埋入土內二尺，外剩四尺，各柳條之間再用繩連結，稱之為「插柳結繩」；並在土堤的外側，挖掘壕溝，而邊境線曾多次遷移並不固定。請問上文應是何種政策？",
+    "options": [
+      "A) 應是秦帝國建立後，為防範匈奴所興建的長城",
+      "B) 應是西晉統一中原後，為防五胡所實施的政策",
+      "C) 應是清帝國在臺灣所實施的土牛紅線隔離政策",
+      "D) 應是清帝國於東北地區所實施的封禁隔離政策"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-085"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 85,
+      "page_end": 85,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 85,
+    "subject": "社會",
+    "question_number": 18,
+    "type": "multiple choice",
+    "stem": "「他們」主張放棄儒家思想，學習西方新思想，也認為漢字學習困難，因而主張使用拉丁化拼音文字「國語字」來出版教科書和報紙；因為國語字出現較晚，但能完全表現想法，且容易學習。因為「他們」積極提倡和鼓勵使用，促使拼音文字的「國語字」逐漸成為通用的文字。請問依照歷史知識判斷，「他們」應該是指下列何者？",
+    "options": [
+      "A) 支持明治維新西化政策的日本人",
+      "B) 支持朝鮮高宗光武改革的朝鮮人",
+      "C) 支持新文化運動的中國知識分子",
+      "D) 支持現代化、西化的越南知識分子"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-085"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 85,
+      "page_end": 85,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 85,
+    "subject": "社會",
+    "question_number": 19,
+    "type": "multiple choice",
+    "stem": "圖二為 1991 ~ 2006 年來臺灣經濟成長率及失業率變動情形，自 2001 年以來，相較於亞洲主要國家，臺灣經濟表現相對疲弱，除 2004 ~ 2006 年之外，失業率均高於經濟成長率。請問是什麼因素造成 2000 年以後臺灣失業率高於經濟成長率？（圖見卷面）",
+    "options": [
+      "A) 此時期臺美斷交、美援停止，國內資金明顯不足",
+      "B) 終止動員戡亂後，導致國內經濟動盪，股價下滑",
+      "C) 產業結構改變，移工引進，擠壓國內勞動的需求",
+      "D) 終止補助加工出口區，國外勞力密集代工業外移"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-085"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 85,
+      "page_end": 85,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 86,
+    "subject": "社會",
+    "question_number": 20,
+    "type": "multiple-choice",
+    "stem": "20. 臺南古具要部落的李仁記又稱「伊尼布斯 ( Inibs )」，從小她就被指定要以神靈代理人的身份，扮演著溝通人與超自然力量的媒介。她也擁有超自然的力量，負責每年農曆 9 月 4 日深夜的夜祭和翌日中午的啟海祭。希望消災祈福的人，也會透過「伊尼布斯」向祖靈祈求。請問關於李仁記的相關敘述，何者是正確的？",
+    "options": [
+      "(A)李仁記代表的是中國道教中「道姑」",
+      "(B)所謂「神靈」是指結合臺灣開墾的開臺祖",
+      "(C)由女性主持祭典，故是母系社會的阿美族",
+      "(D)受漢人信仰影響，伊尼布斯後來轉稱為「欽姨」"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-086"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 86,
+      "page_end": 86,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 86,
+    "subject": "社會",
+    "question_number": 21,
+    "type": "multiple-choice",
+    "stem": "21. 根據圖三漫畫的內容，甲國在臺灣統轄、獨攬商業利益，引發乙國商人不滿，發生貿易糾紛。請問關於此兩國當時在臺灣的貿易情形，下列敘述，何者正確？",
+    "options": [
+      "(A)以淡水為「正港」，商品出口都通過「正港」販售",
+      "(B)此時期臺灣的貿易主要是與中國「區域分工」為主",
+      "(C)甲國以喀爾文教派為主，乙國則以傳統天主教為主",
+      "(D)礙於乙國的封閉，甲國為了維護貿易利益，最後妥協讓步"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-086"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 86,
+      "page_end": 86,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 86,
+    "subject": "社會",
+    "question_number": 22,
+    "type": "multiple-choice",
+    "stem": "22. 1920 年代，因為當時日本的米價購貴，臺灣農民紛改種稻米，使其種植面積大增，但也使米糠相關問題更尖銳化。請問下列哪一敘述最能貼近當時的歷史現場？",
+    "options": [
+      "(A)米糠相犯是土地問題，是在有限的土地面積限制之下，稻作和蔗作面積就者為多的互斥問題",
+      "(B)米糖相剋是經濟問題，代表日人資本的製糖工業和代表中國資本的稻作之間的競爭問題",
+      "(C)米糖相剋是社會問題，主產蔗糖的閩南人與主產稻米的客家人，以米糖做為勢力擴張的憑據",
+      "(D)米糖相剋是政治問題，當局以糖廠絡臺灣菁英分子，犧牲農民權益，減少臺灣人發起政治運動"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [
+      "110-page-086"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 86,
+      "page_end": 86,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 87,
+    "subject": "社會",
+    "question_number": 23,
+    "type": "multiple choice",
+    "stem": "因為條約而開港的臺灣，隨著不同時期的移民，帶來特色各異的文化。其中，19世紀更是臺灣島內人口流動與族群融合的關鍵期。請問關於當時的族群相關資訊，何者為是？",
+    "options": [
+      "(A) 限制人民入臺，因而社會上械鬥頻傳，富不過三代",
+      "(B) 政府封山政策，嚴禁漢人與原住民接觸的政策頗成功",
+      "(C) 漢人加速往內山墾殖，侵入原住民生活圈，漢番衝突加劇",
+      "(D) 漢人移墾面積日增，鹿場減少，平埔族群的經濟大受影響"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 87,
+      "page_end": 87,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 87,
+    "subject": "社會",
+    "question_number": 24,
+    "type": "multiple choice",
+    "stem": "2021年5月《聯合報》報導：防堵臺灣出口「不義之材」，四種貴重木材明年納管。報導指出「林務局、國貿局合作，針對紅檜、扁柏、牛樟、肖楠等四種貴重木材要嚴加管制。其中的樟木出口數量曾占世界第一，在臺灣歷史上引起了血腥殺戮，造就了臺灣富豪，也造就了卓別林時代的好萊塢電影院。當時清朝曾以『特許』酬庸民間擁有私有武力之人土樟腦專賣。」下列哪一家族的興盛原因之一，就是與樟腦專賣有關？",
+    "options": [
+      "(A) 板橋林維源家族",
+      "(B) 鹿港辜顯榮家族",
+      "(C) 彰化施世榜家族",
+      "(D) 臺北李春生家族"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 87,
+      "page_end": 87,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 87,
+    "subject": "社會",
+    "question_number": 25,
+    "type": "multiple choice",
+    "stem": "關於這兩段資料，應當如何理解？（資料一、資料二見題組上方）",
+    "options": [
+      "(A) 兩段資料並無關聯性",
+      "(B) 兩段資料皆說明制度的缺失",
+      "(C) 資料一說明制度的優點，資料二說明制度實施後的缺失",
+      "(D) 資料一說明制度實施後的缺失，資料二說明制度出現的時代背景"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.84,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 87,
+      "page_end": 87,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 87,
+    "subject": "社會",
+    "question_number": 26,
+    "type": "multiple choice",
+    "stem": "資料一中用人的「屬地主義」，轉換成「屬人主義」，指的是下列何者？",
+    "options": [
+      "(A) 從世襲政治變成用人唯才",
+      "(B) 從地方分權變成中央集權",
+      "(C) 從鄉舉里選變成九品官人法",
+      "(D) 從設立儒州郡縣到納入戶籍"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.84,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 87,
+      "page_end": 87,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 88,
+    "subject": "社會",
+    "question_number": 27,
+    "type": "單選題",
+    "stem": "魯夫在進行地理科探究與實作的研究報告，在決定研究主題方向之前，他先廣泛收集了以下 4 篇地理學系碩士論文，若魯夫的研究報告想要採取地理學研究傳統與觀點如下：「整合空間與生態分析的結果，發現區域特色、發展優勢與限制條件」，請問下列哪一個碩士論文和魯夫採取的研究傳統與觀點最相似？",
+    "options": [
+      "(A) 甲：土石流災害認識之研究——臺中縣大甲溪流域周邊居民為例（2006年）\n  本研究設定臺中縣內的大甲溪流域周圍鄉鎮為研究範圍，以了解大甲溪流域周邊臺中縣民對土石流的災害認識，包括對災害之感受及態度，與適應、調整災害的方式及其防災行為。研究方法採用問卷調查與訪談，內容包括：土石流知識、防災常識、擔心程度、防災態度、防災行為傾向、個人資料。",
+      "(B) 乙：臺中市免費公車不同路線滿意度差異研究（2012年）\n  本研究透過田野調查、問卷調查及深度訪談的方式進行資料的蒐集與分析，旨在分析各路線所行經之行政區的人口數、土地利用等空間單元上的差異，視其是否影響客運路線的運量，並檢視臺中市整體公車運量的變化，進而了解TTJ免費公車的實施情況及成效。",
+      "(C) 丙：縣市整併對於都市中心性之影響——以臺中市為例（2015年）\n  本文以整併後之臺中市為研究範圍，並以臺中市合併前後之各區與各里的人口資料進行分析，加上外部資料如政府政策、各種統計資料等，探討縣市整併後對都市中心性之影響。研究涉及合併前後人口分布、交通區位、工業區與政策等對中心性變化之影響，並論述形成此種分布型態的重要條件。",
+      "(D) 丁：臺中縣大甲地區聚落形成與發展之研究（2004年）\n  探究大甲鎮區域聚落的形成與發展，並分析其對區域發展在不同時期的自然、人文、社會等要素。新區域地理學的概念中認為區域的歷史組成是連續的變遷，視區域為一個動態的歷史地理過程。研究將大甲鎮的聚落發展過程依聚落型態分為不同時期，試圖找出各時期所扮演角色的時期與轉變原因。"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-088"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 88,
+      "page_end": 88,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 88,
+    "subject": "社會",
+    "question_number": 28,
+    "type": "單選題（題組第一題，與第29題為題組）",
+    "stem": "1960年代，政府曾請地理學者協助尋找適合為新紙廠種植人工林的地點，預設人工林條件： (1) 要位於氣候適宜地區的平緩山坡地上；(2) 最好該地方也沒有會吃樹苗的猴子出沒；(3) 並且人工林的種植地要有良好行走的路線以保持安全距離。當時計畫因為人工繪製地圖成本太高而中止。時至今日使用地理資訊系統（GIS）可以快速低成本解決問題，但必須先有空間資料與屬性資料。地理資訊系統儲存空間資料可以分為兩種模式：向量式結構和網格式（格網）結構。依據兩種結構特質判斷，當政府要找人工林種植地之三個條件，其空間資料分別最適合使用何種結構？",
+    "options": [
+      "(A) 向量、向量、網格",
+      "(B) 網格、網格、向量",
+      "(C) 網格、向量、網格",
+      "(D) 向量、向量、向量"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.78,
+    "asset_ids": [
+      "110-page-088"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 88,
+      "page_end": 88,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 89,
+    "subject": "社會",
+    "question_number": 29,
+    "type": "multiple-choice",
+    "stem": "29. 若今日使用地理資訊系統來完成 1960 年代肯亞政府的研究計畫，需要使用到下列哪些地理資訊系統的功能？",
+    "options": [
+      "甲、屬性查詢",
+      "乙、路徑分析",
+      "丙、環域分析",
+      "丁、地形分析",
+      "戊、疊圖分析",
+      "(A) 甲乙丙丁",
+      "(B) 甲乙丙戊",
+      "(C) 乙丙丁戊",
+      "(D) 甲丙丁戊"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-089"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 89,
+      "page_end": 89,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 89,
+    "subject": "社會",
+    "question_number": 30,
+    "type": "multiple-choice",
+    "stem": "30. 鎮冬在洛杉磯活動時應該參考下列哪張氣溫雨量圖準備衣物？（題組 30.~32.）",
+    "options": [
+      "(A) 年均溫 11.6°C 年降水量 918 mm（圖表：月份溫度折線與降水柱狀）",
+      "(B) 年均溫 17.0°C 年降水量 325 mm（圖表：月份溫度折線與降水柱狀）",
+      "(C) 年均溫 20.2°C 年降水量 136 mm（圖表：月份溫度折線與降水柱狀）",
+      "(D) 年均溫 24.6°C 年降水量 1,313 mm（圖表：月份溫度折線與降水柱狀）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-089"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 89,
+      "page_end": 89,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 89,
+    "subject": "社會",
+    "question_number": 31,
+    "type": "multiple-choice",
+    "stem": "31. 鎮冬從機場前往市中心的路線會經歷下列哪些變化？",
+    "options": [
+      "甲、土地價格愈來愈高",
+      "乙、居民住宅區愈來愈多",
+      "丙、建築物樓層愈來愈高",
+      "丁、金融商業區愈來愈多",
+      "戊、居住人口密度愈來愈高",
+      "(A) 甲丙丁",
+      "(B) 甲丙戊",
+      "(C) 乙丁戊",
+      "(D) 乙丙丁"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-089"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 89,
+      "page_end": 89,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 90,
+    "subject": "社會",
+    "question_number": 32,
+    "type": "single-choice",
+    "stem": "32. 圖六甲～丁為鎮冬遊覽美國大地時隨手拍攝的路景（依行程順序排列），請問他應該是循著圖五的哪條路線旅遊？",
+    "options": [
+      "(A) 甲",
+      "(B) 乙",
+      "(C) 丙",
+      "(D) 丁"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-090"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 90,
+      "page_end": 90,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 90,
+    "subject": "社會",
+    "question_number": 33,
+    "type": "single-choice",
+    "stem": "33.、34.題為題組\n◎ 2020年11月以前，知名美式量販店在臺灣共有13家分店（如圖七），但中部5縣市僅有「臺中店」一間門市，這使得臺中店成為全臺灣會員數最多、營業額最高的分店，驚人的消費潛力讓該公司在臺中市北屯區新設「北臺中店」（圖七「★」），分食中部地區的零售業大餅。請問：\n33. 這家美式量販店在中部地區開設「北臺中店」，若以中央地理理論探討，代表該公司原先在中部地區的商品圈與商圈呈現何種關係？（----為商品圈，----為商圈）",
+    "options": [
+      "(A) 圖示(A)",
+      "(B) 圖示(B)",
+      "(C) 圖示(C)",
+      "(D) 圖示(D)"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-090"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 90,
+      "page_end": 90,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 91,
+    "subject": "社會",
+    "question_number": 34,
+    "type": "multiple choice",
+    "stem": "若按照中地理論的假設，這間美式量販店的門市應該平均分布在臺灣各地，但實際情況並非如此，下列哪些現象是造成理論與現實產生落差的原因？\n甲、土壤肥沃度不一致    乙、中部地區資源稀缺\n丙、人口密度並不平均    丁、居民收入高低有別\n戊、交通易達性有差異",
+    "options": [
+      "(A) 甲丙丁",
+      "(B) 甲乙戊",
+      "(C) 乙丙丁",
+      "(D) 丙丁戊"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-091"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 91,
+      "page_end": 91,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 91,
+    "subject": "社會",
+    "question_number": 35,
+    "type": "multiple choice",
+    "stem": "「獵點計畫」(Degree Confluence Project, DCP) 是美國麻州工程師在1996年自發性、由個人發起並逐漸轉變為全球活動的地理探勘計畫。此計畫是由活動玩家拜訪地球上每一個整數緯度和經度交點，然後拍攝交點一張照片，再以該交點為中心，往東南西北方向各拍攝一張相片，並且通過全球資訊網發布這些地方的圖片。理論上全球所有經緯線的整數交點有64,442個，但扣除海陸地形因素和經緯線特性因素，僅有16,146個點是「獵點計畫」要造訪的目標。因應經緯線的特性，這個計畫有一個特殊的遊戲規則，當經線間距少於赤道經線間距的2/3時，只有2/3的交點被指定為「一級點」，其餘1/3的交點則設為「二級點」，「一級點」才是計畫的主要目標。請問：\n依據「獵點計畫」，針對經線間距設定的遊戲規則，從赤道往極點方向，大約在南北緯幾度會最早開始出現「二級點」？",
+    "options": [
+      "(A) 緯度 25 度",
+      "(B) 緯度 49 度",
+      "(C) 緯度 60 度",
+      "(D) 緯度 72 度"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-091"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 91,
+      "page_end": 91,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 91,
+    "subject": "社會",
+    "question_number": 36,
+    "type": "multiple choice (image-based)",
+    "stem": "臺灣本島陸地上也有若干個「獵點計畫」的「一級點」，若依照計畫規定在交點的可視範圍內(約100公尺)拍攝照片，請問圖八哪一張照片最可能是臺灣本島陸地在「獵點計畫」中上傳的照片？（圖八四張照片分別標示為甲、乙、丙、丁）",
+    "options": [
+      "(A) 甲",
+      "(B) 乙",
+      "(C) 丙",
+      "(D) 丁"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-091"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 91,
+      "page_end": 91,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 92,
+    "subject": "社會",
+    "question_number": 37,
+    "type": "single-choice",
+    "stem": "37. 除了使用經緯度坐標，臺灣還有一套 TM 二度分帶坐標，請問在臺灣本島陸地上所有「測點計畫」的「一級點」其經度坐標，與臺灣本島 TM 二度分帶投影中央經線的總距離為多少公里？",
+    "options": [
+      "(A) 0",
+      "(B) 220",
+      "(C) 250",
+      "(D) 600 公里"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [
+      "110-page-092"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 92,
+      "page_end": 92,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 92,
+    "subject": "社會",
+    "question_number": 38,
+    "type": "single-choice",
+    "stem": "38. 依據圖九與圖十，下列關於2018年高雄市市長選舉之描述，何者最符合我國現行選舉制度與政治生態？",
+    "options": [
+      "(A) 因縣市行政首長選舉採單一選區絕對多數決制，故對大黨的參選人較為有利",
+      "(B) 因縣市行政首長選舉採一輪投票相對多數決制，較容易形成兩黨制競爭生態",
+      "(C) 根據圖九，該候選人未能於多數選區取得過半席次，因該選舉採「贏者全拿」而落選",
+      "(D) 根據圖十，近三屆高雄市市長選舉皆為國、民兩黨獲較高得票率，故該選舉為「兩黨制」"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-092"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 92,
+      "page_end": 92,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 92,
+    "subject": "社會",
+    "question_number": 39,
+    "type": "single-choice",
+    "stem": "39. 選後，有四家媒體根據圖九與圖十的內容，對2018年高雄市市長選舉進行一系列的選情分析。請問下列哪一家媒體的分析報導最為正確？",
+    "options": [
+      "(A) 香蕉日報：「根據圖九，該候選人的主要支持者多集中於山鄉郊近山區的行政區。」",
+      "(B) 芭樂晚報：「根據圖九，該候選人在各選區的得票數明顯落後其競爭對手。」",
+      "(C) 西瓜新聞：「根據圖十，當年市長選舉打破長年單一政黨執政生態，進行政黨輪替。」",
+      "(D) 芒果晨報：「根據圖十，當年選舉雖由國民黨候選人勝選，但仍有代表性不足的問題。」"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-092"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 92,
+      "page_end": 92,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 93,
+    "subject": "社會",
+    "question_number": 40,
+    "type": "單選題",
+    "stem": "有關圖九得票率分析圖的特點說明，以下哪些是正確的？\n甲、是為分層設色圖\n乙、是為區域密度圖\n丙、茂林區的得票率空間計算單位為里\n丁、得票率愈往山區愈低具有空間連續性變化",
+    "options": [
+      "(A) 甲乙",
+      "(B) 甲丁",
+      "(C) 乙丙",
+      "(D) 乙丁"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-093"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 93,
+      "page_end": 93,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 93,
+    "subject": "社會",
+    "question_number": 41,
+    "type": "單選題（題組）",
+    "stem": "（題組說明）◎ 山壯海闊的花蓮有「詩人故鄉」的美名，更被稱為「流奶與蜜之地」，是自然與人文的薈萃之地。花蓮因位居板塊邊界，地質複雜、地景豐富，雖然全境多山，亦有寬大的沖積扇平原。花蓮地區的居民有1/4為原住民族，並結合西班牙、荷蘭、閩南、客家、漢族等多元文化，保存有非常多歷史遺址，如三級古蹟吉安慶修院、林田山文化區等。然而歷年來，兼具山海美景、豐富物產的花蓮，在自然環境、人文文物保育與開發榮景間，產生諸多爭議，更引發多起公民事件。請問：\n\n41. 日治時期開始，花蓮開墾腳步加快，特別是來自竹苗地區的客家族群，主要集中在奇萊平原及縱谷北端一帶，以璞石閣（今花蓮玉里）為據點向外擴展，新開發的鳳林地區，成為日治時期移居東臺灣最多的一支族群。請問客家人在花東縱谷成為重要開發者的原因哪些是正確的？\n甲、政府透過官營移民，強制移民拓墾\n乙、日資企業開發山林，吸引勞動力前來\n丙、降水稀少、流水作用弱，風力作用增強\n丁、早期開墾的經驗，使他們能克服花東縱谷難以拓墾的石頭地\n戊、西部客家人因為擁有的土地較少，為追求更穩定生活，大量移居東部",
+    "options": [
+      "(A) 甲乙丙",
+      "(B) 乙丙丁",
+      "(C) 甲丙戊",
+      "(D) 乙丁戊"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-093"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 93,
+      "page_end": 93,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 93,
+    "subject": "社會",
+    "question_number": 42,
+    "type": "單選題（題組）",
+    "stem": "42. 花東縱谷的地形以聯合沖積扇為主，並夾雜溫泉、曲流、河階、斷層及侵蝕等不同的地形景觀。請問花東縱谷沖積扇廣布的原因為何？\n甲、河流流至縱谷時流幅變寬\n乙、歐亞和菲律賓板塊聚合帶\n丙、河流流至縱谷時流量減少\n丁、河流流至縱谷時坡度減緩",
+    "options": [
+      "(A) 甲丙",
+      "(B) 甲丁",
+      "(C) 乙丙",
+      "(D) 乙丁"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-093"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 93,
+      "page_end": 93,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 94,
+    "subject": "社會",
+    "question_number": 43,
+    "type": "multiple-choice (single answer)",
+    "stem": "延邊為中國東北某個少數族群的自治州，請根據資料與圖片地理位置判斷，該族群的分布和下列哪個人群移動現象相關？",
+    "options": [
+      "A. 女真人推行漢化政策導致不服者逃竄至延邊",
+      "B. 明末為協助朝鮮抵禦日本入侵所留駐的漢軍",
+      "C. 日本透過移入大量日人以防堵俄國勢力擴張",
+      "D. 日本帝國主義擴張使朝鮮族被強制徵調至此"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [
+      "110-page-094"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 94,
+      "page_end": 94,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 94,
+    "subject": "社會",
+    "question_number": 44,
+    "type": "multiple-choice (multiple answer — choose combination)",
+    "stem": "中國東北地區建築風格多元的原因有哪些？",
+    "options": [
+      "甲、耶穌會教士為了傳教而興建東正教堂",
+      "乙、清初八旗內遷故招募漢人至遼東開墾",
+      "丙、八國聯軍後為阻俄國人侵而移民塞外",
+      "丁、日俄戰爭後俄美日僑民移居至哈爾濱",
+      "戊、日本以長春做為統治中心成立滿洲國國府",
+      "己、汪精衛傀儡長春為中繼點以援日反蒋"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.82,
+    "asset_ids": [
+      "110-page-094"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 94,
+      "page_end": 94,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 95,
+    "subject": "社會",
+    "question_number": 45,
+    "type": "single-choice",
+    "stem": "圖十一中「★」是中國和朝鮮的界山，中國稱「長白山」，朝鮮名「白頭山」，玉兒在此登高遠眺對岸的朝鮮，她返國後想利用 Google Maps 重溫壯麗景致，應該挑選下列哪張圖片？",
+    "options": [
+      "(A) 圖片（見題面 A 圖）",
+      "(B) 圖片（見題面 B 圖）",
+      "(C) 圖片（見題面 C 圖）",
+      "(D) 圖片（見題面 D 圖）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-095"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 95,
+      "page_end": 95,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 95,
+    "subject": "社會",
+    "question_number": 46,
+    "type": "single-choice",
+    "stem": "玉兒在某一天的日誌寫到「傍晚離開瀋陽，才一頓飯的時間就抵達長春，電影大片都來不及看完，我終於體會到地理課本寫的『交通革新』，一日生活圈原來是真的！」請就玉兒的旅行距離和旅行時間，推論這段旅程她應該使用哪一種交通方式？",
+    "options": [
+      "(A) 普通鐵路",
+      "(B) 高速鐵路",
+      "(C) 高速公路",
+      "(D) 航空客運"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-095"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 95,
+      "page_end": 95,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 95,
+    "subject": "社會",
+    "question_number": 47,
+    "type": "single-choice",
+    "stem": "請問文中的「族群」可能居住在下列何處？",
+    "options": [
+      "(A) 與那國島",
+      "(B) 沖繩縣",
+      "(C) 北海道",
+      "(D) 九州長崎縣"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-095"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 95,
+      "page_end": 95,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 96,
+    "subject": "社會",
+    "question_number": 48,
+    "type": "multiple choice",
+    "stem": "根據歷史知識判斷，文中 1903 年舉辦「內國勸業博覽會」，「人類館」展區中的原住民應是來自哪「兩地領土地區」？",
+    "options": [
+      "(A) 臺灣、琉球",
+      "(B) 臺灣、朝鮮",
+      "(C) 滿洲國、琉球",
+      "(D) 朝鮮、滿洲國"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-096"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 96,
+      "page_end": 96,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 96,
+    "subject": "社會",
+    "question_number": 49,
+    "type": "multiple choice",
+    "stem": "相較日本對於原住民權益的逐漸重視，關於我國對原住民族權益保障的說明，下列何者正確？",
+    "options": [
+      "(A) 日治時期為避免原住民族遭到同化，日人設置番界，禁止漢人與原住民族通商往來",
+      "(B) 我國關於原住民族的稱呼，源自於日治時期日本人對原住民族的稱呼",
+      "(C) 國民政府來臺後為保障原住民族文化，立即恢復原住民族的傳統姓氏",
+      "(D) 直轄市原住民族人口較多的區設有直轄市山地原住民區，以維護其自治權"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-096"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 96,
+      "page_end": 96,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 96,
+    "subject": "社會",
+    "question_number": 50,
+    "type": "multiple choice",
+    "stem": "下列何種農業流程最能代表當地族群原本的生活方式？",
+    "options": [
+      "(A) 圖示：左側縱書「作物」，內有「市場」連接兩個「農家」方框；圖中顯示市場為主要流向並有次要流向箭號（圖如卷面）。",
+      "(B) 圖示：左側縱書「作物」，箭向右至上方「農家」，下方有「牲畜」方框與箭向連結（圖如卷面，標示主要流向與次要流向）。",
+      "(C) 圖示：左側縱書「野生動物、植物」，單一主要流向箭指向右方「農家」。",
+      "(D) 圖示：左側縱書「天然牧草」，箭向右依序為「牲畜」→「農家」，以單一主要流向表示。"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-096"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 96,
+      "page_end": 96,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 97,
+    "subject": "社會",
+    "question_number": 51,
+    "type": "single-choice",
+    "stem": "有鑑於社會資源相當有限，「誰可享有」、「如何分配」經常是備受討論的議題。題幹中反對各縣市提供街友服務者，在資源分配上，最有可能保持以下何種立場？(2分)",
+    "options": [
+      "(A)政府所提供的服務應存在排富條款才能符合公平正義",
+      "(B)政府所提供的服務應確保相關預算經三讀程序議決",
+      "(C)政府所提供的服務應有賴檢核與監督機制以避免浪費",
+      "(D)政府所提供的服務應著眼於受惠對象是否能回饋社會"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-097"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 97,
+      "page_end": 97,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 97,
+    "subject": "社會",
+    "question_number": 52,
+    "type": "short-answer",
+    "stem": "題文提及是否允許無家者堆放個人雜物於公共場域，支持方與反對方各持有不同主張。請針對其論辯所涉及對公共利益與基本人權之間的衝突，於作答區中勾選一項最接近的公共政策的爭論？(1分)，並清楚說明此爭論與題目情境相近的理由（50字以內，4分）。",
+    "options": [
+      "□是否為扶持私人企業成長而徵收民宅",
+      "□是否為建構社會安全網強制人民納保",
+      "□是否為保障弱勢族群提供失業補助金",
+      "□是否為維護管理而限制公廁使用時機"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [
+      "110-page-097"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 97,
+      "page_end": 97,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 97,
+    "subject": "社會",
+    "question_number": 53,
+    "type": "multiple-choice",
+    "stem": "小強利用暑假期間參加學校所舉辦的法律與生活營隊，公民老師先帶領同學前往臺南地方法院，隨後並轉往臺南司法博物館（前臺南地方法院）參訪，過程中並請同學撰寫學習單，請依序回答下列問題：\n\n53. 在臺南地方法院參訪時，首先由少年法庭的人員向同學介紹《少年事件處理法》，小強將聽到的內容寫入學習單，但是忙中有錯，記錄的內容有部分錯誤，請協助挑選出：(2分)",
+    "options": [
+      "(A)《少年事件處理法》在近年有重大修正，修法後更強調「行政輔導先行」的精神",
+      "(B)此外，12歲以下不構成兒童，也將不再適用《少年事件處理法》",
+      "(C)（以下內容於本頁不完整，後續選項續於下一頁）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.5,
+    "asset_ids": [
+      "110-page-097"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 97,
+      "page_end": 97,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 98,
+    "subject": "社會",
+    "question_number": 54,
+    "type": "short answer",
+    "stem": "54. 參訪過程中有同學提問是否能順道參訪一旁的地方檢察署，老師表示基於某項原則，檢察署無法入內勞聽，因此暫不考慮參訪，關於老師所提到的原則，請同學填寫一項法律原則（1分），並說明該原則之內涵（50字以內，4分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-098"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 98,
+      "page_end": 98,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 98,
+    "subject": "社會",
+    "question_number": 55,
+    "type": "multiple choice",
+    "stem": "55. 歷史知識判斷，資料一、資料二、資料三分別是哪個國家？（2分）\n\n資料一：19世紀中葉後，士大夫發起一連串反抗殖民者侵略的運動，知識分子寫了《平西殺左》的檄文，號召大家驅逐西洋人，殺死「左道（天主教）信徒」，焚毀各地天主教民村落，造成約上萬天主教徒被殺。最後在殖民侵略者海軍的援助鎮壓下，運動相繼解體。\n\n資料二：『此夷之所欲和者，未知何事，而以若數千年禮儀之邦，豈可與犬羊相和平？雖幾年相持，必淘絕乃已。若有以和字為言者，當施實國之律矣。並立碑於各地，其文曰：洋夷侵犯，非戰則和，主和賣國。』\n\n資料三：當時有學者提出「采西學、制洋器、範國用」建議，主張「以倫常名教為原本，輔以諸國富強之術」，這些構想被當時掌權的大臣接受並進行「改革」。但以學習西方先進技術、仿製新式武器為主的「改革」，也引起部分守舊的士大夫的反彈，駁斥：「天文算學，為益甚微，西人教習正道，所損甚大……藉聞立國之道，尚禮義，不尚權謀。根本之圖，在人心不在技藝。」",
+    "options": [
+      "A. 越南、朝鮮、中國",
+      "B. 中國、越南、朝鮮",
+      "C. 朝鮮、越南、中國",
+      "D. 日本、越南、朝鮮"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-098"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 98,
+      "page_end": 98,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 98,
+    "subject": "社會",
+    "question_number": 56,
+    "type": "short answer",
+    "stem": "56. 資料三中的「改革」是什麼（2分）？請說明判斷的理由為何（請在資料三擷取文字，20字以內，2分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-098"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 98,
+      "page_end": 98,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 99,
+    "subject": "社會",
+    "question_number": 57,
+    "type": "multiple choice",
+    "stem": "日本自 1950 年迄今的人口變化趨勢其原因與結果哪些可能正確？（2 分）\n甲、死亡率上升是人口總數逐年減少的主因\n乙、少子化使日本退居世界人口第十一大國\n丙、老年人口持續成長使日本邁入高齡社會\n丁、透過永久居留權吸引高級專業外籍人士\n戊、婦女就業率提升以彌補勞動力不足問題",
+    "options": [
+      "(A) 甲乙丁",
+      "(B) 甲丁戊",
+      "(C) 乙丁戊",
+      "(D) 乙丙戊"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-099"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 99,
+      "page_end": 99,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 99,
+    "subject": "社會",
+    "question_number": 58,
+    "type": "short answer",
+    "stem": "由於日本的外籍人士僅佔總人口的 2%，對人口變化趨勢的影響不大，因此若以「人口轉型模式」討論，日本近 30 年的人口成長從該模式的什麼階段進入什麼階段？（五階段模式，2 分）\n\n（題面留有「人口轉型模式的階段」欄位供作答）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-099"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 99,
+      "page_end": 99,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 100,
+    "subject": "社會",
+    "question_number": 59,
+    "type": "multiple choice",
+    "stem": "（題組說明）由於美國與中國之間的貿易戰影響，加徵的關稅讓更多跨國公司考慮將產品製造業務從中國轉移到其他國家，其中越南就是最受歡迎的目的地之一，越南也成為了美國與中國貿易戰中主要受益者。「中越零件運輸路徑的黃金200公里，原本海運要一週，現在陸運不到一天就能到（圖十三）。中越國際道路貨物運輸在深圳啟動，『點到點』汽車直達運輸，比傳統的跨境接駁運輸在時間上可以節省約40%，在運輸成本上可以降低約15%。」\n\n文中「　」中的文字可用下列哪個概念，表現深圳與河內之間發生的地理現象？（2分）",
+    "options": [
+      "(A) 國際分工",
+      "(B) 時空輻散",
+      "(C) 垂直整合",
+      "(D) 時空收斂"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-100"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 100,
+      "page_end": 100,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 100,
+    "subject": "社會",
+    "question_number": 60,
+    "type": "constructed response",
+    "stem": "試從產品製造技術的角度判斷，中國與越南之間出現何種核心—邊陲關係的變化？請繪圖表示（早期為虛線，晚期為實線，在答題卷上作答）。（2分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-100"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 100,
+      "page_end": 100,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 101,
+    "subject": "社會",
+    "question_number": 61,
+    "type": "multiple_choice",
+    "stem": "文中的「甲國」、「乙國」分別是哪兩個國家？請依序填入下列備選答案代號。（2分）\n備選答案：",
+    "options": [
+      "辰：圖為大不列顛／英國（經線標示 0°，緯度標示 51°N）",
+      "巳：圖為馬達加斯加（經線標示 47°30'E，緯度標示 23°30'S）",
+      "午：圖為紐西蘭（經線標示 127°30'E，緯度標示 37°30'S）",
+      "未：圖為日本（經線標示 123°30'E，緯度標示 32°30'N）",
+      "（第二列左）經線 125°E，赤道 0°，圖示東南亞群島（選項代號在影像上字跡不清）",
+      "（第二列中）圖為斯里蘭卡（經線標示 81°30'E，緯度標示 6°30'N；選項代號在影像上字跡不清）",
+      "（第二列右）圖為菲律賓群島（經線標示 121°E，緯度標示 15°N；選項代號在影像上字跡不清）",
+      "（第二列最右）圖為愛爾蘭（經線標示 9°W，緯度標示 54°N；選項代號在影像上字跡不清）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [
+      "110-page-101"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 101,
+      "page_end": 101,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 101,
+    "subject": "社會",
+    "question_number": 62,
+    "type": "short_answer",
+    "stem": "文中所提的「甲」國改革運動應是哪一場運動？（2分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [
+      "110-page-101"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 101,
+      "page_end": 101,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 101,
+    "subject": "社會",
+    "question_number": 63,
+    "type": "short_answer",
+    "stem": "請舉出一位「丙」國內部立憲派的代表人物。（2分）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [
+      "110-page-101"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 101,
+      "page_end": 101,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 102,
+    "subject": "社會",
+    "question_number": 64,
+    "type": "multiple_choice",
+    "stem": "「丁國」的氣候類型最可能是下列何者？（2分）",
+    "options": [
+      "（A）圖 (A)（卷面顯示氣候圖，月雨量(mm)為橫軸，月均溫(°C)為縱軸，詳見卷面圖示）",
+      "（B）圖 (B)（卷面顯示氣候圖，月雨量(mm)為橫軸，月均溫(°C)為縱軸，詳見卷面圖示）",
+      "（C）圖 (C)（卷面顯示氣候圖，月雨量(mm)為橫軸，月均溫(°C)為縱軸，詳見卷面圖示）",
+      "（D）圖 (D)（卷面顯示氣候圖，月雨量(mm)為橫軸，月均溫(°C)為縱軸，詳見卷面圖示）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-102"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 102,
+      "page_end": 102,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 102,
+    "subject": "社會",
+    "question_number": 65,
+    "type": "multiple_choice",
+    "stem": "相對於上述國家的立憲與共和之爭，我國近年來在憲政體制出現許多改革的聲音，有學者建議我國政府體制應改為內閣制。假設下列為該學者的建議與說明，何者較為適當？（2分）",
+    "options": [
+      "（A）若國會對於行政院的政策不滿時，總統可以主動解散國會化解衝突",
+      "（B）我國的現行體制，政治權力集中於行政院院長，總統僅為虛位元首",
+      "（C）若行政院長濫權，人民雖可提出罷免案，但其程序時常緩不濟急",
+      "（D）現行制度下，總統可能把持內政與外交權力於一身，「有權卻無責」"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-102"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 102,
+      "page_end": 102,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 103,
+    "subject": "社會",
+    "question_number": 67,
+    "type": "問答題",
+    "stem": "67. 建築師自古以來皆不斷從自然界尋求靈感，「地景」正是主要的仿效對象之一，例如：知名的「蘭陽博物館」，即是以東北角海岸的單面山為設計構想。近期引起熱烈討論的另一地景建築物，是為被塑造為臺中海線旅遊新亮點，即將於2022年開幕的臺中海洋生態館（照片一），建築物外觀稜角分明，表面由不規則石材拼貼成的5層樓 RC 鋼骨構造物，官方公告資料說明設計靈感來自於大甲溪流域沖刷下來的岩石。建築概念說明內容寫道：「整體建築物的設計如同海邊的岩岸，應和著浪的節拍，海浪雕塑了岩石，如同人、空氣、陽光雕塑建築，讓設計手法『實』與『虛』展現自然的紋理。」請依據上文以該建物周圍的(1)地形和地景融入角度(2)河流作用特徵切入入思考，說明該建築物可能出現爭議的事項。（2分，以50字為限）",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-103"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 103,
+      "page_end": 103,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 103,
+    "subject": "社會",
+    "question_number": 68,
+    "type": "連線配對題",
+    "stem": "68. 根據內政部統計民國109年底原住民人口數57.7萬人，較108年底增加0.94%；人口數以阿美族21.5萬人最多，排灣族10.4萬人次之，泰雅族9.3萬人居第三，三者合計占逾原住民總人數7成。經政府認定的原住民族有16族，各縣市原住民人口數，以花蓮縣原住民人口9萬3,450人，占全國原住民人口數16.20%最多，臺東縣7萬8,514人，占13.61%次之，桃園市7萬7,662人，占13.46%居第三；三縣市合計占原住民人口數4成3；各縣市人口中原住民所占比率，以臺東縣36.47%最高，花蓮縣28.81%次之，屏東縣7.44%居第三。請試就文中的臺灣原住民族與主要的分布區域的連線配對，在答題卷上作答。(2分)",
+    "options": [
+      "阿美族",
+      "排灣族",
+      "泰雅族",
+      "卑南族",
+      "地圖輪廓（右下四個輪廓，左起第1、2、3、4）"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [
+      "110-page-103"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 103,
+      "page_end": 103,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 111,
+    "subject": "社會",
+    "question_number": 68,
+    "type": "配對題（連線）",
+    "stem": "將圖中四位原住民族人物與下方四個縣市輪廓配對（以連線表示）。",
+    "options": [
+      "阿美族（人物，左起第1位）",
+      "排灣族（人物，左起第2位）",
+      "泰雅族（人物，左起第3位）",
+      "卑南族（人物，左起第4位）",
+      "地圖輪廓（左起第1個）",
+      "地圖輪廓（左起第2個）",
+      "地圖輪廓（左起第3個）",
+      "地圖輪廓（左起第4個）"
+    ],
+    "answer": [
+      "阿美族 - 地圖輪廓（左起第1個）",
+      "排灣族 - 地圖輪廓（左起第3個）",
+      "泰雅族 - 地圖輪廓（左起第2個）",
+      "卑南族 - 地圖輪廓（左起第4個）"
+    ],
+    "explanation": "右側影像文字：\n課綱：地 Ca-V-2 臺灣的原住民族與南島語族。\n目標：G2 釐清地理基本概念、原理原則與理論的內涵\n解析：阿美族以設籍花蓮縣 5萬3,182 人最多，排灣族以設籍屏東縣 4萬9,340 人最多，泰雅族以設籍桃園市 2萬1,575 人最多。\n評分原則：\n等級2（2分） 3條線配對皆正確\n等級1（1分） 僅1族群的主要分布區配對完全正確\n等級0（0分） 未作答或3條線都連錯",
+    "confidence": 0.82,
+    "asset_ids": [
+      "110-page-111"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 111,
+      "page_end": 111,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 113,
+    "subject": "數學 B",
+    "question_number": 1,
+    "type": "單選題",
+    "stem": "√110 + √2021 介於哪兩個連續整數之間？",
+    "options": [
+      "(1) 11 與 12",
+      "(2) 12 與 13",
+      "(3) 13 與 14",
+      "(4) 14 與 15",
+      "(5) 15 與 16"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-113"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 113,
+      "page_end": 113,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 113,
+    "subject": "數學 B",
+    "question_number": 2,
+    "type": "單選題",
+    "stem": "同時滿足不等式 |x - √147| < 6 與 |x - √32| > 5 的整數 x 有幾個？",
+    "options": [
+      "(1) 8 個",
+      "(2) 9 個",
+      "(3) 10 個",
+      "(4) 11 個",
+      "(5) 12 個"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.95,
+    "asset_ids": [
+      "110-page-113"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 113,
+      "page_end": 113,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 113,
+    "subject": "數學 B",
+    "question_number": 3,
+    "type": "單選題",
+    "stem": "在簡報軟體中，常有利用兩個圖形進行組合，創造出各種圖案的功能。例如「減去」的功能是將第一個選取的圖形捨去與第二個圖形重疊的部分。現在有一正方形與圓形，如右圖，若先選取圓形再選取正方形，利用「減去」功能所得到的圖形為下列哪一個選項？",
+    "options": [
+      "(1) 見試題圖 (左下第一個圖示)",
+      "(2) 見試題圖 (左下第二個圖示)",
+      "(3) 見試題圖 (左下第三個圖示)",
+      "(4) 見試題圖 (左下第四個圖示)",
+      "(5) 見試題圖 (左下第五個圖示)"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.6,
+    "asset_ids": [
+      "110-page-113"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 113,
+      "page_end": 113,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 114,
+    "subject": "數學 B",
+    "question_number": 4,
+    "type": "multiple choice",
+    "stem": "聲音的強度是用每平方公尺多少瓦特 (W/m^2) 來衡量，一般人能感覺出聲音的最小強度為 I_0 = 10^{-12} (W/m^2)。當測得的聲音強度為 I (W/m^2) 時，所產生的噪音分貝數 d 為 d = 10 · log (I / I_0)。研究發現，人們若處於音量小於 50 分貝的環境時，會讓人覺得舒適寧靜；反之，若處於音量大於 70 分貝的環境時，則可能會使聽力受損。設有一部機車以每小時 60 公里的速度行駛時，其產生的噪音為 40 分貝，若有相同的機車 n 部，且同時皆以每小時 60 公里的速度行駛，若不考慮聲音能量的逸散，則使聽力不會受損的最大整數 n 值為何？",
+    "options": [
+      "(1) 3",
+      "(2) 30",
+      "(3) 100",
+      "(4) 1000",
+      "(5) 10000"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.86,
+    "asset_ids": [
+      "110-page-114"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 114,
+      "page_end": 114,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 114,
+    "subject": "數學 B",
+    "question_number": 5,
+    "type": "multiple choice",
+    "stem": "設 f(x) 為實係數三次多項式，若 f(x) 除以 x-2 的餘式為 -5，且 (x+1)f(x) 除以 x^3 - 3 的餘式為 3x - 1，則多項式 f(x) 的各項係數總和為下列哪一個選項？",
+    "options": [
+      "(1) 2",
+      "(2) 4",
+      "(3) 6",
+      "(4) 8",
+      "(5) 10"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.88,
+    "asset_ids": [
+      "110-page-114"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 114,
+      "page_end": 114,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 114,
+    "subject": "數學 B",
+    "question_number": 6,
+    "type": "multiple choice",
+    "stem": "歷史上，各國數學家有許多種求圓周率的方法，其中利用圓的外切正多邊形(每邊均與圓相切的正多邊形)與圓的內接正多邊形(每個頂點都落在圓上的正多邊形)進行估算是一種常見的方法。若先分別計算單位圓的外切正 4n 邊形與內接的正 4n 邊形的周長，再以兩者的算術平均數做為單位圓周長 2π 的近似值，則此 2π 的近似值為何？",
+    "options": [
+      "(1) 4n ( sin(45°/n) + cos(45°/n) )",
+      "(2) 8n ( sin(90°/n) + cos(90°/n) )",
+      "(3) 8n ( sin(45°/n) + cos(45°/n) )",
+      "(4) 8n ( sin(90°/n) + tan(90°/n) )",
+      "(5) 4n ( sin(45°/n) + tan(45°/n) )"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.72,
+    "asset_ids": [
+      "110-page-114"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 114,
+      "page_end": 114,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 115,
+    "subject": "數學 B",
+    "question_number": 7,
+    "type": "single-choice",
+    "stem": "翰翰就讀的高中因疫情影響取消了一年一度的校慶活動，老師為彌補同學們的缺憾，於某次班會時舉行班級同樂會，並且設計一個「樂透」活動作為同樂會的壓軸。活動方式如下：每位同學在小卡上任意寫上一個 0 到 9 的數字，接著老師利用電腦隨機抽出一個 000 到 999 的數字，若小卡上所寫的數字為抽出的數字中任一位數，則該名同學中獎（例如：電腦抽出 033，則小卡上寫 0 或寫 3 的同學即為中獎）。依據上述的活動方式，翰翰中獎的機率在下列哪一個區間中？",
+    "options": [
+      "(1) [0.15 , 0.2)",
+      "(2) [0.2 , 0.25)",
+      "(3) [0.25 , 0.3)",
+      "(4) [0.3 , 0.35)",
+      "(5) [0.35 , 0.4)"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-115"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 115,
+      "page_end": 115,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 115,
+    "subject": "數學 B",
+    "question_number": 8,
+    "type": "multiple-choice",
+    "stem": "設 a⃗ = (3,1)，b⃗ = (5,5)，c⃗ = (−2, k)，試選出正確的選項。",
+    "options": [
+      "(1) b⃗ 在 a⃗ 上的正射影為 2 a⃗",
+      "(2) b⃗ 在 2 a⃗ 上的正射影為 4 a⃗",
+      "(3) a⃗ 在 b⃗ 上的正射影為 2 a⃗",
+      "(4) 若 c⃗ 在 a⃗ 上的正射影與 b⃗ 在 a⃗ 上的正射影相等，則 k = 26",
+      "(5) 若 c⃗ 與 a⃗ 垂直，則 k = 6"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [
+      "110-page-115"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 115,
+      "page_end": 115,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 116,
+    "subject": "數學 B",
+    "question_number": 9,
+    "type": "multiple choice (multiple answers)",
+    "stem": "依據大考中心公告：「110 學年度學測數學科級距為 6.03 分，數學科成績的五項標準分別為頂標 11 級分、前標 9 級分、均標 6 級分、後標 4 級分、底標 3 級分」。已知每位考生的數學科原始得分皆為整數，請依據上述資料，選出正確的選項。",
+    "options": [
+      "(1) 數學科原始得分至少要 91 分才能得到 15 級分",
+      "(2) 若翰俊和俊元的數學科級分數都是 14 級分，則他們兩人的原始得分最多差 5 分",
+      "(3) 若頎和的數學科級分數為 11 級分，則她的級分數至少比該科 87% 的到考考生還高",
+      "(4) 若政源的數學科原始得分為 50 分，則他的成績達到前標",
+      "(5) 若碩亨的數學科原始得分為 30 分，則他的級分數至少比該科 50% 的到考考生還低"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 116,
+      "page_end": 116,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 116,
+    "subject": "數學 B",
+    "question_number": 10,
+    "type": "multiple choice (multiple answers)",
+    "stem": "一正方形 ABCD，直線 AB 的方程式為 2x - y = 1，若 D 點坐標為 (3, 2)，則直線 BC 的方程式可以是下列哪些選項？",
+    "options": [
+      "(1) x + 2y = 10",
+      "(2) x - 2y = -1",
+      "(3) x + 2y = 4",
+      "(4) x + 2y = -1",
+      "(5) 2x + y = 8"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.9,
+    "asset_ids": [],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 116,
+      "page_end": 116,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": false
+    }
+  },
+  {
+    "source_page": 117,
+    "subject": "數學 B",
+    "question_number": 12,
+    "type": "多選題",
+    "stem": "在△ABC中，\\overline{AB}=5，\\overline{AC}=8，\\overline{BC}=7，點P為△ABC內部一點(不含邊界)，且 AP = 2√3，設點P在直線AB與直線AC上的投影點分別為點Q與點R，試選出正確的選項。",
+    "options": [
+      "(1) sin A = √3/2",
+      "(2) △ABC的面積為 20√3",
+      "(3) ∠QPR = 120°",
+      "(4) △AQR 的外接圓直徑為 2√3",
+      "(5) 若點P對於直線AB與直線AC的對稱點分別為點S與點T，則 \\overline{ST} = 8"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [
+      "110-page-117"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 117,
+      "page_end": 117,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 117,
+    "subject": "數學 B",
+    "question_number": 13,
+    "type": "選填題",
+    "stem": "某天有七節課(第一節到第七節)，其中有數學兩節，國文、英文、物理、歷史與音樂各一節。若數學不連續上兩節，且數學與物理不連續上兩節，則課程的安排方法有 ___ 種。(第四節與第五節視為連續兩節)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.7,
+    "asset_ids": [
+      "110-page-117"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 117,
+      "page_end": 117,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 117,
+    "subject": "數學 B",
+    "question_number": 14,
+    "type": "選填題",
+    "stem": "在△ABC中，D為BC上一點，P為AD上一點；已知△BDP、△ACD及△ABC的面積分別為 3、8 及 12。若 \\overrightarrow{BP} = α\\,\\overrightarrow{AB} + β\\,\\overrightarrow{AC}，則實數對 (α, β) 為 ___。(化為最簡分數)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [
+      "110-page-117"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 117,
+      "page_end": 117,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 117,
+    "subject": "數學 B",
+    "question_number": 15,
+    "type": "選填題",
+    "stem": "如右圖所示，利用邊長為1公分的正方立方小積木來做堆疊：第一層用1塊積木，第二層用3塊積木，第三層用6塊積木，……，第 n 層用 (1+2+3+……+n) 塊積木。今有一個用此方式堆疊而成的立體模型，由上至下共計15層，則此立體模型的表面積(即該立體模型的前、後、上、下、左、右各表面的面積總和)為 ___ 平方公分。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [
+      "110-page-117"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 117,
+      "page_end": 117,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 117,
+    "subject": "數學 B",
+    "question_number": 16,
+    "type": "選填題",
+    "stem": "若坐標平面上 P(5,2) 處有一光源，將圖 C: x^2 + y^2 - 6x - 4y + 11 = 0 投射在 y 軸上，則此圓在 y 軸上的陰影長度為 ___。",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.75,
+    "asset_ids": [
+      "110-page-117"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 117,
+      "page_end": 117,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 118,
+    "subject": "數學 B",
+    "question_number": 18,
+    "type": "single choice",
+    "stem": "一般家用電源為「正弦交流電」，正弦交流電是指電路中電流及電壓的大小和方向都隨時間按正弦函數的規律變化，這種隨時間做週期性變化的電流稱為交流電。而交流電在實際使用中，如果用最大電壓來代表交流電的電壓並不合適，因為畢竟在一個週期中只有兩個瞬間會達到最大電壓(即波峰、波谷)。為此人們常用交流電電壓的「有效值」表示其大小，經理論和實驗證明，交流電電壓的有效值等於「最大電壓(即振幅)除以 √2」。例如：家用電源的電壓一般為 110 伏特，此即為「有效值」，故其最大電壓應為 110 × √2 ≈ 155.5(伏特)。今有一交流發電機，其所發出之交流電電壓與時間的關係符合函數\n\nV(t) = a sin(ωt + θ)\n\n其中 V(t) 表示在時間 t 時的電壓，且 a、ω、θ 皆為正數，0 ≤ θ < 2π，時間單位：秒；電壓單位：伏特。V(t) 的函數部分圖形如右，已知圖中 B 點為其中一個波峰。試問此交流發電機電壓的「有效值」最接近下列哪一個選項？(單選題，5 分)",
+    "options": [
+      "(1) 210 伏特",
+      "(2) 240 伏特",
+      "(3) 270 伏特",
+      "(4) 300 伏特",
+      "(5) 420 伏特"
+    ],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.85,
+    "asset_ids": [
+      "110-page-118"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 118,
+      "page_end": 118,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  },
+  {
+    "source_page": 118,
+    "subject": "數學 B",
+    "question_number": 19,
+    "type": "short answer (non-multiple)",
+    "stem": "赫茲 (Hz) 是頻率的單位，表示「每一秒週期性事件發生的次數」。例如：週期為 4 秒的單擺，其頻率為 1/4 赫茲。試求出上述電壓函數 V(t) 的未知常(係)數 a、ω、θ，以及週期 T(單位：秒)和頻率 F(單位：赫茲)。(非選擇題，10 分)",
+    "options": [],
+    "answer": [],
+    "explanation": "",
+    "confidence": 0.8,
+    "asset_ids": [
+      "110-page-118"
+    ],
+    "review_status": "needs_review",
+    "source_metadata": {
+      "filename": "110學測歷屆.pdf",
+      "page_start": 118,
+      "page_end": 118,
+      "parser": "gpt-5-mini-vision",
+      "required_visual": true
+    }
+  }
+]
