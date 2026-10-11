@@ -757,3 +757,35 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
   transform: translateY(-1px);
   box-shadow: 0 10px 30px rgba(167, 139, 250, .36);
 }
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  html, body { background: #fff !important; color: #111 !important; }
+  body::before, body::after { display: none !important; }
+  [data-print-format="overview"] .print-section:not(.print-overview),
+  [data-print-format="subjects"] .print-section:not(.print-subjects),
+  [data-print-format="questions"] .print-section:not(.print-questions) { display: none !important; }
+  .print-section { break-inside: avoid; page-break-inside: avoid; }
+  .print-section > div { break-inside: avoid; page-break-inside: avoid; }
+  .text-muted { color: #4b5563 !important; }
+  .text-white, .text-slate-200, .text-cyan-100, .text-cyan-200, .text-violet-200, .text-emerald-200, .text-amber-200, .text-rose-200 { color: #111 !important; }
+  [class*="bg-white"], [class*="bg-[#"], [class*="bg-[radial"], [class*="bg-gradient"] { background: #fff !important; }
+  [class*="border-white"], [class*="border-cyan"], [class*="border-violet"], [class*="border-emerald"], [class*="border-rose"] { border-color: #d1d5db !important; }
+  .rounded-full[style*="conic-gradient"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  html, body { background: #fff !important; color: #111 !important; }
+  body::before, body::after { display: none !important; }
+  [data-print-format="overview"] .print-section:not(.print-overview),
+  [data-print-format="subjects"] .print-section:not(.print-subjects),
+  [data-print-format="questions"] .print-section:not(.print-questions) { display: none !important; }
+  .print-section { break-inside: avoid; page-break-inside: avoid; }
+  .print-section > div { break-inside: avoid; page-break-inside: avoid; }
+  .text-muted { color: #4b5563 !important; }
+  .text-white, .text-slate-200, .text-cyan-100, .text-cyan-200, .text-violet-200, .text-emerald-200, .text-amber-200, .text-rose-200 { color: #111 !important; }
+  [class*="bg-white"], [class*="bg-[#"], [class*="bg-[radial"], [class*="bg-gradient"] { background: #fff !important; }
+  [class*="border-white"], [class*="border-cyan"], [class*="border-violet"], [class*="border-emerald"], [class*="border-rose"] { border-color: #d1d5db !important; }
+  .rounded-full[style*="conic-gradient"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
