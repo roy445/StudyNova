@@ -2242,4 +2242,20 @@ export const routes: RouteDef[] = [
       return { targets: targets.length, subscribedUsers: subscribedUsers.size, pushAttempted, pushFailed, notified, pushSent, configured: pushConfigured() };
     },
   }),
+  route({
+    method: "GET",
+    path: "/admin/ai-quiz/usage",
+    auth: "admin",
+    handler: async (ctx) => {
+      const days = Math.min(90, Math.max(1, Number(ctx.query.get("days") ?? 30) || 30));
+      const since = new Date(Date.now() - days * 86_400_000);
+      const [summary, daily, byFeature, byProvider] = await Promise.all([
+        db.execute(sql`select count(*)::int as calls, count(*) filter (where success)::int as success, count(*) filter (where not success)::int as failure, coalesce(sum(input_tokens),0)::int as input_tokens, coalesce(sum(output_tokens),0)::int as output_tokens, coalesce(avg(latency_ms),0)::int as avg_latency_ms from ai_usage_logs where created_at >= ${since} and feature in ('ai_practice','quiz_generation','wrong_tip','wrong_answer_review')`),
+        db.execute(sql`select to_char(created_at at time zone 'Asia/Taipei','YYYY-MM-DD') as day, count(*)::int as calls, count(*) filter (where success)::int as success, coalesce(sum(input_tokens + output_tokens),0)::int as tokens from ai_usage_logs where created_at >= ${since} and feature in ('ai_practice','quiz_generation','wrong_tip','wrong_answer_review') group by 1 order by 1`),
+        db.execute(sql`select feature, count(*)::int as calls, count(*) filter (where success)::int as success, coalesce(sum(input_tokens + output_tokens),0)::int as tokens from ai_usage_logs where created_at >= ${since} and feature in ('ai_practice','quiz_generation','wrong_tip','wrong_answer_review') group by feature order by calls desc`),
+        db.execute(sql`select provider, count(*)::int as calls, count(*) filter (where success)::int as success, coalesce(sum(input_tokens + output_tokens),0)::int as tokens from ai_usage_logs where created_at >= ${since} and feature in ('ai_practice','quiz_generation','wrong_tip','wrong_answer_review') group by provider order by calls desc`),
+      ]);
+      return { days, summary: summary.rows[0] ?? {}, daily: daily.rows, byFeature: byFeature.rows, byProvider: byProvider.rows };
+    },
+  }),
 ];

@@ -15,6 +15,7 @@ import {
   questionAnalysisBatches,
   questionAnalysisJobs,
   questions,
+  quizzes,
   sessions,
   deletedAccounts,
   aiMemory,
@@ -61,7 +62,8 @@ export type JobName =
   | "name_moderation_scan"
   | "release_publish"
   | "exam_prep_import"
-  | "exam_prep_draft_analysis";
+  | "exam_prep_draft_analysis"
+  | "quiz_expiry_cleanup";
 
 
 export type JobPayload = Record<string, unknown>;
@@ -329,6 +331,10 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     await db.delete(notifications).where(sql`${notifications.createdAt} < now() - interval '90 days'`);
     return "已清理過期 session 與 90 天前通知";
   },
+  async quiz_expiry_cleanup() {
+    const expired = await db.delete(quizzes).where(sql`${quizzes.expiresAt} is not null and ${quizzes.expiresAt} <= now()`).returning({ id: quizzes.id });
+    return `已清理 ${expired.length} 份超過 3 天的 AI 題組`;
+  },
 
   async compression_process(payload) {
     const { processCompressionJob } = await import("./compression");
@@ -587,6 +593,7 @@ export const CRON_TASKS: Array<{ task: CronTask; label: string; schedule: string
   { task: "inactive_reminder", label: "久未登入關懷提醒", schedule: "每日 18:30" },
   { task: "session_cleanup", label: "Session / 通知清理", schedule: "每日 03:00" },
   { task: "data_retention", label: "保守資料保留清理", schedule: "每日 03:30" },
+  { task: "quiz_expiry_cleanup", label: "AI 題組三天期限清理", schedule: "每 30 分鐘" },
   { task: "name_moderation_scan", label: "使用者名稱巡檢", schedule: "每 6 小時" },
   { task: "study_reminder", label: "每日讀書提醒", schedule: "每日 20:00" },
 ];

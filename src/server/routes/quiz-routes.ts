@@ -178,7 +178,7 @@ export async function generateQuestions(params: {
     const usage = usedOptionPool.reduce<Record<string, number>>((counts, option) => { counts[option] = (counts[option] ?? 0) + 1; return counts; }, {});
     const usedQuestionStems = cleaned.map((item) => item.stem).concat([...reservedQuestionStems]).slice(-120);
     const avoid = `${usedOptionPool.length ? `本次測驗選項使用次數（每個選項只能出現 1 次）：${JSON.stringify(usage)}` : "目前尚無已使用選項。"}\n已經用過的題目（不可改寫後重複）：${JSON.stringify(usedQuestionStems)}`;
-    const { data } = await runAiJson<{ questions?: GeneratedQuestion[]; items?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: `你是台灣國高中題目設計引擎。請只依教材完整內容出題，不得使用預設題庫、常識補寫或杜撰教材沒有的考點。每題都必須能在教材內容中找到依據；若內容不足，回傳較少題目，不要硬湊。回傳 JSON questions。${strictEnglishOptions ? "這是英文單字或文法測驗：每一題必須恰好提供 4 個選項 A、B、C、D，四個選項不可重複；single、part_of_speech、meaning、multiple 必須只有一個正確答案（answer 只放一個選項原文）。每題都要依題幹量身設計選項，禁止複製其他題的整組選項。單字干擾項須與題幹相關、同詞性、語意接近、字形易混淆或是常見誤用；文法干擾項須屬同一文法主題下的不同時態、動詞變化或常見學習者錯誤，且必須有明確唯一正解。" : "single/part_of_speech/meaning 優先提供 4 個合理 options。"}選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。不可為了去重使用不自然或無關選項。整份測驗不得重複相同選項組合；使用繁體中文（英文科目可用英文）。`, parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText}` }], maxOutputTokens: 3000 }, { questions: [] });
+    const { data } = await runAiJson<{ questions?: GeneratedQuestion[]; items?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: `你是台灣國高中題目設計引擎。請只依教材完整內容出題，不得使用預設題庫、常識補寫或杜撰教材沒有的考點。每題都必須能在教材內容中找到依據；若內容不足，回傳較少題目，不要硬湊。回傳 JSON questions，每題欄位為 type、stem、options、answer、explanation、topic、metadata。數學與自然科請保留 LaTeX：行內公式使用 $...$，化學式可用 \\ce{H2O}；若教材包含可直接使用的圖片或圖表 URL，放在 metadata.imageUrl，否則不要捏造 URL。${strictEnglishOptions ? "這是英文單字或文法測驗：每一題必須恰好提供 4 個選項 A、B、C、D，四個選項不可重複；single、part_of_speech、meaning、multiple 必須只有一個正確答案（answer 只放一個選項原文）。每題都要依題幹量身設計選項，禁止複製其他題的整組選項。單字干擾項須與題幹相關、同詞性、語意接近、字形易混淆或是常見誤用；文法干擾項須屬同一文法主題下的不同時態、動詞變化或常見學習者錯誤，且必須有明確唯一正解。" : "single/part_of_speech/meaning 優先提供 4 個合理 options。"}選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。不可為了去重使用不自然或無關選項。整份測驗不得重複相同選項組合；使用繁體中文（英文科目可用英文）。`, parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText}` }], maxOutputTokens: 3000 }, { questions: [] });
     let candidate = filterDuplicateQuestions(cleanGeneratedQuestions(generatedQuestionList(data), params.topic), reservedQuestionStems); let validation = validateQuizOptionPool(candidate);
     if (candidate.length && validation.excessiveCrossQuestionDuplicates && attempt < 2) {
       const repairIndexes = diversityRepairIndexes(candidate, validation.optionUsageCount);
@@ -412,6 +412,7 @@ export const routes: RouteDef[] = [
           options: q!.options,
           subject: q!.subject,
           difficulty: q!.difficulty,
+          metadata: q!.metadata,
         })),
         attempt: attempt ?? null,
         saved: saved.map((s) => ({ questionId: s.questionId, response: s.response })),

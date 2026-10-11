@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progress, Select, Skeleton, useToast } from "@/components/ui";
 import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
+import { MathContent } from "@/components/MathContent";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
 type Quiz = { id: string; title: string; subject: string; difficulty: string; questionCount: number; timeLimitSec: number; createdAt: string; source: string };
 type Attempt = { id: string; quizId: string; status: string; score: number; total: number; correctCount: number; submittedAt: string | null };
-type QuizQuestion = { id: string; type: string; stem: string; options: string[] };
+type QuizQuestion = { id: string; type: string; stem: string; options: string[]; metadata?: Record<string, unknown> };
 type ReviewItem = { questionId: string; stem: string; options: string[]; answer: string[]; explanation: string; response: string[]; isCorrect: boolean };
 
 export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) {
@@ -178,7 +179,8 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
           </div>
           <div className="rounded-2xl border border-[var(--line)] bg-[#0b1730]/70 p-4 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3"><Badge tone="cyan">第 {questionIndex + 1} 題</Badge><span className="text-xs text-muted">{question.type === "multiple" ? "可複選" : "請選出最適合的答案"}</span></div>
-            <h3 className="text-base font-semibold leading-7 sm:text-lg">{question.stem}</h3>
+            <h3 className="text-base font-semibold leading-7 sm:text-lg"><MathContent>{question.stem}</MathContent></h3>
+            {typeof question.metadata?.imageUrl === "string" && <img src={question.metadata.imageUrl} alt="題目關聯圖片" className="mt-4 max-h-80 w-full rounded-xl border border-white/10 object-contain" />}
             {isChoice && options.length > 0 ? (
               <div className="mt-5 space-y-3">
                 {options.map((option, optionIndex) => {
@@ -188,18 +190,19 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
                       const current = answers[question.id] ?? [];
                       void saveAnswer(question.id, selected ? current.filter((item) => item !== option) : [...current, option]);
                     } else void saveAnswer(question.id, [option]);
-                  }} className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all ${selected ? "border-[#4c8dff] bg-[#4c8dff]/15 shadow-[0_0_0_2px_rgba(76,141,255,.12)]" : "border-white/15 bg-white/[.025] hover:border-[#4c8dff]/70 hover:bg-[#4c8dff]/10"} ${checked?.isCorrect && selected ? "border-emerald-400 bg-emerald-400/15" : checked && !checked.isCorrect && selected ? "border-rose-400 bg-rose-400/15" : ""}`}><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${selected ? "bg-[#377dff] text-white" : "bg-white/10 text-muted"}`}>{optionLetters[optionIndex]}</span><span className="text-sm leading-6">{option}</span></button>;
+                  }} className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all ${selected ? "border-[#4c8dff] bg-[#4c8dff]/15 shadow-[0_0_0_2px_rgba(76,141,255,.12)]" : "border-white/15 bg-white/[.025] hover:border-[#4c8dff]/70 hover:bg-[#4c8dff]/10"} ${checked?.isCorrect && selected ? "border-emerald-400 bg-emerald-400/15" : checked && !checked.isCorrect && selected ? "border-rose-400 bg-rose-400/15" : ""}`}><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${selected ? "bg-[#377dff] text-white" : "bg-white/10 text-muted"}`}>{optionLetters[optionIndex]}</span><span className="text-sm leading-6"><MathContent>{option}</MathContent></span></button>;
                 })}
               </div>
             ) : <Input value={answers[question.id]?.[0] ?? ""} disabled={Boolean(checked)} onChange={(e) => void saveAnswer(question.id, [e.target.value])} placeholder="輸入你的答案" />}
-            {checked && <div className={`mt-5 rounded-2xl border p-4 ${checked.isCorrect ? "border-emerald-400/40 bg-emerald-400/10" : "border-rose-400/40 bg-rose-400/10"}`}><p className="font-semibold">{checked.isCorrect ? "回答正確" : "回答錯誤"}</p>{!checked.isCorrect && <p className="mt-1 text-sm">正確答案：{checked.answer.join("、")}</p>}{checked.explanation && <p className="mt-2 text-sm leading-6 text-muted">解析：{checked.explanation}</p>}</div>}
+            {checked && <div className={`mt-5 rounded-2xl border p-4 ${checked.isCorrect ? "border-emerald-400/40 bg-emerald-400/10" : "border-rose-400/40 bg-rose-400/10"}`}><p className="font-semibold">{checked.isCorrect ? "回答正確" : "回答錯誤"}</p>{!checked.isCorrect && <p className="mt-1 text-sm">正確答案：<MathContent>{checked.answer.join("、")}</MathContent></p>}{checked.explanation && <p className="mt-2 text-sm leading-6 text-muted">解析：<MathContent>{checked.explanation}</MathContent></p>}</div>}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
             {!checked ? <Button full={false} loading={busy} onClick={() => void checkCurrentAnswer(question)}>檢查答案</Button> : questionIndex < active.questions.length - 1 ? <Button full={false} onClick={() => { setQuestionIndex((index) => index + 1); }}>下一題</Button> : <Button full={false} loading={busy} onClick={() => void submit(active.attemptId, active.quiz.timeLimitSec - remaining)}>交卷並查看成績</Button>}
             <Button variant="ghost" disabled={questionIndex === 0} onClick={() => setQuestionIndex((index) => Math.max(0, index - 1))}>上一題</Button>
             <Button variant="ghost" onClick={() => setActive(null)}>稍後再作答</Button>
           </div>
-          <p className="text-xs text-muted">答案會自動保存；關閉或重新整理後，已作答內容仍可恢復。</p>
+          <p className="text-xs text-muted print:hidden">答案會自動保存；關閉或重新整理後，已作答內容仍可恢復。</p>
+          <div className="hidden print:block"><p className="mt-6 border-t border-black pt-3 text-xs">StudyNova AI 測驗・列印日期：{new Date().toLocaleDateString("zh-TW")}</p></div>
         </div>
       </Card>
     );
@@ -359,28 +362,29 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
                   答對 {review.correct}／{review.total} 題
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={async () => {
-                  const res = await apiPost<{ url: string }>("/shares", { kind: "quiz", title: `我拿到 ${review.score} 分！`, payload: { score: review.score, correct: review.correct, total: review.total } });
+              <div className="flex flex-wrap gap-2 print:hidden">
+                <Button size="sm" variant="outline" onClick={() => window.print()}>列印／另存 PDF</Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                  const res = await apiPost<{ url: string }>('/shares', { kind: 'quiz', title: `我拿到 ${review.score} 分！`, payload: { score: review.score, correct: review.correct, total: review.total } });
                   await navigator.clipboard.writeText(`${window.location.origin}${res.url}`);
                   toast.push("success", "分享連結已複製");
-                }}
-              >
-                分享成績卡
-              </Button>
+                  }}
+                >分享成績卡</Button>
+              </div>
             </div>
             {review.items.map((r, i) => (
               <div key={r.questionId} className={`glass-soft p-3 ${r.isCorrect ? "" : "border border-rose-400/30"}`}>
                 <p className="text-sm font-medium">
-                  {i + 1}. {r.stem}
+                  {i + 1}. <MathContent>{r.stem}</MathContent>
                 </p>
                 <p className="mt-1 text-xs">
                   你的答案：<span className={r.isCorrect ? "text-emerald-300" : "text-rose-300"}>{r.response.join("、") || "（未作答）"}</span>
                 </p>
-                {!r.isCorrect && <p className="text-xs text-emerald-300">正解：{r.answer.join("、")}</p>}
-                {r.explanation && <p className="mt-1 text-xs text-muted">解析：{r.explanation}</p>}
+                {!r.isCorrect && <p className="text-xs text-emerald-300">正解：<MathContent>{r.answer.join("、")}</MathContent></p>}
+                {r.explanation && <p className="mt-1 text-xs text-muted">解析：<MathContent>{r.explanation}</MathContent></p>}
               </div>
             ))}
           </div>
