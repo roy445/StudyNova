@@ -61,7 +61,9 @@ export const routes: RouteDef[] = [
       if (payload.activityId !== ctx.params.id || !body.payload.pathname.startsWith(`exam-prep/${ctx.params.id}/`)) throw fail("PERM_FILE_DENIED", { message: "Blob 上傳範圍驗證失敗。" });
       const token = await issueSignedToken({ pathname: body.payload.pathname, operations: ["put"], token: process.env.BLOB_READ_WRITE_TOKEN, oidcToken: process.env.VERCEL_OIDC_TOKEN, storeId: process.env.BLOB_STORE_ID, allowedContentTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp", "text/plain", "text/markdown", "application/json"], maximumSizeInBytes: 500 * 1024 * 1024 });
       const presigned = await presignUrl(token, { operation: "put", pathname: body.payload.pathname, access: "private", addRandomSuffix: true });
-      return { type: body.type, presignedUrlPayload: presigned };
+      // uploadPresigned() reads this response directly and does not understand
+      // StudyNova's normal { ok, data } API envelope.
+      return Response.json({ type: body.type, presignedUrlPayload: presigned });
     },
   }),
   route({
