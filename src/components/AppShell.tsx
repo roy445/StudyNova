@@ -479,9 +479,9 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
             <button onClick={() => setSearchOpen(true)} aria-label="搜尋" className="focus-ring rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
               <SymbolIcon name="search" size={18} />
             </button>
-            <button onClick={() => setUsageGuideOpen(true)} aria-label="開啟目前功能教學" className="focus-ring rounded-xl border border-[#37d3ff]/30 px-2.5 py-2 text-xs text-[#b9f2ff] hover:bg-[#37d3ff]/10">
-              教學
-            </button>
+            <Link href="/features" aria-label="開啟功能總攬" className="focus-ring rounded-xl border border-[#37d3ff]/30 px-2.5 py-2 text-xs text-[#b9f2ff] hover:bg-[#37d3ff]/10">
+              功能總攬
+            </Link>
             <Link href="/profile?tab=nova" className="focus-ring hidden items-center gap-1 rounded-xl border border-[#ffc857]/30 px-2.5 py-2 text-xs text-[#ffd98a] sm:flex">
               <SymbolIcon name="nova" size={15} /> {nova}
             </Link>
