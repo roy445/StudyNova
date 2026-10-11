@@ -33,7 +33,7 @@ const NAV: NavItem[] = [
   { href: "/study", label: "學習", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/pk", label: "線上 PK", icon: "duel", special: true },
-  { href: "/weekly", label: "小考", icon: "weekly" },
+  { href: "/weekly", label: "測驗與刷題", icon: "weekly" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
 
@@ -41,7 +41,7 @@ const PAGE_PROMPTS: Record<string, string> = {
   "/dashboard": "首頁提供學習紀錄、錯題、單字與公告；請從學習中心選擇要使用的功能。",
   "/learning": "可以先選擇科目，再開啟線上課程、教材、錯題或單字功能。",
   "/study": "可以選擇錯題、單字或專注工具；需要解釋時直接輸入問題。",
-  "/weekly": "這裡可以查看每週小考、單字與解析；要不要先看看本週重點？",
+  "/weekly": "這裡可以查看測驗、刷題、單字與解析；要不要先看看本週重點？",
   "/challenge": "挑戰功能會顯示可參加的題目與對戰規則。",
   "/online-pk": "線上 PK 的答案、計時與分數由伺服器驗證。",
   "/grades": "我可以幫你看成績趨勢，找出下一個最值得補強的科目。",
@@ -68,7 +68,7 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/pk", label: "線上 PK", icon: "duel" },
-  { href: "/weekly", label: "每週小考", icon: "weekly" },
+  { href: "/weekly", label: "測驗與刷題", icon: "weekly" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
   const FEATURE_BY_PATH: Record<string, string> = { "/learning": "learning", "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
@@ -81,7 +81,7 @@ const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   export: { title: "資料匯出使用提醒", text: "只會匯出你的資料。請先查看樣本預覽，正式下載前會兩次確認並扣除對應 Nova。" },
   essay: { title: "作文批改使用提醒", text: "AI 建議僅供學習參考，請自行檢查文意、引用與老師要求後再提交。" },
   study: { title: "學習中心使用提醒", text: "複習與專注紀錄可依你的節奏調整；儲存前請確認日期、範圍與內容。" },
-  weekly: { title: "每週小考使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
+  weekly: { title: "測驗與刷題使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
   challenge: { title: "挑戰功能使用提醒", text: "請確認挑戰對象、題目與截止時間；不要分享帳號、密碼或個人敏感資料。" },
   "online-pk": { title: "線上 PK 使用提醒", text: "每題答案、計時與分數都由伺服器驗證；斷線可在短時間內重連，請不要分享私人房間密碼。" },
   grades: { title: "成績分析使用提醒", text: "分析結果是學習參考，不代表正式校務成績；請確認輸入資料正確。" },
@@ -422,7 +422,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           <Wordmark size={42} />
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
-          {(examPrep.data?.activities.length ? [...SIDE_NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
+          {(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [...SIDE_NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
             return (
@@ -571,7 +571,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       {/* Mobile bottom nav */}
       <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
-          {(examPrep.data?.activities.length ? [...NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities[0]?.closeAt }] : NAV).map((item) => {
+          {(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [...NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities.find((activity) => activity.effectiveStatus === "open")?.closeAt }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);

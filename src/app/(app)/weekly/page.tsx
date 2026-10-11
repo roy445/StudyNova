@@ -131,8 +131,8 @@ export default function WeeklyPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-xl font-bold sm:text-2xl">▦ 每週小考</h1>
-        <p className="text-xs text-muted sm:text-sm">管理員上傳的本週單字、句子、考卷與答案，經人工確認後才會發布給你。</p>
+        <h1 className="text-xl font-bold sm:text-2xl">▦ 測驗與刷題</h1>
+        <p className="text-xs text-muted sm:text-sm">這裡整合每週測驗、考卷刷題、單字複習與解析；內容經人工確認後才會發布給你。</p>
       </header>
 
       {list.loading && <Card><Skeleton lines={3} /></Card>}

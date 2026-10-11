@@ -4,10 +4,10 @@ import { createHash } from "node:crypto";
 import { head, issueSignedToken } from "@vercel/blob";
 import { handleUploadPresigned, type HandleUploadPresignedBody } from "@vercel/blob/client";
 import { db } from "@/db";
-import { examPrepActivities, examPrepImportJobs, examPrepQuestionDrafts, questionBankMemberships, questionBanks, questionSources, questionVersions, questions } from "@/db/schema";
+import { examPrepActivities, examPrepImportAssets, examPrepImportJobs, examPrepImportPages, examPrepQuestionDrafts, questionBankMemberships, questionBanks, questionSources, questionVersions, questions } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
-import { createPresignedUpload, objectOwner, putObject, registerBlobObject, signObjectUrl, verifyPresignedUpload } from "../storage";
+import { createPresignedUpload, deleteObject, objectOwner, putObject, registerBlobObject, signObjectUrl, verifyPresignedUpload } from "../storage";
 import { queue } from "../queue";
 import { checksum, listExamPrepImportDetails } from "../exam-prep-import";
 
@@ -206,6 +206,22 @@ export const routes: RouteDef[] = [
       await queue().enqueue({ name: "exam_prep_import", payload: { jobId: job.id }, uniqueKey: `exam-prep-import:${job.id}:retry:${Date.now()}` });
       void queue().drain(1);
       return { queued: true, jobId: job.id };
+    },
+  }),
+  route({
+    method: "DELETE",
+    path: "/admin/exam-prep/imports/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const job = (await db.select().from(examPrepImportJobs).where(eq(examPrepImportJobs.id, ctx.params.id)).limit(1))[0];
+      if (!job) throw notFound("找不到段考考卷匯入工作");
+      const pages = await db.select({ objectId: examPrepImportPages.objectId }).from(examPrepImportPages).where(eq(examPrepImportPages.jobId, job.id));
+      const assets = await db.select({ objectId: examPrepImportAssets.objectId }).from(examPrepImportAssets).where(eq(examPrepImportAssets.jobId, job.id));
+      const objectIds = Array.from(new Set([job.objectId, ...pages.map((row) => row.objectId), ...assets.map((row) => row.objectId)].filter((id): id is string => Boolean(id))));
+      await db.delete(examPrepImportJobs).where(eq(examPrepImportJobs.id, job.id));
+      await Promise.all(objectIds.map((objectId) => deleteObject(objectId, admin.userId, true).catch(() => undefined)));
+      return { deleted: true, jobId: job.id };
     },
   }),
   route({

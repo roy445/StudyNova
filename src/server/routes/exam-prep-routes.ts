@@ -94,7 +94,7 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const settings = (await db.select({ schoolLevel: userSettings.schoolLevel, grade: userSettings.grade }).from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
-      const rows = await db.select().from(examPrepActivities).where(and(or(eq(examPrepActivities.status, "scheduled"), eq(examPrepActivities.status, "open"), eq(examPrepActivities.status, "closed")), settings?.schoolLevel ? eq(examPrepActivities.educationLevel, settings.schoolLevel) : undefined, settings?.grade ? eq(examPrepActivities.grade, settings.grade) : undefined)).orderBy(desc(examPrepActivities.openAt), desc(examPrepActivities.createdAt));
+      const rows = await db.select().from(examPrepActivities).where(and(or(eq(examPrepActivities.status, "scheduled"), eq(examPrepActivities.status, "open")), settings?.schoolLevel ? eq(examPrepActivities.educationLevel, settings.schoolLevel) : undefined, settings?.grade ? eq(examPrepActivities.grade, settings.grade) : undefined)).orderBy(desc(examPrepActivities.openAt), desc(examPrepActivities.createdAt));
       const now = new Date();
       const subjects = rows.length ? await db.select().from(examPrepSubjects).where(or(...rows.map((row) => eq(examPrepSubjects.activityId, row.id)))).orderBy(asc(examPrepSubjects.subject)) : [];
       const subjectMap = new Map<string, typeof subjects>();

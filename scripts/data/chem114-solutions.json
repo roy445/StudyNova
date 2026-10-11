@@ -1,0 +1,2478 @@
+{
+  "source": "114-1-1高中化學.pdf",
+  "pages": [
+    {
+      "page_type": "question",
+      "page_summary": "高雄市立鼓山高中 114 學年度第一學期第一次段考高一化學科第1頁選擇題部分。頁首為試卷說明與填寫欄位。題目為單一選擇題第1至第7題（本頁顯示至第7題），包含圖示、粒子圖、溫度-加熱時間關係圖、多種實驗裝置示意圖與計算題。題幹、選項與化學式大致清晰；個別小字處略有模糊但不影響題意判讀。頁面無答案或詳解。confidence: 0.85。",
+      "questions": [
+        {
+          "number": 1,
+          "question_type": "single",
+          "stem": "加熱物質 X，其溫度變化與加熱時間的關係如附圖。下列 a~e 為 5 種物質的組成粒子之示意圖，則 X 可能是：\n(圖為五個盒中粒子示意 a,b,c,d,e 與右側溫度-加熱時間曲線，曲線顯示加熱時由固→液→氣，液相有平台後再上升並最後氣相溫度最高且上升幅度大)\n請選出可能為 X 的示意圖。",
+          "options": [
+            "A. a",
+            "B. b",
+            "C. c",
+            "D. d",
+            "E. e"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            "五個盒子 a-e：a 為少數雙原子分子與單原子顆粒混合；b 為許多相同密集小黑球；c 為黑白成對分子(像水)與孤立白球；d 為雙原子分子分布；e 為三原子或多原子團聚(三聚)分子圖。",
+            "右側溫度-時間曲線：固態溫度上升後有固⇨熔化平台再上升到液態，接著有沸騰平台後上升到氣態"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "number": 2,
+          "question_type": "single",
+          "stem": "許多人喜歡在夏天到海邊戲水，也會在沙灘玩沙。試問在臺灣沿海的沙灘隨意抓取的一把砂是屬於下列哪一類的物質？",
+          "options": [
+            "A. 元素",
+            "B. 純物質",
+            "C. 化合物",
+            "D. 混合物",
+            "E. 聚合物"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            ""
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 3,
+          "question_type": "single",
+          "stem": "下列操作法之配對，何者正確？（圖甲、圖乙、圖丙 三張實驗裝置示意圖）\n圖甲為裝有過濾漏斗與濾紙的裝置置放於燒杯上（疑為萃取或過濾示意）；圖乙為直立量筒或氣體收集柱；圖丙為回流或蒸餾裝置（有燒瓶、冷凝管、接收燒瓶）。\n選項列出甲、乙、丙 分別對應「萃取、層析、蒸餾」等操作，請選出正確配對。",
+          "options": [
+            "A. 圖甲—萃取、圖乙—層析、圖丙—蒸餾",
+            "B. 圖甲—層析、圖乙—萃取、圖丙—蒸餾",
+            "C. 圖甲—萃取、圖乙—蒸餾、圖丙—層析",
+            "D. 圖甲—層析、圖乙—蒸餾、圖丙—萃取",
+            "E. 圖甲—蒸餾、圖乙—萃取、圖丙—層析"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            "圖甲：漏斗、濾紙、燒杯（過濾裝置）",
+            "圖乙：直立量筒或收集管（量取體積或收集氣體）",
+            "圖丙：燒瓶加熱、冷凝管與接收瓶（蒸餾裝置）"
+          ],
+          "confidence": 0.75
+        },
+        {
+          "number": 4,
+          "question_type": "single",
+          "stem": "試求 0.46 克二氧化氮中，含有多少莫耳的二氧化氮分子？其中氧原子個數有幾個？(N = 14，O = 16，Avogadro 常數 N_A = 6.02 × 10^23)",
+          "options": [
+            "A. 0.10 mol，6.02 × 10^22",
+            "B. 0.01 mol，1.204 × 10^22",
+            "C. 0.01 mol，6.02 × 10^21",
+            "D. 0.02 mol，1.204 × 10^22",
+            "E. 0.02 mol，6.02 × 10^21"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            ""
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 5,
+          "question_type": "single",
+          "stem": "下列有關原子的敘述，何者正確？",
+          "options": [
+            "A. 原子大部分的質量集中在原子核",
+            "B. 原子核占據原子中大部分的體積",
+            "C. 原子因質子數與中子數相等，呈現電中性",
+            "D. 原子中一個質子的電量為 9.1 × 10^-31 庫侖",
+            "E. 原子核的直徑約為 10^-10 公尺"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            ""
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 6,
+          "question_type": "single",
+          "stem": "甲、乙兩容器中分別盛入同溫、同壓下之 CO2(g) 與 CH4(g)，已知兩容器中原子總數相等，則甲、乙兩容器體積的比為何？選項給出比值 1:1、5:3、3:5、55:16、16:55。",
+          "options": [
+            "A. 1 : 1",
+            "B. 5 : 3",
+            "C. 3 : 5",
+            "D. 55 : 16",
+            "E. 16 : 55"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            ""
+          ],
+          "confidence": 0.85
+        },
+        {
+          "number": 7,
+          "question_type": "single",
+          "stem": "某生進行氫氣燃燒生成水蒸氣的實驗，其反應式如下：2 H2(g) + O2(g) → 2 H2O(g)。若其欲得到 15 升之水蒸氣，試問需耗去幾升的氫氣與氧氣共若干升？（選項為 15、20、22.5、25.5、50）",
+          "options": [
+            "A. 15",
+            "B. 20",
+            "C. 22.5",
+            "D. 25.5",
+            "E. 50"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            ""
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "answer_key": [
+        {
+          "number": 1,
+          "answer": [
+            ""
+          ],
+          "explanation": ""
+        },
+        {
+          "number": 2,
+          "answer": [
+            ""
+          ],
+          "explanation": ""
+        },
+        {
+          "number": 3,
+          "answer": [
+            ""
+          ],
+          "explanation": ""
+        },
+        {
+          "number": 4,
+          "answer": [
+            ""
+          ],
+          "explanation": ""
+        },
+        {
+          "number": 5,
+          "answer": [
+            ""
+          ],
+          "explanation": ""
+        },
+        {
+          "number": 6,
+          "answer": [
+            ""
+          ],
+          "explanation": ""
+        },
+        {
+          "number": 7,
+          "answer": [
+            ""
+          ],
+          "explanation": ""
+        }
+      ],
+      "assets": [
+        {
+          "question_number": 1,
+          "kind": "figure",
+          "description": "五個粒子示意圖 a-e（盒內不同排列與組成）與右側溫度對時間曲線（固→液→氣，有相變平台）。"
+        },
+        {
+          "question_number": 3,
+          "kind": "diagram",
+          "description": "圖甲：漏斗與濾紙置於燒杯之上（過濾）；圖乙：直立量筒或收集柱；圖丙：燒瓶加熱並連接冷凝管與接收燒瓶（蒸餾）。"
+        },
+        {
+          "question_number": 4,
+          "kind": "formula",
+          "description": "化學式：NO2；給定原子量 N=14, O=16，Avogadro 常數 6.02 × 10^23"
+        },
+        {
+          "question_number": 7,
+          "kind": "formula",
+          "description": "反應式：2 H2(g) + O2(g) → 2 H2O(g)；涉及氣體體積比例計算"
+        }
+      ],
+      "page": 1
+    },
+    {
+      "page_type": "question",
+      "page_summary": "本頁為高中化學選擇題試卷第2頁（題號8至15），包含相圖（壓力 vs 溫度）及多項選擇題與一題表格題。題目以繁體中文呈現，化學式與上下標已以 Unicode 表示。圖中相圖有固態、液態、氣態分界線，三相點位於約壓力1.0 atm、溫度約-40°C，臨界或另一參考點在100°C 處有虛線標示。題目8至9與該相圖相關；題10至14為概念題（分離方法、原子與週期表、電子數、電子質量等）；題15為四種原子電子排列表與質量數表，詢問哪項敘述錯誤。頁面並未包含答案或詳解。若有任何文字不清楚則未做猜測，整體辨識信心中等。注意：部分小字或符號可能微弱不清晰，confidence 在個別題目中標示。",
+      "questions": [
+        {
+          "number": 8,
+          "question_type": "multiple",
+          "stem": "題組(8-9)某物質的相圖如附圖。8. 有關此物質的熔點的敘述，何者正確？",
+          "options": [
+            "A. 隨壓力的增大而降低",
+            "B. 在任何壓力下皆為 −40°C",
+            "C. 在任何壓力下皆為 100°C",
+            "D. 不隨壓力而改變",
+            "E. 隨壓力增大而增高"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "相圖：縱軸為壓力 (atm) 標示 0.2、0.6、1.0、1.4；橫軸為溫度 (°C) 標示 -40 與 100。相界分為固態、液態、氣態，三相點附近在約 1.0 atm 與 -40°C，液相與固相分界線在三相點左側有斜率，使固-液線在壓力增大時熔點降低（表示固相密度大於液相或相反，具體見圖）。"
+          ],
+          "confidence": 0.75
+        },
+        {
+          "number": 9,
+          "question_type": "single",
+          "stem": "9. 0.6 atm 下，將此固態物質加熱，則其將：",
+          "options": [
+            "A. 在 −40°C 以下熔化",
+            "B. 在 −40°C 昇華",
+            "C. 在 −40°C 熔化",
+            "D. 在低於 −40°C 昇華",
+            "E. 在 −40°C 汽化"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "同上相圖，0.6 atm 對應於縱軸在三相點下方；加熱路徑由固態開始往高溫，會先穿過固-氣界線或固-液界線（需依圖判斷，圖示固-氣線在左下方，於0.6 atm 下加熱固體應先升華或熔化，具體見相圖）。"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "number": 10,
+          "question_type": "multiple",
+          "stem": "10. 下列關於物質分離方法的敘述，何項正確？",
+          "options": [
+            "A. 用過濾法分離物質是利用物質的顆粒大小不同",
+            "B. 石油分餾是利用不同成分間的化學性質差異",
+            "C. 化合物經過適當的物理方法可分解出其成分元素",
+            "D. 混合物只能經過適當的物理方法分解出其成分物質",
+            "E. 溶析是利用成分物質溶解度不同而分離"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.85
+        },
+        {
+          "number": 11,
+          "question_type": "multiple",
+          "stem": "11. 下列有關元素與週期表的敘述，何者正確？",
+          "options": [
+            "A. 兩個水分子 1H–17O–1H 與 1H–16O–2H，所含有中子數的總和相同",
+            "B. Na、Mg、Al 三種金屬元素中，Al 的原子半徑最大",
+            "C. 室溫時，VIIA 族（或第17族）元素皆為氣體",
+            "D. 週期表左下方元素，較不易失去電子",
+            "E. 鈹 (Be) 為類金屬元素"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.8
+        },
+        {
+          "number": 12,
+          "question_type": "multiple",
+          "stem": "12. 下列敘述何者不是道爾頓所提出原子說的內容？",
+          "options": [
+            "A. 一切物質都是由原子所構成",
+            "B. 化學反應是原子重新排列組合，形成新的分子",
+            "C. 相同原子具有相同質量與性質",
+            "D. 不同原子可用整數個互相結合而形成各種物質",
+            "E. 原子說是主要是根據當時所做的實驗所提出的理論"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 13,
+          "question_type": "single",
+          "stem": "13. 已知某原子內含有 17 個電子，則此原子的價電子（最外層電子）應位於下列哪一個電子殼層？",
+          "options": [
+            "A. K 層",
+            "B. L 層",
+            "C. M 層",
+            "D. N 層",
+            "E. O 層"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 14,
+          "question_type": "multiple",
+          "stem": "14. 下列有關電子的敘述，何者有誤？",
+          "options": [
+            "A. 質量電子之電量為 96500 庫倫 (註：此選項文字可能有誤，原題應為阿伏加德羅常數或電子電荷等)",
+            "B. 每個電子帶 −1 電荷",
+            "C. 電子在原子核外從 n = 0 殼層開始，依序向外排列",
+            "D. 電子質量約為質子質量的 1/1840 倍",
+            "E. 由湯姆森發現"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.6
+        },
+        {
+          "number": 15,
+          "question_type": "multiple",
+          "stem": "15. 甲、乙、丙、丁四種原子，其電子排列及質量數如表所示，則有關此四種原子的敘述何者錯誤？ 表格內容：甲: 電子排列 2；質量數 4。乙: 電子排列 2,2；質量數 9。丙: 電子排列 2,8,2；質量數 24。丁: 電子排列 2,8,8,2；質量數 40。",
+          "options": [
+            "A. 甲、乙、丙、丁四原子均含偶數個中子",
+            "B. 甲、乙、丙、丁四原子的價電子數相同",
+            "C. 甲、乙、丙、丁四原子均屬於主族元素",
+            "D. 乙^{2+}、丙^{2+}、丁^{2+} 與惰性氣體的電子數目相同",
+            "E. 乙、丙、丁屬於同族元素"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "表格：四種原子電子排列表與質量數，詳見題幹描述"
+          ],
+          "confidence": 0.85
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 8,
+          "kind": "figure",
+          "description": "相圖（壓力 vs 溫度）：縱軸壓力 (atm) 標示 0.2、0.6、1.0、1.4；橫軸溫度 (°C) 標示 -40 與 100。三相點位於約 1.0 atm 與 -40°C。固-液邊界在圖中顯示隨壓力變化，趨勢使熔點隨壓力增加而降低。"
+        },
+        {
+          "question_number": 15,
+          "kind": "table",
+          "description": "表：甲(電子排2, 質量數4)、乙(2,2, 質量數9)、丙(2,8,2, 質量數24)、丁(2,8,8,2, 質量數40)。"
+        }
+      ],
+      "page": 2
+    },
+    {
+      "page_type": "question",
+      "page_summary": "本頁為高中化學選擇題題庫第3頁，包含第16題至第24題（第16–20題為單選題，第21–24題為多重選擇或單選）。頁面有元素週期表示意圖（題17）、蒸餾實驗裝置圖（題19）及原子電子排列表圖（題24）。影像清晰度良好，少數文字邊緣較淡但可辨識，無答案或詳解頁內容。所有題目、選項及圖示皆已擷取；若有不確定處在各題的 confidence 欄標示為較低。注意：化學式與上下標已以 Unicode 表示（例如 O2、H2O）。",
+      "questions": [
+        {
+          "number": 16,
+          "question_type": "single",
+          "stem": "下列有關純物質與混合物的敘述，何者正確？",
+          "options": [
+            "A. 純物質只含一種原子",
+            "B. 定壓下，混合物的熔點為定值",
+            "C. 定壓下，化合物的沸點為定值",
+            "D. 化合物可經由物理變化分解為元素",
+            "E. 混合物中各成分的比例固定"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 17,
+          "question_type": "single",
+          "stem": "附圖是按元素特性而區分的週期表（圖中區域標示甲、乙、丙、丁、戊、己等區域）。類金屬元素因性質介於金屬與非金屬之間，故可作為半導體電子材料，這些元素在週期表中都分布在何處？",
+          "options": [
+            "A. 乙丙區域之間",
+            "B. 丙丁區域之間",
+            "C. 丁戊區域之間",
+            "D. 戊己區域之間",
+            "E. 丙區域內"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "週期表示意圖：左端縱列為甲(1A)、乙大區塊；中間長橫列為丙、丁區；右側有階梯狀表示丁到戊區，最右為己區。區域標示如圖。"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 18,
+          "question_type": "single",
+          "stem": "同溫、同壓下，10 mL 的 X2 氣體與 20 mL 的 Y2 氣體反應生成 20 mL 氣體化合物，則該化合物的分子式為：",
+          "options": [
+            "A. XY",
+            "B. X2Y",
+            "C. XY2",
+            "D. X2Y4",
+            "E. X2Y5"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 19,
+          "question_type": "single",
+          "stem": "附圖為實驗室常用的蒸餾裝置，試問下列有關蒸餾法的敘述何者錯誤？",
+          "options": [
+            "A. 蒸餾法之原理是利用物質沸點不同而達分離效果",
+            "B. 蒸餾 58 度高梁酒時，錐形瓶甲收集到者為水",
+            "C. 冷凝水需由 A 口進入而自 B 口流出",
+            "D. 蒸餾瓶乙中放置沸石之目的為防止突沸",
+            "E. 溫度計之探頭應在支管附近，以控制蒸餾溫度"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "蒸餾裝置圖：左邊為加熱的蒸餾瓶（標為乙），上方連溫度計及側向導出管，冷凝管傾斜至右下收集口（標為甲）；冷卻水進口標為 A，出水口標為 B。"
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 20,
+          "question_type": "single",
+          "stem": "下表為元素週期表的一部分，甲至戊表示元素符號，其中甲的原子序為 13。試問表中，哪一個元素的原子半徑最大？（選項：甲、乙、丙、丁、戊）",
+          "options": [
+            "A. 甲",
+            "B. 乙",
+            "C. 丙",
+            "D. 丁",
+            "E. 戊"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "小表：一列顯示甲、乙於上層，丙、丁、戊在下層（排列如圖），甲原子序為13（即 Al）。"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 21,
+          "question_type": "multiple",
+          "stem": "下列有關濾紙層析分析法的敘述，哪些正確？（多選）",
+          "options": [
+            "A. 此法利用物質密度的不同來分離物質的方法",
+            "B. 物質與溶劑間作用力愈大的物質，在濾紙中展開的距離愈遠",
+            "C. 利用濾紙層析可分析出植物色素的成分",
+            "D. 濾紙分層分析法需在空氣中進行",
+            "E. 濾紙作用力為氫鍵或范德瓦力等弱作用力"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 22,
+          "question_type": "multiple",
+          "stem": "拉瓦節創立氧化說以解釋燃燒等實驗現象，被後世稱為「近代化學之父」。有關質量守恆定律的敘述，哪些正確？（多選）",
+          "options": [
+            "A. 燃燒的本質是物質與氧氣發生反應",
+            "B. 反應前、後，物質總質量不變",
+            "C. 反應物消耗的總分子數等於生成物生成的總分子數",
+            "D. 反應物消耗的總質量等於生成物生成的總質量",
+            "E. 反應物的總質量等於生成物的總質量"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 23,
+          "question_type": "multiple",
+          "stem": "給定下列物質：石墨、鹽酸、汽油、空氣、硫酸銅晶體、乾冰、排骨湯、乙醇、不鏽鋼。則有關物質分類的敘述，哪些正確？",
+          "options": [
+            "A. 純物質共有 4 種",
+            "B. 混合物共有 5 種",
+            "C. 化合物共有 2 種",
+            "D. 均勻混合物共 4 種",
+            "E. 不均勻混合物僅 1 種"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 24,
+          "question_type": "multiple",
+          "stem": "下列基態原子的電子排列方式，哪些正確？（選圖表示電子層次與電子數）",
+          "options": [
+            "A. 2He （示意圖）",
+            "B. 5B （示意圖）",
+            "C. 8O （示意圖）",
+            "D. 12Mg（示意圖）",
+            "E. 17Cl（示意圖）"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "五個示意電子殼層圖（如同原卷底部），分別標為 He、B、O、Mg、Cl 的電子排布圖。"
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 17,
+          "kind": "table",
+          "description": "題17 的區域化示意週期表圖，標示甲、乙、丙、丁、戊、己等區域及原子序標號，用以判斷類金屬所在區域。"
+        },
+        {
+          "question_number": 19,
+          "kind": "diagram",
+          "description": "蒸餾實驗裝置圖：蒸餾瓶（乙）、冷凝管、溫度計、收集瓶（甲），冷凝水進口 A 與出口 B 標示清楚。"
+        },
+        {
+          "question_number": 20,
+          "kind": "table",
+          "description": "題20 的小元素表格（甲至戊），甲的原子序為13（Al）作為判斷原子半徑的參考。"
+        },
+        {
+          "question_number": 24,
+          "kind": "figure",
+          "description": "五個基態原子電子排布示意圖（同心圓表示電子層，每層點數不同）。"
+        }
+      ],
+      "page": 3
+    },
+    {
+      "page_type": "question",
+      "page_summary": "高雄市立鼓山高中 114 學年度第一學期第一次段考高一化學科考卷第4頁掃描。頁面包含選擇題及問答題第一章範圍，題號從二、問答題開始（共4大題，佔30分）。內容包括：題1：已知等重的下列氣體 a~e：(H=1、C=12、N=14、O=16、F=19) a) F2 b) N2O c) NO2 d) C3H8 e) CO2，三個小問求分子量最大、哪些分子數相同、哪種氣體所含原子數最多。題2：試計算下列物質的克數（給出原子量 H=1、N=14、O=16、Na=23、Cl=35.5、Ag=108），三小題分別為 (1) 2 莫耳 NaCl (2) 0.5 莫耳 HNO3 (3) 6.02×10^22 個 Ag 原子。題3：附表列出 a~r 九種元素在週期表中的位置（表格含主族 1A~8A 與週期二~四，格內有 a~r 位置），接著多個小問： (1) 寫出 b~r 八種元素符號 (2) a、b、c 三種元素按原子半徑由大到小排序 (3) a、c、d 三種元素的氧化物溶於水後酸性最強者 (4) f 元素最常見氯化物的化學式。題4：將下列各實驗及貢獻與科學家相互配合（以代號 A~I 作答），列出多個敘述需配對；敘述包括測元素 X 對射線波長建立原子序概念、利用陰極射線管實驗發現電子之存在、同溫同壓同體積氣體具有相同分子數、以 α 粒子散射實驗結果建立核原子模型等。頁面含一張週期表位置表格影像區域與多處空格以供作答。掃描品質良好，字跡與化學式清晰可辨。此頁為試題頁，無答案或詳解。",
+      "questions": [
+        {
+          "number": 1,
+          "question_type": "multiple",
+          "stem": "已知等重的下列氣體 a～e：(H=1、C=12、N=14、O=16、F=19)\n① a F2  ② b N2O  ③ c NO2  ④ d C3H8  ⑤ e CO2 （皆以代號作答，每格兩分）\n(1) 哪一種氣體的分子量最大？\n(2) 哪些氣體的分子數相同？\n(3) 哪一種氣體所含的原子數最多？",
+          "options": [
+            "A. a、b、c、d、e（選項非單一，請以代號回答）"
+          ],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            "無特殊圖像，題目文字列於頁面上方中間"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 2,
+          "question_type": "short",
+          "stem": "試計算下列物質的克數：（原子量：H=1、N=14、O=16、Na=23、Cl=35.5、Ag=108）每小題2分\n(1) 2 莫耳 NaCl\n(2) 0.5 莫耳 HNO3\n(3) 6.02×10^22 個 Ag 原子",
+          "options": [],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            "每小題下有空白作答欄位"
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 3,
+          "question_type": "multiple",
+          "stem": "附表列出了 a~r 九種元素在週期表中的位置，請據此回答下列各小題。（以元素符號或化學式回答）\n(1) 寫出 b~r 八種元素符號。\n(2) a、b、c 三種元素按原子半徑由大到小依序排列。\n(3) a、c、d 三種元素的氧化物溶於水後酸性最強者。\n(4) f 元素最常見氯化物的化學式。（以元素符號表示）",
+          "options": [],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            "包含一張週期表小格，列出週期二~四與主族 1A~8A，格內標示 a、b、c、d、e、f、g、h、r 等位置"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "number": 4,
+          "question_type": "multiple",
+          "stem": "試將下列各實驗及貢獻與科學家相互配合。（請以代號 A、B、C……作答）\n代號： (A) 道耳頓 (B) 莫斯利 (C) 湯姆森 (D) 查克克 (E) 門得列夫 (F) 拉塞福 (G) 拉瓦節 (H) 密立坎 (I) 汪佛加斯（或掃描原卷代號依序列出）\n(1) 測各元素 X 對射線波長建立原子序概念。\n(2) 利用陰極射線管實驗發現電子之存在。\n(3) 同溫同壓同體積的氣體具有相同的分子數。\n(4) 以 α 粒子散射實驗結果建立核原子模型。",
+          "options": [],
+          "answer": [
+            ""
+          ],
+          "explanation": "",
+          "image_regions": [
+            "此題下方有多個敘述與空格供填入科學家代號"
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 1,
+          "kind": "formula",
+          "description": "列出氣體化學式：F2、N2O、NO2、C3H8、CO2；原子量提示 H=1、C=12、N=14、O=16、F=19"
+        },
+        {
+          "question_number": 2,
+          "kind": "formula",
+          "description": "計算用化學式與原子量：NaCl、HNO3、Ag；原子量 H=1、N=14、O=16、Na=23、Cl=35.5、Ag=108"
+        },
+        {
+          "question_number": 3,
+          "kind": "diagram",
+          "description": "週期表位置表格：主族 1A~8A、週期二~四，格內標示 a、b、c、d、e、f、g、h、r 等"
+        },
+        {
+          "question_number": 4,
+          "kind": "table",
+          "description": "科學家與實驗配對題目區塊，列出多項敘述與空格"
+        }
+      ],
+      "page": 4
+    },
+    {
+      "page_type": "question",
+      "page_summary": "高雄市立鼓山高級中學 114 學年度第一學期高二自然組化學科第一次段考試卷第 1 頁（為第5頁掃描影像），包含單選題第1題至第15題題幹與各選項。題目為中文繁體，含多個化學式、反應式及上下標，如 NH4NO2、SiO2+3C → SiC+2CO、Ag+H2S+O2 → Ag2S+H2O、C6H12O6 等。頁面為試題題幹頁，未包含答案或詳解。影像整體清晰，少數字元（如選項括號序號）可能因掃描導致細節模糊但可辨識主要內容。以下擷取所有題目（1–15），包含題號、題幹、選項、空的答案與說明頁無詳解，並標示每題信心水準（多數高，但若有不確定處標註較低）。",
+      "questions": [
+        {
+          "number": 1,
+          "question_type": "single",
+          "stem": "亞硝酸銨是亞硝酸的銨鹽，化學式為 NH4NO2。它被用作滅鼠劑、殺微生物劑和農業上的殺蟲劑，對人和水生生物都有很強的毒性。NH4NO2 中，前一個氮原子與後一個氮原子的氧化數分別為何？",
+          "options": [
+            "A. 0、0",
+            "B. −3、+3",
+            "C. +3、−3",
+            "D. −2、+2",
+            "E. +2、−2"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "題目文字及化學式：NH4NO2"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 2,
+          "question_type": "single",
+          "stem": "下列對氧化數的敘述，何者正確？",
+          "options": [
+            "A. 鈉的最高氧化數均為 +7",
+            "B. KH、H2O2 的 H 氧化數相同",
+            "C. Pb3O4 中 Pb 之氧化數為分數，因 Pb 在此化合物中有三種氧化數",
+            "D. OF2 的氟的氧化數為 +1",
+            "E. 氧化數可以代表離子的電荷"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "題目文字"
+          ],
+          "confidence": 0.6
+        },
+        {
+          "number": 3,
+          "question_type": "single",
+          "stem": "高溫下，反應式 SiO2 + 3 C → SiC + 2 CO 中，氧化劑和還原劑的質量比為何？（原子量：C=12，O=16，Si=28）",
+          "options": [
+            "A. 1 : 3",
+            "B. 5 : 3",
+            "C. 1 : 2",
+            "D. 2 : 1",
+            "E. 3 : 1"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式 SiO2 + 3 C → SiC + 2 CO"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "number": 4,
+          "question_type": "single",
+          "stem": "N2H4（肼或聯胺）及 N2O4 可作火箭推進劑，其反應生成氮及水。有關上述反應，何者錯誤？",
+          "options": [
+            "A. N2O4 中氮進行還原反應",
+            "B. N2O4 中的氧沒有參與氧化還原反應",
+            "C. N2H4 中氮的氧化數為 +2",
+            "D. N2H4 中氮進行氧化反應",
+            "E. N2H4 中的氫沒有參與氧化還原"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "分子式 N2H4、N2O4 與描述"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "number": 5,
+          "question_type": "single",
+          "stem": "銀器在硫化氫存在的空氣中，會發生下列反應，而形成硫化銀：Ag + H2S + O2 → Ag2S + H2O（未平衡）。今取銀、硫化氫、氧各 0.1 mol，其單則何者為限量試劑？（原子量：Ag=108，S=32）",
+          "options": [
+            "A. Ag",
+            "B. H2S",
+            "C. O2",
+            "D. Ag2S"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式 Ag + H2S + O2 → Ag2S + H2O；給定 mol 數 0.1 mol"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "number": 6,
+          "question_type": "single",
+          "stem": "含有惰性雜質的碳酸鈣（CaCO3）試樣重為 4.00 g。以高溫加熱此試樣，生成 CaO 和 CO2，收集得 CO2 重 0.88 g，試問此試樣所含碳酸鈣的重量百分率為何？（CaCO3=100）",
+          "options": [
+            "A. 75%",
+            "B. 50%",
+            "C. 25%",
+            "D. 12.5%",
+            "E. 6.25%"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "資料：試樣重 4.00 g、CO2 得 0.88 g"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 7,
+          "question_type": "single",
+          "stem": "近年來，大家中 CO2 的濃度上升已成為全球性問題，因而興起節能減碳運動。國內的環保團體也宣導「中秋節不烤肉」。假設某市賣的烤肉用木炭，其含碳量為 90%，則一包 10 公斤木炭完全燃燒後，會產生幾公斤 CO2？",
+          "options": [
+            "A. 44",
+            "B. 33",
+            "C. 22",
+            "D. 11",
+            "E. 8"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "敘述木炭含碳量 90%，包重 10 kg，求生成 CO2 質量"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "number": 8,
+          "question_type": "single",
+          "stem": "甲烷 CH4 與乙炔 C2H6 的混合氣體共 10.8 g，與足量的氧氣完全燃燒後，產生 30.8 g 的 CO2，則混合氣體中甲烷重多少克？",
+          "options": [
+            "A. 7.2",
+            "B. 6.4",
+            "C. 6.0",
+            "D. 4.8",
+            "E. 3.6"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "資料：混合氣體總重 10.8 g，燃燒後 CO2 30.8 g"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 9,
+          "question_type": "single",
+          "stem": "綠色植物行光合作用製造葡萄糖，反應式如下：6 CO2(g) + 6 H2O(l) → C6H12O6(s) + 6 O2(g)。若植物經光合作用製得葡萄糖 540 g，根據此反應式推算，最少使空氣中的二氧化碳（CO2）減少幾克？（分子量：C6H12O6=180）",
+          "options": [
+            "A. 792",
+            "B. 801",
+            "C. 812",
+            "D. 845",
+            "E. 930"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式 6 CO2 + 6 H2O → C6H12O6 + 6 O2，葡萄糖 540 g"
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 10,
+          "question_type": "single",
+          "stem": "某生粗製一種醋類，並將 12 克的乙酸及 24 克的乙酸鈉少量的濃硫酸，置入燒瓶中共熱，實驗完成後，得到具有香氣的味道的乙酸乙酯 13.0 克，則產率為多少？（原子量：C=12，O=16，H=1.0）",
+          "options": [
+            "A. 20%",
+            "B. 50%",
+            "C. 33%",
+            "D. 42%"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "資料：乙酸 12 g、乙酸鈉 24 g、產物乙酸乙酯 13.0 g"
+          ],
+          "confidence": 0.75
+        },
+        {
+          "number": 11,
+          "question_type": "single",
+          "stem": "1000 mL 的 O2，通過臭氧（O3）的產生器，在同溫同壓下體積為 700 mL，則下列敘述何者正確？",
+          "options": [
+            "A. O2(g) 消耗 900 mL",
+            "B. 生產 O3(g) 300 mL",
+            "C. 最少產生 O2(g) 300 mL",
+            "D. O2(g) 消耗率為 70%",
+            "E. 反應後混合氣體平均分子量為 32"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "氣體體積資料：O2 1000 mL → O3 700 mL 在相同條件下"
+          ],
+          "confidence": 0.6
+        },
+        {
+          "number": 12,
+          "question_type": "single",
+          "stem": "汽車的安全氣囊在汽車發生車禍時，會利用置氮化鈉的高溫分解反應，迅速產生氮氣（2 NaN3(s) → 2 Na(s) + 3 N2(g)），以達到保護乘客的目的。若在實驗室下，要產生 73.5 公升的氮氣，則需完全分解多少克的 NaN3？（NaN3 的分子量為 65.0 g/mol，常溫常壓下理想氣體的莫耳體積為 24.5 L/mol）",
+          "options": [
+            "A. 6.5",
+            "B. 65",
+            "C. 130",
+            "D. 260"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式 2 NaN3 → 2 Na + 3 N2；目標 N2 體積 73.5 L；Vm = 24.5 L/mol；M(NaN3)=65.0"
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 13,
+          "question_type": "single",
+          "stem": "CH4 與 C3H8 混合氣體中，與過量氧氣反應，生成 8.8 g CO2 與 5.04 g H2O，則混合氣體中 CH4 與 C3H8 的莫耳數比為多少？",
+          "options": [
+            "A. 1 : 1",
+            "B. 2 : 1",
+            "C. 2 : 3",
+            "D. 1 : 3"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "資料：生成 CO2 8.8 g、H2O 5.04 g"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 14,
+          "question_type": "single",
+          "stem": "下列哪一個方程式可代表 C2H5OH 的莫耳生成熱？",
+          "options": [
+            "A. C2H6(g) + 1/2 O2(g) → C2H5OH(l)",
+            "B. 2 CO2(g) + 3 H2O(l) → C2H5OH(l) + 3 O2(g)",
+            "C. C(s) + 3/2 H2(g) + 1/2 O2(g) → C2H5OH(l)",
+            "D. 2 C(s) + 3 H2O(g) → C2H5OH(l) + O2(g)"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "四個方程式選項"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "number": 15,
+          "question_type": "single",
+          "stem": "已知 C(s)、CO(g)、H2(g) 的標準莫耳燃燒熱分別為 −393.9 kJ、−283.9 kJ、−285.8 kJ，且 H2O(l) → H2O(g) ΔH = 40.7 kJ，則焦炭與水蒸氣反應產生水煤氣（C(s) + H2O(g) → CO(g) + H2(g)）的反應熱為多少 kJ？",
+          "options": [
+            "A. 135.1",
+            "B. −135.1",
+            "C. 175.1",
+            "D. −175.1"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "提供燃燒熱資料與目標反應 C + H2O(g) → CO + H2"
+          ],
+          "confidence": 0.95
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 1,
+          "kind": "formula",
+          "description": "NH4NO2（亞硝酸銨）"
+        },
+        {
+          "question_number": 3,
+          "kind": "formula",
+          "description": "SiO2 + 3 C → SiC + 2 CO（含原子量提示 C=12,O=16,Si=28）"
+        },
+        {
+          "question_number": 5,
+          "kind": "formula",
+          "description": "Ag + H2S + O2 → Ag2S + H2O（未平衡）"
+        },
+        {
+          "question_number": 9,
+          "kind": "formula",
+          "description": "6 CO2 + 6 H2O → C6H12O6 + 6 O2；C6H12O6=180"
+        },
+        {
+          "question_number": 12,
+          "kind": "formula",
+          "description": "2 NaN3(s) → 2 Na(s) + 3 N2(g)，Vm=24.5 L/mol，M(NaN3)=65.0 g/mol"
+        },
+        {
+          "question_number": 15,
+          "kind": "formula",
+          "description": "燃燒熱資料：ΔHf C(s) = −393.9 kJ、CO(g)=−283.9 kJ、H2(g)=−285.8 kJ；H2O(l)→H2O(g) ΔH=40.7 kJ"
+        }
+      ],
+      "page": 5
+    },
+    {
+      "page_type": "question",
+      "page_summary": "第6頁為多重選擇題，題號為第16題至26題（頁首註明）。本頁包含第1至第10題（每題為多重選擇題），題目內容為氧化數、配平、化學反應方程式、氣體反應與計量、乙炔製備與產率、生成熱與反應熱等高中化學概念。題幹、選項含化學式與化學方程式（含上下標與係數）。掃描品質整體良好，文字可辨；少數處符號（如部分選項的編號或小寫變數）稍微不清楚，但不影響題意。此頁非答案或詳解頁，無答案標示或解答。",
+      "questions": [
+        {
+          "number": 1,
+          "question_type": "multiple",
+          "stem": "下列有關氧化數的敘述，哪些正確？\n(A) NaH 中，氫的氧化數為 +1\n(B) KClO3 中，氯的氧化數為 +5\n(C) P4 的氧化數為 0\n(D) H3PO3 中，磷的氧化數為 +5\n(E) K2O2 中氧的氧化數為 −1",
+          "options": [
+            "A. NaH 中，氫的氧化數為 +1",
+            "B. KClO3 中，氯的氧化數為 +5",
+            "C. P4 的氧化數為 0",
+            "D. H3PO3 中，磷的氧化數為 +5",
+            "E. K2O2 中氧的氧化數為 −1"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "題目文字包含化學式 NaH、KClO3、P4、H3PO3、K2O2，無圖表"
+          ],
+          "confidence": 0.96
+        },
+        {
+          "number": 2,
+          "question_type": "multiple",
+          "stem": "反應式： a H2S + b MnO4^- + c H^+ → x S + y Mn^{2+} + z H2O ，其中 a、b、c、x、y、z 為反應係數，且呈最簡正整數比，則下列何者錯誤？\n(A) a + b ≠ x + y\n(B) c + y = z\n(C) 2c = z\n(D) a + c = z\n(E) 2y = z",
+          "options": [
+            "A. a + b ≠ x + y",
+            "B. c + y = z",
+            "C. 2c = z",
+            "D. a + c = z",
+            "E. 2y = z"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式含離子 MnO4^-、H^+ 與產物 S、Mn^{2+}、H2O"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 3,
+          "question_type": "multiple",
+          "stem": "下列化學反應式： a I^- + b ClO3^- + c H^+ → d I2 + e Cl2 + f H2O，係數之間的關係下列敘述哪些正確？\n(A) a + b + c = 4f\n(B) d + e + f = c\n(C) a + b = d + f\n(D) b + c = 2d + 2e\n(E) a + c = 2d + 2f",
+          "options": [
+            "A. a + b + c = 4f",
+            "B. d + e + f = c",
+            "C. a + b = d + f",
+            "D. b + c = 2d + 2e",
+            "E. a + c = 2d + 2f"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式含 I^-、ClO3^-、H^+ → I2、Cl2、H2O，係數為整數關係式"
+          ],
+          "confidence": 0.92
+        },
+        {
+          "number": 4,
+          "question_type": "multiple",
+          "stem": "有關 2 H2(g) + O2(g) → 2 H2O(l) 反應方程式之敘述，何者正確？\n(A) 平衡時莫耳數比 氫：氧：水 = 2：1：2\n(B) 同溫同壓下，2 L 的氫和 1 L 的氧作用，生成 2 L 的水\n(C) 氫與氧作用生成水的分子數比為 2：1：2\n(D) 4 克的氫與 32 克的氧作用生成 36 克的水\n(E) 同重量的 H2 與 O2 完全反應時，O2 為限量試劑",
+          "options": [
+            "A. 平衡時莫耳數比 氫：氧：水 = 2：1：2",
+            "B. 同溫同壓下，2 L 的氫和 1 L 的氧作用，生成 2 L 的水",
+            "C. 氫與氧作用生成水的分子數比為 2：1：2",
+            "D. 4 克的氫與 32 克的氧作用生成 36 克的水",
+            "E. 同重量的 H2 與 O2 完全反應時，O2 為限量試劑"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式 2 H2 + O2 → 2 H2O；含質量與體積的敘述"
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 5,
+          "question_type": "multiple",
+          "stem": "有關 3 H2(g) + N2(g) → 2 NH3(g) 之反應式的敘述，下列哪些資料不正確？\n(A) 理論上，同溫、同壓下 3 升的氫氣與 1 升的氮作用生成 2 升的氨\n(B) 氫與氮氣作用生成氨的分子數比為 3：1：2\n(C) 3 莫耳氫氣與 1 莫耳的氮完全作用最多可生成 2 莫耳的氨\n(D) 同重量的 H2 與 N2 完全反應時，H2 為限量試劑\n(E) 反應達平衡時「氫：氮：氨」的莫耳數比為「3：1：2」",
+          "options": [
+            "A. 理論上，同溫、同壓下 3 升的氫氣與 1 升的氮作用生成 2 升的氨",
+            "B. 氫與氮氣作用生成氨的分子數比為 3：1：2",
+            "C. 3 莫耳氫氣與 1 莫耳的氮完全作用最多可生成 2 莫耳的氨",
+            "D. 同重量的 H2 與 N2 完全反應時，H2 為限量試劑",
+            "E. 反應達平衡時「氫：氮：氨」的莫耳數比為「3：1：2」"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式 3 H2 + N2 → 2 NH3 與體積/莫耳/限量試劑敘述"
+          ],
+          "confidence": 0.94
+        },
+        {
+          "number": 6,
+          "question_type": "multiple",
+          "stem": "乙炔是工業上重要的原料，可以由下列方法製得： CaC2(s) + 2 H2O(l) → Ca(OH)2(aq) + C2H2(g)。今有 64 克的 CaC2 與 18 克的水反應，在 STP 下得到 C2H2(g) 10 L，則下列敘述哪些是正確的？（Ca = 40）\n(A) CaC2 為限量試劑\n(B) H2O 為限量試劑\n(C) 理論上生成乙炔 0.5 莫耳\n(D) 產率約為 50%\n(E) 產率約為 89.3%",
+          "options": [
+            "A. CaC2 為限量試劑",
+            "B. H2O 為限量試劑",
+            "C. 理論上生成乙炔 0.5 莫耳",
+            "D. 產率約為 50%",
+            "E. 產率約為 89.3%"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式 CaC2 + 2 H2O → Ca(OH)2 + C2H2，數據：64 g CaC2、18 g H2O、C2H2 產率計算（STP）"
+          ],
+          "confidence": 0.93
+        },
+        {
+          "number": 7,
+          "question_type": "multiple",
+          "stem": "依生成熱的意義，下列哪些其生成熱為零？\n(A) 斜方硫 (B) 單斜硫 (C) 石墨 (D) 鑽石 (E) 赤磷",
+          "options": [
+            "A. 斜方硫",
+            "B. 單斜硫",
+            "C. 石墨",
+            "D. 鑽石",
+            "E. 赤磷"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "題目詢問標準生成焓為零之元素的同素異形或同質體"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 8,
+          "question_type": "multiple",
+          "stem": "下列有關反應熱的敘述何者正確？\n(A) 正反應的反應熱和逆反應的反應熱大小相等、符號相反\n(B) 如果反應熱為正值，則為吸熱反應，該反應不可能發生\n(C) 反應熱與反應途徑無關，僅與反應物、生成物的狀態有關\n(D) 反應熱為分子動能變化的表現\n(E) 化學反應的反應熱為生成物的熱含量減去反應物的熱含量",
+          "options": [
+            "A. 正反應的反應熱和逆反應的反應熱大小相等、符號相反",
+            "B. 如果反應熱為正值，則為吸熱反應，該反應不可能發生",
+            "C. 反應熱與反應途徑無關，僅與反應物、生成物的狀態有關",
+            "D. 反應熱為分子動能變化的表現",
+            "E. 化學反應的反應熱為生成物的熱含量減去反應物的熱含量"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "有關反應熱（熱化學）之概念敘述"
+          ],
+          "confidence": 0.95
+        },
+        {
+          "number": 9,
+          "question_type": "multiple",
+          "stem": "下列有關熱化學反應的敘述，哪些正確？\n(A) ΔH > 0 表示吸熱反應\n(B) 所有物質的燃燒都是放熱\n(C) 氯化鋰與水合氯化銀的反應是吸熱，反應於水溫下降\n(D) 5 克水在 1 ℃ 時的熱含量為 5 卡\n(E) 若 H2 的莫耳燃燒熱為 −286 kJ/mol，則電解 36 克水產生的 H2，完全燃燒可放 572 kJ",
+          "options": [
+            "A. ΔH > 0 表示吸熱反應",
+            "B. 所有物質的燃燒都是放熱",
+            "C. 氯化鋰與水合氯化銀的反應是吸熱，反應於水溫下降",
+            "D. 5 克水在 1 ℃ 時的熱含量為 5 卡",
+            "E. 若 H2 的莫耳燃燒熱為 −286 kJ/mol，則電解 36 克水產生的 H2，完全燃燒可放 572 kJ"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "熱化學題目含 ΔH 符號與數值 −286 kJ/mol 以及熱量換算敘述"
+          ],
+          "confidence": 0.92
+        },
+        {
+          "number": 10,
+          "question_type": "multiple",
+          "stem": "已知 2 H2(g) + O2(g) → 2 H2O(l)，ΔH = −572 kJ，則下列敘述何者正確？\n(A) 本反應為放熱反應\n(B) 水的莫耳生成熱為 −572 kJ\n(C) 氫的莫耳燃燒熱為 −572 kJ\n(D) 本反應亦可表示為 2 H2(g) + O2(g) → 2 H2O(l) + 572 kJ\n(E) 若 2 H2(g) + O2(g) → 2 H2O(g) 的反應熱為 Q kJ，則 |Q| < 572",
+          "options": [
+            "A. 本反應為放熱反應",
+            "B. 水的莫耳生成熱為 −572 kJ",
+            "C. 氫的莫耳燃燒熱為 −572 kJ",
+            "D. 本反應亦可表示為 2 H2(g) + O2(g) → 2 H2O(l) + 572 kJ",
+            "E. 若 2 H2(g) + O2(g) → 2 H2O(g) 的反應熱為 Q kJ，則 |Q| < 572"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "反應式與 ΔH = −572 kJ 的熱化學敘述"
+          ],
+          "confidence": 0.95
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 1,
+          "kind": "formula",
+          "description": "化學式 NaH、KClO3、P4、H3PO3、K2O2 出現在第1題選項。"
+        },
+        {
+          "question_number": 2,
+          "kind": "formula",
+          "description": "反應式 a H2S + b MnO4^- + c H^+ → x S + y Mn^{2+} + z H2O，含離子表示。"
+        },
+        {
+          "question_number": 3,
+          "kind": "formula",
+          "description": "反應式 a I^- + b ClO3^- + c H^+ → d I2 + e Cl2 + f H2O。"
+        },
+        {
+          "question_number": 4,
+          "kind": "formula",
+          "description": "反應式 2 H2(g) + O2(g) → 2 H2O(l)，並含體積與質量敘述。"
+        },
+        {
+          "question_number": 6,
+          "kind": "formula",
+          "description": "反應式 CaC2 + 2 H2O → Ca(OH)2 + C2H2 及數據 64 g CaC2、18 g H2O、C2H2 10 L (STP)、Ca = 40。"
+        },
+        {
+          "question_number": 9,
+          "kind": "formula",
+          "description": "H2 燃燒熱 −286 kJ/mol 提及於第9題選項。"
+        }
+      ],
+      "page": 6
+    },
+    {
+      "page_type": "question",
+      "page_summary": "本頁為高雄市立鼓山高級中學 114 學年度高三自然組化學科第一次段考考題第 1 頁（掃描頁面標示為第 7 頁），包含多題選擇題（至少題號 1 至 21 可見），題型以單選題為主，題幹、選項含化學式、上下標、電子排布示意圖與一表格（第 20 題為配對題）；頁面為試題題目頁，無答案或詳解。影像品質良好大部分題目可辨識，但個別小字或表格內細節在放大後仍有些許模糊，對若干選項括號內編號及部分符號辨識有低信心，已盡量逐題擷取完整題幹與選項並保留化學式與上下標表示法。頁面頂端有學校及班級姓名座號空格與科目代碼 007，左側為編號欄；頁面底部標示為 1/3，表示為三頁試卷之第一頁。若需逐字原始影像 OCR 檔或更高解析度裁切圖，請告知。",
+      "questions": [
+        {
+          "number": 1,
+          "question_type": "single",
+          "stem": "下列何組物質兩者都屬於化合物？",
+          "options": [
+            "A. 氯酸鉀、鹽酸",
+            "B. 鑽石、紅磷",
+            "C. 葡萄糖、乾冰",
+            "D. 臭氧、二氧化氮",
+            "E. 雙氧水、水"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 2,
+          "question_type": "single",
+          "stem": "A、B 二元素生成化合物 X、Y，0.3 g A + 0.4 g B -> 0.7 g X；1.8 g A + 4.8 g B -> 6.6 g Y。若 X 之化學式為 AB，則 Y 之化學式為：",
+          "options": [
+            "A. AB2",
+            "B. A2B",
+            "C. AB3",
+            "D. A3B",
+            "E. A2B3"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 3,
+          "question_type": "single",
+          "stem": "A 和 B 兩元素可反應產生化合物 C，反應 A + B → C。若取 A 元素 10 g，B 元素 20 g，放入反應器內，A 用完後，發現 B 還剩下 5 g，則此化合物 C 中所含 A、B 兩種元素的質量比為何？",
+          "options": [
+            "A. 1:2",
+            "B. 2:1",
+            "C. 2:3",
+            "D. 3:2",
+            "E. 1:1"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 4,
+          "question_type": "single",
+          "stem": "已知自然界中 10B 占 20%，11B 占 80%，則下列何者為硼之平均原子量？",
+          "options": [
+            "A. 10.2",
+            "B. 10.5",
+            "C. 10.8",
+            "D. 10.9",
+            "E. 10.4"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 5,
+          "question_type": "single",
+          "stem": "a Cu + b HNO3 → c Cu(NO3)2 + d NO2 + e H2O，將方程式平衡後的係數總和為：",
+          "options": [
+            "A. 9",
+            "B. 10",
+            "C. 14",
+            "D. 18",
+            "E. 20"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 6,
+          "question_type": "single",
+          "stem": "某元素其電子的排列如附圖（中心核外有 3 個電子層，最外層顯示 7 個價電子），則該元素為何？（圖為電子殼層示意，最外殼有 7 顆電子）",
+          "options": [
+            "A. 16S",
+            "B. 15P",
+            "C. 14Si",
+            "D. 17Cl",
+            "E. 18Ar"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "電子殼層示意圖：三個圈層，最外圈顯示 7 顆電子"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 7,
+          "question_type": "single",
+          "stem": "下列哪一個物質是以共價鍵結合的分子化合物？",
+          "options": [
+            "A. H2O",
+            "B. NaOH",
+            "C. MgO",
+            "D. NaHCO3",
+            "E. NH4Cl"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 8,
+          "question_type": "single",
+          "stem": "下列何種組合，結合後各元素仍能擁有和氬原子相同的電子數，並形成穩定的分子物質？",
+          "options": [
+            "A. Cl, Na",
+            "B. C, Cl",
+            "C. Ca, Cl",
+            "D. Cl, Cl",
+            "E. S, O"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.85
+        },
+        {
+          "number": 9,
+          "question_type": "single",
+          "stem": "下列物質的導電度大小順序正確者為何？",
+          "options": [
+            "A. 鋁 > 石墨 > 銅 > 硫",
+            "B. 銅 > 鋁 > 石墨 > 硫",
+            "C. 石墨 > 硫 > 鋁 > 銅",
+            "D. 硫 > 石墨 > 銀 > 鋁",
+            "E. 銀 > 鋁 > 石墨 > 硫"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.7
+        },
+        {
+          "number": 10,
+          "question_type": "single",
+          "stem": "有關石墨與鑽石的敘述，下列何者錯誤？",
+          "options": [
+            "A. 兩者皆為分子晶體",
+            "B. 欲將石墨轉換成鑽石，理論上是可行的",
+            "C. 兩者皆可導熱",
+            "D. 要氧化/燃燒石墨需破壞其價鍵",
+            "E. 石墨是二維網狀晶體，鑽石是三維網狀晶體"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.85
+        },
+        {
+          "number": 11,
+          "question_type": "single",
+          "stem": "有關同一物質之三態之敘述，下列何者正確？",
+          "options": [
+            "A. 可壓縮性：固 > 液 > 氣",
+            "B. 分子量：固 > 液 > 氣",
+            "C. 分子：固 > 液 > 氣",
+            "D. 位能：固 > 液 > 氣",
+            "E. 固 > 液 > 氣（選項原文顯示多項比較，影像略有模糊）"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.6
+        },
+        {
+          "number": 12,
+          "question_type": "single",
+          "stem": "對氯化鈉水溶液與純水，其中有一個是純物質，另一個是混合物，可用何種方法來區別？",
+          "options": [
+            "A. 測導電度",
+            "B. 測酸鹼性",
+            "C. 利用顏色",
+            "D. 利用過濾法",
+            "E. 測黏滯性"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 13,
+          "question_type": "single",
+          "stem": "下列何組物質可用以說明化合比定律？",
+          "options": [
+            "A. O, O2, O3",
+            "B. CH4、C2H4、C2H2",
+            "C. NaCl、MgCl2、AlCl3",
+            "D. Cl2、P4、S8",
+            "E. H3PO4、H3PO3、H3PO2"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 14,
+          "question_type": "single",
+          "stem": "有關於水（H2O）的敘述，下列何者錯誤？",
+          "options": [
+            "A. 氫鍵與共價鍵並存",
+            "B. 水分子由一個氧原子和兩個氫原子所構成",
+            "C. 在水分子中共有三對孤對電子",
+            "D. H2O 這種化學式的表示法稱為分子式",
+            "E. 0 ℃以下，水結成冰，冰也是分子化合物"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        },
+        {
+          "number": 15,
+          "question_type": "single",
+          "stem": "下列化合物完全燃燒後，哪一選項會消耗同分子數的氧氣，及產生相同分子數水？",
+          "options": [
+            "A. C2H5OH",
+            "B. C3H6O",
+            "C. C3H8",
+            "D. C6H6",
+            "E. C2H4"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.6
+        },
+        {
+          "number": 16,
+          "question_type": "single",
+          "stem": "關於 Cl2、O2、N2 分子之共價鍵鍵能大小比較，何者正確？",
+          "options": [
+            "A. Cl2 > O2 > N2",
+            "B. N2 > Cl2 > O2",
+            "C. N2 > O2 > Cl2",
+            "D. O2 > N2 > Cl2",
+            "E. O2 > Cl2 > N2"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.7
+        },
+        {
+          "number": 17,
+          "question_type": "single",
+          "stem": "一化學反應：A + B → C + D，其中 C、D 均不是氣體，不會逸散。將 A 物質 10 g；B 物質 20 g，置入錐形瓶內反應。反應完畢後，發現 B 物質還剩下 5 g，而生成的 C 物質 15 g，請問會生成多少 D 物質？",
+          "options": [
+            "A. 5 g",
+            "B. 10 g",
+            "C. 15 g",
+            "D. 20 g",
+            "E. 25 g"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 18,
+          "question_type": "single",
+          "stem": "主族原子最多可容納的電子數為何？",
+          "options": [
+            "A. 2",
+            "B. 8",
+            "C. 18",
+            "D. 32",
+            "E. 50"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.85
+        },
+        {
+          "number": 19,
+          "question_type": "single",
+          "stem": "以滴管取出紫色紫草汁，滴 1 滴於濾紙中心，然後逐滴加酒精於濾紙中心，結果在濾紙上呈現數層同心圓的顏色，這是因為染料由於哪一方法被分離？",
+          "options": [
+            "A. 萃取",
+            "B. 傾析",
+            "C. 離心",
+            "D. 過濾",
+            "E. 層析"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 20,
+          "question_type": "multiple",
+          "stem": "下列有關科學家及其重大科學發現或理論的配對，何者錯誤？（題目提供表格配對多項，選出錯誤配對）",
+          "options": [
+            "A. 湯姆森：以陰極射線實驗推論電子是原子的基本粒子",
+            "B. 密立根：以油滴實驗測得電子的質量",
+            "C. 拉塞福：利用 α 粒子散射實驗建立原子核模型",
+            "D. 莫斯利：測定元素放射之 X 射線波長而建立原子序觀念",
+            "E. 道耳頓：提出原子說解釋質量守恆定律"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "表格：左列為選項字母 A~E，右列為科學家與發現描述，要求配對正誤（影像部分字句仍可辨）"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "number": 21,
+          "question_type": "single",
+          "stem": "下列有關常見物質分類的敘述，何者正確？",
+          "options": [
+            "A. 鹽酸是氯化氫水溶液，為純物質",
+            "B. 黃銅由銅和鋅兩種元素組成，為化合物",
+            "C. 乙醇含有碳、氫、氧等原子，為混合物",
+            "D. 水銀有固定的沸點，為化合物",
+            "E. 18K 金主成分是金，為混合物"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.8
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 6,
+          "kind": "figure",
+          "description": "電子殼層示意圖：中心核外三層圈，最外層顯示 7 顆電子（做為判斷元素的依據）。"
+        },
+        {
+          "question_number": 20,
+          "kind": "table",
+          "description": "配對表格：科學家與其重大科學發現或理論描述（包含湯姆森、密立根、拉塞福、莫斯利、道耳頓等）；表格文字大致可辨但部分細節略有模糊。"
+        },
+        {
+          "question_number": 1,
+          "kind": "diagram",
+          "description": "頁首試卷標題與班級姓名座號欄位、科目代碼 007，整頁為選擇題排版。"
+        }
+      ],
+      "page": 7
+    },
+    {
+      "page_type": "question",
+      "page_summary": "本頁為高中化學選擇題與圖表題之試卷掃描第8頁（頁碼顯示為2/3），包含題號22至30（22~30為單選題），以及之後開始的多重選擇題序言與第1~5題題幹。頁面包含多個小圖與兩個關鍵圖表：題23的瓶子與彈性塑膠塞示意圖、題26的壓力—溫度相圖（標示0.3、0.5、1.0 atm 與溫度軸10、20、80°C等標記）以及題27的溫度—熱量關係曲線（刻度顯示熱量軸千卡與溫度軸 -20、60°C 與分段台階）。掃描品質整體良好，文字與化學式大多可辨識；少數選項之文字於邊緣略微不完整但可推斷。下列逐題擷取題幹、選項與圖表描述，並保留原卷未提供之答案或詳解欄位為空字串；confidence欄位為每題辨識信心估計（0.0~1.0）。",
+      "questions": [
+        {
+          "number": 22,
+          "question_type": "single",
+          "stem": "乙醇 CH3CH2OH 是實驗室常用的燃料及溶劑，化學式 CH3CH2OH 屬於何者？",
+          "options": [
+            "A. 結構式",
+            "B. 示性式",
+            "C. 電子點式",
+            "D. 分子式",
+            "E. 實驗式"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 23,
+          "question_type": "single",
+          "stem": "附圖為一瓶子的用彈性塑膠封口，放入熱水中，結果發現彈性塑膠鼓起來，如右圖所示。從氣體分子的觀點來看，何者可解釋上述現象？",
+          "options": [
+            "A. 空氣粒子間的間隔較大",
+            "B. 瓶內空氣粒子增加",
+            "C. 空氣粒子受熱上昇",
+            "D. 空氣粒子本身的體積變大",
+            "E. 空氣粒子的壓力變小"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "示意圖：一瓶子塞上彈性塑膠塞，瓶內有許多小圓點代表空氣粒子；旁邊另一圖為瓶置於盛有熱水的容器中，箭頭及水蒸氣表示受熱情形；彈性塑膠塞向外膨脹。"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 24,
+          "question_type": "single",
+          "stem": "要將食鹽水中的食鹽和水分開來，應利用下列哪一種分離技術？",
+          "options": [
+            "A. 過濾",
+            "B. 蒸餾",
+            "C. 傾析",
+            "D. 萃取",
+            "E. 層析"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.98
+        },
+        {
+          "number": 25,
+          "question_type": "single",
+          "stem": "將一個玻璃瓶裝滿水，密封後置入乾冰和酒精組成的冷劑中，經一段時間作用，該玻璃瓶發生爆炸。下列何者是玻璃瓶爆炸的主因？",
+          "options": [
+            "A. 水結冰，體積膨脹，內部壓力過大而爆炸",
+            "B. 乾冰揮發過快，造成玻璃瓶內氣體過多",
+            "C. 玻璃在低溫下體積收縮，因此爆炸",
+            "D. 酒精與乾冰反應，釋出大量熱能而爆炸",
+            "E. 因酒精易燃而發生爆炸"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.92
+        },
+        {
+          "number": 26,
+          "question_type": "single",
+          "stem": "一物之三相圖如附圖，下列何種條件可昇華？（圖中縱軸為壓力（atm），有 1.0、0.5、0.3 標記；橫軸為溫度（°C），有 10、20、80 標記；固相—液相—氣相分界曲線示意）",
+          "options": [
+            "A. 1 atm 下由 30°C → 90°C",
+            "B. 1 atm 下由 5°C → 30°C",
+            "C. 0.3 atm 下由 5°C → 30°C",
+            "D. 0.3 atm 下由 30°C → 80°C",
+            "E. 0.5 atm 下由 60°C → 80°C"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "相圖：壓力對溫度曲線，左下有低壓區 (0.3 atm) 與右上 1.0 atm；蒸發/昇華分界線標示可辨識三相邊界點。"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "number": 27,
+          "question_type": "single",
+          "stem": "在一大氣壓下，將 100 克的某固態物質，用一穩定熱源加熱時，所得之溫度與熱量曲線關係圖如附圖所示。下列敘述何者正確？（圖示顯示溫度—熱量曲線，分段有固相升溫、熔化平台、液相升溫三段，數值標示熱量 0、15、21、29 千卡與溫度 -20、60°C 等）",
+          "options": [
+            "A. 此物質的正常沸點為 -20°C",
+            "B. 此物質在液態時之比熱為 0.75 卡/克°C",
+            "C. 此物質的熔化熱大於汽化熱",
+            "D. 此物質在進行相變化時屬於化學變化",
+            "E. 此物質完全汽化需熱量 6 千卡"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "溫度—熱量曲線：從熱量0到15千卡，溫度從 -20°C 上升到某點；15到21千卡為平台（熔化）；21到29千卡液相溫度上升至約60°C。"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 28,
+          "question_type": "single",
+          "stem": "下列何組物質是同位素？",
+          "options": [
+            "A. O2 與 O3",
+            "B. 黃磷與赤磷",
+            "C. 12C 與 13C",
+            "D. 彈性硫與斜方硫",
+            "E. 鑽石、石墨"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.99
+        },
+        {
+          "number": 29,
+          "question_type": "multiple",
+          "stem": "已知氧的原子序為 8，今有一個氧原子與一個氫原子藉由共用電子形成水分子，則有關此過程的下列敘述何者錯誤？（題目列出多個敘述，請選出錯誤者）",
+          "options": [
+            "A. 氧原子與氫原子是以轉移價電子方式形成化學鍵",
+            "B. 水分子中總共有十個電子",
+            "C. 二個氫原子與一個氧原子結合後，使氧擁有與氬相同的電子數",
+            "D. 二個氫原子與一個氧原子結合後，使氫擁有與氦相同的電子數",
+            "E. 化學鍵是一種原子間的吸引力"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.95
+        },
+        {
+          "number": 30,
+          "question_type": "single",
+          "stem": "氫氣通過過熱氧化銅的化學反應式為 2 NH3 + 3 CuO → Cu + X + H2O（注意：X代表其中一種產物，且只有產物的係數尚未平衡）。試問：下列哪一個選項，最有可能是 X？",
+          "options": [
+            "A. NO",
+            "B. NO2",
+            "C. N2",
+            "D. N2O",
+            "E. N2O4"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 23,
+          "kind": "figure",
+          "description": "瓶子與彈性塑膠塞示意圖：左側小圖顯示瓶內有許多圓點代表氣體；右側示意瓶子浸入盛熱水的容器，瓶口彈性塑膠鼓起。"
+        },
+        {
+          "question_number": 26,
+          "kind": "diagram",
+          "description": "壓力—溫度相圖（三相圖）: 縱軸刻度標示 0.3、0.5、1.0 atm；橫軸標示溫度 10、20、80°C；圖中畫出固—液—氣三相分界線。"
+        },
+        {
+          "question_number": 27,
+          "kind": "diagram",
+          "description": "溫度—熱量曲線圖：橫軸為熱量（千卡）標示 0、15、21、29；縱軸為溫度（°C）標示 -20 與 60°C；圖含固相升溫段、熔化平台（15→21 千卡）與液相升溫段。"
+        }
+      ],
+      "page": 8
+    },
+    {
+      "page_type": "question",
+      "page_summary": "第9頁為選擇題卷面，包含第6至第10題的題目與選項，題型為多選或判斷式敘述題。頁中間有一個有機分子結構示意圖（中央為 C，連接一個 O 和三個 H，應為甲酸 HCOOH 的結構或類似示意），影像整體清晰度尚可，但部分字體因掃描對比偏淡或微小，少數字元辨識可能不確定；我已逐題擷取題幹與選項，若有不確定處已將 confidence 降低並說明。此頁非答案或詳解頁，故 answer/explanation 欄位留空字串或空陣列。若需更高解析度以提升辨識正確度，建議提供局部放大影像。",
+      "questions": [
+        {
+          "number": 6,
+          "question_type": "multiple",
+          "stem": "下列敘述何者可說明定比定律？(A)過氧化氫與水中皆含氧與氫原子 (B)碳原子有 12C、13C、14C 三種 (C)H2O 可由氫氣在空氣中燃燒而得，亦可由過氧化氫的分解產生 (D)自然界所含 35Cl 與 37Cl 之比為 3:1 (E)44 克的二氧化碳含 12 克的碳、22 克的二氧化碳僅含 6 克的碳",
+          "options": [
+            "A. 過氧化氫與水中皆含氧與氫原子",
+            "B. 碳原子有 12C、13C、14C 三種",
+            "C. H2O 可由氫氣在空氣中燃燒而得，亦可由過氧化氫的分解產生",
+            "D. 自然界所含 35Cl 與 37Cl 之比為 3:1",
+            "E. 44 克的二氧化碳含 12 克的碳、22 克的二氧化碳僅含 6 克的碳"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.85
+        },
+        {
+          "number": 7,
+          "question_type": "multiple",
+          "stem": "已知甲酸分子的化學式為 HCOOH，有關原子間的鍵結與性質，下列敘述哪些是正確的？(A)分子中有 4 對孤對電子 (B)純液體可導電 (C)分子中有 3 個單鍵、1 個雙鍵 (D)在水溶液中可解離出 H+ (E)HCOOH 為離子化合物",
+          "options": [
+            "A. 分子中有 4 對孤對電子",
+            "B. 純液體可導電",
+            "C. 分子中有 3 個單鍵、1 個雙鍵",
+            "D. 在水溶液中可解離出 H+",
+            "E. HCOOH 為離子化合物"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "中央插圖為一分子結構示意：上方 H，左方 H，右方 O─H，中心 C 與上、左、右及下各連一鍵，應為 H─C─O─H 與另一側 O 雙鍵到 C（示意甲酸結構）"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "number": 8,
+          "question_type": "multiple",
+          "stem": "下列有關金屬晶體的敘述，哪些正確？(A)在金屬晶體中，所有陽離子呈規則排列 (B)形成金屬鍵的價電子不屬於某一原子而屬於整個晶體，稱為電子海 (C)金屬具有光澤 (D)金屬晶體的導電是由於陰陽離子的移動 (E)熔點高，故常溫下無以液態存在的金屬",
+          "options": [
+            "A. 在金屬晶體中，所有陽離子呈規則排列",
+            "B. 形成金屬鍵的價電子不屬於某一原子而屬於整個晶體，稱為電子海",
+            "C. 金屬具有光澤",
+            "D. 金屬晶體的導電是由於陰陽離子的移動",
+            "E. 熔點高，故常溫下無以液態存在的金屬"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.88
+        },
+        {
+          "number": 9,
+          "question_type": "multiple",
+          "stem": "有關下列兩個化學式 CH3OH 及 ______ 的敘述，哪些正確？題目版面第二個式子為示意式/結構式之區分（掃描有部分不清），問題原文為：有關下列兩個化學式 CH3OH 及 的敘述，哪些正確？(A)前者為結構式，後者為示性式 (B)前者為示性式，後者為結構式 (C)分子式相同 (D)分子量不同 (E)分子中的氫原子總數不同",
+          "options": [
+            "A. 前者為結構式，後者為示性式",
+            "B. 前者為示性式，後者為結構式",
+            "C. 分子式相同",
+            "D. 分子量不同",
+            "E. 分子中的氫原子總數不同"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [
+            "原題第二個化學式掃描較不清楚，為一個示性或結構式的比較（疑為 CH3OH 的示性與結構式對照）"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "number": 10,
+          "question_type": "multiple",
+          "stem": "有關各種分離物質的方法，下列敘述哪些正確？(A)混合物的分離可利用各物質在物理性質上的差異 (B)欲分離糖水中的糖與水，可使用過濾法 (C)要從海水中萃取微量的碘，可使用酒精作為萃取液 (D)要從海水中分離出水，可採用蒸餾法 (E)紅墨水經過層析，各成分會因為與濾紙的吸附力不同被分離",
+          "options": [
+            "A. 混合物的分離可利用各物質在物理性質上的差異",
+            "B. 欲分離糖水中的糖與水，可使用過濾法",
+            "C. 要從海水中萃取微量的碘，可使用酒精作為萃取液",
+            "D. 要從海水中分離出水，可採用蒸餾法",
+            "E. 紅墨水經過層析，各成分會因為與濾紙的吸附力不同被分離"
+          ],
+          "answer": [],
+          "explanation": "",
+          "image_regions": [],
+          "confidence": 0.9
+        }
+      ],
+      "answer_key": [],
+      "assets": [
+        {
+          "question_number": 7,
+          "kind": "figure",
+          "description": "甲酸（或相關）分子結構示意圖：中心 C，上方連一 H，左方連一 H，右方連 O─H（羥基），下方應有 O 雙鍵連接 C（示意 HCOOH）。掃描中圖形位於頁中央偏上。"
+        }
+      ],
+      "page": 9
+    }
+  ],
+  "solutions": [
+    {
+      "page": 1,
+      "questions": [
+        {
+          "number": 1,
+          "answer": "",
+          "explanation": "題目：加熱物質 X，其溫度變化與加熱時間的關係如附圖（固→液→氣三段明顯平台）。題目配有 a～e 五種物質之組成粒子示意圖，要求判斷 X 可能是哪一圖。\n說明與判斷過程：由加熱曲線可知該樣品呈現固-熔融-沸騰三個明顯階段，且在熔解與沸騰處有恆溫平台，代表所加熱的是純物質（或至少在該相變溫度範圍內為單一純物質），而不是易於有多成分、連續升溫的混合物；因此對應的粒子圖應顯示構成粒子彼此相同（同一種分子或原子）的排列，且固相呈有規則緊密排列、液相較鬆散、氣相間隔遠。但題圖 a～e 的粒子細節（黑白粒子代表何種原子、是否為同一種分子、或為混合物）在影像上無法清楚辨識（粒子間聯結、組成是否一致、固相排列的細節均不明），因此無法可靠判定應為 a、b、c、d 或 e 中哪一圖。若需得出唯一答案，必須能清楚看出哪一圖為“單一種分子（或原子）組成且在固態顯規則排列、液態較無序、氣態粒子間距大”的序列，但目前影像解析不足以支援此判定。\n結論：影像或題意不清楚，無法安全選出答案。",
+          "confidence": 0.2,
+          "needs_review": true
+        },
+        {
+          "number": 2,
+          "answer": "D",
+          "explanation": "題目：在臺灣沿海隨意抓取的一把沙屬於哪一類物質？\n分析：沙（沙粒）通常由不同物質混合組成，例如二氧化矽（石英）、碳酸鈣（貝殼碎片）、有機碎屑等，並非單一元素或純物質，因此屬於混合物（含多種化合物或礦物的混合）。\n結論：選 D（混合物）。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 3,
+          "answer": "A",
+          "explanation": "題目：下列操作法與圖示配對，哪者正確？（圖甲、圖乙、圖丙分別為三種實驗裝置）\n判斷各圖:\n- 圖甲：見一個有活栓的梨形分液漏斗（或帶活栓的分液器）裝在架上，可分相後抽出下層或上層，這是液-液萃取或分液操作（萃取、分層）。\n- 圖乙：見一根豎直細長的柱子，內部似裝填物並有頂到底流動，與層析柱（柱層析）外觀相符，故為層析（分離不同極性或溶解度之物質）。\n- 圖丙：為典型的簡單蒸餾裝置（圓底燒瓶加熱、連接回流冷凝管至收集燒瓶），功能為蒸餾分離。\n選項比對：A 選項為 圖甲—萃取、圖乙—層析、圖丙—蒸餾，與上述判斷一致。\n結論：選 A。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 4,
+          "answer": "B",
+          "explanation": "題目：0.46 克二氧化氮（NO2）含有多少莫耳之二氧化氮分子？其中氧原子個數有幾個？（N=14，O=16）\n計算步驟：\n1. 計算 NO2 的摩爾質量：M(NO2)=14 + 2×16 = 46 g·mol^-1。\n2. 摩爾數 n = 質量 / 摩爾質量 = 0.46 g / 46 g·mol^-1 = 0.01 mol。\n3. 分子數 = n × 阿伏伽德羅常數 = 0.01 mol × 6.02×10^23 mol^-1 = 6.02×10^21 個 NO2 分子。\n4. 每個 NO2 分子含 2 個氧原子，因此氧原子總數 = 2 × 6.02×10^21 = 1.204×10^22 個。\n答案對應：選項 B 為 (0.01, 1.204×10^22)。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 5,
+          "answer": "A",
+          "explanation": "題目：下列有關原子的敘述，何者正確？（選一）\n各選項評析：\n(A) 原子大部分的質量集中在原子核。——正確。原子核含質子與中子，佔原子質量的幾乎全部（>99.9%）。\n(B) 原子核占據原子中大部分的體積。——錯誤。原子核體積非常小，原子大部分體積由圍繞的電子雲佔據，原子核僅占極小體積。\n(C) 原子因質子數與電子數相等，呈現電中性。——此說法對「中性原子」成立，但並非所有原子在所有情況下都中性（可成為離子）；題目通常要求普遍正確之敘述，故此選項具條件性而非絕對敘述，考題慣以 (A) 為正確答案。\n(D) 原子中一個質子的電量為 9.1×10^-31 庫侖。——錯誤。9.11×10^-31 為電子的質量（kg）量級；質子電量約 1.602×10^-19 庫侖。\n(E) 原子核的直徑約為 10^-10 公尺。——錯誤。原子整體的尺寸約 10^-10 m（Å）；原子核尺寸約 10^-15 m（飛米）量級。\n結論：選 A。",
+          "confidence": 0.85,
+          "needs_review": false
+        },
+        {
+          "number": 6,
+          "answer": "B",
+          "explanation": "題目：甲、乙兩容器分別盛入同溫、同壓下之 CO2(g) 與 CH4(g)。已知兩容器中原子總數相等，則甲、乙兩容器體積比為何？\n分析與計算：\n- 每一個 CO2 分子含 3 個原子；每一個 CH4 分子含 5 個原子。\n- 設 CO2 分子數為 n1，CH4 分子數為 n2。由題意：原子總數相等 → 3 n1 = 5 n2 → n1/n2 = 5/3。\n- 在相同溫度與壓力下，氣體體積與分子（莫耳）數成正比（V ∝ n），因此 V甲/V乙 = n1/n2 = 5/3。\n結論：選 B（5:3）。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 7,
+          "answer": "C",
+          "explanation": "題目：反應 2H2(g) + O2(g) → 2H2O(g)。若欲得到 15 L 之水蒸氣，試問需耗去氫氣與氧氣共若干升？\n分析：在相同溫度與壓力下，氣體體積與摩爾數成正比。化學當量關係：2 mol H2 + 1 mol O2 → 2 mol H2O。\n因此每 2 份 H2O 對應 2 份 H2（故 H2 所需體積等於 H2O 的體積）；而每 2 份 H2O 對應 1 份 O2（故 O2 所需體積為 H2O 的一半）。\n若欲得 15 L H2O，則所需 H2 = 15 L，所需 O2 = 15/2 = 7.5 L，合計 = 15 + 7.5 = 22.5 L。\n結論：選 C（22.5 L）。",
+          "confidence": 0.99,
+          "needs_review": false
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "questions": [
+        {
+          "number": 8,
+          "answer": "E",
+          "explanation": "題圖為某物質的相圖，固態與液態之相界線（熔點隨壓力改變的曲線）向右上方傾斜，表示在較高壓力下，固態→液態的平衡溫度增加。因此熔點會隨壓力增大而增加。故選 E。",
+          "confidence": 0.85,
+          "needs_review": false
+        },
+        {
+          "number": 9,
+          "answer": "D",
+          "explanation": "在相圖上，若所施加的壓力 0.6 atm 位於三相點（solid–liquid–gas 共點）壓力之下，則由固態加熱時會先遇到固–氣相界線而直接昇華為氣態，而不會經過液態。由圖可見在 0.6 atm 的垂直線與固–氣相界線交於低於 −40°C 的位置，因此固體在低於 −40°C 即昇華。故選 D。",
+          "confidence": 0.7,
+          "needs_review": true
+        },
+        {
+          "number": 10,
+          "answer": "A",
+          "explanation": "各選項判斷：\n(A) 過濾是利用顆粒大小差異使固體滯留於濾紙、液體通過，敘述正確。\n(B) 石油分餾（分餾或分餾蒸餾）是利用各成分沸點（物理性質）不同而分離，非化學性質差異，故 B 錯。\n(C) 化合物要分解為元素通常需化學方法（例如化學反應），單純的物理方法無法把化合物直接分解成元素，故 C 錯。\n(D) 混合物可用物理方法分離，敘述若寫為「只可用物理方法」較絕對；但實務上混合物以物理方法分離為主，此選項措辭有爭議。\n(E) 餾（餾分/蒸餾）係利用成分沸點不同而分離，敘述若題意為「餾析」指蒸餾則正確；但原文可能用詞不精確。\n綜合判斷，最明確正確且無歧義者為 (A)。",
+          "confidence": 0.6,
+          "needs_review": true
+        },
+        {
+          "number": 11,
+          "answer": "A",
+          "explanation": "各選項逐一檢視（精簡）：\n(A) 題目描述為兩種含不同同位素的水分子，其所含中子數總和相同。例如：H2 17O（含 O-17，O 有 17−8=9 個中子，兩個 1H 各 0 中子）與 1H–2H–16O（含 O-16，O 有 8 個中子，且含一個 2H（1 個中子）與一個 1H（0 個中子）），兩者中子總數均為 9，故此敘述正確。\n(B) Na、Mg、Al 三者中，原子半徑最大者為 Na（同一週期左邊半徑大），故 B 錯。\n(C) 17 族元素（VIIA）在室溫並非全部為氣體（Br2 液體、I2 固體），故 C 錯。\n(D) 週期表左下角元素傾向易失電子（成陽離子），敘述「較不易失去電子」錯誤，故 D 錯。\n(E) Be（鈹）為第二族鹼土金屬，不屬類金屬，故 E 錯。\n因此正確選項為 A。",
+          "confidence": 0.85,
+          "needs_review": false
+        },
+        {
+          "number": 12,
+          "answer": "E",
+          "explanation": "道耳頓（Dalton）原子說的主要內容包括：一切物質由原子構成；同一元素的原子具有相同的質量與性質（當時之認知）；不同元素之原子可依不同數目結合形成化合物；化學反應為原子之重新排列。選項 (A)、(B)、(C)、(D) 均為道耳頓原子說的內容或其直接表述。選項 (E) 表示「原子說主要是根據當時所做的實驗所提出」屬於對原子說成因的描述（道耳頓確實參考化學定律與實驗資料提出理論），但此項較屬於方法論陳述而非道耳頓直接提出的學說內容；題目欲選出「不是道耳頓所提出原子說的內容」時，(E) 與其他選項相比最不屬於原子說本身的條文，故選 E。（註：此題文字與命題可能有歧義）",
+          "confidence": 0.6,
+          "needs_review": true
+        },
+        {
+          "number": 13,
+          "answer": "C",
+          "explanation": "已知原子含 17 個電子，則原子序數 Z = 17（氯），電子排布依殼層（K,L,M,...）為 2,8,7，最外層（價電子）位於第三殼（M 層）。故選 C。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 14,
+          "answer": "C",
+          "explanation": "各選項判斷：\n(A) 1 mol 電子之電量為法拉第常數約 F = 96485 C ≈ 96500 C，敘述正確（近似值）。\n(B) 每個電子帶 −1 個基本電荷（−e），敘述正確。\n(C) 電子在原子核外之主量子數 n 從 n = 1（第一殼）開始，並非 n = 0，故此敘述錯誤。\n(D) 電子質量約為質子質量之 1/1836（常以 1/1840 作近似），敘述為近似正確。\n(E) 電子由湯姆森（J. J. Thomson）發現，敘述正確。\n因此錯誤者為 (C)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 15,
+          "answer": "A",
+          "explanation": "表格資料（由題給）：\n甲：電子排列 2，質量數 4 → Z = 2，A = 4 → 中子數 = A − Z = 2（偶數）\n乙：電子排列 2,2，質量數 9 → Z = 4，A = 9 → 中子數 = 9 − 4 = 5（奇數）\n丙：電子排列 2,8,2，質量數 24 → Z = 12，A = 24 → 中子數 = 12（偶數）\n丁：電子排列 2,8,8,2，質量數 40 → Z = 20，A = 40 → 中子數 = 20（偶數）\n(A) 敘述「甲、乙、丙、丁四原子均含偶數個中子」為假，因乙的中子數為 5（奇數），故 A 為錯誤敘述。\n其他選項檢驗：價電子數甲乙丙丁皆為 2；乙、丙、丁同屬第 2 族主族元素；帶二價正電之離子電子數分別對應惰性氣體電子數，皆成立。因此唯一錯誤者為 (A)。",
+          "confidence": 0.95,
+          "needs_review": false
+        }
+      ]
+    },
+    {
+      "page": 3,
+      "questions": [
+        {
+          "number": 16,
+          "answer": "C",
+          "explanation": "題意：判斷有關純物質與混合物的敘述何者正確。\n逐項分析：\n(A)「純物質只含一種原子」：錯。純物質包括元素（單一種原子）與化合物（由不同原子組成）皆為純物質，故此敘述不正確。\n(B)「定壓下，混合物的熔點為定值」：錯。混合物的熔點通常為範圍或依成分變動（如共晶等），非單一定值。\n(C)「定壓下，化合物的沸點為定值」：對。純淨化合物在定壓下具有固定的沸點（若為單一相純物質）。\n(D)「化合物可經由物理變化分解為元素」：錯。化合物要分解成元素需化學變化（化學反應），非單純物理變化。\n(E)「混合物中各成分的比例固定」：錯。混合物成分比例可改變，比例不固定。\n因此正確選項為 (C)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 17,
+          "answer": "B",
+          "explanation": "題意：圖示為依元素特性劃分之週期表區域，詢問類金屬（介於金屬與非金屬之間、常作為半導體材料）位於哪區之間。\n概念：類金屬（metalloids）分佈於週期表的金屬區與非金屬區之交界處，常沿著週期表的「階梯線」分布；即位在金屬區與非金屬區之間的區域。\n依圖之區域標示，類金屬應位在丙區與丁區之間（位於金屬與非金屬之交界帶）。\n因此選 (B) 丙丁區域之間。\n註：因原圖區域標示解析度有限，判讀區位有少許不確定性，故建議以原卷區域標示比對確認。",
+          "confidence": 0.7,
+          "needs_review": true
+        },
+        {
+          "number": 18,
+          "answer": "C",
+          "explanation": "題意：同溫同壓下，10 mL 的 X2 與 20 mL 的 Y2 反應生成 20 mL 的氣體化合物，求該化合物之分子式。\n觀念與步驟：\n- 在相同溫度與壓力下，氣體體積與莫耳數成正比，故可直接以體積比當作莫耳比。\n- 初始：X2 的莫耳數 ∝ 10，Y2 的莫耳數 ∝ 20。反應後產物莫耳數為 20。\n設產物分子式為 XpYq（每一分子含 p 個 X 原子、q 個 Y 原子）。\n生成 1 摩爾產物需消耗 p/2 摩爾的 X2 與 q/2 摩爾的 Y2（因 X2、Y2 為二原子分子）。\n生成 20（相對單位）莫耳產物需消耗 (p/2)·20 的 X2 與 (q/2)·20 的 Y2。\n由可用量限制：(p/2)·20 ≤ 10 → p ≤ 1；(q/2)·20 ≤ 20 → q ≤ 2。\n因此 p=1，q=1 或 q=2 都為整數可能。但考慮原子守恆（若反應消耗完兩者），總 X 原子數為 2×10=20，總 Y 原子數為 2×20=40，產物共有 20 個分子，平均每分子 X:Y = 20:40 = 1:2，故分子式應為 XY2。\n結論：分子式為 XY2，故選 (C)。",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 19,
+          "answer": "B",
+          "explanation": "題意：參考所示蒸餾裝置，判斷敘述何者錯誤。\n各選項分析：\n(A) 蒸餾法原理為利用物質沸點不同以達分離：正確。\n(B) 「蒸餾 58 度高粱酒時，錐形瓶甲收集到者為水」：錯誤。高粱酒（含乙醇）蒸餾時，低溫段的蒸餾餾出物較富乙醇而非水，故蒸餾初段收集到的主要為易揮發的乙醇；敘述錯誤，應為乙醇而非水。\n(C) 冷凝水需由低端（A 口）進、由上端（B 口）出，以確保冷凝管內冷卻水充滿並向上流出：正確。\n(D) 在蒸餾瓶內加入沸石（沸石、沸石或沸騰石）可避免突沸（bumping）：正確。\n(E) 溫度計之溫珠（感溫球）應置於側管附近以測量逸出蒸氣之溫度並控制蒸餾溫度：正確。\n因此錯誤為 (B)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 20,
+          "answer": "C",
+          "explanation": "題意：表中甲至戊為元素符號，已知甲之原子序為 13（即 Al，位於第 3 週期、13 族）。問哪一元素原子半徑最大。\n觀念：原子半徑趨勢為同一族由上而下增大；同一週期自左向右減小（因有效核電荷增加，束縛電子更緊）。\n由已知甲為 Z=13（Al），在圖中通常其正下方的元素為同族下一週期之元素（原子半徑會較大）。因此位於甲下方的元素（圖中標為丙）原子半徑最大。\n結論：選 (C) 丙。\n註：因原圖格局解析度有限，對各符號在圖中精確相對位置判讀有少許不確定性，故建議以原卷圖示再次確認位置對應。",
+          "confidence": 0.6,
+          "needs_review": true
+        },
+        {
+          "number": 21,
+          "answer": "B,C",
+          "explanation": "題意：有關濾紙層析（紙層析）分析法，哪些敘述正確？\n各選項分析：\n(A) 「利用物質密度不同分離」：錯。層析法是利用樣品與固定相（濾紙）及流動相（展開劑）間親和力（極性、溶解度、吸附力等）差異來分離，不是密度差。\n(B) 「物質與溶劑間作用力愈大，展開距離愈遠」：對。若物質與流動相（溶劑）之親和力（溶解度）較大，該物質會較偏向流動相而隨溶劑上移，展開距離較遠。\n(C) 「可分離出植物色素成分」：對。紙層析常用於分離植物色素（如葉綠素、類胡蘿蔔素、花青素等）。\n(D) 「需在空氣中進行」：錯。實務上常把展開槽蓋起以飽和溶劑蒸氣，避免溶劑過快蒸發，故並非必須在開放空氣中進行。\n(E) 「與濾紙作用力愈大的物質，展開距離愈遠」：錯。與濾紙（固定相）作用力越強，樣品會較易被吸附停留，展開距離反而越短。\n因此正確為 (B) 與 (C)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 22,
+          "answer": "A,B,D,E",
+          "explanation": "題意：有關質量守恆定律（Lavoisier 提出）哪些敘述正確？\n逐項分析：\n(A) 「燃燒本質是物質與氧氣發生反應」：根據拉瓦節的氧化說，燃燒為與氧反應，故此敘述在一般燃燒情形下為正確（特指典型燃燒）。\n(B) 「反應前後，物質總質量不變」：對。在封閉系統中化學反應前後總質量守恆。\n(C) 「反應物消耗的總分子數等於生成物的總分子數」：錯。分子數不一定守恆（分子可拆合、合成），質量守恆而非分子數守恆。\n(D) 「反應物消耗的總質量等於生成物生成的總質量」：對，這為質量守恆的數學表述之一（在封閉系統）。\n(E) 「反應物的總質量等於生成物的總質量」：對，與 (D) 同義，亦正確。\n因此正確選項為 (A)、(B)、(D)、(E)。\n備註：以上正確性皆以「封閉系統」或在考慮所有反應物與生成物（含氣體逸散等）之情形下成立。",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 23,
+          "answer": "B,D,E",
+          "explanation": "題意：給定物質：石墨、鹽酸、汽油、空氣、銅、硫酸銅晶體、乾冰、排骨湯、乙醇、不鏽鋼，判斷下列敘述哪些正確（純物質、混合物、化合物、均勻/不均勻混合物 的數量）。\n分類（依常見教科書分類假設）：\n- 純物質（元素或純化合物）：石墨（元素 C）、銅（元素 Cu）、硫酸銅晶體（CuSO4，化合物）、乾冰（CO2，純物質）、乙醇（若視為純樣，為化合物） → 共 5 種純物質。\n- 均勻混合物（均相混合物）：鹽酸（HCl 溶於水）、汽油（均相混合物）、空氣（均勻氣體混合物）、不鏽鋼（均相合金） → 共 4 種均勻混合物。\n- 不均勻混合物（非均相）：排骨湯 → 1 種。\n因此檢視選項：\n(A) 純物質共 4 種：錯（依上列為 5 種）。\n(B) 混合物共有 5 種：對（均勻 4 + 不均勻 1 = 5）。\n(C) 化合物共 2 種：錯。化合物（純化合物）在上表為 硫酸銅、乾冰、乙醇 共 3 種（若視乙醇為純），故不為 2。\n(D) 均勻混合物共 4 種：對（鹽酸、汽油、空氣、不鏽鋼）。\n(E) 不均勻混合物僅 1 種：對（排骨湯）。\n結論：正確為 (B)、(D)、(E)。\n註：本題判定以教科書常見且題目列項之一般理解（例如將乙醇視為純物質；鹽酸視為水溶液）為依據；若出題者對某些項目有不同假設，分類數量可能改變。",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 24,
+          "answer": "A,B,C,D,E",
+          "explanation": "題意：判斷所繪基態原子電子排列圖與指定原子（A: He Z=2、B: B Z=5、C: O Z=8、D: Mg Z=12、E: Cl Z=17）是否正確。\n基態電子分布應為：\n- He (Z=2)：K殼 2 電子 (2)\n- B (Z=5)：K殼 2、L殼 3 (2,3)\n- O (Z=8)：K殼 2、L殼 6 (2,6)\n- Mg (Z=12)：K殼 2、L殼 8、M殼 2 (2,8,2)\n- Cl (Z=17)：K殼 2、L殼 8、M殼 7 (2,8,7)\n若所繪圖示分布符合上述數字，即為正確。因原題圖示在掃描影像中解析度有限，難以完全放大確認每一圖示之電子數目；但若圖中分布如上則 (A)、(B)、(C)、(D)、(E) 均為正確。\n建議以清晰原卷圖示逐一核對內圈/外圈電子數以確認無誤。",
+          "confidence": 0.6,
+          "needs_review": true
+        }
+      ]
+    },
+    {
+      "page": 4,
+      "questions": [
+        {
+          "number": 1,
+          "answer": "(1) c (2) b, d, e (3) d",
+          "explanation": "題目已知等重的氣體 a～e：a = F2, b = N2O, c = NO2, d = C3H8, e = CO2。先計算摩爾質量：F2 = 19×2 = 38 g·mol⁻¹；N2O = 14×2 + 16 = 44 g·mol⁻¹；NO2 = 14 + 16×2 = 46 g·mol⁻¹；C3H8 = 12×3 + 1×8 = 36 + 8 = 44 g·mol⁻¹；CO2 = 12 + 16×2 = 44 g·mol⁻¹。 (1) 分子量最大者為 NO2 (46 g·mol⁻¹) → c。 (2) 題為「等質量」但問哪些氣體的分子數相同；若質量相等，分子數 ∝ 1/摩爾質量，因此摩爾質量相同者其分子數相同。N2O、C3H8、CO2 的摩爾質量皆為 44 g·mol⁻¹ → b, d, e。 (3) 每個分子所含原子數：F2 = 2；N2O = 3；NO2 = 3；C3H8 = 3+8 = 11；CO2 = 3。原子數最多為 C3H8 → d。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 2,
+          "answer": "(1) 117 g (2) 31.5 g (3) 10.8 g",
+          "explanation": "使用摩爾質量計算：原子量給定 H=1, N=14, O=16, Na=23, Cl=35.5, Ag=108。 (1) 2 mol NaCl：M(NaCl)=23+35.5=58.5 g·mol⁻¹，質量 = 2 mol × 58.5 g·mol⁻¹ = 117 g。 (2) 0.5 mol HNO3：M(HNO3)=1+14+16×3=63 g·mol⁻¹，質量 = 0.5 mol × 63 g·mol⁻¹ = 31.5 g。 (3) 6.02×10^22 個 Ag 原子：阿佛伽德羅常數 NA = 6.02×10^23 個·mol⁻¹，故物質的量 n = (6.02×10^22)/(6.02×10^23) = 0.10 mol；質量 = 0.10 mol × 108 g·mol⁻¹ = 10.8 g。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 3,
+          "answer": "(1) b = K, c = Al, d = Si, e = C, f = O, g = Cl, h = Se, r = Ar\n(2) 原子半徑由大至小：b > a > c（K > Mg > Al）\n(3) a, c, d 的氧化物水後酸性最強者：d > c > a（SiO2 > Al2O3(兩性) > MgO（鹼性））\n(4) f 元素最常見氧化物化學式：O2",
+          "explanation": "由題中週期表位置推定各符號代表的元素（以主族與週期位置對照）：\n(1) 解析各字母位置並對應元素符號：\n b：第4週期、1A → 鉀 K。\n a：第3週期、2A → 鎂 Mg。（在後續小題中用到）\n c：第3週期、3A → 鋁 Al。\n d：第3週期、4A → 矽 Si。\n e：第2週期、4A → 碳 C。\n f：第2週期、6A → 氧 O。\n g：第3週期、7A → 氯 Cl。\n h：第4週期、6A → 硒 Se。\n r：第3週期、8A → 氬 Ar。\n(2) 原子半徑趨勢：同族由上而下增大、同週由左至右減小；所以 b(K, 4週期) 最大，其次為 a(Mg, 3週期2A)，再來 c(Al, 3週期3A) → 排序 K > Mg > Al。 (回答填寫 b > a > c)。\n(3) 氧化物水溶液的酸鹼性趨勢：同週金屬氧化物由左到右由鹼→兩性→酸。 a = Mg → MgO 為鹼性氧化物； c = Al → Al2O3 兩性； d = Si → SiO2 為酸性氧化物（溶於水形成酸性或呈酸性氧化物行為）。酸性強度：SiO2 > Al2O3 > MgO，因此 d > c > a。\n(4) f = O，其最常見的“氧化物”形式為雙原子分子 O2（常見氧分子）。註：若題意欲問 f 與他種元素形成的氧化物，需依元素而定；此處依表位置判定 f = O，故寫 O2。",
+          "confidence": 0.8,
+          "needs_review": false
+        },
+        {
+          "number": 4,
+          "answer": "(1) B (2) C (3) I (4) F",
+          "explanation": "題目列出科學家：(A) 道耳頓 (B) 莫斯利 (C) 湯姆森 (D) (不清楚，紙上字跡) (E) 門得列夫 (F) 拉塞福 (G) 拉瓦節 (H) 密立坎 (I) 亞佛加厥。各敘述配對： (1) “測各元素 X 對射線波長建立原子序概念” → 這是莫斯利的工作 → B。 (2) “利用陰極射線管實驗發現電子之存在” → 湯姆森 (J. J. Thomson) → C。 (3) “同溫同壓同體積的氣體具有相同的分子數” → 亞佛加厥 (Avogadro) → I。 (4) “以 α 粒子散射實驗結果建立核原子模型” → 拉塞福 (Rutherford) → F。",
+          "confidence": 0.95,
+          "needs_review": false
+        }
+      ]
+    },
+    {
+      "page": 5,
+      "questions": [
+        {
+          "number": 1,
+          "answer": "B",
+          "explanation": "NH4NO2 可視為 NH4+ 與 NO2-。NH4+ 中 N 的氧化數：設為 x，x + 4(+1) = 0 => x +4 =0 => x = −3。NO2- 中 N 的氧化數：設為 y，y + 2(−2) = −1 => y −4 = −1 => y = +3。故前一個 N 為 −3，後一個 N 為 +3。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 2,
+          "answer": "A",
+          "explanation": "逐選項檢討：\n(A) 「鹵素的最高氧化數約為 +7」正確（例如 Cl2O7 中 Cl 為 +7）。\n(B) KH 中 H 為 −1（氫化物），而 H2O2 中 H 為 +1，故不同，錯誤。\n(C) Pb3O4 為混合價態化合物，實際含 Pb(II) 與 Pb(IV) 兩種氧化數，非三種，敘述錯誤。\n(D) 在 OF2 中 F 必為 −1，因此 O 為 +2，敘述「F 為 +1」錯誤。\n(E) 氧化數在單原子離子時等於電荷，但一般化合物中氧化數僅為形式電荷，不一定等於實際離子電荷，該敘述過度簡化而不正確。故僅 (A) 正確。",
+          "confidence": 0.93,
+          "needs_review": false
+        },
+        {
+          "number": 3,
+          "answer": "C",
+          "explanation": "反應：SiO2 + 3 C -> SiC + 2 CO。考慮電子轉移：三個碳中，產物含一個碳在 SiC（氧化數由 0 -> −4，得到 4 e），兩個碳在 2 CO（各 0 -> +2，各失 2 e，共失 4 e），故被還原（作為氧化劑）的碳數：1；被氧化（作為還原劑）的碳數：2。質量比以碳為計：1 mol 碳 : 2 mol 碳，質量比為 1 : 2。選 (C)。（原子量 C=12，若換成質量計算：12 : 24 = 1:2）",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 4,
+          "answer": "C",
+          "explanation": "先求 N2H4 中 N 的氧化數：設每 N 為 x，2x + 4(+1) = 0 => 2x +4 =0 => x = −2（故敘述「N2H4 中氮的氧化數為 +2」為錯誤）。逐項檢討：\n(A) N2O4 中 N (+4) 可被還原為 N2（0），因此 N2O4 中的氮會進行還原，正確。\n(B) N2O4 中的氧仍為 −2，若生成之產物中氧化數未變則氧未直接改變氧化數，敘述可看為正確（題意欲選出錯誤者）。\n(D) N2H4 中氮由 −2 變為 0（生成 N2），為氧化反應，正確。\n(E) N2H4 中的氫在反應中多為 +1，在生成水時仍為 +1，未參與氧化還原，正確。故唯一錯誤為 (C)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 5,
+          "answer": "A",
+          "explanation": "平衡反應為：4 Ag + 2 H2S + O2 -> 2 Ag2S + 2 H2O。由此摩爾比 Ag:H2S:O2 = 4:2:1。給定各為 0.10 mol，計算各能生成 Ag2S 的量：\n- 由 Ag (0.10 mol)：4 mol Ag 生成 2 mol Ag2S，故 1 mol Ag 生成 0.5 mol Ag2S；0.10 mol Ag -> 0.05 mol Ag2S。\n- 由 H2S (0.10 mol)：2 mol H2S 生成 2 mol Ag2S，故 1 mol H2S 生成 1 mol Ag2S；0.10 mol -> 0.10 mol Ag2S。\n- 由 O2 (0.10 mol)：1 mol O2 生成 2 mol Ag2S；0.10 mol -> 0.20 mol Ag2S。\n產物以最小值決定，故 Ag 將先耗盡，為限量試劑。選 (A)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 6,
+          "answer": "B",
+          "explanation": "反應：CaCO3 -> CaO + CO2。CO2 摩爾質量 44 g/mol。收集到 CO2 質量 0.88 g，故 mol CO2 = 0.88/44 = 0.02 mol，對應 CaCO3 也是 0.02 mol，質量 = 0.02 × 100 g/mol = 2.00 g。樣品重 4.00 g，CaCO3 含量百分率 = 2.00/4.00 = 0.50 = 50%。選 (B)。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 7,
+          "answer": "B",
+          "explanation": "10 kg 木炭含碳量 90% -> 碳質量 = 10 kg × 0.9 = 9.0 kg。完全燃燒：C + O2 -> CO2，質量比分為 CO2/C = 44/12 = 11/3 ≈ 3.6667。產生 CO2 質量 = 9.0 kg × 44/12 = 9.0 × 3.6667 = 33.0 kg。選 (B)。",
+          "confidence": 0.97,
+          "needs_review": false
+        },
+        {
+          "number": 8,
+          "answer": "D",
+          "explanation": "設甲烷質量為 x 克，乙烷質量為 10.8 − x 克。碳原子摩爾數＝甲烷的 mol + 乙烷中碳的 mol = x/16 + (10.8−x)/15。完全燃燒產生 CO2 質量為 44 ×（碳的 mol）。已知 CO2 質量 30.8 g，故：\n44×(x/16 + (10.8−x)/15) = 30.8。\n化簡：x(1/16−1/15)+10.8/15 = 30.8/44 = 0.7。\n計算較簡便的代數解：（以 moles 方式）\n由式子解得 x = 4.8 g。選 (D)。（可檢查：甲烷 4.8 g → 0.3 mol C；乙烷 6.0 g → 0.2 mol C×2 =0.4 mol C；總 C mol =0.7 → CO2 質量 =0.7×44=30.8 g）",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 9,
+          "answer": "A",
+          "explanation": "C6H12O6 摩爾質量 180 g/mol。540 g 葡萄糖為 540/180 = 3.0 mol。光合作用反應每生 1 mol 葡萄糖消耗 6 mol CO2，故消耗 CO2 = 6 × 3.0 = 18 mol。CO2 摩爾質量 44 g/mol，質量 = 18 × 44 = 792 g。選 (A)。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 10,
+          "answer": "B",
+          "explanation": "乙酸 (CH3COOH) 摩爾質量 = 12×2 + 1×4 +16×2 = 60 g/mol，12 g 乙酸為 12/60 = 0.20 mol。假設用的是戊醇 (C5H11OH) 摩爾質量 88 g/mol，44 g 對應 0.50 mol，因此限制試劑為乙酸 (0.20 mol)。乙酸戊酯（C7H14O2）摩爾質量 = 130 g/mol，理論產量 = 0.20 mol ×130 = 26.0 g。實得 13.0 g，產率 = 13.0/26.0 = 0.50 = 50%。選 (B)。",
+          "confidence": 0.92,
+          "needs_review": false
+        },
+        {
+          "number": 11,
+          "answer": "A",
+          "explanation": "臭氧生成反應常可表示為 3 O2 -> 2 O3。設消耗 O2 為 x mL，則生成 O3 為 (2/3)x mL，剩餘 O2 為 1000 − x。反應後總體積 = (1000 − x) + (2/3)x = 1000 − x/3。已知為 700 mL，故 1000 − x/3 = 700 -> x/3 = 300 -> x = 900 mL。因此：\n- O2 被消耗 900 mL（正確）\n- 生成 O3 為 (2/3)×900 = 600 mL（非選項 B 的 300）\n- 餘 O2 為 1000−900 = 100 mL（非選項 C 的 300）\n- 消耗率為 900/1000 = 90%（非 70%）\n- 反應後混合氣體平均分子量為混有大量 O3 (48) 與少量 O2 (32)，明顯大於 32。故正確為 (A)。",
+          "confidence": 0.97,
+          "needs_review": false
+        },
+        {
+          "number": 12,
+          "answer": "C",
+          "explanation": "反應式：2 NaN3(s) -> 2 Na(s) + 3 N2(g)。需產生 N2 氣體 73.5 L，常溫常壓下 1 mol 氣體體積 24.5 L，故所需 mol N2 = 73.5/24.5 = 3.00 mol。依氣體化學量關係，3 mol N2 對應需分解 NaN3 的 mol 為：由方程式 3 mol N2 由 2 mol NaN3 生成 3 mol N2，故 NaN3 mol = (2/3)×(mol N2) = (2/3)×3.00 = 2.00 mol。質量 = 2.00 × 65.0 g/mol = 130 g。選 (C)。",
+          "confidence": 0.96,
+          "needs_review": false
+        },
+        {
+          "number": 13,
+          "answer": "D",
+          "explanation": "設 CH4 的 mol 為 a，C3H8 的 mol 為 b。完全燃燒生成：CO2 mol = a + 3b；H2O mol = 2a + 4b。已知 CO2 質量 8.8 g -> mol = 8.8/44 = 0.20 mol；H2O 質量 5.04 g -> mol = 5.04/18 = 0.28 mol。列方程：\na + 3b = 0.20\n2a + 4b = 0.28\n由第一式乘 2 得 2a + 6b = 0.40，減第二式得 2b = 0.12 -> b = 0.06 mol，代回得 a = 0.20 − 3(0.06) = 0.02 mol。故莫耳數比 a:b = 0.02:0.06 = 1:3。選 (D)。",
+          "confidence": 0.97,
+          "needs_review": false
+        },
+        {
+          "number": 14,
+          "answer": "D",
+          "explanation": "標準生成熱的定義是由元素之標準狀態直接生成該物質的反應方程式（元素以其標準狀態）。C2H5OH(l) 的組成為 2 C、6 H、1 O，對應的元素反應式為：2 C(s) + 3 H2(g) + 1/2 O2(g) -> C2H5OH(l)。故代表生成熱的方程式為該式，為選項 (D)（註：試題圖片部分選項被截斷，但標準生成熱所要求之元素反應式即如上）。",
+          "confidence": 0.8,
+          "needs_review": true
+        },
+        {
+          "number": 15,
+          "answer": "A",
+          "explanation": "已知各物質之標準莫耳燃燒熱（即元素燃燒為生成氧化物時之 ΔH）：\nC(s) + O2 -> CO2  ΔH = −393.9 kJ （因此 ΔHf(CO2) = −393.9 kJ）\nCO(g) + 1/2 O2 -> CO2  ΔH = −283.9 kJ （此為 CO 燃燒成 CO2）\nH2(g) + 1/2 O2 -> H2O(l) ΔH = −285.8 kJ （因此 ΔHf(H2O,l) = −285.8 kJ）\n另 H2O(l) -> H2O(g) ΔH = +40.7 kJ，所以 ΔHf(H2O,g) = −285.8 + 40.7 = −245.1 kJ。\n先由 CO 燃燒資料求 ΔHf(CO)：\nCO + 1/2 O2 -> CO2 : ΔH = ΔHf(CO2) − ΔHf(CO) = −283.9\n代入 ΔHf(CO2)=−393.9 得 −393.9 − ΔHf(CO) = −283.9 -> ΔHf(CO) = −110.0 kJ。\n目標反應：C(s) + H2O(g) -> CO(g) + H2(g)\n其 ΔH = ΔHf(CO) + ΔHf(H2) − [ΔHf(C) + ΔHf(H2O,g)] = (−110.0 + 0) − (0 + (−245.1)) = −110.0 +245.1 = +135.1 kJ。\n因此反應熱為 +135.1 kJ（吸熱）。選 (A)。",
+          "confidence": 0.95,
+          "needs_review": false
+        }
+      ]
+    },
+    {
+      "page": 6,
+      "questions": [
+        {
+          "number": 1,
+          "answer": "B,C,E",
+          "explanation": "判定各選項氧化數：\n(A) NaH 中 H 為氫化物，氧化數為 −1，故 (A) 錯誤。\n(B) KClO3：K 為 +1，O 為 −2×3=−6，故 Cl=+5，(B) 正確。\n(C) P4 為單質，氧化數為 0，(C) 正確。\n(D) H3PO3 中 P 的氧化數：設 P=x，3(+1)+x+3(−2)=0 →3+x−6=0 → x=+3，非 +5，(D) 錯。\n(E) K2O2 為過氧化物，O 的氧化數為 −1，(E) 正確。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 2,
+          "answer": "A,C,D,E",
+          "explanation": "以半反應法配平：\n氧化：H2S → S ： H2S → S + 2H+ + 2e−\n還原：MnO4− → Mn2+ ： MnO4− + 8H+ + 5e− → Mn2+ + 4H2O\n使電子數相消，氧化乘以 5，還原乘以 2：\n5 H2S + 2 MnO4− + 6 H+ → 5 S + 2 Mn2+ + 8 H2O\n故係數 a=5,b=2,c=6,x=5,y=2,z=8。\n檢驗選項：\n(A) a+b≠x+y？ 5+2=7，x+y=5+2=7，故敘述為假 → (A) 為錯誤敘述。\n(B) c+y = z？ 6+2=8 = z，(B) 正確。\n(C) 2c = z？ 2×6=12 ≠8，(C) 錯誤敘述。\n(D) a+c = z？ 5+6=11 ≠8，(D) 錯誤敘述。\n(E) 2y = z？ 2×2=4 ≠8，(E) 錯誤敘述。\n因此錯誤的敘述為 A、C、D、E。",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 3,
+          "answer": "A,B,E",
+          "explanation": "以半反應法配平 ClO3− 變 Cl2 及 I− 變 I2：\n還原（Cl）：2 ClO3− + 12 H+ + 10 e− → Cl2 + 6 H2O\n氧化（I）：10 I− → 5 I2 + 10 e−\n相加得：10 I− + 2 ClO3− + 12 H+ → 5 I2 + Cl2 + 6 H2O\n係數 a=10,b=2,c=12,d=5,e=1,f=6。\n檢驗選項：\n(A) a+b+c = 4f？ 10+2+12=24，4f=4×6=24，成立。\n(B) d+e+f = c？ 5+1+6=12 = c，成立。\n(C) a+b = d+f？ 10+2=12，d+f=5+6=11，不成立。\n(D) b+c = 2d+2e？ 2+12=14，2d+2e=10+2=12，不成立。\n(E) a+c = 2d+2f？ 10+12=22，2d+2f=10+12=22，成立。\n故正確敘述為 A、B、E。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 4,
+          "answer": "A,C,D,E",
+          "explanation": "反應為 2 H2(g) + O2(g) → 2 H2O(l)。\n(A) 依化學計量係數，H2:O2:H2O = 2:1:2，正確。\n(B) 在相同溫度、壓力下氣體體積與莫耳數成正比，但生成物為液態水，不能以氣體體積計算為 2 L，且體積不守恆，因此敘述錯誤。\n(C) 以分子數表示亦為 2:1:2（2 分子 H2 與 1 分子 O2 生成 2 分子 H2O），正確。\n(D) 質量守恆：4 g H2 + 32 g O2 → 36 g H2O，正確（H2: 2 g/mol→2 mol 為 4 g→2 mol? 說明：4 g H2 = 2 mol? 錯誤的單位表述會造成混淆，但數值上 4 g + 32 g =36 g，總質量守恆，故結論正確）。\n(E) 若取相同質量 m 的 H2 與 O2，因 H2 摩爾質量 2 g·mol−1，O2 為 32 g·mol−1，故 O2 莫耳數遠小，為限制試劑，(E) 正確。",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 5,
+          "answer": "D,E",
+          "explanation": "反應 3 H2 + N2 → 2 NH3。\n(A) 同溫同壓下，體積比等於莫耳數比，3 L H2 與 1 L N2 可生成 2 L NH3，(A) 正確。\n(B) 分子數比 H2:N2:NH3 = 3:1:2，(B) 正確。\n(C) 理論上 3 mol H2 與 1 mol N2 完全反應生成 2 mol NH3，(C) 正確。\n(D) 若兩者同重量 m，則 n(H2)=m/2，n(N2)=m/28；需求上 1 mol N2 需 3 mol H2，實際 n(H2) 明顯較多，故 H2 非限量而為過量，(D) 敘述錯誤。\n(E) 反應達平衡時各物質之莫耳數比不一定等於化學計量係數（平衡組成由平衡常數決定），因此敘述『平衡時為 3:1:2』錯誤。\n因此不正確的敘述為 (D) 與 (E)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 6,
+          "answer": "B,C,E",
+          "explanation": "反應：CaC2 + 2 H2O → Ca(OH)2 + C2H2。\n給定：64 g CaC2、18 g H2O。摩爾質量：CaC2 = 40 + 12×2 = 64 g·mol−1，H2O = 18 g·mol−1。\n故 n(CaC2)=64/64=1.00 mol，n(H2O)=18/18=1.00 mol。\n由化學計量 1 mol CaC2 需 2 mol H2O，故 H2O 為限制試劑 → (B) 正確，(A) 錯誤。\n理論上每 2 mol H2O 生成 1 mol C2H2，因此以 1.00 mol H2O 可生成 0.50 mol C2H2 → (C) 正確。\n實際產率：實測產生氣體 10 L（STP 時 1 mol 氣體約 22.4 L），n(獲得)=10/22.4=0.44643 mol。\n產率 = 0.44643 / 0.50 = 0.89286 ≈ 89.3% → (E) 正確；(D) 表示約 50% 則錯誤。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 7,
+          "answer": "A,C",
+          "explanation": "生成熱（標準生成焓 ΔHf°）為零者為元素在其標準狀態下的同素異形或形態：\n碳的標準態為石墨（graphite），鑽石為同素異形但非標準態；故 (C) 石墨 ΔHf°=0，(D) 鑽石 ≠0。\n硫的標準態為斜方硫（rhombic sulfur，中文常稱斜方硫），單斜硫為另一同素異形，只有斜方硫的 ΔHf°=0，(A) 正確，(B) 單斜硫 ≠0。\n赤磷（紅磷）非磷的標準態（白磷常視為標準態），赤磷 ΔHf° ≠0，(E) 錯。\n因此生成熱為零者為 (A) 與 (C)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 8,
+          "answer": "A,C,E",
+          "explanation": "逐項判斷：\n(A) 正反應 ΔH 與逆反應 ΔH 大小相等、符號相反（ΔHrev = −ΔHf），正確。\n(B) 若反應焓 ΔH>0 表示吸熱，但並不表示反應不可能發生（必須考慮自由能 ΔG），故 (B) 錯誤。\n(C) 反應熱（反應焓）與反應途徑無關，僅與反應物與生成物的初末態（狀態函數）有關（赫斯定律），正確。\n(D) 反應熱主要為焓（enthlapy）變化的表現；若在常壓下以放/吸熱方式觀察到的熱量為ΔH，不宜直接稱為『分子內能變化』（內能 ΔU 與焓 ΔH 相關但不同），因此 (D) 不正確。\n(E) 化學反應的反應熱可表示為生成物的焓減去反應物的焓（ΔH = ΣHf(products) − ΣHf(reactants)），正確。",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 9,
+          "answer": "A,B,D,E",
+          "explanation": "逐項判斷：\n(A) ΔH>0 表示吸熱反應，正確。\n(B) 一般定義下『燃燒』為與氧劇烈反應通常放出熱量，故大多數燃燒為放熱，教科書上視為正確敘述，(B) 常視為正確。\n(C) 敘述『氯化鈉與水合氯化鈉的反應是吸熱；反應導致水溫下降』文意模糊：NaCl 與其水合物之間的反應（若指溶解或水合／脫水）其熱效應依物質不同而異，題目措辭不清，本題此選項判定為不可靠，故不列為正確項（標記需審核）。\n(D) 5 克水在升高 1 °C 時所吸收的熱量為 q = m·c·ΔT = 5 g × 1 cal·g−1·°C−1 × 1 °C = 5 cal，正確。\n(E) 若 H2 的莫耳燃燒熱為 −286 kJ·mol−1（表示 2 H2 + O2 → 2 H2O 時每 mol H2 釋 −286 kJ），電解 36 g 水（36 g / 18 g·mol−1 = 2.00 mol H2O）可產生 2.00 mol H2（因 2 H2O → 2 H2 + O2），完全燃燒 2.00 mol H2 釋放熱量 = 2.00 × 286 kJ = 572 kJ，敘述正確。\n因此可判為 A、B、D、E 為正確；但因 (C) 的原文或情境有不明之處，建議核對題意。",
+          "confidence": 0.7,
+          "needs_review": true
+        },
+        {
+          "number": 10,
+          "answer": "A,D",
+          "explanation": "已知 2 H2(g) + O2(g) → 2 H2O(l)，ΔH = −572 kJ。\n(A) ΔH 為負值，表示放熱反應，(A) 正確。\n(B) 水的『每莫耳生成熱』（標準生成焓 ΔHf°）為 −286 kJ·mol−1（因 2 mol H2O 對應 −572 kJ），所以說為 −572 kJ·mol−1 是不正確，(B) 錯誤。\n(C) 氫氣每莫耳燃燒熱為 −286 kJ·mol−1（不是 −572 kJ），(C) 錯誤。\n(D) 可將放熱反應寫成 2 H2 + O2 → 2 H2O(l) + 572 kJ，表示放出 572 kJ，化學方程式右側寫能量項是可接受的表示法，(D) 正確。\n(E) 若 2 H2 + O2 → 2 H2O(g) 的反應熱為 0 kJ（假設情況），則由 2 H2O(g) → 2 H2O(l) 的凝結放熱（約 −ΔHvap×2）來決定 2 H2 + O2 → 2 H2O(l) 的 ΔH，絕對值不一定小於 572 kJ；實際數值需已知蒸發焓，題目斷言 |Q| < 572 無法從已知資料直接推出，(E) 不正確或無法保證。\n綜上正確為 (A) 與 (D)。",
+          "confidence": 0.9,
+          "needs_review": false
+        }
+      ]
+    },
+    {
+      "page": 7,
+      "questions": [
+        {
+          "number": 1,
+          "answer": "C",
+          "explanation": "題目：下列何組物質兩者都屬於化合物？\n解析：化合物定義為由兩種或以上不同元素以化學鍵結合形成的純物質。選項中葡萄糖(C6H12O6)與乾冰(固態CO2)皆為由不同元素所組成之化合物，故選(C)。\n備註：影像中部分選項詞意（如「鹽酸」視為溶液）或許造成判讀差異，若把「鹽酸」視為含溶劑之混合物則(A)不成立；若視為純HCl則(A)也成立，故此題影像讀取有不確定性。",
+          "confidence": 0.35,
+          "needs_review": true
+        },
+        {
+          "number": 2,
+          "answer": "A",
+          "explanation": "題目大意：A、B兩元素形成X、Y兩化合物。已知0.3 g A + 0.4 g B → 0.7 g X；1.8 g A + 4.8 g B → 6.6 g Y。若X之化學式為 AB（影像原文部分數字或文字略有不清，此處以X=AB推理），求Y之化學式。\n步驟：\n1. 從X組成得A:B質量比 = 0.3 : 0.4 = 3 : 4。\n   假設X = AB，則單位比 a : b = 3 : 4。\n2. Y的質量比 A:B = 1.8 : 4.8 = 3 : 8。\n   若Y為 A_xB_y，則其質量比為 x·a : y·b。以a:b = 3:4代入，得到 (3x) : (4y) = 3 : 8 → x : y = 1 : 2。\n3. 因此Y的簡式為 AB2，對應選項(A)。\n備註：原試卷掃描處X化學式處可能略難辨（看起來像AB2但若為AB則上面推導成立）。因影像不確定性標記需複核。",
+          "confidence": 0.75,
+          "needs_review": true
+        },
+        {
+          "number": 3,
+          "answer": "C",
+          "explanation": "題目：A + B → C。起始放入A 10 g、B 20 g，反應後A用完，B剩5 g。求化合物C中A與B的質量比。\n解析：反應消耗的B = 20−5 = 15 g；消耗的A = 10 g。故產物中A:B = 10 : 15 = 2 : 3，對應選(C)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 4,
+          "answer": "C",
+          "explanation": "題目：天然硼的同位素組成為10B占20%、11B占80%，求平均原子量。\n計算：平均原子量 = 0.20×10 + 0.80×11 = 2 + 8.8 = 10.8，故選(C)。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 5,
+          "answer": "B",
+          "explanation": "題目：配平反應 a Cu + b HNO3 → c Cu(NO3)2 + d NO2 + e H2O，求配平後係數總和。\n配平已知常見反應（濃硝酸氧化）為：Cu + 4 HNO3 → Cu(NO3)2 + 2 NO2 + 2 H2O。\n係數和 = 1 + 4 + 1 + 2 + 2 = 10，故選(B)10。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 6,
+          "answer": "D",
+          "explanation": "題目：某元素電子排列表圖（內外殼電子數由內到外為2、8、7），求該元素。\n解析：由電子殼層數量可推原子序數 = 2+8+7 = 17，原子序17為氯(Cl)，選(D)17Cl。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 7,
+          "answer": "A",
+          "explanation": "題目：何者為以共價鍵結合的分子化合物？\n解析：H2O為小分子且原子間為共價鍵，為分子化合物；NaOH、MgO、NaHCO3常見為離子化合物；NH4Cl為離子性（NH4+ 與 Cl−）。故選(A) H2O。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 8,
+          "answer": "D",
+          "explanation": "題目要找能經成鍵後使各元素達到氖(Ne)相同電子數（八電子）並形成穩定的分子。\n解析：氯原子(Cl)藉由和另一氯原子共用一對電子形成Cl2，每一個Cl可達到八隅規（8電子），並形成穩定分子Cl2。因此配對Cl–Cl合適。故選(D)Cl與Cl。\n備註：原試卷選項影像模糊，但此為常見考點，故回答Cl2。",
+          "confidence": 0.6,
+          "needs_review": true
+        },
+        {
+          "number": 9,
+          "answer": null,
+          "explanation": "題目：下列物質的導電度大小順序何者正確？\n解析：一般導電性強弱順序為金屬（Al、Fe等）≫石墨(碳的導電性良好，但導電率通常小於常見金屬如鋁、銅)≫非導體(硫)。但選項中實際文字順序及比較對象在影像上部分文字難以完全辨認，無法確定哪一選項與上述順序相符，因此無法可靠作答，需請提供該題完整選項文字以判定正確答案。",
+          "confidence": 0.05,
+          "needs_review": true
+        },
+        {
+          "number": 10,
+          "answer": "A",
+          "explanation": "題目：有關石墨與鑽石敘述，哪一項錯誤？\n解析：\n- 石墨與鑽石均為由碳原子構成，但兩者皆為共價網路固體（covalent network），非分子晶體，因此“兩者皆為分子晶體”是錯誤敘述。\n- 其他陳述：理論上在高壓高溫下石墨可轉為鑽石（可行）、兩者均可導熱（鑽石導熱性非常好，石墨沿層面亦良好）、氧化兩者需破壞共價鍵、石墨為二維層狀網狀、鑽石為三維網狀，皆為正確。\n因此錯誤選項為(A)。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 11,
+          "answer": "C",
+          "explanation": "題目：有關同一物質三態（固、液、氣）的敘述何者正確？\n解析：分子間距離的大小順序為：氣 > 液 > 固（氣體分子最分散，固體分子最靠近）。因此選(C)。其他選項如可壓縮性應為 氣 > 液 > 固，分子量在三態間不變等均為錯誤或不合題意的敘述。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 12,
+          "answer": "A",
+          "explanation": "題目：將氯化鈉水溶液與純水比較，其中一個為純物質、另一為混合物，問可用何種方法區別？\n解析：鹽水導電（含離子），純水電導極低（理想純水幾乎不導電）。因此測導電度可快速分辨兩者。故選(A) 測導電度。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 13,
+          "answer": "B",
+          "explanation": "題目：下列何組物質可用說明倍比定律（元素以不同比例結合形成不同化合物）？\n解析：倍比定律需要同兩種元素以不同簡整數比結合，例如碳與氫形成的不同烴類可說明此律。選項(B) CH4、C2H4、C2H2均由碳與氫兩元素組成，且C:H之比例分別為1:4、1:2、1:1，符合倍比定律示例，故選(B)。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 14,
+          "answer": "C",
+          "explanation": "題目：有關水(H2O)的敘述，下列何者錯誤？\n解析：\n(A) 正確：氫與氧以共價鍵結合。\n(B) 正確：水分子由一個氧和兩個氫組成。\n(C) 錯誤：氧在水分子上有兩對孤電子（每對為2電子），共2對，而非3對。\n(D) 正確：H2O這種表示法為分子式。\n(E) 正確：在0 °C 以下水可結冰，水屬分子化合物。\n故錯誤為(C)。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 15,
+          "answer": null,
+          "explanation": "題目：下列化合物完全燃燒後，哪一選項會消耗相同分子數的氧氣，及產生相同分子數水？\n解析：完全燃燒一般方程式：CxHyOz + (x + y/4 − z/2) O2 → x CO2 + (y/2) H2O。\n要使兩化合物消耗相同O2分子數且生成相同H2O分子數，需使兩者的y（氫原子數）相同（以確保H2O數相同），且x + y/4 − z/2相等。影像中該題選項列表字跡與配對排列不夠清晰，無法確定每個候選配對的完整式子與題意（試題可能要在選項內比較兩個化合物）。因此無法在影像資訊不足下可靠解答，需請補充該題完整選項文字或清晰影像以作判定。",
+          "confidence": 0.05,
+          "needs_review": true
+        },
+        {
+          "number": 16,
+          "answer": "C",
+          "explanation": "題目：關於Cl2、O2、N2分子內共價鍵的鍵能大小比較，何者正確？\n解析：鍵能大小通常與鍵階成正比：N≡N（三鍵）鍵能最大，其次為O=O（雙鍵），最小為Cl–Cl（單鍵）。因此順序為 N2 > O2 > Cl2，對應選(C)。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 17,
+          "answer": "B",
+          "explanation": "題目：化學反應 A + B → C + D，初始 A 10 g、B 20 g，反應後發現B剩5 g，且生成C 15 g，求生成D的質量。\n解析：消耗的B = 20 − 5 = 15 g，消耗的A = 10 g（題述A用完）。反應物總消耗質量 = 10 + 15 = 25 g，依質量守恆，生成物質量總和亦為25 g。已知C為15 g，故D質量 = 25 − 15 = 10 g，選(B)10 g。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 18,
+          "answer": "D",
+          "explanation": "題目：主殼層最多可容納的電子數為何？\n解析：一個主能階n最多可容納電子數為2n^2。若題目詢問常見至第4主殼（n=4）時，最大為2×4^2 = 32。影像題目未明確指明欲求哪一主殼或一般公式，選項中最大值為32，依高中常識常列出各殼最大容納數為2、8、18、32，故此處選(D)32。\n備註：若題意為一般式，正確表述應為2n^2；因原題文字可能省略指明殼層數，故本題有部分判讀不確定性。",
+          "confidence": 0.55,
+          "needs_review": true
+        },
+        {
+          "number": 19,
+          "answer": "E",
+          "explanation": "題目：以滴管取紫蘇葉汁滴於濾紙中心，逐滴加酒精於中心，濾紙上出現數個同心圓顏色，該分離染料的方法稱為？\n解析：此為紙層析（paper chromatography）或簡稱層析法，用溶劑沿紙張擴散使不同色素隨流動相遷移而分離，故選(E) 層析（chromatography）。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 20,
+          "answer": "B",
+          "explanation": "題目：表格列出科學家與其重大科學發現，問何者錯誤？（表格中敘述為：湯姆森：以陰極射線實驗推論電子是原子的基本粒子；密立根：以油滴實驗測得電子的質量；拉塞福：利用α粒子散射建立原子核模型；莫斯利：測定元素放射之X射線波長而建立原子序觀念；道耳頓：提出原子說解釋質量守恆定律）\n解析：Millikan（密立根）的油滴實驗測得的是電子的電荷(e)，並非直接測定電子的質量；電子質量是由湯姆森(e/m比)與密立根(e)結合後推算出來。因此「密立根測得電子的質量」的敘述錯誤，對應選(B)。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 21,
+          "answer": "E",
+          "explanation": "題目：下列有關常見物質分類的敘述，何者正確？\n解析：\n(A) 鹽酸為氯化氫溶於水的溶液，為溶液（均相混合物），非純物質，故錯。\n(B) 黃銅為銅與鋅的合金（混合物），非化合物，故錯。\n(C) 乙醇是含C、H、O的純化合物（不是混合物），故錯。\n(D) 汞（水銀）為元素，雖有固定沸點，但非化合物，該敘述若說為化合物則錯誤（視原文敘述而定）。\n(E) 18K金為金的合金，主要成份是金，但為混合物（合金），此敘述正確。\n因此選(E)。",
+          "confidence": 0.95,
+          "needs_review": false
+        }
+      ]
+    },
+    {
+      "page": 8,
+      "questions": [
+        {
+          "number": 22,
+          "answer": "A",
+          "explanation": "CH3CH2OH 為縮寫的結構式（condensed structural formula），顯示原子連接順序（C-C-O 並有側鏈上之 H）。故屬於「結構式」。選項解釋：分子式僅寫元素及數量（例如 C2H6O），實驗式通常指實驗求得之最簡整數比，電子點式為價電子分布之表示，而 CH3CH2OH 明顯為結構式。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 23,
+          "answer": "C",
+          "explanation": "當密封瓶置入熱水中時，瓶內空氣受熱，空氣分子平均動能增加（與溫度成正比），分子碰撞頻率與衝擊力增加，造成氣體壓力上升，進而使彈性塑膠鼓起。從分子觀點，直接的原因是「空氣粒子受熱能增加（平均動能上升）」。因此選 (C)。(其他選項如「粒子數增加」或「粒子本身體積變大」不符合氣體行為；粒子間間隔變大為結果之一但非直接說明「受熱」的機制；壓力變小顯然與現象相反。)",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 24,
+          "answer": "B",
+          "explanation": "要把食鹽（溶質）和水（溶劑）分開，常用的分離方法為蒸餾或蒸發結晶。蒸餾（蒸餾/蒸餾法）可加熱使水蒸發並冷凝回收純水，留下固體食鹽，因此應選 (B) 蒸餾。選項說明：過濾適用於固液不溶混合物，萃取與層析非合適於溶質與溶劑已形成溶液的情況，傾析為密度不同之兩不可混液體的分離。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 25,
+          "answer": "B",
+          "explanation": "題意：將密封裝滿水之玻璃瓶置入乾冰與酒精組成之冷劑中，經一段時間後玻璃瓶爆炸。乾冰（固態 CO2）會昇華成 CO2(g)，在密閉容器內快速產生大量氣體，內部壓力升高致使玻璃爆裂。故主因為乾冰揮發／昇華過快造成內部氣體過多，選 (B)。其他選項例如水結冰會膨脹但置入的是低溫昇華劑且瓶內為液態水，酒精燃燒或化學反應亦不符合情境。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 26,
+          "answer": "C",
+          "explanation": "固→氣直接昇華發生的條件是壓力低於該物質之三相點壓力（低於 triple point），加熱後不會經由液相即由固轉為氣。由圖可見三相點壓力約介於 0.3 atm 與 0.5 atm 之間（圖中標示 0.5 atm 與 0.3 atm），因此在 0.3 atm 下由 5°C 升至 30°C 時會跨越固—氣相界線而不進入液相，屬昇華過程。選項 (C) 0.3 atm 下由 5°C→30°C 為正確。備註：因原圖解析度有限，三相點精確數值推估有不確定性，故此題對圖的判讀有一定仰賴圖示位置。",
+          "confidence": 0.7,
+          "needs_review": true
+        },
+        {
+          "number": 27,
+          "answer": "E",
+          "explanation": "圖示為 100 g 固體物質受熱的溫度—熱量曲線：\n- 固體由 -20°C 加熱到 0°C 所需熱量為 15 kcal。\n  因此固體比熱 c_s = Q/(m ΔT) = 15 kcal / (100 g × 20 °C) = 0.0075 kcal·g⁻1·°C⁻1 = 7.5 cal·g⁻1·°C⁻1。\n- 熔化潛熱（固→液）為 15 → 21 kcal 間的平臺，即 ΔQ_fus = 6 kcal（對 100 g 者）。每克 = 6 kcal / 100 g = 0.06 kcal·g⁻1 = 60 cal·g⁻1。\n- 液體由 0°C 升至 60°C 所需熱量為 21 → 29 kcal，即 ΔQ = 8 kcal。\n  因此液體比熱 c_l = 8 kcal / (100 g × 60 °C) = 8/6000 = 0.001333... kcal·g⁻1·°C⁻1 = 1.333... cal·g⁻1·°C⁻1。\n- 從 29 kcal 開始出現沸騰平臺（圖示），若圖中完全汽化所需熱量等於熔化熱 6 kcal（圖上兩平臺長度相同），則完全汽化所需熱量為 6 kcal（整個樣品）。\n檢視選項：\n(A) 正常沸點為 -20°C：錯誤（-20°C 為固相起始溫度）。\n(B) 液態比熱為 0.75 cal·g⁻1·°C⁻1：錯誤，計算為約 1.333 cal·g⁻1·°C⁻1。\n(C) 熔化熱大於汽化熱：圖示兩者數值相等（皆為 6 kcal），故此敘述錯誤。\n(D) 相變為化學變化：錯誤，相變為物理變化。\n(E) 完全汽化需熱量 6 千卡：與圖中沸騰平臺長度相同假設下為正確答案。\n因此選 (E)。",
+          "confidence": 0.9,
+          "needs_review": false
+        },
+        {
+          "number": 28,
+          "answer": "C",
+          "explanation": "同位素指的是原子序相同（同為同一元素），但質量數不同的原子。選項 (C) 12C 與 13C 為碳的兩種同位素，正確。其他選項：O2 與 O3 為不同分子；黃磷與白磷為同素異形（同元素不同結晶形）；彈性硫與斜方硫、鑽石與石墨為同素異形或同素異形態，不是同位素。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 29,
+          "answer": "A",
+          "explanation": "已知氧原子序 8，水分子由兩個氫原子與一個氧原子靠共用電子（共價鍵）形成。逐項判斷：\n(A) 說氫與氧以「轉移價電子」方式形成化學鍵（意指離子鍵、電子完全轉移）——錯誤，水中的鍵為共價鍵（電子共享），因此 (A) 為錯誤敘述。\n(B) 水分子總電子數 = 8 (O) + 1 + 1 (兩個 H) = 10 個電子，正確。\n(C) 兩氫+一氧結合後，氧的電子數為 8（配位使其獲得八隻價電子的配位），與氬（Ar）相同電子數，敘述可視為正確（氧達到八隅體）。\n(D) 每個氫在共價結合後可視為擁有 2 顆電子（共享），與氦相同，正確。\n(E) 化學鍵是一種原子間吸引力，正確。\n因此錯誤選項為 (A)。",
+          "confidence": 0.97,
+          "needs_review": false
+        },
+        {
+          "number": 30,
+          "answer": "C",
+          "explanation": "反應：2 NH3 + 3 CuO → Cu + X + H2O，假設 X 為單一產物並使整個反應配平。設 X = N2，則配平檢查：\n2 NH3 + 3 CuO → 3 Cu + N2 + 3 H2O\n左：N 2，H 6，Cu 3，O 3；右：N 2，H 6（3 H2O），Cu 3，O 3（3 H2O）。質量守恆，配平成立。其他含氮氧化物（NO、NO2、N2O、N2O4）不會在此簡單還原條件下唯一產物且配平不符題意。故 X 最可能為 N2，選 (C)。",
+          "confidence": 0.95,
+          "needs_review": false
+        }
+      ]
+    },
+    {
+      "page": 9,
+      "questions": [
+        {
+          "number": 6,
+          "answer": "C,E",
+          "explanation": "題意：何者可說明定比定律（同一化合物中元素質量比固定）？\n(A) 過氧化氫與水中皆含氧與氫原子 — 僅表示成分有相同元素，未說明比例固定，與定比定律無關，錯。 \n(B) 碳原子有 12C、13C、14C 三種 — 是同位素概念，屬元素性質，非化合物組成的固定比例，錯。 \n(C) H2O 可由氫氣在空氣中燃燒而得；亦可由過氧化氫的分解產生 — 同一化合物可由不同方法製成，但組成（H:O 質量比）相同，符合定比定律，對。 \n(D) 自然界所含 35Cl 與 37Cl 之比為 3:1 — 描述同位素自然豐度，與化合物組成固定比例無關，錯。 \n(E) 44 g 的二氧化碳含 12 g 的碳；22 g 的二氧化碳含 6 g 的碳 — 顯示 CO2 中 C 與 O 的質量比固定（44 g CO2 含 12 g C，即 12:32），且按比例縮放仍成立，直接說明定比定律，對。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 7,
+          "answer": "A,C,D",
+          "explanation": "題意：甲酸 HCOOH 的鍵結與性質判斷。\n分子結構：H–C(=O)–OH（即甲酸）。\n(A) 分子中有 4 對孤對電子 — 兩個氧原子各有兩對孤對電子，共 4 對孤對電子，故正確。\n(B) 純液體可導電 — 甲酸為分子性弱酸，純液體中無大量自由離子，故不導電（只有部分自離解極少量），此敘述錯誤。\n(C) 分子中有 3 個單鍵、1 個雙鍵 — 分子鍵：C–H（單）、C–O（單，連接 OH）、O–H（單）、C=O（雙），合計 3 單鍵 1 雙鍵，故正確。\n(D) 在水溶液中可解離出 H+ — 甲酸為弱酸，溶於水會部分電離成 H+ 與 HCOO−，故正確。\n(E) HCOOH 為離子化合物 — 甲酸為共價分子（分子性酸），不是離子化合物，錯誤。",
+          "confidence": 0.99,
+          "needs_review": false
+        },
+        {
+          "number": 8,
+          "answer": "A,B,C",
+          "explanation": "題意：金屬晶體性質判斷。\n(A) 在金屬晶體中，所有陽離子呈規則排列 — 金屬由規則排列的正離子格點構成（晶格），此描述正確。\n(B) 形成金屬鍵的價電子不屬於某一原子而屬於整個晶體，稱為電子海 — 電子海模型描述金屬鍵與導電性，正確。\n(C) 金屬具有光澤 — 金屬的自由電子能吸收並反射可見光，造成光澤，正確。\n(D) 金屬晶體的導電是由於陰陽離子的移動 — 錯誤，金屬導電主因為游離電子（電子海）移動，非離子移動。\n(E) 熔點高，故常溫下無以液態存在的金屬 — 此為過度概括，實際上有例外（例如 Hg 常溫為液態），因此敘述為錯誤。",
+          "confidence": 0.98,
+          "needs_review": false
+        },
+        {
+          "number": 9,
+          "answer": "B,C",
+          "explanation": "題意：比較 CH3OH 與所畫結構式的性質（所畫為甲醇的結構式）。\n(B) 前者為示性式，後者為結構式 — CH3OH 屬示性或縮寫式（示性式/示性結構式），而圖示為完整結構式（用鍵表示），此敘述正確。\n(A) 前者為結構式，後者為示性式 — 顛倒，故錯誤。\n(C) 分子式相同 — 兩者均表示甲醇，分子式與原子數相同，正確。\n(D) 分子量不同 — 分子量相同，錯誤。\n(E) 分子中的氫原子總數不同 — 氫原子總數相同（皆為 4 個 H），錯誤。",
+          "confidence": 0.95,
+          "needs_review": false
+        },
+        {
+          "number": 10,
+          "answer": "A,C,D,E",
+          "explanation": "題意：判斷各種分離方法敘述正誤。\n(A) 混合物的分離可利用各物質在物理性質上的差異 — 正確，分離方法（過濾、蒸餾、萃取、層析等）即利用密度、溶解度、沸點、吸附力等物理性質差異。\n(B) 欲分離糖水中的糖與水，可使用過濾法 — 錯誤，糖溶於水形成溶液，粒子無法被濾紙截留；應用蒸發、結晶或蒸餾等方法。\n(C) 要從海水中萃取微量的碘，可使用酒精作為萃取液 — 正確（萃取法利用溶解度差；碘在有機溶劑或含醇溶劑中可被萃取），教科書常以有機溶劑（如 CCl4、CHCl3 或酒精）萃取游離碘，故此敘述被視為正確。\n(D) 要從海水中分離出水，可採用蒸餾法 — 正確，利用水與溶質沸點差或蒸氣壓差回收淡水。\n(E) 紅墨水經過層析，各成分會因為與濾紙的吸附力不同被分離 — 正確，層析（紙層析）正是利用吸附力與親水/疏水平衡分離染料成分。",
+          "confidence": 0.9,
+          "needs_review": false
+        }
+      ]
+    }
+  ]
+}
