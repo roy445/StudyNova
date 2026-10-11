@@ -31,6 +31,7 @@ const releaseMigrations = [
   "0107_pk_bot_accounts.sql",
   "0108_users_system_column_repair.sql",
   "0120_previous_exam_center.sql",
+  "0121_ai_question_converter.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

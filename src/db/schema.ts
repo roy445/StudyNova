@@ -818,6 +818,58 @@ export const quizzes = pgTable(
   (t) => [index("quizzes_user_idx").on(t.userId), uniqueIndex("quizzes_slug_uq").on(t.shareSlug)],
 );
 
+export const aiQuestionConverterJobs = pgTable(
+  "ai_question_converter_jobs",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    // The SQL migration owns this FK because fileContexts is declared later in this schema module.
+    sourceContextId: uuid("source_context_id").notNull(),
+    sourceFileName: text("source_file_name").notNull().default(""),
+    title: text("title").notNull().default("AI 題目互動化題組"),
+    status: text("status").notNull().default("queued"),
+    stage: text("stage").notNull().default("queued"),
+    pageCount: integer("page_count").notNull().default(0),
+    totalCount: integer("total_count").notNull().default(0),
+    interactiveCount: integer("interactive_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    summary: jsonb("summary").$type<Record<string, number>>().notNull().default({}),
+    isPro: boolean("is_pro").notNull().default(false),
+    aiUsage: integer("ai_usage").notNull().default(0),
+    novaCost: integer("nova_cost").notNull().default(0),
+    processingMs: integer("processing_ms").notNull().default(0),
+    quizId: uuid("quiz_id").references(() => quizzes.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [index("ai_question_converter_user_idx").on(t.userId, t.createdAt), index("ai_question_converter_status_idx").on(t.status, t.createdAt)],
+);
+
+export const aiQuestionConverterItems = pgTable(
+  "ai_question_converter_items",
+  {
+    id: id(),
+    jobId: uuid("job_id").notNull().references(() => aiQuestionConverterJobs.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    pageNumber: integer("page_number").notNull().default(0),
+    type: text("type").notNull().default("single"),
+    status: text("status").notNull().default("interactive"),
+    stem: text("stem").notNull().default(""),
+    options: jsonb("options").$type<string[]>().notNull().default([]),
+    answer: jsonb("answer").$type<string[]>().notNull().default([]),
+    originalExplanation: text("original_explanation").notNull().default(""),
+    aiExplanation: text("ai_explanation").notNull().default(""),
+    skipReason: text("skip_reason").notNull().default(""),
+    sourceText: text("source_text").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: created(),
+  },
+  (t) => [index("ai_question_converter_item_job_idx").on(t.jobId, t.ordinal)],
+);
+
 export const quizQuestionHistory = pgTable(
   "quiz_question_history",
   {

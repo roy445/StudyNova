@@ -34,6 +34,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/ops", label: "整合總控台（相容）", icon: "settings" },
       { href: "/admin/pro-renewals", label: "Nova Pro 續約", icon: "nova" },
       { href: "/admin/ai-jobs", label: "AI 背景工作", icon: "nova" },
+      { href: "/admin/ai-question-converter", label: "AI 題目互動化", icon: "weekly" },
     ],
   },
   {

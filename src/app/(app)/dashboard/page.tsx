@@ -123,6 +123,7 @@ export default function DashboardPage() {
         <Link href="/study?tab=ocr" className="group rounded-2xl border border-emerald-300/35 bg-emerald-300/[0.06] p-3 transition hover:-translate-y-0.5 hover:border-emerald-200/75 sm:p-4"><span className="text-3xl">▧</span><h3 className="mt-2 font-black">圖片 OCR</h3><p className="mt-1 text-xs leading-5 text-muted">拍照辨識講義與題目。</p></Link>
         <Link href="/learning" className="group rounded-2xl border border-cyan-300/30 bg-cyan-300/[0.06] p-3 transition hover:-translate-y-0.5 hover:border-cyan-200/75 sm:p-4"><span className="text-3xl">📚</span><h3 className="mt-2 font-black">繼續學習</h3><p className="mt-1 text-xs leading-5 text-muted">回到線上課程與教材。</p></Link>
         <Link href="/study?tab=quiz" className="group rounded-2xl border border-amber-300/30 bg-amber-300/[0.05] p-3 transition hover:-translate-y-0.5 hover:border-amber-200/75 sm:p-4"><span className="text-3xl">✓</span><h3 className="mt-2 font-black">練習與單字</h3><p className="mt-1 text-xs leading-5 text-muted">測驗、錯題與單字複習。</p></Link>
+        <Link href="/ai-question-converter" className="group col-span-2 rounded-2xl border border-fuchsia-300/35 bg-fuchsia-300/[0.06] p-3 transition hover:-translate-y-0.5 hover:border-fuchsia-200/75 sm:p-4"><span className="text-3xl">🧩</span><h3 className="mt-2 font-black">AI 題目互動化</h3><p className="mt-1 text-xs leading-5 text-muted">上傳含答案的 PDF，先預覽再轉成互動題組。</p></Link>
       </section>
 
       {/* Novi greeting */}

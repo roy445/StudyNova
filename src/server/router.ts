@@ -107,6 +107,7 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/content-routes"),
     import("./routes/reading-routes"),
     import("./routes/ai-routes"),
+    import("./routes/ai-question-converter-routes"),
     import("./routes/social-routes"),
     import("./routes/economy-routes"),
     import("./routes/weekly-routes"),

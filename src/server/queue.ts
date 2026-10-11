@@ -25,6 +25,7 @@ import {
   dailyKnowledgeItems,
   pkBotJobs,
   ttsJobs,
+  aiQuestionConverterJobs,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
@@ -38,6 +39,7 @@ import { DAILY_KNOWLEDGE_SUBJECTS, generateDailyKnowledge, fingerprint } from ".
 import { publishScheduledRelease } from "./release-publisher";
 import { processExamPrepImport } from "./exam-prep-import";
 import { processExamPrepDraftAnalysis } from "./exam-prep-draft-analysis";
+import { processConverterJob } from "./ai-question-converter";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -63,6 +65,7 @@ export type JobName =
   | "release_publish"
   | "exam_prep_import"
   | "exam_prep_draft_analysis"
+  | "ai_question_converter"
   | "quiz_expiry_cleanup";
 
 
@@ -99,6 +102,13 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     if (!draftId || !userId) throw new Error("缺少段考題目草稿分析參數");
     const result = await processExamPrepDraftAnalysis(draftId, userId);
     return `段考題目草稿 ${draftId}：${result.status}`;
+  },
+
+  async ai_question_converter(payload) {
+    const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
+    if (!jobId) throw new Error("缺少 AI 題目互動化工作 ID");
+    const result = await processConverterJob(jobId);
+    return `AI 題目互動化 ${jobId}：${result.status}`;
   },
 
   async daily_tasks_refresh() {
@@ -307,7 +317,8 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     const archived = await db.select({ id: aiConversations.id }).from(aiConversations).where(and(eq(aiConversations.archived, true), sql`${aiConversations.updatedAt} < ${memoryCutoff}`)).limit(500);
     for (const conversation of archived) await db.delete(aiMessages).where(eq(aiMessages.conversationId, conversation.id));
     const contexts = await db.delete(fileContexts).where(sql`${fileContexts.createdAt} < now() - interval '90 days'`).returning({ id: fileContexts.id });
-    return `保守清理完成：刪除 ${oldMemory.length} 筆低價值記憶、${contexts.length} 筆過期檔案分析，清理 ${archived.length} 個封存對話訊息`;
+    const converterJobs = await db.delete(aiQuestionConverterJobs).where(sql`${aiQuestionConverterJobs.expiresAt} is not null and ${aiQuestionConverterJobs.expiresAt} < now()`).returning({ id: aiQuestionConverterJobs.id });
+    return `保守清理完成：刪除 ${oldMemory.length} 筆低價值記憶、${contexts.length} 筆過期檔案分析、${converterJobs.length} 筆 AI 題目互動化資料，清理 ${archived.length} 個封存對話訊息`;
   },
 
   async name_moderation_scan() {
