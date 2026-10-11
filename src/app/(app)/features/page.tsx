@@ -8,6 +8,7 @@ type Feature = { href: string; icon: SymbolName; title: string; description: str
 const FEATURES: Feature[] = [
   { href: "/ai", icon: "nova", title: "Novi AI 助教", description: "提問、解析與執行學習操作", tone: "violet" },
   { href: "/study", icon: "study", title: "學習中心", description: "教材、AI 出題、錯題與單字", tone: "cyan" },
+  { href: "/ai-question-converter", icon: "weekly", title: "AI 題目互動化", description: "PDF 題目先預覽，再建立互動題組", tone: "violet" },
   { href: "/ai-quiz", icon: "question", title: "AI 測驗", description: "建立互動測驗並查看解析", tone: "violet" },
   { href: "/learning", icon: "book", title: "線上學習", description: "依章節閱讀課程與教材", tone: "blue" },
   { href: "/solve", icon: "camera", title: "拍照解題", description: "上傳題目取得步驟解析", tone: "emerald" },
