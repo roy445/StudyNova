@@ -5,6 +5,7 @@ import { examPrepActivities, examPrepImportAssets, examPrepImportJobs, examPrepI
 import { extractText } from "./routes/content-routes";
 import { extractPdfQuestionChunks, parseNumberedChoiceQuestionText, renderPdfImagePages } from "./pdf-question-extract";
 import { putObject, readObject } from "./storage";
+import sharp from "sharp";
 
 export function checksum(data: Buffer) {
   return createHash("sha256").update(data).digest("hex");
@@ -43,8 +44,10 @@ export async function processExamPrepImport(jobId: string) {
       try { chunks = await extractPdfQuestionChunks(original.data, 12_000); text = chunks.map((chunk) => chunk.text).join("\n\n").trim(); } catch { chunks = []; }
       pageImages = await renderPdfImagePages(original.data, 1.25);
     } else if (original.mimeType.startsWith("image/")) {
-      pageImages = [{ page: 1, base64: original.data.toString("base64") }];
-      try { text = await extractText(original.mimeType, original.data, job.uploadedBy, subject); } catch { text = ""; }
+      let normalizedImage = original.data;
+      try { normalizedImage = await sharp(original.data).rotate().png().toBuffer(); } catch { /* 交給後續 OCR 處理原始圖片 */ }
+      pageImages = [{ page: 1, base64: normalizedImage.toString("base64") }];
+      try { text = await extractText("image/png", normalizedImage, job.uploadedBy, subject); } catch { text = ""; }
     } else {
       text = original.data.toString("utf8");
       chunks = [{ pageStart: 1, pageEnd: 1, text }];

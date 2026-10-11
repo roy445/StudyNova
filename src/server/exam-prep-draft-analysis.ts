@@ -1,8 +1,10 @@
 import { runAiJson } from "./ai";
+import type { AiPart } from "./ai";
 import { getAiPolicy, policyInstructions } from "./ai-policy";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { examPrepQuestionDrafts } from "@/db/schema";
+import { examPrepImportAssets, examPrepImportJobs, examPrepQuestionDrafts } from "@/db/schema";
+import { readObject } from "./storage";
 
 type Draft = {
   subject: string;
@@ -58,7 +60,7 @@ export function draftQualityGate(draft: Draft, analysis: Partial<DraftAnalysis>)
     hasStem: draft.stem.trim().length >= 4,
     hasOptions: draft.type === "fill" || draft.type === "short" || draft.type === "essay" || draft.options.length >= 2,
     answerPresent: Boolean(draft.answer.length || analysis.verifiedAnswer?.length),
-    answerInOptions: !draft.options.length || (draft.answer.length > 0 && draft.answer.every((answer) => answerMatchesOption(answer, draft.options))),
+    answerInOptions: !draft.options.length || (draft.answer.length > 0 ? draft.answer : verifiedAnswer).every((answer) => answerMatchesOption(answer, draft.options)),
     hasUnderstanding: understanding.trim().length >= 12,
     hasApproach: approach.trim().length >= 12,
     hasExplanation: detailedExplanation.trim().length >= 24,
@@ -71,14 +73,14 @@ export function draftQualityGate(draft: Draft, analysis: Partial<DraftAnalysis>)
   return { passed: failed.length === 0, score: Math.round((Object.values(checks).filter(Boolean).length / Object.values(checks).length) * 100), checks, failed, answerConflict, answerConflictStatus: answerConflict ? "ANSWER_CONFLICT" : "MATCHED" };
 }
 
-export async function analyzeExamPrepDraft(draft: Draft, userId: string) {
+export async function analyzeExamPrepDraft(draft: Draft, userId: string, imageParts: AiPart[] = []) {
   const policy = await getAiPolicy("question_analysis");
   const options = draft.options.length ? draft.options.map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`).join("\n") : "（非選擇題／無選項）";
   const response = await runAiJson<Partial<DraftAnalysis>>({
     feature: "exam_prep_draft_analysis",
     userId,
     system: `你是 StudyNova 段考題目審核專家。${policyInstructions(policy)}\n你必須重新推導答案，不能盲從原卷答案；若無法確認，verifiedAnswer 輸出空陣列並說明原因。不可捏造題目沒有提供的圖表資訊。只輸出 JSON。`,
-    parts: [{ kind: "text", text: `請分析這一題。\n科目：${draft.subject}\n題型：${draft.type}\n題幹：${draft.stem}\n選項：\n${options}\n原始答案：${draft.answer.join("、") || "未提供"}\n原始解析：${draft.explanation || "未提供"}\n\nJSON 欄位：understanding、verifiedAnswer(string[])、answerReason、approach、detailedExplanation、optionAnalysis([{option,reason}])、coreConcept、commonErrors(string[])、memoryTip。` }],
+    parts: [{ kind: "text", text: `請分析這一題。\n科目：${draft.subject}\n題型：${draft.type}\n題幹：${draft.stem}\n選項：\n${options}\n原始答案：${draft.answer.join("、") || "未提供"}\n原始解析：${draft.explanation || "未提供"}\n\n若圖片中有公式、圖表、幾何圖形或題幹文字，必須以圖片為準補足文字；若原卷沒有答案，請自行推導 verifiedAnswer，並產生可教學的 detailedExplanation。看不清楚時不要猜，請在 answerReason 說明。\nJSON 欄位：understanding、verifiedAnswer(string[])、answerReason、approach、detailedExplanation、optionAnalysis([{option,reason}])、coreConcept、commonErrors(string[])、memoryTip。` }, ...imageParts],
     maxOutputTokens: 3200,
     temperature: 0.1,
   }, {});
@@ -103,13 +105,33 @@ export async function processExamPrepDraftAnalysis(draftId: string, userId: stri
   if (draft.analysisStatus === "completed" && draft.quality && (draft.quality as { passed?: boolean }).passed) return { status: draft.analysisStatus, quality: draft.quality };
   await db.update(examPrepQuestionDrafts).set({ analysisStatus: "analyzing", analysisAttempts: draft.analysisAttempts + 1, analysisError: "", updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
   try {
-    const result = await analyzeExamPrepDraft({ subject: draft.subject, type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation }, userId);
+    const assets = await db.select({ objectId: examPrepImportAssets.objectId, pageNumber: examPrepImportAssets.pageNumber }).from(examPrepImportAssets).where(and(eq(examPrepImportAssets.jobId, draft.jobId), eq(examPrepImportAssets.assetType, "image")));
+    const imageParts: AiPart[] = [];
+    for (const asset of assets.filter((item) => item.pageNumber !== null && (draft.pageStart === null || item.pageNumber >= draft.pageStart) && (draft.pageEnd === null || item.pageNumber <= draft.pageEnd)).slice(0, 3)) {
+      try {
+        const object = await readObject(asset.objectId);
+        if (object.mimeType.startsWith("image/")) imageParts.push({ kind: "image", mimeType: object.mimeType, base64: object.data.toString("base64") });
+      } catch { /* 圖片遺失時仍可用 OCR 文字分析 */ }
+    }
+    const result = await analyzeExamPrepDraft({ subject: draft.subject, type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation }, userId, imageParts);
     const analysisStatus = result.quality.passed ? "completed" : "quality_failed";
-    await db.update(examPrepQuestionDrafts).set({ analysis: result.analysis, quality: { ...result.quality, provider: result.provider }, analysisStatus, analyzedAt: new Date(), updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
+    const verifiedAnswer = result.analysis.verifiedAnswer.length ? result.analysis.verifiedAnswer : draft.answer;
+    const explanation = result.analysis.detailedExplanation.trim() || draft.explanation;
+    await db.update(examPrepQuestionDrafts).set({ answer: verifiedAnswer, explanation, analysis: result.analysis, quality: { ...result.quality, provider: result.provider, imageCount: imageParts.length }, analysisStatus, analyzedAt: new Date(), updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
+    await updateExamPrepAnalysisProgress(draft.jobId);
     return { status: analysisStatus, quality: result.quality };
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI 題目分析失敗";
     await db.update(examPrepQuestionDrafts).set({ analysisStatus: "failed", analysisError: message, updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
+    await updateExamPrepAnalysisProgress(draft.jobId);
     throw error;
   }
+}
+
+async function updateExamPrepAnalysisProgress(jobId: string) {
+  const drafts = await db.select({ analysisStatus: examPrepQuestionDrafts.analysisStatus }).from(examPrepQuestionDrafts).where(eq(examPrepQuestionDrafts.jobId, jobId));
+  const total = drafts.length;
+  const processed = drafts.filter((draft) => ["completed", "quality_failed", "failed"].includes(draft.analysisStatus)).length;
+  const progress = total ? Math.round((processed / total) * 100) : 0;
+  await db.update(examPrepImportJobs).set({ status: processed === total ? "pending_review" : "processing", stage: "ai_analysis", progress, updatedAt: new Date(), ...(processed === total ? { completedAt: new Date() } : {}) }).where(eq(examPrepImportJobs.id, jobId));
 }
