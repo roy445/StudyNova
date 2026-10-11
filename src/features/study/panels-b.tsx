@@ -19,7 +19,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
   const quizGenerateCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
   const [genOpen, setGenOpen] = useState(autoGenerate);
-  const [form, setForm] = useState({ subject: "英文", topic: "", materialId: "", sourceText: "", count: 5, difficulty: "normal", type: "single", timeLimitSec: 600 });
+  const [form, setForm] = useState({ subject: "英文", topic: "", materialId: "", sourceText: "", exampleText: "", count: 5, difficulty: "normal", type: "single", timeLimitSec: 600 });
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [active, setActive] = useState<{ quiz: Quiz; questions: QuizQuestion[]; attemptId: string } | null>(null);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
@@ -27,6 +27,8 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
   const [review, setReview] = useState<{ score: number; correct: number; total: number; items: ReviewItem[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [checkedAnswers, setCheckedAnswers] = useState<Record<string, { isCorrect: boolean; answer: string[]; explanation: string }>>({});
 
   const submit = useCallback(
     async (attemptId: string, duration: number) => {
@@ -87,6 +89,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
         difficulty: form.difficulty,
         type: form.type,
         timeLimitSec: form.timeLimitSec,
+        exampleText: form.exampleText,
       };
       if (materialId) payload.materialId = materialId;
       else payload.sourceText = form.sourceText;
@@ -96,6 +99,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
       setGenOpen(false);
       setSourceFile(null);
       await list.reload();
+      await start(res.quiz);
     } catch (err) {
       toast.push("error", errorMessage(err));
     } finally {
@@ -116,6 +120,8 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
       setActive({ quiz, questions: full.questions, attemptId: started.attempt.id });
       setRemaining(quiz.timeLimitSec);
       setReview(null);
+      setQuestionIndex(0);
+      setCheckedAnswers({});
       if (started.resumed) toast.push("info", "已恢復上次未完成的作答");
     } catch (err) {
       toast.push("error", errorMessage(err));
@@ -134,57 +140,66 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
     }
   }
 
+  async function checkCurrentAnswer(question: QuizQuestion) {
+    const response = answers[question.id] ?? [];
+    if (!response.length || !response[0].trim()) {
+      toast.push("info", "請先選擇或輸入答案");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await apiPost<{ isCorrect: boolean; answer: string[]; explanation: string }>(`/attempts/${active?.attemptId}/check`, { questionId: question.id, response });
+      setCheckedAnswers((current) => ({ ...current, [question.id]: result }));
+    } catch (err) {
+      toast.push("error", errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (active) {
     const answered = Object.values(answers).filter((v) => v.length).length;
+    const question = active.questions[questionIndex];
+    const checked = checkedAnswers[question.id];
+    const optionLetters = ["A", "B", "C", "D", "E", "F"];
+    const isChoice = ["single", "truefalse", "part_of_speech", "meaning", "multiple"].includes(question.type);
+    const options = question.options.length ? question.options : question.type === "truefalse" ? ["正確", "錯誤"] : [];
+    const answeredPercent = Math.round(((questionIndex + 1) / active.questions.length) * 100);
     return (
       <Card
         title={active.quiz.title}
-        subtitle={`${active.questions.length} 題・已作答 ${answered} 題（答案會自動儲存，可中斷後恢復）`}
+        subtitle={`${questionIndex + 1}／${active.questions.length} 題・已作答 ${answered} 題`}
         action={<Badge tone={remaining < 60 ? "rose" : "cyan"}>{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</Badge>}
       >
-        <div className="space-y-3">
-          {active.questions.map((q, i) => (
-            <div key={q.id} className="glass-soft p-3">
-              <p className="text-sm font-medium">
-                {i + 1}. {q.stem}
-              </p>
-              <div className="mt-2 space-y-1.5">
-                {q.type === "single" || q.type === "truefalse" || q.type === "part_of_speech" || q.type === "meaning" ? (
-                  q.options.map((o) => (
-                    <label key={o} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm ${answers[q.id]?.[0] === o ? "border-[#37d3ff] bg-[#37d3ff]/10" : "border-[var(--line)]"}`}>
-                      <input type="radio" name={q.id} checked={answers[q.id]?.[0] === o} onChange={() => saveAnswer(q.id, [o])} className="accent-[#37d3ff]" />
-                      <span>{o}</span>
-                    </label>
-                  ))
-                ) : q.type === "multiple" ? (
-                  q.options.map((o) => (
-                    <label key={o} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm ${answers[q.id]?.includes(o) ? "border-[#37d3ff] bg-[#37d3ff]/10" : "border-[var(--line)]"}`}>
-                      <input
-                        type="checkbox"
-                        checked={answers[q.id]?.includes(o) ?? false}
-                        onChange={(e) => {
-                          const cur = answers[q.id] ?? [];
-                          saveAnswer(q.id, e.target.checked ? [...cur, o] : cur.filter((x) => x !== o));
-                        }}
-                        className="accent-[#37d3ff]"
-                      />
-                      <span>{o}</span>
-                    </label>
-                  ))
-                ) : (
-                  <Input value={answers[q.id]?.[0] ?? ""} onChange={(e) => saveAnswer(q.id, [e.target.value])} placeholder="輸入答案" />
-                )}
-              </div>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <Button loading={busy} onClick={() => submit(active.attemptId, active.quiz.timeLimitSec - remaining)}>
-              交卷
-            </Button>
-            <Button variant="ghost" onClick={() => setActive(null)}>
-              稍後再作答
-            </Button>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted"><span>作答進度</span><span>{answeredPercent}%</span></div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#7c5cff] transition-all duration-500" style={{ width: `${answeredPercent}%` }} /></div>
           </div>
+          <div className="rounded-2xl border border-[var(--line)] bg-[#0b1730]/70 p-4 sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3"><Badge tone="cyan">第 {questionIndex + 1} 題</Badge><span className="text-xs text-muted">{question.type === "multiple" ? "可複選" : "請選出最適合的答案"}</span></div>
+            <h3 className="text-base font-semibold leading-7 sm:text-lg">{question.stem}</h3>
+            {isChoice && options.length > 0 ? (
+              <div className="mt-5 space-y-3">
+                {options.map((option, optionIndex) => {
+                  const selected = answers[question.id]?.includes(option) ?? false;
+                  return <button type="button" key={`${question.id}-${option}`} disabled={Boolean(checked)} onClick={() => {
+                    if (question.type === "multiple") {
+                      const current = answers[question.id] ?? [];
+                      void saveAnswer(question.id, selected ? current.filter((item) => item !== option) : [...current, option]);
+                    } else void saveAnswer(question.id, [option]);
+                  }} className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all ${selected ? "border-[#4c8dff] bg-[#4c8dff]/15 shadow-[0_0_0_2px_rgba(76,141,255,.12)]" : "border-white/15 bg-white/[.025] hover:border-[#4c8dff]/70 hover:bg-[#4c8dff]/10"} ${checked?.isCorrect && selected ? "border-emerald-400 bg-emerald-400/15" : checked && !checked.isCorrect && selected ? "border-rose-400 bg-rose-400/15" : ""}`}><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${selected ? "bg-[#377dff] text-white" : "bg-white/10 text-muted"}`}>{optionLetters[optionIndex]}</span><span className="text-sm leading-6">{option}</span></button>;
+                })}
+              </div>
+            ) : <Input value={answers[question.id]?.[0] ?? ""} disabled={Boolean(checked)} onChange={(e) => void saveAnswer(question.id, [e.target.value])} placeholder="輸入你的答案" />}
+            {checked && <div className={`mt-5 rounded-2xl border p-4 ${checked.isCorrect ? "border-emerald-400/40 bg-emerald-400/10" : "border-rose-400/40 bg-rose-400/10"}`}><p className="font-semibold">{checked.isCorrect ? "回答正確" : "回答錯誤"}</p>{!checked.isCorrect && <p className="mt-1 text-sm">正確答案：{checked.answer.join("、")}</p>}{checked.explanation && <p className="mt-2 text-sm leading-6 text-muted">解析：{checked.explanation}</p>}</div>}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!checked ? <Button full={false} loading={busy} onClick={() => void checkCurrentAnswer(question)}>檢查答案</Button> : questionIndex < active.questions.length - 1 ? <Button full={false} onClick={() => { setQuestionIndex((index) => index + 1); }}>下一題</Button> : <Button full={false} loading={busy} onClick={() => void submit(active.attemptId, active.quiz.timeLimitSec - remaining)}>交卷並查看成績</Button>}
+            <Button variant="ghost" disabled={questionIndex === 0} onClick={() => setQuestionIndex((index) => Math.max(0, index - 1))}>上一題</Button>
+            <Button variant="ghost" onClick={() => setActive(null)}>稍後再作答</Button>
+          </div>
+          <p className="text-xs text-muted">答案會自動保存；關閉或重新整理後，已作答內容仍可恢復。</p>
         </div>
       </Card>
     );
@@ -320,6 +335,12 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
               />
             </Field>
           )}
+          <Field label="考試範圍／章節" hint="也可以只填範圍，例如：高一英文・現在完成式、關係代名詞">
+            <Input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} placeholder="輸入章節、單元或考試範圍" />
+          </Field>
+          <Field label="範例題目（選填）" hint="AI 會參考題型、文字風格、難度與選項設計，不會直接複製原題">
+            <textarea value={form.exampleText} onChange={(e) => setForm({ ...form, exampleText: e.target.value })} className="focus-ring min-h-[100px] w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2 text-sm" placeholder="貼上老師考卷或你希望參考的題目風格" />
+          </Field>
           {!form.materialId && !sourceFile && !form.sourceText.trim() && <p className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs leading-5 text-amber-100">請上傳要出題的檔案、選擇既有教材，或先到「教材專區」上傳內容後再回來出題。</p>}
           {busy && <div className="rounded-xl border border-[#37d3ff]/30 bg-[#37d3ff]/10 p-3" role="status" aria-live="polite"><div className="flex items-center justify-between text-xs"><span>AI 正在分析教材並建立題目…</span><span>{generationProgress}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-black/30"><div className="h-full rounded-full bg-gradient-to-r from-[#37d3ff] to-[#8b5cf6] transition-all duration-700" style={{ width: `${generationProgress}%` }} /></div><p className="mt-1 text-[11px] text-muted">完成後可立即開始，或稍後從本區查看。</p></div>}
           <Button full loading={busy} onClick={generate}>

@@ -287,6 +287,7 @@ export const routes: RouteDef[] = [
           topic: z.string().max(80).optional(),
           materialId: z.string().uuid().nullable().optional(),
           sourceText: z.string().max(20000).optional(),
+          exampleText: z.string().max(12000).optional(),
           count: z.number().int().min(1).max(50).default(5),
           difficulty,
           type: qType.default("single"),
@@ -304,7 +305,9 @@ export const routes: RouteDef[] = [
         if (m.status !== "ready") throw fail("REQ_VALIDATION", { message: "教材尚未完成處理，請等待教材狀態變成 ready 後再出題。" });
         sourceText = `【指定教材：${m.title}】\n【教材完整內容開始】\n${m.content?.trim() || m.summary?.trim() || m.title}\n【教材完整內容結束】`;
       }
-      if (!sourceText.trim()) throw fail("REQ_CONTENT_TOO_SHORT", { message: "請選擇教材或輸入出題內容。" });
+      if (body.exampleText?.trim()) sourceText += `${sourceText.trim() ? "\n\n" : ""}【範例題目與風格參考】\n${body.exampleText.trim()}`;
+      if (!sourceText.trim() && body.topic?.trim()) sourceText = `【使用者指定考試範圍】\n${body.topic.trim()}`;
+      if (!sourceText.trim()) throw fail("REQ_CONTENT_TOO_SHORT", { message: "請選擇教材、輸入考試範圍、貼上內容或提供範例題。" });
       await consumeFeature(user.userId, "ai_practice");
       const policy = (await db.select().from(examModePolicies).where(and(eq(examModePolicies.mode, body.examMode), eq(examModePolicies.enabled, true))).limit(1))[0];
       if (!policy) throw fail("REQ_VALIDATION", { message: "找不到可用的考試模式" });
@@ -523,6 +526,26 @@ export const routes: RouteDef[] = [
         await bumpAchievement(user.userId, "questions_answered", answered[0]?.c ?? 0);
       }
       return { attempt: updated[0], score, correct, total: qs.length, review, reward };
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/attempts/:id/check",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ questionId: z.string().uuid(), response: z.array(z.string().max(500)).max(8) }));
+      const attempt = (await db.select().from(quizAttempts).where(eq(quizAttempts.id, ctx.params.id)).limit(1))[0];
+      if (!attempt) throw notFound("找不到作答紀錄");
+      if (attempt.userId !== user.userId) throw forbidden();
+      if (attempt.status !== "in_progress") throw fail("WEEK_ALREADY_SUBMITTED", { message: "這份測驗已經結束" });
+      const quiz = (await db.select().from(quizzes).where(eq(quizzes.id, attempt.quizId)).limit(1))[0];
+      const question = (await db.select().from(questions).where(eq(questions.id, body.questionId)).limit(1))[0];
+      if (!quiz || !question || !quiz.questionIds.includes(question.id)) throw notFound("找不到這一題");
+      const isCorrectAnswer = isCorrect(question.type, question.answer, body.response);
+      await db.insert(answers).values({ attemptId: attempt.id, questionId: question.id, response: body.response }).onConflictDoUpdate({ target: [answers.attemptId, answers.questionId], set: { response: body.response, updatedAt: new Date() } });
+      return { isCorrect: isCorrectAnswer, answer: question.answer, explanation: question.explanation };
     },
   }),
 
