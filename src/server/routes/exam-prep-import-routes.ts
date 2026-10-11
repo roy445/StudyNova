@@ -226,6 +226,44 @@ export const routes: RouteDef[] = [
     },
   }),
   route({
+    method: "POST",
+    path: "/admin/exam-prep/imports/:id/pause",
+    auth: "admin",
+    handler: async (ctx) => {
+      const job = (await db.select().from(examPrepImportJobs).where(eq(examPrepImportJobs.id, ctx.params.id)).limit(1))[0];
+      if (!job) throw notFound("找不到段考考卷匯入工作");
+      await db.update(examPrepImportJobs).set({ status: "paused", stage: "ai_analysis_paused", updatedAt: new Date() }).where(eq(examPrepImportJobs.id, job.id));
+      return { paused: true, jobId: job.id };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/imports/:id/resume",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const job = (await db.select().from(examPrepImportJobs).where(eq(examPrepImportJobs.id, ctx.params.id)).limit(1))[0];
+      if (!job) throw notFound("找不到段考考卷匯入工作");
+      const drafts = await db.select({ id: examPrepQuestionDrafts.id }).from(examPrepQuestionDrafts).where(and(eq(examPrepQuestionDrafts.jobId, job.id), inArray(examPrepQuestionDrafts.analysisStatus, ["queued", "analyzing", "failed", "quality_failed"] as string[])));
+      await db.update(examPrepImportJobs).set({ status: "processing", stage: "ai_analysis", errorMessage: "", updatedAt: new Date() }).where(eq(examPrepImportJobs.id, job.id));
+      await db.update(examPrepQuestionDrafts).set({ analysisStatus: "queued", analysisError: "", updatedAt: new Date() }).where(and(eq(examPrepQuestionDrafts.jobId, job.id), inArray(examPrepQuestionDrafts.id, drafts.map((draft) => draft.id))));
+      for (const draft of drafts) await queue().enqueue({ name: "exam_prep_draft_analysis", payload: { draftId: draft.id, userId: admin.userId }, uniqueKey: `exam-prep-draft-analysis:${draft.id}:resume:${Date.now()}` });
+      void queue().drain(Math.min(drafts.length, 4));
+      return { resumed: true, queued: drafts.length, jobId: job.id };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/imports/:id/cancel",
+    auth: "admin",
+    handler: async (ctx) => {
+      const job = (await db.select().from(examPrepImportJobs).where(eq(examPrepImportJobs.id, ctx.params.id)).limit(1))[0];
+      if (!job) throw notFound("找不到段考考卷匯入工作");
+      await db.update(examPrepImportJobs).set({ status: "cancelled", stage: "cancelled", errorMessage: "已由管理員取消", updatedAt: new Date(), completedAt: new Date() }).where(eq(examPrepImportJobs.id, job.id));
+      return { cancelled: true, jobId: job.id };
+    },
+  }),
+  route({
     method: "PATCH",
     path: "/admin/exam-prep/imports/:id/drafts/:draftId",
     auth: "admin",

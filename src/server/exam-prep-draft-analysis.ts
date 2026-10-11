@@ -102,6 +102,8 @@ export async function analyzeExamPrepDraft(draft: Draft, userId: string, imagePa
 export async function processExamPrepDraftAnalysis(draftId: string, userId: string) {
   const draft = (await db.select().from(examPrepQuestionDrafts).where(eq(examPrepQuestionDrafts.id, draftId)).limit(1))[0];
   if (!draft) throw new Error("找不到段考題目草稿");
+  const job = (await db.select({ status: examPrepImportJobs.status }).from(examPrepImportJobs).where(eq(examPrepImportJobs.id, draft.jobId)).limit(1))[0];
+  if (job?.status === "paused" || job?.status === "cancelled") return { status: job.status, quality: {} };
   if (draft.analysisStatus === "completed" && draft.quality && (draft.quality as { passed?: boolean }).passed) return { status: draft.analysisStatus, quality: draft.quality };
   await db.update(examPrepQuestionDrafts).set({ analysisStatus: "analyzing", analysisAttempts: draft.analysisAttempts + 1, analysisError: "", updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
   await updateExamPrepAnalysisProgress(draft.jobId);
@@ -116,9 +118,10 @@ export async function processExamPrepDraftAnalysis(draftId: string, userId: stri
     }
     const result = await analyzeExamPrepDraft({ subject: draft.subject, type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation }, userId, imageParts);
     const analysisStatus = result.quality.passed ? "completed" : "quality_failed";
+    const reviewStatus = result.quality.passed && !result.quality.answerConflict ? "approved" : "needs_review";
     const verifiedAnswer = result.analysis.verifiedAnswer.length ? result.analysis.verifiedAnswer : draft.answer;
-    const explanation = result.analysis.detailedExplanation.trim() || draft.explanation;
-    await db.update(examPrepQuestionDrafts).set({ answer: verifiedAnswer, explanation, analysis: result.analysis, quality: { ...result.quality, provider: result.provider, imageCount: imageParts.length }, analysisStatus, analyzedAt: new Date(), updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
+    const explanation = draft.explanation.trim() || result.analysis.detailedExplanation.trim();
+    await db.update(examPrepQuestionDrafts).set({ answer: verifiedAnswer, explanation, analysis: result.analysis, quality: { ...result.quality, provider: result.provider, imageCount: imageParts.length }, analysisStatus, status: reviewStatus, analyzedAt: new Date(), updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
     await updateExamPrepAnalysisProgress(draft.jobId);
     return { status: analysisStatus, quality: result.quality };
   } catch (error) {
@@ -130,6 +133,8 @@ export async function processExamPrepDraftAnalysis(draftId: string, userId: stri
 }
 
 async function updateExamPrepAnalysisProgress(jobId: string) {
+  const currentJob = (await db.select({ status: examPrepImportJobs.status }).from(examPrepImportJobs).where(eq(examPrepImportJobs.id, jobId)).limit(1))[0];
+  if (currentJob?.status === "paused" || currentJob?.status === "cancelled") return;
   const drafts = await db.select({ analysisStatus: examPrepQuestionDrafts.analysisStatus, questionNumber: examPrepQuestionDrafts.questionNumber, analysisError: examPrepQuestionDrafts.analysisError, quality: examPrepQuestionDrafts.quality }).from(examPrepQuestionDrafts).where(eq(examPrepQuestionDrafts.jobId, jobId));
   const total = drafts.length;
   const processed = drafts.filter((draft) => ["completed", "quality_failed", "failed"].includes(draft.analysisStatus)).length;
