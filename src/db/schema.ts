@@ -661,6 +661,44 @@ export const questionBankMemberships = pgTable(
   (t) => [uniqueIndex("question_bank_membership_uq").on(t.bankId, t.questionId), index("question_bank_membership_question_idx").on(t.questionId), index("question_bank_membership_bank_idx").on(t.bankId, t.createdAt)],
 );
 
+/* ---------------------------------------------------- PREVIOUS EXAMS */
+export const previousExamCollections = pgTable(
+  "previous_exam_collections",
+  {
+    id: id(), slug: text("slug").notNull(), title: text("title").notNull(), examType: text("exam_type").notNull().default("學測"), year: integer("year").notNull(),
+    description: text("description").notNull().default(""), sourceFilename: text("source_filename").notNull().default(""), sourceObjectId: uuid("source_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    status: text("status").notNull().default("draft"), isOpen: boolean("is_open").notNull().default(false), settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }), publishedAt: timestamp("published_at", { withTimezone: true }), createdAt: created(), updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("previous_exam_collections_slug_uq").on(t.slug), index("previous_exam_collections_year_idx").on(t.examType, t.year, t.isOpen)],
+);
+
+export const previousExamSubjects = pgTable(
+  "previous_exam_subjects",
+  {
+    id: id(), collectionId: uuid("collection_id").notNull().references(() => previousExamCollections.id, { onDelete: "cascade" }), subjectKey: text("subject_key").notNull(), subjectName: text("subject_name").notNull(), category: text("category").notNull().default("學測科目"),
+    sortOrder: integer("sort_order").notNull().default(0), isOpen: boolean("is_open").notNull().default(true), questionCount: integer("question_count").notNull().default(0), metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}), createdAt: created(), updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("previous_exam_subjects_collection_key_uq").on(t.collectionId, t.subjectKey), index("previous_exam_subjects_collection_sort_idx").on(t.collectionId, t.isOpen, t.sortOrder)],
+);
+
+export const previousExamQuestions = pgTable(
+  "previous_exam_questions",
+  {
+    id: id(), collectionId: uuid("collection_id").notNull().references(() => previousExamCollections.id, { onDelete: "cascade" }), subjectId: uuid("subject_id").notNull().references(() => previousExamSubjects.id, { onDelete: "cascade" }), questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }), questionNumber: integer("question_number").notNull(), questionKind: text("question_kind").notNull().default("選擇題"),
+    sourcePageStart: integer("source_page_start"), sourcePageEnd: integer("source_page_end"), explanationPageStart: integer("explanation_page_start"), explanationPageEnd: integer("explanation_page_end"), sourceText: text("source_text").notNull().default(""), explanationText: text("explanation_text").notNull().default(""), assetIds: jsonb("asset_ids").$type<string[]>().notNull().default([]), metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}), createdAt: created(), updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("previous_exam_questions_subject_number_uq").on(t.subjectId, t.questionNumber), index("previous_exam_questions_collection_subject_idx").on(t.collectionId, t.subjectId, t.questionNumber), index("previous_exam_questions_question_idx").on(t.questionId)],
+);
+
+export const previousExamAttempts = pgTable(
+  "previous_exam_attempts",
+  {
+    id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), collectionId: uuid("collection_id").notNull().references(() => previousExamCollections.id, { onDelete: "cascade" }), subjectId: uuid("subject_id").notNull().references(() => previousExamSubjects.id, { onDelete: "cascade" }), previousQuestionId: uuid("previous_question_id").notNull().references(() => previousExamQuestions.id, { onDelete: "cascade" }), response: jsonb("response").$type<string[]>().notNull().default([]), isCorrect: boolean("is_correct").notNull().default(false), durationSec: integer("duration_sec").notNull().default(0), createdAt: created(),
+  },
+  (t) => [index("previous_exam_attempts_user_idx").on(t.userId, t.collectionId, t.subjectId, t.createdAt), uniqueIndex("previous_exam_attempts_user_question_uq").on(t.userId, t.previousQuestionId)],
+);
+
 export const questionSources = pgTable(
   "question_sources",
   {

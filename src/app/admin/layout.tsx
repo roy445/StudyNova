@@ -28,6 +28,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/members", label: "會員與權限", icon: "admin" },
       { href: "/admin/content-console", label: "內容控制台", icon: "study" },
       { href: "/admin/question-banks", label: "題庫控制台", icon: "question" },
+      { href: "/admin/previous-exams", label: "歷屆刷題管理", icon: "weekly" },
       { href: "/admin/announcements", label: "公告控制台", icon: "report" },
       { href: "/admin/economy", label: "獎勵與促銷", icon: "shop" },
       { href: "/admin/ops", label: "整合總控台（相容）", icon: "settings" },

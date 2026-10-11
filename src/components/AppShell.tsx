@@ -66,6 +66,7 @@ const NOVI_MODES = [
 const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習中心", icon: "study" },
+  { href: "/previous-exams", label: "歷屆刷題", icon: "weekly" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/pk", label: "線上 PK", icon: "duel" },
   { href: "/weekly", label: "每週小考", icon: "weekly" },

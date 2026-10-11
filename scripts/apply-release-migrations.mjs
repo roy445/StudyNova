@@ -30,6 +30,7 @@ const releaseMigrations = [
   "0106_restore_tester_recruitment_announcement.sql",
   "0107_pk_bot_accounts.sql",
   "0108_users_system_column_repair.sql",
+  "0120_previous_exam_center.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
