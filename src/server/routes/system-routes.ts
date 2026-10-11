@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { pushSubscriptions, notifications, users, novaTransactions, questions, jobQueue, weeklyExamWeeks, storageObjects, featurePermissions, platformSettings, customizationCategories, customizationVersions } from "@/db/schema";
 import { route, type Ctx, type RouteDef } from "../router";
 import { badRequest, fail, hashPassword, verifyPassword, generateNovaId, safeErrorMessage, toCsv, todayStr } from "../core";
-import { listNotifications, markRead, unreadCount, pushConfigured, sendPush } from "../notify";
+import { listNotifications, markRead, unreadCount, pushConfigured, sendPush, notify, resolveAudience } from "../notify";
 import { CRON_TASKS, queue, runCronTask, isWeekOpen, type CronTask } from "../queue";
 import { storageHealth, activeDriver, putObject, readObject, deleteObject } from "../storage";
 import { aiConfigured, providerConfigs, providerMetrics, runAi } from "../ai";
@@ -169,6 +169,23 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const user = ctx.requireUser();
       return sendPush(user.userId, { title: "StudyNova 測試推播", body: "推播已成功啟用 ✅", link: "/dashboard" });
+    },
+  }),
+
+  route({
+    method: "POST",
+    path: "/admin/push/exam-prep",
+    auth: "admin",
+    handler: async (ctx) => {
+      const body = await ctx.json(z.object({
+        title: z.string().min(1).max(160).default("段考衝刺中心已開放"),
+        message: z.string().min(1).max(800).default("114 段考衝刺已上線，立即開始限時刷題！"),
+        link: z.string().startsWith("/").max(300).default("/exam-prep"),
+        dedupeKey: z.string().min(1).max(180).default("exam-prep-114-open"),
+      }));
+      const audience = await resolveAudience("all", []);
+      const results = await Promise.all(audience.map((userId) => notify({ userId, kind: "exam_prep", title: body.title, body: body.message, link: body.link, dedupeKey: `${body.dedupeKey}:${userId}`, push: true })));
+      return { sentTo: audience.length, created: results.filter(Boolean).length, configured: pushConfigured() };
     },
   }),
 

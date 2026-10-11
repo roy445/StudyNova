@@ -425,6 +425,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           {(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [...SIDE_NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
+            const isExamPrep = item.href === "/exam-prep";
             return (
               <Link
                 key={item.href}
@@ -433,7 +434,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   active ? "bg-gradient-to-r from-[#7c5cff]/30 to-[#37d3ff]/10 text-[var(--text)] shadow-inner" : "text-muted hover:bg-white/5 hover:text-[var(--text)]"
                 }`}
               >
-                {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-side-icon" /> : <SymbolIcon name={item.icon} size={19} active={active} />}
+                {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-side-icon" /> : isExamPrep ? <img src="/brand/exam-prep-icon.jpg" alt="段考衝刺" className="h-7 w-7 rounded-full object-cover ring-2 ring-cyan-300/60" /> : <SymbolIcon name={item.icon} size={19} active={active} />}
                 <span className="truncate">{item.label}</span>
                 {isPk && <span className="pk-beta-badge">BETA</span>}
               </Link>
@@ -574,6 +575,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           {(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [...NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities.find((activity) => activity.effectiveStatus === "open")?.closeAt }] : NAV).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
+            const isExamPrep = item.href === "/exam-prep";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
             return (
               <li key={item.href} className="flex-1">
@@ -583,7 +585,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
                 >
                   {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
-                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
+                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : isExamPrep ? <img src="/brand/exam-prep-icon.jpg" alt="段考衝刺" className="h-7 w-7 rounded-full object-cover ring-2 ring-cyan-300/70" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
                   <span className="max-w-full truncate">{item.label}</span>
                   {isPk && <span className="pk-beta-badge pk-beta-mobile">BETA</span>}
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
