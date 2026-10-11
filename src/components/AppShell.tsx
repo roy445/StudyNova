@@ -31,7 +31,6 @@ type NavItem = { href: string; label: string; icon: SymbolName; special?: boolea
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
-  { href: "/ai-question-converter", label: "AI 題目", icon: "weekly" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/pk", label: "線上 PK", icon: "duel", special: true },
   { href: "/weekly", label: "測驗與刷題", icon: "weekly" },
@@ -67,7 +66,6 @@ const NOVI_MODES = [
 const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習中心", icon: "study" },
-  { href: "/ai-question-converter", label: "AI 題目互動化", icon: "weekly" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
   { href: "/pk", label: "線上 PK", icon: "duel" },
   { href: "/weekly", label: "測驗與刷題", icon: "weekly" },
