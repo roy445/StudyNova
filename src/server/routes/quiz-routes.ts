@@ -40,6 +40,10 @@ type GeneratedQuestion = {
   explanation?: string;
   topic?: string;
   metadata?: Record<string, unknown>;
+  optionA?: unknown;
+  optionB?: unknown;
+  optionC?: unknown;
+  optionD?: unknown;
 };
 
 export function normalizeQuizOption(value: string): string {
@@ -142,7 +146,7 @@ function cleanGeneratedQuestions(raw: GeneratedQuestion[], topic: string): Clean
   return raw.map((q) => {
     const type = qType.safeParse(q.type ?? "single").success && q.type !== "mixed" ? (q.type as string) : "single";
     const stem = String(q.stem ?? q.question ?? q.questionText ?? "").trim();
-    const options = normalizeQuestionOptions(q.options ?? q.choices);
+    const options = normalizeQuestionOptions(q.options ?? q.choices ?? [q.optionA, q.optionB, q.optionC, q.optionD]);
     const rawAnswer = q.answer ?? q.correctAnswer ?? q.correct;
     const answerValues = Array.isArray(rawAnswer) ? rawAnswer : rawAnswer === undefined || rawAnswer === null || rawAnswer === "" ? [] : [rawAnswer];
     const answerArr = answerValues.map((value) => {
@@ -153,7 +157,8 @@ function cleanGeneratedQuestions(raw: GeneratedQuestion[], topic: string): Clean
       return options.find((option) => normalizeQuizOption(option) === normalizeQuizOption(text)) ?? text;
     }).filter(Boolean);
     if (!stem || !answerArr.length) return null;
-    if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && options.length < 2) return null;
+    if (type === "single" && options.length !== 4) return null;
+    if (["multiple", "part_of_speech", "meaning"].includes(type) && options.length < 2) return null;
     if (["single", "multiple", "part_of_speech", "meaning"].includes(type) && !answerArr.every((answer) => options.some((option) => normalizeQuizOption(option) === normalizeQuizOption(answer)))) return null;
     return { type, stem: stem.slice(0, 2000), options: options.slice(0, 8), answer: answerArr.slice(0, 8), explanation: String(q.explanation ?? "").slice(0, 2000), metadata: q.metadata ?? {}, topic: String(q.topic ?? topic).slice(0, 60) };
   }).filter(Boolean) as CleanQuestion[];
@@ -192,7 +197,7 @@ export async function generateQuestions(params: {
     const usage = usedOptionPool.reduce<Record<string, number>>((counts, option) => { counts[option] = (counts[option] ?? 0) + 1; return counts; }, {});
     const usedQuestionStems = cleaned.map((item) => item.stem).concat([...reservedQuestionStems]).slice(-120);
     const avoid = `${usedOptionPool.length ? `本次測驗選項使用次數（每個選項只能出現 1 次）：${JSON.stringify(usage)}` : "目前尚無已使用選項。"}\n已經用過的題目（不可改寫後重複）：${JSON.stringify(usedQuestionStems)}`;
-    const { data } = await runAiJson<{ questions?: GeneratedQuestion[]; items?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: `你是台灣國高中題目設計引擎。請只依教材完整內容出題，不得使用預設題庫、常識補寫或杜撰教材沒有的考點。每題都必須能在教材內容中找到依據；若內容不足，回傳較少題目，不要硬湊。回傳 JSON questions，每題欄位為 type、stem、options、answer、explanation、topic、metadata。數學與自然科請保留 LaTeX：行內公式使用 $...$，化學式可用 \\ce{H2O}；若教材包含可直接使用的圖片或圖表 URL，放在 metadata.imageUrl，否則不要捏造 URL。${strictEnglishOptions ? "這是英文單字或文法測驗：每一題必須恰好提供 4 個選項 A、B、C、D，四個選項不可重複；single、part_of_speech、meaning、multiple 必須只有一個正確答案（answer 只放一個選項原文）。每題都要依題幹量身設計選項，禁止複製其他題的整組選項。單字干擾項須與題幹相關、同詞性、語意接近、字形易混淆或是常見誤用；文法干擾項須屬同一文法主題下的不同時態、動詞變化或常見學習者錯誤，且必須有明確唯一正解。" : "single/part_of_speech/meaning 優先提供 4 個合理 options。"}選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。不可為了去重使用不自然或無關選項。整份測驗不得重複相同選項組合；使用繁體中文（英文科目可用英文）。`, parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText}` }], maxOutputTokens: 3000 }, { questions: [] });
+    const { data } = await runAiJson<{ questions?: GeneratedQuestion[]; items?: GeneratedQuestion[] }>({ feature: "quiz_generate", userId: params.userId, system: `你是台灣國高中題目設計引擎。請只依教材完整內容出題，不得使用預設題庫、常識補寫或杜撰教材沒有的考點。每題都必須能在教材內容中找到依據；若內容不足，回傳較少題目，不要硬湊。回傳 JSON questions，每題欄位為 type、stem、options、answer、explanation、topic、metadata。當題型是 single（單選題）時，options 必須是恰好 4 個互不重複的字串，answer 必須恰好 1 個且存在於 options；即使教材內容不足，也不可省略 options，若無法設計四個合理選項就不要回傳該題。數學與自然科請保留 LaTeX：行內公式使用 $...$，化學式可用 \\ce{H2O}；若教材包含可直接使用的圖片或圖表 URL，放在 metadata.imageUrl，否則不要捏造 URL。${strictEnglishOptions ? "這是英文單字或文法測驗：每一題必須恰好提供 4 個選項 A、B、C、D，四個選項不可重複；single、part_of_speech、meaning、multiple 必須只有一個正確答案（answer 只放一個選項原文）。每題都要依題幹量身設計選項，禁止複製其他題的整組選項。單字干擾項須與題幹相關、同詞性、語意接近、字形易混淆或是常見誤用；文法干擾項須屬同一文法主題下的不同時態、動詞變化或常見學習者錯誤，且必須有明確唯一正解。" : "single 必須提供 4 個合理且互不重複的 options；part_of_speech/meaning 也優先提供 4 個合理 options。"}選項不等於考試範圍：干擾選項可以使用範圍外但合理的合法詞彙。不可為了去重使用不自然或無關選項。整份測驗不得重複相同選項組合；使用繁體中文（英文科目可用英文）。`, parts: [{ kind: "text", text: `科目：${params.subject}\n主題：${params.topic}\n難度：${params.difficulty}\n題型：${params.type}\n學制：${params.level}\n題數：${params.count}\n${avoid}\n教材內容：\n${params.sourceText}` }], maxOutputTokens: 3000 }, { questions: [] });
     let candidate = filterDuplicateQuestions(cleanGeneratedQuestions(generatedQuestionList(data), params.topic), reservedQuestionStems); let validation = validateQuizOptionPool(candidate);
     if (candidate.length && validation.excessiveCrossQuestionDuplicates && attempt < 2) {
       const repairIndexes = diversityRepairIndexes(candidate, validation.optionUsageCount);
