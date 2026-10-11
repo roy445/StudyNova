@@ -104,6 +104,7 @@ export async function processExamPrepDraftAnalysis(draftId: string, userId: stri
   if (!draft) throw new Error("找不到段考題目草稿");
   if (draft.analysisStatus === "completed" && draft.quality && (draft.quality as { passed?: boolean }).passed) return { status: draft.analysisStatus, quality: draft.quality };
   await db.update(examPrepQuestionDrafts).set({ analysisStatus: "analyzing", analysisAttempts: draft.analysisAttempts + 1, analysisError: "", updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
+  await updateExamPrepAnalysisProgress(draft.jobId);
   try {
     const assets = await db.select({ objectId: examPrepImportAssets.objectId, pageNumber: examPrepImportAssets.pageNumber }).from(examPrepImportAssets).where(and(eq(examPrepImportAssets.jobId, draft.jobId), eq(examPrepImportAssets.assetType, "image")));
     const imageParts: AiPart[] = [];
@@ -129,9 +130,14 @@ export async function processExamPrepDraftAnalysis(draftId: string, userId: stri
 }
 
 async function updateExamPrepAnalysisProgress(jobId: string) {
-  const drafts = await db.select({ analysisStatus: examPrepQuestionDrafts.analysisStatus }).from(examPrepQuestionDrafts).where(eq(examPrepQuestionDrafts.jobId, jobId));
+  const drafts = await db.select({ analysisStatus: examPrepQuestionDrafts.analysisStatus, questionNumber: examPrepQuestionDrafts.questionNumber, analysisError: examPrepQuestionDrafts.analysisError, quality: examPrepQuestionDrafts.quality }).from(examPrepQuestionDrafts).where(eq(examPrepQuestionDrafts.jobId, jobId));
   const total = drafts.length;
   const processed = drafts.filter((draft) => ["completed", "quality_failed", "failed"].includes(draft.analysisStatus)).length;
   const progress = total ? Math.round((processed / total) * 100) : 0;
-  await db.update(examPrepImportJobs).set({ status: processed === total ? "pending_review" : "processing", stage: "ai_analysis", progress, updatedAt: new Date(), ...(processed === total ? { completedAt: new Date() } : {}) }).where(eq(examPrepImportJobs.id, jobId));
+  const current = drafts.find((draft) => draft.analysisStatus === "analyzing") ?? drafts.find((draft) => draft.analysisStatus === "queued");
+  const problems = drafts.filter((draft) => draft.analysisStatus === "failed" || draft.analysisStatus === "quality_failed").slice(-3).map((draft) => {
+    const failed = Array.isArray((draft.quality as { failed?: unknown } | null)?.failed) ? ((draft.quality as { failed: unknown[] }).failed).join("、") : "品質檢查未通過";
+    return `第${draft.questionNumber ?? "?"}題：${draft.analysisError || failed}`;
+  });
+  await db.update(examPrepImportJobs).set({ status: processed === total ? "pending_review" : "processing", stage: current ? `ai_analysis_question_${current.questionNumber ?? "?"}` : "ai_analysis_done", progress, errorMessage: problems.join("；"), updatedAt: new Date(), ...(processed === total ? { completedAt: new Date() } : {}) }).where(eq(examPrepImportJobs.id, jobId));
 }

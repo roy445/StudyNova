@@ -511,13 +511,13 @@ class PostgresQueue implements QueueAdapter {
     const results: Array<{ name: string; ok: boolean; detail: string }> = [];
     let processed = 0;
     let failed = 0;
-    for (const job of due) {
+    const runOne = async (job: typeof due[number]) => {
       const claimed = await db
         .update(jobQueue)
         .set({ status: "running", startedAt: new Date(), attempts: sql`${jobQueue.attempts} + 1` })
         .where(and(eq(jobQueue.id, job.id), eq(jobQueue.status, "pending")))
         .returning({ id: jobQueue.id });
-      if (!claimed[0]) continue;
+      if (!claimed[0]) return;
       try {
         const handler = handlers[job.name as JobName];
         if (!handler) throw new Error(`unknown job ${job.name}`);
@@ -539,7 +539,9 @@ class PostgresQueue implements QueueAdapter {
           failed += 1;
         }
       }
-    }
+    };
+    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : 1;
+    for (let index = 0; index < due.length; index += concurrency) await Promise.all(due.slice(index, index + concurrency).map(runOne));
     return { processed, failed, results };
   }
 

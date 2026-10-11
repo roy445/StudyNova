@@ -221,7 +221,7 @@ export const routes: RouteDef[] = [
       await db.update(examPrepQuestionDrafts).set({ analysisStatus: "queued", analysisError: "", updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.jobId, job.id));
       await db.update(examPrepImportJobs).set({ status: "processing", stage: "ai_analysis", progress: 0, errorMessage: "", updatedAt: new Date() }).where(eq(examPrepImportJobs.id, job.id));
       for (const draft of drafts) await queue().enqueue({ name: "exam_prep_draft_analysis", payload: { draftId: draft.id, userId: admin.userId }, uniqueKey: `exam-prep-draft-analysis:${draft.id}:${Date.now()}` });
-      void queue().drain(1);
+      void queue().drain(Math.min(drafts.length, 4));
       return { queued: drafts.length, jobId: job.id };
     },
   }),
