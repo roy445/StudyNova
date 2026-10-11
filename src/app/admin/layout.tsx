@@ -21,7 +21,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
   {
       label: "功能與服務",
     items: [
-      { href: "/admin/features", label: "功能總控台", icon: "admin" },
+      { href: "/admin/features", label: "功能總覽", icon: "admin" },
       { href: "/admin/testers", label: "✦ 測試員控制專區", icon: "spark" },
       { href: "/admin/testers/feedback", label: "測試心得回饋看板", icon: "report" },
       { href: "/admin/ai", label: "AI 控制台", icon: "nova" },
