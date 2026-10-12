@@ -108,9 +108,12 @@ export const routes: RouteDef[] = [
     path: "/exam-prep/:id",
     auth: "user",
     handler: async (ctx) => {
+      const user = ctx.requireUser();
       const result = await activityWithSubjects(ctx.params.id);
       const status = result.activity.effectiveStatus;
-      return { ...result, access: { canEnter: status === "open", reason: status === "scheduled" ? "活動尚未開放" : status === "closed" ? "活動已關閉，目前只能查看複習資源" : status === "archived" ? "活動已封存" : status === "open" ? "" : "活動尚未準備完成" } };
+      const latestQuiz = (await db.select({ id: quizzes.id }).from(quizzes).where(and(eq(quizzes.userId, user.userId), eq(quizzes.source, `exam_prep:${ctx.params.id}`))).orderBy(desc(quizzes.createdAt)).limit(1))[0];
+      const latestAttempt = latestQuiz ? (await db.select({ id: quizAttempts.id, status: quizAttempts.status }).from(quizAttempts).where(and(eq(quizAttempts.quizId, latestQuiz.id), eq(quizAttempts.userId, user.userId))).orderBy(desc(quizAttempts.startedAt)).limit(1))[0] : null;
+      return { ...result, resume: latestQuiz ? { quizId: latestQuiz.id, attemptId: latestAttempt?.id ?? null, status: latestAttempt?.status ?? null } : null, access: { canEnter: status === "open", reason: status === "scheduled" ? "活動尚未開放" : status === "closed" ? "活動已關閉，目前只能查看複習資源" : status === "archived" ? "活動已封存" : status === "open" ? "" : "活動尚未準備完成" } };
     },
   }),
   route({

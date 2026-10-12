@@ -418,10 +418,12 @@ export const routes: RouteDef[] = [
         await db
           .select()
           .from(quizAttempts)
-          .where(and(eq(quizAttempts.quizId, quiz.id), eq(quizAttempts.userId, user.userId), eq(quizAttempts.status, "in_progress")))
+          .where(and(eq(quizAttempts.quizId, quiz.id), eq(quizAttempts.userId, user.userId)))
+          .orderBy(desc(quizAttempts.startedAt))
           .limit(1)
       )[0];
       const saved = attempt ? await db.select().from(answers).where(eq(answers.attemptId, attempt.id)) : [];
+      const reviewAvailable = attempt?.status === "submitted";
       return {
         quiz,
         questions: ordered.map((q) => ({
@@ -434,7 +436,12 @@ export const routes: RouteDef[] = [
           metadata: q!.metadata,
         })),
         attempt: attempt ?? null,
-        saved: saved.map((s) => ({ questionId: s.questionId, response: s.response })),
+        reviewAvailable,
+        saved: saved.map((s) => ({ questionId: s.questionId, response: s.response, isCorrect: reviewAvailable ? s.isCorrect : undefined })),
+        review: reviewAvailable ? ordered.map((q) => {
+          const savedAnswer = saved.find((s) => s.questionId === q!.id);
+          return { questionId: q!.id, stem: q!.stem, options: normalizeQuestionOptions(q!.options), answer: q!.answer, explanation: q!.explanation, response: savedAnswer?.response ?? [], isCorrect: savedAnswer?.isCorrect ?? false };
+        }) : null,
       };
     },
   }),
@@ -457,6 +464,15 @@ export const routes: RouteDef[] = [
           .limit(1)
       )[0];
       if (existing) return { attempt: existing, resumed: true };
+      const submitted = (
+        await db
+          .select()
+          .from(quizAttempts)
+          .where(and(eq(quizAttempts.quizId, quiz.id), eq(quizAttempts.userId, user.userId), eq(quizAttempts.status, "submitted")))
+          .orderBy(desc(quizAttempts.submittedAt))
+          .limit(1)
+      )[0];
+      if (submitted) return { attempt: submitted, resumed: true };
       const rows = await db
         .insert(quizAttempts)
         .values({ quizId: quiz.id, userId: user.userId, total: quiz.questionIds.length })

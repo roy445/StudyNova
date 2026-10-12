@@ -1,7 +1,9 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+// Next.js imports server modules while collecting route configuration during build.
+// Use a non-routable placeholder only for that phase; real requests still require Neon.
+const databaseUrl = process.env.DATABASE_URL ?? (process.env.NEXT_PHASE === "phase-production-build" ? "postgresql://build:build@127.0.0.1:5432/build" : undefined);
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
