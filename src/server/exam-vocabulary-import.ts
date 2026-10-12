@@ -60,6 +60,7 @@ export async function processExamVocabularyImport(jobId: string) {
     const provider = typeof details.provider === "string" ? details.provider : "unknown";
     const reason = typeof details.reason === "string" ? details.reason : "";
     const message = `${raw}${reason ? `｜${reason}` : ""}`.slice(0, 500);
+    const transient = ["rate_limited", "server_error", "timeout", "network"].includes(category) || /high demand|temporarily|try again later|timeout|忙碌|逾時/i.test(`${raw} ${reason}`);
     console.error("[StudyNova][exam-vocabulary-ocr]", {
       jobId: job.id,
       objectId: job.objectId,
@@ -74,6 +75,12 @@ export async function processExamVocabularyImport(jobId: string) {
       error: raw,
       stack: error instanceof Error ? error.stack : undefined,
     });
+    if (transient) {
+      await db.update(examVocabularyImportJobs).set({ status: "queued", progress: 35, errorMessage: "AI 目前忙碌或暫時無回應，已自動排隊等待重試。", updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id));
+      const retryError = error instanceof Error ? error : new Error(raw);
+      (retryError as Error & { retryableQueue?: boolean }).retryableQueue = true;
+      throw retryError;
+    }
     const failed = (await db.update(examVocabularyImportJobs).set({ status: "failed", progress: 100, errorMessage: message, updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id)).returning())[0];
     return failed;
   }

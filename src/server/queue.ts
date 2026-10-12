@@ -548,8 +548,16 @@ class PostgresQueue implements QueueAdapter {
       } catch (err) {
         const message = err instanceof Error ? err.message.slice(0, 300) : "unknown";
         const attemptNumber = job.attempts + 1;
+        const retryableQueue = Boolean(err && typeof err === "object" && (err as { retryableQueue?: unknown }).retryableQueue);
         const maxAttempts = 5;
-        if (attemptNumber < maxAttempts) {
+        if (retryableQueue) {
+          // Provider load, rate limits and timeouts are not OCR failures. Keep
+          // the import queued and retry with backoff without surfacing a red
+          // failure state to the admin.
+          const delayMs = Math.min(15 * 60_000, 60_000 * 2 ** Math.min(attemptNumber - 1, 4));
+          await db.update(jobQueue).set({ status: "pending", lastError: message, runAt: new Date(Date.now() + delayMs), startedAt: null, finishedAt: null }).where(eq(jobQueue.id, job.id));
+          results.push({ name: job.name, ok: false, detail: `暫時忙碌，已排隊重試（${Math.ceil(delayMs / 60000)} 分鐘後）` });
+        } else if (attemptNumber < maxAttempts) {
           const delayMs = Math.min(15 * 60_000, 30_000 * 2 ** (attemptNumber - 1));
           await db.update(jobQueue).set({ status: "pending", lastError: message, runAt: new Date(Date.now() + delayMs), startedAt: null, finishedAt: null }).where(eq(jobQueue.id, job.id));
           results.push({ name: job.name, ok: false, detail: `retry ${attemptNumber + 1}/${maxAttempts} scheduled in ${Math.ceil(delayMs / 1000)}s: ${message}` });
