@@ -272,7 +272,7 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
                       <td className="py-2">{p.priority}</td>
                       <td className="py-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-medium">{p.provider.startsWith("gemini_") ? `Gemini API ${p.provider.slice(-1)}` : p.provider}</span>
+                          <span className="font-medium">{p.provider.startsWith("gemini_") ? `Gemini API ${p.provider.slice("gemini_".length)}` : p.provider}</span>
                           <Badge tone={p.configured ? (p.enabled ? "green" : "muted") : "rose"}>{p.configured ? (p.enabled ? "啟用" : "停用") : "未設定"}</Badge>
                         </div>
                         <span className="text-muted">{p.model}</span>
