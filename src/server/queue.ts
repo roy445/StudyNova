@@ -560,7 +560,7 @@ class PostgresQueue implements QueueAdapter {
         }
       }
     };
-    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : due.length > 1 && due.every((job) => job.name === "exam_vocabulary_import") ? 3 : 1;
+    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : due.length > 1 && due.every((job) => job.name === "exam_vocabulary_import") ? 6 : 1;
     for (let index = 0; index < due.length; index += concurrency) await Promise.all(due.slice(index, index + concurrency).map(runOne));
     return { processed, failed, results };
   }
