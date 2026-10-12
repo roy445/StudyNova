@@ -64,6 +64,7 @@ import {
   pkMatches,
   pkPresence,
   pkRooms,
+  userTitles,
 } from "@/db/schema";
 import { normalizeQuestionRows, questionDedupeKey } from "../question-import";
 import { route, type RouteDef } from "../router";
@@ -348,7 +349,8 @@ export const routes: RouteDef[] = [
         .orderBy(desc(users.createdAt))
         .limit(pageSize)
         .offset((page - 1) * pageSize), db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.isSystem, false), q ? or(ilike(users.novaId, like), ilike(users.email, like), ilike(users.displayName, like)) : sql`true`))]);
-      return { users: rows, total: total[0]?.count ?? 0, page, pageSize };
+      const titles = rows.length ? await db.select({ userId: userTitles.userId, title: userTitles.title }).from(userTitles).where(and(inArray(userTitles.userId, rows.map((row) => row.userId)), eq(userTitles.active, true))) : [];
+      return { users: rows.map((row) => ({ ...row, activeTitle: titles.find((title) => title.userId === row.userId)?.title ?? null })), total: total[0]?.count ?? 0, page, pageSize };
     },
   }),
 
@@ -374,7 +376,7 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(
         z.object({
           userIds: z.array(z.string().uuid()).min(1).max(200),
-          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role", "send_notification", "logout", "delete_account"]),
+          action: z.enum(["block", "unblock", "grant_pro", "extend_pro", "revoke_pro", "gift_nova", "gift_xp", "reset_quota", "set_unlimited", "set_role", "grant_active_title", "send_notification", "logout", "delete_account"]),
           reason: z.string().min(1, "請填寫操作原因").max(300),
           amount: z.number().int().min(-100000).max(100000).optional(),
           days: z.number().int().min(1).max(3650).optional(),
@@ -406,6 +408,12 @@ export const routes: RouteDef[] = [
             case "set_role": {
               if (!body.role) throw fail("ADMIN_MISSING_PARAM", { message: "請選擇角色" });
               await db.update(users).set({ role: body.role, updatedAt: new Date() }).where(eq(users.userId, userId));
+              break;
+            }
+            case "grant_active_title": {
+              const title = (body.title?.trim() || "本月活躍學習者").slice(0, 120);
+              await db.update(userTitles).set({ active: false }).where(and(eq(userTitles.userId, userId), eq(userTitles.active, true)));
+              await db.insert(userTitles).values({ userId, title, description: body.reason, assignedBy: admin.userId });
               break;
             }
             case "grant_pro":

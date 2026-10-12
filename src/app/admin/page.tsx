@@ -24,6 +24,7 @@ type AdminUser = {
   nova: number | null;
   level: number | null;
   xp: number | null;
+  activeTitle: string | null;
 };
 type GradeGoal = { id: string; subject: string; targetScore: number | null; baselineScore: number | null; achievedAt: string | null };
 type ChristmasTheme = {
@@ -81,6 +82,7 @@ const ACTIONS = [
   { key: "logout", label: "一鍵登出" },
   { key: "set_unlimited", label: "設定功能無限", needFeature: true },
   { key: "set_role", label: "設定角色", needRole: true },
+  { key: "grant_active_title", label: "授予活躍帳號稱號", needTitle: true },
   { key: "send_notification", label: "發送通知／推播", needNotification: true },
   { key: "delete_account", label: "永久刪除帳號與資料" },
 ];
@@ -283,7 +285,7 @@ export default function AdminOverviewPage() {
                   <th className="pb-2">NOVA ID</th>
                   <th className="pb-2">名稱</th>
                   <th className="pb-2">Email</th>
-                  <th className="pb-2">角色</th>
+                  <th className="pb-2">角色／稱號</th>
                   <th className="pb-2">狀態</th>
                   <th className="pb-2">最後上線</th>
                   <th className="pb-2 text-right">Nova</th>
@@ -306,7 +308,7 @@ export default function AdminOverviewPage() {
                     <td className="py-2 font-mono">{u.novaId}</td>
                     <td className="py-2">{u.displayName}</td>
                     <td className="max-w-[160px] truncate py-2 text-muted">{u.email}</td>
-                    <td className="py-2">{u.role === "tester" ? <Badge tone="violet">測試員</Badge> : u.role}</td>
+                    <td className="py-2"><div>{u.role === "tester" ? <Badge tone="violet">測試員</Badge> : u.role}</div>{u.activeTitle && <Badge tone="gold">{u.activeTitle}</Badge>}</td>
                     <td className="py-2">
                       <span title={u.status === "blocked" ? `原因：${u.blockedReason || "未填寫"}｜日期：${u.blockedAt ? formatTaipeiDateTime(u.blockedAt) : "—"}` : "帳號正常"}><Badge tone={u.status === "active" ? "green" : "rose"}>{u.status}</Badge></span>
                     </td>
@@ -515,6 +517,11 @@ export default function AdminOverviewPage() {
                 <option value="tester">測試員</option>
                 <option value="admin">管理員</option>
               </Select>
+            </Field>
+          )}
+          {currentAction?.needTitle && (
+            <Field label="活躍帳號稱號">
+              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="預設：本月活躍學習者" />
             </Field>
           )}
           {currentAction?.needNotification && (
