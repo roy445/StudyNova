@@ -11,12 +11,12 @@ export const runtime = "nodejs";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const ALLOWED = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
-type Payload = { userId: string; setId: string; unitTitle: string; filename: string };
+type Payload = { setId: string; unitTitle?: string; filename: string };
 
 function parsePayload(value: string | null | undefined) {
   if (!value) throw new Error("缺少英文段考上傳授權資料");
   const parsed = JSON.parse(value) as Partial<Payload>;
-  if (!parsed.userId || !parsed.setId || !parsed.filename) throw new Error("英文段考上傳授權資料不完整");
+  if (!parsed.setId || !parsed.filename) throw new Error("英文段考上傳授權資料不完整");
   return parsed as Payload;
 }
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       token: process.env.BLOB_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         const payload = parsePayload(clientPayload);
-        if (payload.userId !== admin.userId || !pathname.startsWith(`exam-vocabulary/${payload.setId}/`)) throw new Error("英文段考上傳權限驗證失敗");
+        if (!pathname.startsWith(`exam-vocabulary/${payload.setId}/`)) throw new Error("英文段考上傳路徑驗證失敗");
         const set = (await db.select({ id: examVocabularySets.id }).from(examVocabularySets).where(eq(examVocabularySets.id, payload.setId)).limit(1))[0];
         if (!set) throw new Error("找不到英文段考總範圍");
         return {
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
         const payload = parsePayload(tokenPayload);
-        if (payload.userId !== admin.userId || !blob.pathname.startsWith(`exam-vocabulary/${payload.setId}/`)) throw new Error("英文段考檔案路徑驗證失敗");
+        if (!blob.pathname.startsWith(`exam-vocabulary/${payload.setId}/`)) throw new Error("英文段考檔案路徑驗證失敗");
         const set = (await db.select({ id: examVocabularySets.id }).from(examVocabularySets).where(eq(examVocabularySets.id, payload.setId)).limit(1))[0];
         if (!set) throw new Error("找不到英文段考總範圍");
         const metadata = await head(blob.pathname);

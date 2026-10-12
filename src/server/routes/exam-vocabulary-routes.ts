@@ -7,9 +7,9 @@ import { examVocabularyImportJobs, examVocabularyItems, examVocabularySets, exam
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 import { deleteObject, putObject, readObject } from "../storage";
-import { runAiJson } from "../ai";
 import { embedCjkFont, embedMathFont, sanitizeTextForCjkPdf } from "../cjk-font";
 import { writeAudit } from "../audit";
+import { queue } from "../queue";
 
 const setId = z.string().uuid();
 const unitId = z.string().uuid();
@@ -26,19 +26,6 @@ async function getSet(id: string, publicOnly = false) {
   if (!row) throw notFound("找不到段考單字總範圍");
   return row;
 }
-async function extractWords(userId: string, file: File) {
-  const stored = await putObject({ userId, filename: file.name, mimeType: file.type || "image/jpeg", data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
-  const object = await readObject(stored.id);
-  const { data } = await runAiJson<{ words?: ExtractedWord[]; readable?: boolean; message?: string }>({
-    feature: "learning_vocabulary_ocr",
-    userId,
-    system: "你是高中英文段考單字 OCR 專家。請辨識圖片或 PDF 中所有單字與片語，不能只取幾個。只回傳 JSON：{words:[{word,meaning,partOfSpeech,phonetic,phrase,phraseMeaning,example,exampleZh}],readable:true}。word 必須是英文單字或片語的核心形式；中文意義保留繁體中文；看不清楚的項目不要猜。若圖片不是單字資料，words 回傳空陣列。",
-    parts: [{ kind: "image", mimeType: object.mimeType, base64: object.data.toString("base64") }],
-    maxOutputTokens: 6000,
-  }, { words: [], readable: true });
-  return { sourceFile: file.name, objectId: stored.id, words: data.words ?? [], readable: data.readable !== false, message: data.message ?? "" };
-}
-
 async function createPdf(set: typeof examVocabularySets.$inferSelect, units: Array<typeof examVocabularyUnits.$inferSelect>, items: Array<typeof examVocabularyItems.$inferSelect>) {
   const { PDFDocument, rgb, degrees } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
@@ -228,22 +215,20 @@ export const routes: RouteDef[] = [
     const unit = (await db.insert(examVocabularyUnits).values({ setId: set.id, title: unitTitle, sortOrder: Number(form.get("unitSortOrder") ?? 0) || 0 }).returning())[0];
     const files = form.getAll("files").filter((value): value is File => typeof File !== "undefined" && value instanceof File).slice(0, 30);
     if (!files.length) throw fail("ADMIN_TEXTBOOK_REQUEST_INVALID", { message: "請至少選擇一張單字或片語圖片。" });
-    let accepted = 0; let skipped = 0; const errors: string[] = [];
+    let queued = 0; let failed = 0; const errors: string[] = [];
     for (const file of files) {
       try {
-        const result = await extractWords(admin.userId, file);
-        const rows = result.words.map((item, index) => ({ setId: set.id, unitId: unit.id, word: String(item.word ?? "").trim().slice(0, 160), meaning: String(item.meaning ?? "").trim().slice(0, 500), partOfSpeech: String(item.partOfSpeech ?? "").trim().slice(0, 80), phonetic: String(item.phonetic ?? "").trim().slice(0, 100), phrase: String(item.phrase ?? "").trim().slice(0, 240), phraseMeaning: String(item.phraseMeaning ?? "").trim().slice(0, 300), example: String(item.example ?? "").trim().slice(0, 500), exampleZh: String(item.exampleZh ?? "").trim().slice(0, 500), sourceFile: result.sourceFile, metadata: { readable: result.readable, objectId: result.objectId }, sortOrder: index } as const)).filter((item) => normalizeWord(item.word));
-        for (const row of rows) {
-          const normalized = normalizeWord(row.word);
-          const existing = (await db.select({ id: examVocabularyItems.id }).from(examVocabularyItems).where(and(eq(examVocabularyItems.setId, set.id), sql`lower(trim(${examVocabularyItems.word})) = ${normalized}`)).limit(1))[0];
-          if (existing) { skipped += 1; continue; }
-          await db.insert(examVocabularyItems).values(row);
-          accepted += 1;
-        }
-      } catch (error) { errors.push(`${file.name}: ${error instanceof Error ? error.message.slice(0, 160) : "分析失敗"}`); }
+        const stored = await putObject({ userId: admin.userId, filename: file.name, mimeType: file.type || "image/jpeg", data: Buffer.from(await file.arrayBuffer()), allow: ["image", "pdf"] });
+        const job = (await db.insert(examVocabularyImportJobs).values({ setId: set.id, unitId: unit.id, uploadedBy: admin.userId, objectId: stored.id, filename: file.name.slice(0, 500), status: "queued", progress: 0 }).returning({ id: examVocabularyImportJobs.id }))[0];
+        await queue().enqueue({ name: "exam_vocabulary_import", payload: { jobId: job.id }, uniqueKey: `exam-vocabulary-import:${job.id}` });
+        queued += 1;
+      } catch (error) {
+        failed += 1;
+        errors.push(`${file.name}: ${error instanceof Error ? error.message.slice(0, 160) : "上傳失敗"}`);
+      }
     }
-    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.upload", resourceId: set.id, ip: ctx.ip, metadata: { unitId: unit.id, files: files.length, accepted, skipped, errors: JSON.stringify(errors) } });
-    return { setId: set.id, unit, processedFiles: files.length, accepted, skipped, errors };
+    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.upload", resourceId: set.id, ip: ctx.ip, metadata: { unitId: unit.id, files: files.length, queued, failed, errors: JSON.stringify(errors) } });
+    return { setId: set.id, unit, processedFiles: files.length, queued, failed, errors };
   }}),
   route({ method: "POST", path: "/admin/exam-vocabulary/:id/pdf", auth: "admin", handler: async (ctx) => {
     const set = await getSet(ctx.params.id);
