@@ -6,6 +6,10 @@ import { runAiJson } from "./ai";
 
 export type ExtractedWord = { word?: string; meaning?: string; partOfSpeech?: string; phonetic?: string; phrase?: string; phraseMeaning?: string; example?: string; exampleZh?: string };
 
+function primaryMeaning(value: unknown) {
+  return String(value ?? "").trim().split(/[、；;，,\/\|]/)[0]?.trim().slice(0, 500) ?? "";
+}
+
 function needsMeaning(value: unknown) {
   const text = String(value ?? "").trim();
   return !text || /不確定|不清楚|看不清|待確認|無法辨識|unknown|unclear|\?{1,}/i.test(text);
@@ -60,7 +64,7 @@ export async function processExamVocabularyImport(jobId: string) {
       setId: job.setId,
       unitId: job.unitId,
       word: String(item.word ?? "").trim().slice(0, 160),
-      meaning: String(item.meaning ?? "").trim().slice(0, 500),
+      meaning: primaryMeaning(item.meaning),
       partOfSpeech: String(item.partOfSpeech ?? "").trim().slice(0, 80),
       phonetic: String(item.phonetic ?? "").trim().slice(0, 100),
       phrase: String(item.phrase ?? "").trim().slice(0, 240),
