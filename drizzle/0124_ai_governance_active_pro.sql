@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS active_account_scores (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   period text NOT NULL,
-  user_id uuid NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   score real NOT NULL DEFAULT 0,
   rank integer NOT NULL DEFAULT 0,
   selected boolean NOT NULL DEFAULT false,
@@ -16,10 +16,10 @@ CREATE INDEX IF NOT EXISTS active_account_score_period_idx ON active_account_sco
 
 CREATE TABLE IF NOT EXISTS user_titles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title text NOT NULL,
   description text NOT NULL DEFAULT '',
-  assigned_by uuid REFERENCES users(user_id) ON DELETE SET NULL,
+  assigned_by uuid REFERENCES users(id) ON DELETE SET NULL,
   assigned_at timestamptz NOT NULL DEFAULT now(),
   active boolean NOT NULL DEFAULT true
 );
