@@ -1104,7 +1104,7 @@ stage = "ai_provider";
       const durationSec = Number(form.get("durationSec") ?? 0) || 0;
       if (!(file instanceof File)) throw fail("REQ_NO_FILE", { message: "請提供錄音檔" });
       if (!aiConfigured()) throw fail("AI_VOICE_REQUIRED");
-      await consumeFeature(user.userId, "ai_speech");
+      await consumeFeature(user.userId, "speech_analysis");
 
       const buf = Buffer.from(await file.arrayBuffer());
       const stored = await putObject({ userId: user.userId, filename: file.name || "record.webm", mimeType: file.type || "audio/webm", data: buf, allow: ["audio"] });

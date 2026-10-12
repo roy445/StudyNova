@@ -66,6 +66,7 @@ const FEATURES = [
   { feature: "ai_study_plan", label: "AI 讀書計畫", freeDailyLimit: 1, proDailyLimit: 3 },
   { feature: "wrong_review_ai", label: "錯題 AI 複習", freeDailyLimit: 6, proDailyLimit: 15 },
   { feature: "ai_speech", label: "AI 朗讀 / 語音分析", freeDailyLimit: -1, proDailyLimit: -1 },
+  { feature: "speech_analysis", label: "AI 語音分析", freeDailyLimit: 2, proDailyLimit: 6 },
   { feature: "ai_visual", label: "AI 重點心智圖", freeDailyLimit: 3, proDailyLimit: 10 },
   { feature: "learning_chapter_pdf", label: "線上學習章節 PDF", freeDailyLimit: -1, proDailyLimit: -1 },
   { feature: "image_ocr", label: "圖片辨識", freeDailyLimit: 5, proDailyLimit: 20 },

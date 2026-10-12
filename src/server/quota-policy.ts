@@ -23,6 +23,7 @@ export const SERVER_FEATURE_DEFAULTS: readonly FeaturePermissionPolicy[] = [
   { feature: "ai_study_plan", label: "AI 讀書計畫", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 3, monthlyLimit: 0, novaCost: 0 },
   { feature: "wrong_review_ai", label: "錯題 AI 複習", enabled: true, proOnly: false, freeDailyLimit: 6, proDailyLimit: 15, monthlyLimit: 0, novaCost: 0 },
   { feature: "ai_speech", label: "AI 朗讀／語音分析", enabled: true, proOnly: false, freeDailyLimit: -1, proDailyLimit: -1, monthlyLimit: 0, novaCost: 0 },
+  { feature: "speech_analysis", label: "AI 語音分析", enabled: true, proOnly: false, freeDailyLimit: 2, proDailyLimit: 6, monthlyLimit: 0, novaCost: 0 },
   { feature: "ai_visual", label: "AI 重點心智圖", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 10, monthlyLimit: 0, novaCost: 0 },
   { feature: "learning_ai_chat", label: "線上學習 AI 問答", enabled: true, proOnly: false, freeDailyLimit: 10, proDailyLimit: 40, monthlyLimit: 0, novaCost: 0 },
   { feature: "learning_ai_question_generation", label: "線上學習 AI 出題", enabled: true, proOnly: false, freeDailyLimit: 2, proDailyLimit: 8, monthlyLimit: 0, novaCost: 5 },
