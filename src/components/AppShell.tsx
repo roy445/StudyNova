@@ -180,6 +180,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     "/dashboard",
   );
   const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
+  const examPrep = useApi<{ activities: Array<{ id: string; closeAt: string | null; effectiveStatus: string }> }>("/exam-prep/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
 
@@ -399,7 +400,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           <Wordmark size={42} />
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
-          {([...SIDE_NAV, ...(examHubs.data?.hubs.length ? [{ href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
+          {([...SIDE_NAV, ...(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [{ href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true }] : []), ...(examHubs.data?.hubs.length ? [{ href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/online-pk";
             return (
@@ -410,7 +411,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   active ? "bg-gradient-to-r from-[#7c5cff]/30 to-[#37d3ff]/10 text-[var(--text)] shadow-inner" : "text-muted hover:bg-white/5 hover:text-[var(--text)]"
                 }`}
               >
-                {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-side-icon" /> : <SymbolIcon name={item.icon} size={19} active={active} />}
+                {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-side-icon" /> : item.href === "/exam-prep" ? <img src="/brand/exam-prep-icon.jpg" alt="段考衝刺" className="h-7 w-7 rounded-full object-cover ring-2 ring-cyan-300/60" /> : <SymbolIcon name={item.icon} size={19} active={active} />}
                 <span className="truncate">{item.label}</span>
                 {isPk && <span className="pk-beta-badge">BETA</span>}
               </Link>
@@ -453,6 +454,9 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
             <button onClick={() => setSearchOpen(true)} aria-label="搜尋" className="focus-ring rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
               <SymbolIcon name="search" size={18} />
             </button>
+            <Link href="/features" aria-label="開啟功能總覽" className="focus-ring hidden rounded-xl border border-[#37d3ff]/30 px-2.5 py-2 text-xs text-[#b9f2ff] hover:bg-[#37d3ff]/10 sm:block">
+              功能總覽
+            </Link>
             <button onClick={() => setUsageGuideOpen(true)} aria-label="開啟目前功能教學" className="focus-ring rounded-xl border border-[#37d3ff]/30 px-2.5 py-2 text-xs text-[#b9f2ff] hover:bg-[#37d3ff]/10">
               教學
             </button>
@@ -545,7 +549,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       {/* Mobile bottom nav */}
       <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
-          {([...NAV, ...(examHubs.data?.hubs.length ? [{ href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
+          {([...NAV, ...(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [{ href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities.find((activity) => activity.effectiveStatus === "open")?.closeAt }] : []), ...(examHubs.data?.hubs.length ? [{ href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/online-pk";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
@@ -557,7 +561,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
                 >
                   {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
-                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
+                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : item.href === "/exam-prep" ? <img src="/brand/exam-prep-icon.jpg" alt="段考衝刺" className="h-7 w-7 rounded-full object-cover ring-2 ring-cyan-300/70" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
                   <span className="max-w-full truncate">{item.label}</span>
                   {isPk && <span className="pk-beta-badge pk-beta-mobile">BETA</span>}
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
