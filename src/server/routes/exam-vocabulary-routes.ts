@@ -170,8 +170,17 @@ export const routes: RouteDef[] = [
     const result = [];
     for (const set of sets) {
       const units = await db.select().from(examVocabularyUnits).where(eq(examVocabularyUnits.setId, set.id)).orderBy(asc(examVocabularyUnits.sortOrder));
-      const [{ itemCount }] = await db.select({ itemCount: count() }).from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id));
-      result.push({ ...set, units, itemCount: Number(itemCount ?? 0) });
+      const items = await db.select({ sourceFile: examVocabularyItems.sourceFile, metadata: examVocabularyItems.metadata }).from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id));
+      const sourceMap = new Map<string, { filename: string; itemCount: number; objectIds: string[] }>();
+      for (const item of items) {
+        const filename = item.sourceFile || "未命名來源";
+        const current = sourceMap.get(filename) ?? { filename, itemCount: 0, objectIds: [] };
+        current.itemCount += 1;
+        const objectId = typeof item.metadata?.objectId === "string" ? item.metadata.objectId : "";
+        if (objectId && !current.objectIds.includes(objectId)) current.objectIds.push(objectId);
+        sourceMap.set(filename, current);
+      }
+      result.push({ ...set, units, itemCount: items.length, sources: Array.from(sourceMap.values()) });
     }
     return { sets: result };
   }}),
@@ -193,6 +202,14 @@ export const routes: RouteDef[] = [
     const rows = await db.update(examVocabularySets).set({ ...body, updatedAt: new Date() }).where(eq(examVocabularySets.id, ctx.params.id)).returning();
     if (!rows[0]) throw notFound("找不到段考單字總範圍");
     return { set: rows[0] };
+  }}),
+  route({ method: "DELETE", path: "/admin/exam-vocabulary/:id/sources", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const set = await getSet(ctx.params.id);
+    const body = await ctx.json(z.object({ sourceFiles: z.array(z.string().min(1).max(500)).min(1).max(100) }));
+    const rows = await db.delete(examVocabularyItems).where(and(eq(examVocabularyItems.setId, set.id), inArray(examVocabularyItems.sourceFile, body.sourceFiles))).returning({ id: examVocabularyItems.id });
+    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.sources.delete", resourceId: set.id, ip: ctx.ip, metadata: { sourceFiles: JSON.stringify(body.sourceFiles), deleted: rows.length } });
+    return { deleted: rows.length, sourceFiles: body.sourceFiles };
   }}),
   route({ method: "POST", path: "/admin/exam-vocabulary/:id/upload", auth: "admin", handler: async (ctx) => {
     const admin = ctx.requireUser();
