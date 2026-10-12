@@ -84,6 +84,7 @@ export default function DashboardPage() {
     } catch (err) { toast.push("error", err instanceof Error ? err.message : "申請失敗"); } finally { setAppealSending(false); }
   }
 
+  useEffect(() => { const timer = window.setInterval(() => setHeroIndex((value) => value + 1), 7000); return () => window.clearInterval(timer); }, []);
 
   if (loading) {
     return (
@@ -98,7 +99,6 @@ export default function DashboardPage() {
     );
   }
   if (error || !data) return <ErrorState message={error ?? "載入失敗"} onRetry={reload} />;
-  useEffect(() => { const timer = window.setInterval(() => setHeroIndex((value) => value + 1), 7000); return () => window.clearInterval(timer); }, []);
   const marqueeCopies = Math.max(2, Math.ceil(8 / Math.max(1, data.marquee.length)));
   const marqueeSegment = Array.from({ length: marqueeCopies }, () => data.marquee).flat();
 
