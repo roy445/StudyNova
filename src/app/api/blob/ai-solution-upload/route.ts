@@ -2,10 +2,7 @@ import { del, head } from "@vercel/blob";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { db } from "@/db";
 import { storageObjects } from "@/db/schema";
-import { requireUser, rateLimit } from "@/server/auth";
-import { consumeFeature, featureState } from "@/server/economy";
 import { AI_SOLUTION_UPLOAD_FEATURE } from "@/server/quota-policy";
 import { AppError, safeErrorMessage } from "@/server/errors";
 
@@ -35,6 +32,7 @@ function filenameOnly(value: string) {
 
 export async function POST(request: Request) {
   try {
+    const [{ db }, { requireUser, rateLimit }, { consumeFeature, featureState }] = await Promise.all([import("@/db"), import("@/server/auth"), import("@/server/economy")]);
     const body = (await request.json()) as HandleUploadBody;
     const response = await handleUpload({
       body,

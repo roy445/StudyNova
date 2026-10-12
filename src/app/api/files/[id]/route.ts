@@ -1,15 +1,11 @@
-import { getSession } from "@/server/auth";
-import { readObject, verifyObjectSignature, objectOwner } from "@/server/storage";
-import { db } from "@/db";
 import { aiArtifacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { isProUser } from "@/server/economy";
-import { getMaintenanceState } from "@/server/maintenance";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const [{ getSession }, { readObject, verifyObjectSignature, objectOwner }, { db }, { isProUser }, { getMaintenanceState }] = await Promise.all([import("@/server/auth"), import("@/server/storage"), import("@/db"), import("@/server/economy"), import("@/server/maintenance")]);
   const { id } = await ctx.params;
   const maintenance = await getMaintenanceState();
   if (maintenance.enabled) return Response.json({ ok: false, code: "SERVICE_MAINTENANCE", message: maintenance.notice, estimatedRecoveryAt: maintenance.estimatedRecoveryAt }, { status: 503 });

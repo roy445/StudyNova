@@ -1,6 +1,3 @@
-import { readObject } from "@/server/storage";
-import { getMaintenanceState } from "@/server/maintenance";
-import { db } from "@/db";
 import { textbookEditions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -8,6 +5,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const [{ readObject }, { getMaintenanceState }, { db }] = await Promise.all([import("@/server/storage"), import("@/server/maintenance"), import("@/db")]);
   const maintenance = await getMaintenanceState();
   if (maintenance.enabled) return Response.json({ ok: false, code: "SERVICE_MAINTENANCE", message: maintenance.notice, estimatedRecoveryAt: maintenance.estimatedRecoveryAt }, { status: 503 });
   try {

@@ -2,12 +2,8 @@ import { get, head } from "@vercel/blob";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
 import { questionImportJobs, storageObjects } from "@/db/schema";
-import { requireAdmin } from "@/server/auth";
-import { extractJson, runAi } from "@/server/ai";
-import { normalizeQuestionRows, questionDedupeKey } from "@/server/question-import";
-import { extractPdfQuestionChunks, parseNumberedChoiceQuestionText, renderPdfImagePages } from "@/server/pdf-question-extract";
+import { questionDedupeKey } from "@/server/question-import";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -128,6 +124,7 @@ function normalizeItem(item: Record<string, unknown>, sourceObjectId: string, so
 }
 
 export async function POST(request: Request) {
+  const [{ db }, { requireAdmin }, { extractJson, runAi }, { normalizeQuestionRows }, { extractPdfQuestionChunks, parseNumberedChoiceQuestionText, renderPdfImagePages }] = await Promise.all([import("@/db"), import("@/server/auth"), import("@/server/ai"), import("@/server/question-import"), import("@/server/pdf-question-extract")]);
   const body = (await request.json()) as HandleUploadBody;
   try {
     const response = await handleUpload({

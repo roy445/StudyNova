@@ -1,10 +1,8 @@
-import { pool } from "@/db";
-import { diagnoseDatabaseRuntime } from "@/server/db-runtime-diagnostics";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
+  const [{ pool }, { diagnoseDatabaseRuntime }] = await Promise.all([import("@/db"), import("@/server/db-runtime-diagnostics")]);
   const diagnostic = await diagnoseDatabaseRuntime(pool);
   const ok = diagnostic.connection === "success" && diagnostic.query === "success";
   if (!ok) console.error("[StudyNova][db-runtime-health]", JSON.stringify(diagnostic));

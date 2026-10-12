@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq, or, sql } from "drizzle-orm";
-import { db } from "@/db";
 import { friends, shares, users } from "@/db/schema";
 import { LogoMark, StarField } from "@/components/brand";
-import { getSession } from "@/server/auth";
 import { ShareActions } from "./share-actions";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +19,7 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export default async function SharePage({ params }: { params: Promise<{ slug: string }> }) {
+  const [{ db }, { getSession }] = await Promise.all([import("@/db"), import("@/server/auth")]);
   const { slug } = await params;
   const rows = await db.select().from(shares).where(eq(shares.slug, slug)).limit(1);
   const share = rows[0];

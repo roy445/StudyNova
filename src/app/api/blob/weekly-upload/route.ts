@@ -2,15 +2,14 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { head } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
 import { storageObjects, weeklyExamFiles, weeklyExamWeeks } from "@/db/schema";
-import { requireAdmin } from "@/server/auth";
 
 const KINDS = ["paper", "answer", "magazine", "word_source", "sentence_source", "extra"] as const;
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const [{ db }, { requireAdmin }] = await Promise.all([import("@/db"), import("@/server/auth")]);
   const body = (await request.json()) as HandleUploadBody;
   try {
     const response = await handleUpload({
