@@ -449,8 +449,8 @@ export const routes: RouteDef[] = [
       const config = await getPkConfig();
       const now = new Date();
       const [online, pkOnline, matching, waitingRooms, liveMatches] = await Promise.all([
-        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), eq(pkPresence.state, "online"))),
-        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), eq(pkPresence.state, "online"), sql`${pkPresence.currentMatchId} is not null`)),
+        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), inArray(pkPresence.state, ["online", "recently_active"]))),
+        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), inArray(pkPresence.state, ["online", "recently_active"]), sql`${pkPresence.currentMatchId} is not null`)),
         db.select({ count: sql<number>`count(distinct ${pkMatchmakingQueue.userId})::int` }).from(pkMatchmakingQueue).where(and(eq(pkMatchmakingQueue.status, "waiting"), gte(pkMatchmakingQueue.expiresAt, now))),
         db.select({ count: sql<number>`count(*)::int` }).from(pkRooms).where(eq(pkRooms.status, "waiting")),
         db.select({ count: sql<number>`count(*)::int` }).from(pkMatches).where(sql`${pkMatches.status} in ('countdown', 'in_progress', 'paused')`),
@@ -467,7 +467,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async () => {
       const now = new Date();
-      const rows = await db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), eq(pkPresence.state, "online")));
+      const rows = await db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), inArray(pkPresence.state, ["online", "recently_active"])));
       return { online: Number(rows[0]?.count ?? 0), asOf: now.toISOString() };
     },
   }),

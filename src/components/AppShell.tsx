@@ -306,7 +306,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     let timer: ReturnType<typeof setTimeout>;
     const heartbeat = () => {
       const visible = document.visibilityState === "visible";
-      void apiPost("/pk/presence/heartbeat", { sessionKey, state: visible ? "online" : "offline", metadata: { route: pathname, visibility: document.visibilityState } }).catch(() => {});
+      void apiPost("/pk/presence/heartbeat", { sessionKey, state: visible ? "online" : "recently_active", metadata: { route: pathname, visibility: document.visibilityState } }).catch(() => {});
       timer = setTimeout(heartbeat, 30_000);
     };
     const onVisibility = () => heartbeat();
