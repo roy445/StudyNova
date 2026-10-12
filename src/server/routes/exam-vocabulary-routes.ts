@@ -227,8 +227,9 @@ export const routes: RouteDef[] = [
         errors.push(`${file.name}: ${error instanceof Error ? error.message.slice(0, 160) : "上傳失敗"}`);
       }
     }
-    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.upload", resourceId: set.id, ip: ctx.ip, metadata: { unitId: unit.id, files: files.length, queued, failed, errors: JSON.stringify(errors) } });
-    return { setId: set.id, unit, processedFiles: files.length, queued, failed, errors };
+    const drained = queued > 0 ? await queue().drain(Math.min(queued, 3)) : { processed: 0, failed: 0, results: [] };
+    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.upload", resourceId: set.id, ip: ctx.ip, metadata: { unitId: unit.id, files: files.length, queued, failed, drained: drained.processed, drainFailed: drained.failed, errors: JSON.stringify(errors) } });
+    return { setId: set.id, unit, processedFiles: files.length, queued, failed, drained: drained.processed, drainFailed: drained.failed, errors };
   }}),
   route({ method: "POST", path: "/admin/exam-vocabulary/:id/pdf", auth: "admin", handler: async (ctx) => {
     const set = await getSet(ctx.params.id);

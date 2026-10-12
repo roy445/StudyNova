@@ -56,6 +56,7 @@ export async function POST(request: Request) {
         if (!unit) unit = (await db.insert(examVocabularyUnits).values({ setId: set.id, title: unitName }).returning({ id: examVocabularyUnits.id }))[0];
         const job = (await db.insert(examVocabularyImportJobs).values({ setId: set.id, unitId: unit.id, uploadedBy: admin.userId, objectId: storedId, filename: payload.filename.slice(0, 500), status: "queued", progress: 0 }).returning({ id: examVocabularyImportJobs.id }))[0];
         await queue().enqueue({ name: "exam_vocabulary_import", payload: { jobId: job.id }, uniqueKey: `exam-vocabulary-import:${job.id}` });
+        await queue().drain(1);
       },
     });
     return NextResponse.json(response);
