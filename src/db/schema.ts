@@ -980,6 +980,62 @@ export const vocabularyFolderItems = pgTable(
   (t) => [uniqueIndex("vocabulary_folder_items_uq").on(t.folderId, t.vocabularyId), index("vocabulary_folder_items_folder_idx").on(t.folderId), index("vocabulary_folder_items_vocab_idx").on(t.vocabularyId)],
 );
 
+/* -------------------------------------------- EXAM VOCABULARY / 段考總單字 */
+export const examVocabularySets = pgTable(
+  "exam_vocabulary_sets",
+  {
+    id: id(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    examLabel: text("exam_label").notNull().default("英文段考"),
+    enabled: boolean("enabled").notNull().default(true),
+    published: boolean("published").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_vocab_sets_public_idx").on(t.enabled, t.published, t.sortOrder), index("exam_vocab_sets_updated_idx").on(t.updatedAt)],
+);
+
+export const examVocabularyUnits = pgTable(
+  "exam_vocabulary_units",
+  {
+    id: id(),
+    setId: uuid("set_id").notNull().references(() => examVocabularySets.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_vocab_units_set_idx").on(t.setId, t.sortOrder)],
+);
+
+export const examVocabularyItems = pgTable(
+  "exam_vocabulary_items",
+  {
+    id: id(),
+    setId: uuid("set_id").notNull().references(() => examVocabularySets.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").notNull().references(() => examVocabularyUnits.id, { onDelete: "cascade" }),
+    word: text("word").notNull(),
+    meaning: text("meaning").notNull().default(""),
+    partOfSpeech: text("part_of_speech").notNull().default(""),
+    phonetic: text("phonetic").notNull().default(""),
+    phrase: text("phrase").notNull().default(""),
+    phraseMeaning: text("phrase_meaning").notNull().default(""),
+    example: text("example").notNull().default(""),
+    exampleZh: text("example_zh").notNull().default(""),
+    sourceFile: text("source_file").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_vocab_items_set_word_uq").on(t.setId, t.word), index("exam_vocab_items_unit_idx").on(t.unitId, t.sortOrder), index("exam_vocab_items_set_idx").on(t.setId, t.sortOrder)],
+);
+
 /* -------------------------------------------------------- PLAN / STUDY */
 
 export const studyPlans = pgTable(

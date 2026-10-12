@@ -32,8 +32,8 @@ const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
-  { href: "/pk", label: "線上 PK", icon: "duel", special: true },
-  { href: "/weekly", label: "測驗與刷題", icon: "weekly" },
+  { href: "/online-pk", label: "線上 PK", icon: "duel", special: true },
+  { href: "/weekly", label: "小考", icon: "weekly" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
 
@@ -41,7 +41,7 @@ const PAGE_PROMPTS: Record<string, string> = {
   "/dashboard": "首頁提供學習紀錄、錯題、單字與公告；請從學習中心選擇要使用的功能。",
   "/learning": "可以先選擇科目，再開啟線上課程、教材、錯題或單字功能。",
   "/study": "可以選擇錯題、單字或專注工具；需要解釋時直接輸入問題。",
-  "/weekly": "這裡可以查看測驗、刷題、單字與解析；要不要先看看本週重點？",
+  "/weekly": "這裡可以查看每週小考、單字與解析；要不要先看看本週重點？",
   "/challenge": "挑戰功能會顯示可參加的題目與對戰規則。",
   "/online-pk": "線上 PK 的答案、計時與分數由伺服器驗證。",
   "/grades": "我可以幫你看成績趨勢，找出下一個最值得補強的科目。",
@@ -67,10 +67,11 @@ const SIDE_NAV: Array<{ href: string; label: string; icon: SymbolName }> = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習中心", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
-  { href: "/pk", label: "線上 PK", icon: "duel" },
-  { href: "/weekly", label: "測驗與刷題", icon: "weekly" },
+  { href: "/online-pk", label: "線上 PK", icon: "duel" },
+  { href: "/weekly", label: "每週小考", icon: "weekly" },
   { href: "/profile", label: "我的 Nova", icon: "profile" },
 ];
+type ExamVocabularyCatalog = { enabled: boolean; totalItems: number };
   const FEATURE_BY_PATH: Record<string, string> = { "/learning": "learning", "/solve": "solve", "/ai": "ai", "/compress": "compress", "/export": "export", "/essay": "essay", "/study": "study", "/weekly": "weekly", "/challenge": "challenge", "/online-pk": "online-pk", "/grades": "grades", "/report": "report", "/admin": "admin", "/profile": "profile", "/dashboard": "dashboard" };
 const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   learning: { title: "線上學習使用提醒", text: "課程內容依正式教材建立；尚未完成的科目與互動模型會明確顯示開發中，不使用假功能。" },
@@ -81,7 +82,7 @@ const FEATURE_GUIDANCE: Record<string, { title: string; text: string }> = {
   export: { title: "資料匯出使用提醒", text: "只會匯出你的資料。請先查看樣本預覽，正式下載前會兩次確認並扣除對應 Nova。" },
   essay: { title: "作文批改使用提醒", text: "AI 建議僅供學習參考，請自行檢查文意、引用與老師要求後再提交。" },
   study: { title: "學習中心使用提醒", text: "複習與專注紀錄可依你的節奏調整；儲存前請確認日期、範圍與內容。" },
-  weekly: { title: "測驗與刷題使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
+  weekly: { title: "每週小考使用提醒", text: "提交前請確認答案；測驗結果與獎勵會依系統最後提交紀錄計算。" },
   challenge: { title: "挑戰功能使用提醒", text: "請確認挑戰對象、題目與截止時間；不要分享帳號、密碼或個人敏感資料。" },
   "online-pk": { title: "線上 PK 使用提醒", text: "每題答案、計時與分數都由伺服器驗證；斷線可在短時間內重連，請不要分享私人房間密碼。" },
   grades: { title: "成績分析使用提醒", text: "分析結果是學習參考，不代表正式校務成績；請確認輸入資料正確。" },
@@ -145,6 +146,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const [usageRulesRead, setUsageRulesRead] = useState(false);
   const [usageRulesAccepted, setUsageRulesAccepted] = useState(false);
   const usageRulesRef = useRef<HTMLDivElement>(null);
+  const examVocabulary = useApi<ExamVocabularyCatalog>("/exam-vocabulary/catalog");
 
   useEffect(() => {
     void apiGet<{ required: boolean; document: { version: string; title: string; body: string } | null }>("/auth/usage-rules")
@@ -177,20 +179,14 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
     "/dashboard",
   );
-  const examPrep = useApi<{ activities: Array<{ id: string; closeAt: string | null; effectiveStatus: string }>; profile: { schoolLevel: string | null; grade: number | null } | null }>("/exam-prep/available");
+  const examHubs = useApi<{ hubs: Array<{ id: string; closeAt: string | null }>; needsProfile: boolean }>("/exam-hubs/available");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
-  const presence = useApi<{ online: number; asOf: string }>("/pk/presence/summary");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void presence.reload(); }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [presence.reload]);
 
   useEffect(() => {
     let registration: ServiceWorkerRegistration | undefined;
@@ -246,43 +242,24 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
-    type VitalName = "FCP" | "LCP" | "CLS" | "TBT" | "TTI";
-    const latest = new Map<VitalName, number>();
-    const timers = new Map<VitalName, number>();
-    const sent = new Set<VitalName>();
-    const schedule = (name: VitalName, value: number) => {
-      if (sent.has(name) || !Number.isFinite(value) || value < 0) return;
-      latest.set(name, value);
-      const previous = timers.get(name);
-      if (previous) window.clearTimeout(previous);
-      timers.set(name, window.setTimeout(() => {
-        timers.delete(name);
-        if (sent.has(name)) return;
-        const metric = latest.get(name);
-        if (metric === undefined) return;
-        sent.add(name);
-        void apiPost("/performance/vitals", { name, value: metric, route: pathname, navigationType: performance.getEntriesByType("navigation")[0]?.entryType ?? "navigation" }).catch(() => {
-          // Observability must never block navigation, learning, or PK interactions.
-        });
-      }, 1_200));
-    };
+    const send = (name: "FCP" | "LCP" | "CLS" | "TBT" | "TTI", value: number) => { void apiPost("/performance/vitals", { name, value, route: pathname, navigationType: performance.getEntriesByType("navigation")[0]?.entryType ?? "navigation" }).catch(() => {}); };
     const observers: PerformanceObserver[] = [];
     try {
-      const paint = new PerformanceObserver((list) => { const entry = list.getEntries().find((item) => item.name === "first-contentful-paint"); if (entry) schedule("FCP", entry.startTime); });
+      const paint = new PerformanceObserver((list) => { const entry = list.getEntries().find((item) => item.name === "first-contentful-paint"); if (entry) send("FCP", entry.startTime); });
       paint.observe({ type: "paint", buffered: true }); observers.push(paint);
     } catch {}
     try {
-      const lcp = new PerformanceObserver((list) => { const entry = list.getEntries().at(-1); if (entry) schedule("LCP", entry.startTime); });
+      const lcp = new PerformanceObserver((list) => { const entry = list.getEntries().at(-1); if (entry) send("LCP", entry.startTime); });
       lcp.observe({ type: "largest-contentful-paint", buffered: true }); observers.push(lcp);
     } catch {}
     try {
       let cls = 0;
-      const layout = new PerformanceObserver((list) => { for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) if (!entry.hadRecentInput) cls += entry.value ?? 0; schedule("CLS", cls); });
+      const layout = new PerformanceObserver((list) => { for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) if (!entry.hadRecentInput) cls += entry.value ?? 0; send("CLS", cls); });
       layout.observe({ type: "layout-shift", buffered: true }); observers.push(layout);
     } catch {}
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    if (nav?.domInteractive) schedule("TTI", nav.domInteractive);
-    return () => { observers.forEach((observer) => observer.disconnect()); timers.forEach((timer) => window.clearTimeout(timer)); };
+    if (nav?.domInteractive) send("TTI", nav.domInteractive);
+    return () => observers.forEach((observer) => observer.disconnect());
   }, [pathname]);
 
   useEffect(() => {
@@ -303,7 +280,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     sessionStorage.setItem(storageKey, sessionKey);
     let timer: ReturnType<typeof setTimeout>;
     const heartbeat = () => {
-      void apiPost("/pk/presence/heartbeat", { sessionKey, state: pathname.startsWith("/pk") ? "online" : "recently_active", metadata: { route: pathname } }).catch(() => {});
+      void apiPost("/pk/presence/heartbeat", { sessionKey, state: pathname.startsWith("/online-pk") ? "online" : "recently_active", metadata: { route: pathname } }).catch(() => {});
       timer = setTimeout(heartbeat, 45_000);
     };
     const onVisibility = () => { if (document.visibilityState === "visible") heartbeat(); };
@@ -405,7 +382,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const unread = notif.data?.unread ?? 0;
   const nova = summary.data?.nova ?? 0;
   const level = summary.data?.novi?.level ?? 1;
-  const featureNotices = Array.from(new Map((summary.data?.announcements ?? []).filter((item) => item.pinned && (item.targetFeature === "all" || item.targetFeature === featureKey)).map((item) => [`${item.title}|${item.body}`, item])).values()).slice(0, 3);
+  const featureNotices = (summary.data?.announcements ?? []).filter((item) => item.pinned && (item.targetFeature === "all" || item.targetFeature === featureKey)).slice(0, 3);
 
   const kindLabel = useMemo(
     () => ({ material: "教材", note: "筆記", quiz: "測驗", question: "題目", activity: "活動" }) as Record<string, string>,
@@ -422,10 +399,9 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           <Wordmark size={42} />
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto scroll-thin">
-          {(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [...SIDE_NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName }] : SIDE_NAV).map((item) => {
+          {([...SIDE_NAV, ...(examHubs.data?.hubs.length ? [{ href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const isPk = item.href === "/pk";
-            const isExamPrep = item.href === "/exam-prep";
+            const isPk = item.href === "/online-pk";
             return (
               <Link
                 key={item.href}
@@ -434,7 +410,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   active ? "bg-gradient-to-r from-[#7c5cff]/30 to-[#37d3ff]/10 text-[var(--text)] shadow-inner" : "text-muted hover:bg-white/5 hover:text-[var(--text)]"
                 }`}
               >
-                {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-side-icon" /> : isExamPrep ? <img src="/brand/exam-prep-icon.jpg" alt="段考衝刺" className="h-7 w-7 rounded-full object-cover ring-2 ring-cyan-300/60" /> : <SymbolIcon name={item.icon} size={19} active={active} />}
+                {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-side-icon" /> : <SymbolIcon name={item.icon} size={19} active={active} />}
                 <span className="truncate">{item.label}</span>
                 {isPk && <span className="pk-beta-badge">BETA</span>}
               </Link>
@@ -469,20 +445,17 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         {/* Header */}
         <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/85 backdrop-blur-xl">
           <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5 sm:px-5">
-            <Link href="/dashboard" className="focus-ring flex min-w-0 items-center gap-2 lg:hidden">
+            <Link href="/dashboard" className="focus-ring flex items-center gap-2 lg:hidden">
               <LogoMark size={62} />
-              <span className="flex min-w-0 flex-col items-start gap-0.5">
-                <span className="neon-text text-base font-extrabold leading-tight">StudyNova</span>
-                <span className="online-presence-badge" title="目前正在 StudyNova 一起學習的人數"><span className="online-presence-dot" />{presence.data?.online ?? "—"} 人在線</span>
-              </span>
+              <span className="neon-text text-base font-extrabold">StudyNova</span>
             </Link>
             <div className="flex-1" />
             <button onClick={() => setSearchOpen(true)} aria-label="搜尋" className="focus-ring rounded-xl border border-[var(--line)] px-2.5 py-2 text-sm hover:bg-white/5">
               <SymbolIcon name="search" size={18} />
             </button>
-            <Link href="/features" aria-label="開啟功能總攬" className="focus-ring rounded-xl border border-[#37d3ff]/30 px-2.5 py-2 text-xs text-[#b9f2ff] hover:bg-[#37d3ff]/10">
-              功能總攬
-            </Link>
+            <button onClick={() => setUsageGuideOpen(true)} aria-label="開啟目前功能教學" className="focus-ring rounded-xl border border-[#37d3ff]/30 px-2.5 py-2 text-xs text-[#b9f2ff] hover:bg-[#37d3ff]/10">
+              教學
+            </button>
             <Link href="/profile?tab=nova" className="focus-ring hidden items-center gap-1 rounded-xl border border-[#ffc857]/30 px-2.5 py-2 text-xs text-[#ffd98a] sm:flex">
               <SymbolIcon name="nova" size={15} /> {nova}
             </Link>
@@ -556,7 +529,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         </header>
 
         <main className="app-main mx-auto min-w-0 max-w-6xl overflow-x-clip px-3 py-4 sm:px-5 sm:py-6">
-          {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p><p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>)}</section>}
+          {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => { return <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p><p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>; })}</section>}
           {FEATURE_GUIDANCE[featureKey] && <div className="mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
           {children}
           <footer aria-label="網站資訊" className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
@@ -572,10 +545,9 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       {/* Mobile bottom nav */}
       <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
-          {(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [...NAV, { href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities.find((activity) => activity.effectiveStatus === "open")?.closeAt }] : NAV).map((item) => {
+          {([...NAV, ...(examHubs.data?.hubs.length ? [{ href: "/exam-hubs", label: "段考專區", icon: "weekly" as SymbolName, special: true, closeAt: examHubs.data.hubs[0]?.closeAt }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const isPk = item.href === "/pk";
-            const isExamPrep = item.href === "/exam-prep";
+            const isPk = item.href === "/online-pk";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
             return (
               <li key={item.href} className="flex-1">
@@ -585,7 +557,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                   className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
                 >
                   {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
-                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : isExamPrep ? <img src="/brand/exam-prep-icon.jpg" alt="段考衝刺" className="h-7 w-7 rounded-full object-cover ring-2 ring-cyan-300/70" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
+                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
                   <span className="max-w-full truncate">{item.label}</span>
                   {isPk && <span className="pk-beta-badge pk-beta-mobile">BETA</span>}
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
