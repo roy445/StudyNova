@@ -3,7 +3,7 @@ import path from "node:path";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { examVocabularyImportJobs, examVocabularyItems, examVocabularySets, examVocabularyUnits } from "@/db/schema";
+import { examVocabularyImportJobs, examVocabularyItems, examVocabularySets, examVocabularyUnits, jobQueue } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 import { deleteObject, putObject, readObject } from "../storage";
@@ -160,19 +160,19 @@ export const routes: RouteDef[] = [
     for (const set of sets) {
       const units = await db.select().from(examVocabularyUnits).where(eq(examVocabularyUnits.setId, set.id)).orderBy(asc(examVocabularyUnits.sortOrder));
       const items = await db.select({ sourceFile: examVocabularyItems.sourceFile, metadata: examVocabularyItems.metadata }).from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id));
-      const jobs = await db.select({ filename: examVocabularyImportJobs.filename, status: examVocabularyImportJobs.status, progress: examVocabularyImportJobs.progress, accepted: examVocabularyImportJobs.accepted, skipped: examVocabularyImportJobs.skipped, errorMessage: examVocabularyImportJobs.errorMessage, objectId: examVocabularyImportJobs.objectId }).from(examVocabularyImportJobs).where(eq(examVocabularyImportJobs.setId, set.id)).orderBy(desc(examVocabularyImportJobs.createdAt));
-      const sourceMap = new Map<string, { filename: string; itemCount: number; objectIds: string[]; status: string; progress: number; accepted: number; skipped: number; errorMessage: string }>();
+      const jobs = await db.select({ id: examVocabularyImportJobs.id, filename: examVocabularyImportJobs.filename, status: examVocabularyImportJobs.status, progress: examVocabularyImportJobs.progress, accepted: examVocabularyImportJobs.accepted, skipped: examVocabularyImportJobs.skipped, errorMessage: examVocabularyImportJobs.errorMessage, objectId: examVocabularyImportJobs.objectId }).from(examVocabularyImportJobs).where(eq(examVocabularyImportJobs.setId, set.id)).orderBy(desc(examVocabularyImportJobs.createdAt));
+      const sourceMap = new Map<string, { filename: string; jobId: string; itemCount: number; objectIds: string[]; status: string; progress: number; accepted: number; skipped: number; errorMessage: string }>();
       for (const item of items) {
         const filename = item.sourceFile || "未命名來源";
-        const current = sourceMap.get(filename) ?? { filename, itemCount: 0, objectIds: [], status: "completed", progress: 100, accepted: 0, skipped: 0, errorMessage: "" };
+        const current = sourceMap.get(filename) ?? { filename, jobId: "", itemCount: 0, objectIds: [], status: "completed", progress: 100, accepted: 0, skipped: 0, errorMessage: "" };
         current.itemCount += 1;
         const objectId = typeof item.metadata?.objectId === "string" ? item.metadata.objectId : "";
         if (objectId && !current.objectIds.includes(objectId)) current.objectIds.push(objectId);
         sourceMap.set(filename, current);
       }
       for (const job of jobs) {
-        const current = sourceMap.get(job.filename) ?? { filename: job.filename, itemCount: 0, objectIds: [], status: job.status, progress: job.progress, accepted: 0, skipped: 0, errorMessage: job.errorMessage };
-        current.status = job.status; current.progress = Math.max(current.progress, job.progress); current.accepted += job.accepted; current.skipped += job.skipped; current.errorMessage = job.errorMessage || current.errorMessage;
+        const current = sourceMap.get(job.filename) ?? { filename: job.filename, jobId: job.id, itemCount: 0, objectIds: [], status: job.status, progress: job.progress, accepted: 0, skipped: 0, errorMessage: job.errorMessage };
+        current.jobId = job.id; current.status = job.status; current.progress = Math.max(current.progress, job.progress); current.accepted += job.accepted; current.skipped += job.skipped; current.errorMessage = job.errorMessage || current.errorMessage;
         if (!current.objectIds.includes(job.objectId)) current.objectIds.push(job.objectId);
         sourceMap.set(job.filename, current);
       }
@@ -208,6 +208,20 @@ export const routes: RouteDef[] = [
     for (const job of jobs) await deleteObject(job.objectId, admin.userId, true).catch(() => undefined);
     await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.sources.delete", resourceId: set.id, ip: ctx.ip, metadata: { sourceFiles: JSON.stringify(body.sourceFiles), deleted: rows.length } });
     return { deleted: rows.length, jobsDeleted: jobs.length, sourceFiles: body.sourceFiles };
+  }}),
+  route({ method: "POST", path: "/admin/exam-vocabulary/:id/import-jobs/:jobId/retry", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const set = await getSet(ctx.params.id);
+    const job = (await db.select().from(examVocabularyImportJobs).where(and(eq(examVocabularyImportJobs.id, ctx.params.jobId), eq(examVocabularyImportJobs.setId, set.id))).limit(1))[0];
+    if (!job) throw notFound("找不到這筆 OCR 工作");
+    if (job.status !== "failed") throw fail("ADMIN_TEXTBOOK_REQUEST_INVALID", { message: "只有失敗的 OCR 工作可以重試。" });
+    await db.update(examVocabularyImportJobs).set({ status: "queued", progress: 0, accepted: 0, skipped: 0, errorMessage: "", updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id));
+    const uniqueKey = `exam-vocabulary-import:${job.id}`;
+    const existingQueue = (await db.update(jobQueue).set({ status: "pending", payload: { jobId: job.id }, runAt: new Date(), attempts: 0, lastError: "", startedAt: null, finishedAt: null }).where(eq(jobQueue.uniqueKey, uniqueKey)).returning({ id: jobQueue.id }))[0];
+    if (!existingQueue) await queue().enqueue({ name: "exam_vocabulary_import", payload: { jobId: job.id }, uniqueKey });
+    const drained = await queue().drain(1);
+    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.retry", resourceId: set.id, ip: ctx.ip, metadata: { jobId: job.id, filename: job.filename, drained: drained.processed, drainFailed: drained.failed } });
+    return { jobId: job.id, filename: job.filename, status: "queued", drained: drained.processed, drainFailed: drained.failed };
   }}),
   route({ method: "POST", path: "/admin/exam-vocabulary/:id/upload", auth: "admin", handler: async (ctx) => {
     const admin = ctx.requireUser();
