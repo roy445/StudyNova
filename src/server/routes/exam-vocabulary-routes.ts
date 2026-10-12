@@ -48,24 +48,95 @@ async function createPdf(set: typeof examVocabularySets.$inferSelect, units: Arr
   const logo = fs.existsSync(logoPath) ? await pdf.embedPng(fs.readFileSync(logoPath)) : null;
   const unitNames = new Map(units.map((unit) => [unit.id, unit.title]));
   const safe = (value: string) => sanitizeTextForCjkPdf(value).text;
-  let page = pdf.addPage([595, 842]);
+  const pageWidth = 842;
+  const pageHeight = 595;
+  const left = 30;
+  const tableTop = 438;
+  const columns = [
+    { key: "no", label: "#", width: 32 },
+    { key: "word", label: "單字／片語", width: 125 },
+    { key: "meaning", label: "中文意思", width: 155 },
+    { key: "phrase", label: "片語與片語意思", width: 165 },
+    { key: "example", label: "例句／例句翻譯", width: 335 },
+  ] as const;
+  const fontSize = 8.5;
+  const lineHeight = 11;
+  const cellPadding = 6;
+  const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
+  const wrapText = (value: string, width: number, maxLines = 5) => {
+    const text = safe(value || "—").replace(/\r/g, "");
+    const lines: string[] = [];
+    for (const paragraph of text.split("\n")) {
+      let line = "";
+      let lineWidth = 0;
+      for (const char of paragraph || " ") {
+        const charWidth = /[\x00-\xff]/.test(char) ? fontSize * 0.52 : fontSize;
+        if (line && lineWidth + charWidth > width) {
+          lines.push(line);
+          line = "";
+          lineWidth = 0;
+        }
+        line += char;
+        lineWidth += charWidth;
+      }
+      if (line) lines.push(line);
+    }
+    if (lines.length > maxLines) {
+      lines.length = maxLines;
+      lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, Math.max(1, lines[maxLines - 1].length - 1))}…`;
+    }
+    return lines.length ? lines : ["—"];
+  };
+  let pageNumber = 0;
+  let page = pdf.addPage([pageWidth, pageHeight]);
   const drawHeader = () => {
-    if (logo) page.drawImage(logo, { x: 42, y: 775, width: 32, height: 32 });
-    page.drawText(safe("StudyNova AI"), { x: 82, y: 790, size: 15, font, color: rgb(0.08, 0.2, 0.42) });
-    page.drawText(safe(`${set.examLabel}｜${set.title}`), { x: 42, y: 750, size: 18, font, color: rgb(0.08, 0.12, 0.22) });
-    page.drawText(safe(`單字總覽・共 ${items.length} 字`), { x: 42, y: 730, size: 10, font, color: rgb(0.35, 0.4, 0.5) });
-    page.drawText("STUDYNOVA", { x: 205, y: 360, size: 42, font: mathFont, color: rgb(0.3, 0.55, 0.8), rotate: degrees(32), opacity: 0.1 });
+    pageNumber += 1;
+    if (logo) page.drawImage(logo, { x: left, y: 535, width: 28, height: 28 });
+    page.drawText(safe("StudyNova AI"), { x: left + 38, y: 547, size: 14, font, color: rgb(0.08, 0.2, 0.42) });
+    page.drawText(safe(`${set.examLabel}｜${set.title}`), { x: left, y: 505, size: 18, font, color: rgb(0.08, 0.12, 0.22) });
+    page.drawText(safe(`英文段考單字總覽・共 ${items.length} 字・表格版`), { x: left, y: 486, size: 9, font, color: rgb(0.35, 0.4, 0.5) });
+    page.drawText("STUDYNOVA", { x: 300, y: 250, size: 48, font: mathFont, color: rgb(0.3, 0.55, 0.8), rotate: degrees(25), opacity: 0.08 });
+    page.drawText(safe(`第 ${pageNumber} 頁`), { x: pageWidth - 70, y: 24, size: 8, font, color: rgb(0.4, 0.45, 0.55) });
   };
   drawHeader();
-  let y = 700;
+  let y = tableTop;
+  const drawTableHeader = () => {
+    let x = left;
+    page.drawRectangle({ x: left, y: y - 25, width: tableWidth, height: 25, color: rgb(0.08, 0.25, 0.42), borderColor: rgb(0.2, 0.55, 0.75), borderWidth: 0.8 });
+    for (const column of columns) {
+      page.drawText(safe(column.label), { x: x + cellPadding, y: y - 17, size: 8.5, font, color: rgb(0.92, 0.98, 1) });
+      x += column.width;
+      page.drawLine({ start: { x, y: y - 25 }, end: { x, y }, thickness: 0.6, color: rgb(0.2, 0.55, 0.75) });
+    }
+    y -= 25;
+  };
+  drawTableHeader();
   for (const [index, item] of items.entries()) {
-    if (y < 54) { page = pdf.addPage([595, 842]); drawHeader(); y = 700; }
+    const cells = [
+      String(index + 1),
+      `${item.word}${item.phonetic ? `\n${item.phonetic}` : ""}${item.partOfSpeech ? `\n${item.partOfSpeech}` : ""}`,
+      item.meaning,
+      item.phrase ? `${item.phrase}${item.phraseMeaning ? `\n${item.phraseMeaning}` : ""}` : "—",
+      item.example ? `${item.example}${item.exampleZh ? `\n${item.exampleZh}` : ""}` : "—",
+    ];
+    const wrapped = cells.map((value, cellIndex) => wrapText(value, columns[cellIndex].width - cellPadding * 2));
+    const rowHeight = Math.max(34, ...wrapped.map((lines) => lines.length * lineHeight + cellPadding * 2));
+    if (y - rowHeight < 38) {
+      page = pdf.addPage([pageWidth, pageHeight]);
+      drawHeader();
+      y = tableTop;
+      drawTableHeader();
+    }
     const unit = unitNames.get(item.unitId) ?? "未分類單元";
-    const line = `${index + 1}. ${item.word}  ${item.meaning}${item.partOfSpeech ? `（${item.partOfSpeech}）` : ""}`;
-    page.drawText(safe(line).slice(0, 95), { x: 42, y, size: 10.5, font, color: rgb(0.08, 0.12, 0.22) });
-    page.drawText(safe(`${unit}${item.phonetic ? `・${item.phonetic}` : ""}`), { x: 60, y: y - 14, size: 8, font, color: rgb(0.34, 0.42, 0.55) });
-    if (item.phrase) page.drawText(safe(`片語：${item.phrase}${item.phraseMeaning ? `｜${item.phraseMeaning}` : ""}`).slice(0, 92), { x: 60, y: y - 27, size: 8, font, color: rgb(0.15, 0.42, 0.55) });
-    y -= item.phrase ? 48 : 36;
+    let x = left;
+    page.drawRectangle({ x: left, y: y - rowHeight, width: tableWidth, height: rowHeight, color: index % 2 === 0 ? rgb(0.97, 0.985, 1) : rgb(0.91, 0.95, 0.98), borderColor: rgb(0.68, 0.78, 0.86), borderWidth: 0.5 });
+    wrapped.forEach((lines, cellIndex) => {
+      lines.forEach((line, lineIndex) => page.drawText(line, { x: x + cellPadding, y: y - cellPadding - lineIndex * lineHeight - fontSize, size: fontSize, font, color: cellIndex === 0 ? rgb(0.18, 0.32, 0.46) : rgb(0.08, 0.12, 0.2) }));
+      x += columns[cellIndex].width;
+      page.drawLine({ start: { x, y: y - rowHeight }, end: { x, y }, thickness: 0.45, color: rgb(0.68, 0.78, 0.86) });
+    });
+    page.drawText(safe(`單元：${unit}`), { x: left + columns[0].width + cellPadding, y: y - rowHeight + 5, size: 6.5, font, color: rgb(0.35, 0.45, 0.55) });
+    y -= rowHeight;
   }
   return Buffer.from(await pdf.save());
 }
