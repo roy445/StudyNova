@@ -305,10 +305,11 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     sessionStorage.setItem(storageKey, sessionKey);
     let timer: ReturnType<typeof setTimeout>;
     const heartbeat = () => {
-      void apiPost("/pk/presence/heartbeat", { sessionKey, state: pathname.startsWith("/pk") ? "online" : "recently_active", metadata: { route: pathname } }).catch(() => {});
-      timer = setTimeout(heartbeat, 45_000);
+      const visible = document.visibilityState === "visible";
+      void apiPost("/pk/presence/heartbeat", { sessionKey, state: visible ? "online" : "offline", metadata: { route: pathname, visibility: document.visibilityState } }).catch(() => {});
+      timer = setTimeout(heartbeat, 30_000);
     };
-    const onVisibility = () => { if (document.visibilityState === "visible") heartbeat(); };
+    const onVisibility = () => heartbeat();
     heartbeat();
     document.addEventListener("visibilitychange", onVisibility);
     return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", onVisibility); };

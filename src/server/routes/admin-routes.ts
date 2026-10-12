@@ -2058,8 +2058,8 @@ export const routes: RouteDef[] = [
     handler: async () => {
       const now = new Date();
       const [online, pkOnline, waitingRooms, liveMatches, matching, anomalies] = await Promise.all([
-        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(gte(pkPresence.expiresAt, now)),
-        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), sql`${pkPresence.currentMatchId} is not null`)),
+        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), eq(pkPresence.state, "online"))),
+        db.select({ count: sql<number>`count(distinct ${pkPresence.userId})::int` }).from(pkPresence).where(and(gte(pkPresence.expiresAt, now), eq(pkPresence.state, "online"), sql`${pkPresence.currentMatchId} is not null`)),
         db.select({ count: sql<number>`count(*)::int` }).from(pkRooms).where(eq(pkRooms.status, "waiting")),
         db.select({ count: sql<number>`count(*)::int` }).from(pkMatches).where(sql`${pkMatches.status} in ('countdown', 'in_progress', 'paused')`),
         db.select({ count: sql<number>`count(*)::int` }).from(pkMatches).where(eq(pkMatches.status, "matching")),
