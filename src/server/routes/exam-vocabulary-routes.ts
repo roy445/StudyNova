@@ -161,13 +161,13 @@ export const routes: RouteDef[] = [
       const units = await db.select().from(examVocabularyUnits).where(eq(examVocabularyUnits.setId, set.id)).orderBy(asc(examVocabularyUnits.sortOrder));
       const items = await db.select({ id: examVocabularyItems.id, sourceFile: examVocabularyItems.sourceFile, word: examVocabularyItems.word, meaning: examVocabularyItems.meaning, partOfSpeech: examVocabularyItems.partOfSpeech, phonetic: examVocabularyItems.phonetic, phrase: examVocabularyItems.phrase, phraseMeaning: examVocabularyItems.phraseMeaning, example: examVocabularyItems.example, exampleZh: examVocabularyItems.exampleZh, metadata: examVocabularyItems.metadata }).from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id));
       const jobs = await db.select({ id: examVocabularyImportJobs.id, filename: examVocabularyImportJobs.filename, status: examVocabularyImportJobs.status, progress: examVocabularyImportJobs.progress, accepted: examVocabularyImportJobs.accepted, skipped: examVocabularyImportJobs.skipped, errorMessage: examVocabularyImportJobs.errorMessage, objectId: examVocabularyImportJobs.objectId }).from(examVocabularyImportJobs).where(eq(examVocabularyImportJobs.setId, set.id)).orderBy(desc(examVocabularyImportJobs.createdAt));
-      type SourceDetail = { id: string; word: string; meaning: string; partOfSpeech: string; phonetic: string; phrase: string; phraseMeaning: string; example: string; exampleZh: string };
+      type SourceDetail = { id: string; word: string; meaning: string; partOfSpeech: string; phonetic: string; phrase: string; phraseMeaning: string; example: string; exampleZh: string; importantInfo?: string };
       const sourceMap = new Map<string, { filename: string; jobId: string; itemCount: number; objectIds: string[]; status: string; progress: number; accepted: number; skipped: number; errorMessage: string; items: SourceDetail[] }>();
       for (const item of items) {
         const filename = item.sourceFile || "未命名來源";
         const current = sourceMap.get(filename) ?? { filename, jobId: "", itemCount: 0, objectIds: [], status: "completed", progress: 100, accepted: 0, skipped: 0, errorMessage: "", items: [] };
         current.itemCount += 1;
-        current.items.push({ id: item.id, word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech, phonetic: item.phonetic, phrase: item.phrase, phraseMeaning: item.phraseMeaning, example: item.example, exampleZh: item.exampleZh });
+        current.items.push({ id: item.id, word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech, phonetic: item.phonetic, phrase: item.phrase, phraseMeaning: item.phraseMeaning, example: item.example, exampleZh: item.exampleZh, importantInfo: typeof item.metadata?.importantInfo === "string" ? item.metadata.importantInfo : "" });
         const objectId = typeof item.metadata?.objectId === "string" ? item.metadata.objectId : "";
         if (objectId && !current.objectIds.includes(objectId)) current.objectIds.push(objectId);
         sourceMap.set(filename, current);
