@@ -1,8 +1,9 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db } from "@/db";
-import { aiProviderHealth, aiUsageLogs } from "@/db/schema";
+import { aiProviderHealth, aiUsageLogs, users } from "@/db/schema";
 import { fail, monthStart, nextUtcMonthStart } from "./core";
+import { notify } from "./notify";
 
 export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "gemini_4" | "gemini_5" | "openai" | "openrouter";
 
@@ -303,6 +304,31 @@ async function healthRow(name: ProviderName, model: string) {
   return inserted[0] ?? (await db.select().from(aiProviderHealth).where(eq(aiProviderHealth.provider, name)).limit(1))[0];
 }
 
+async function notifyIfAllProvidersQuotaCooled(configs: ProviderConfig[], feature: string) {
+  try {
+    const now = new Date();
+    const health = await db.select({ provider: aiProviderHealth.provider, enabled: aiProviderHealth.enabled, cooldownUntil: aiProviderHealth.cooldownUntil, lastFailureCategory: aiProviderHealth.lastFailureCategory }).from(aiProviderHealth);
+    const active = configs.filter((cfg) => health.some((row) => row.provider === cfg.name && row.enabled !== false));
+    const cooled = active.length > 0 && active.every((cfg) => {
+      const row = health.find((item) => item.provider === cfg.name);
+      return row?.lastFailureCategory === "quota_exhausted" && row.cooldownUntil && new Date(row.cooldownUntil) > now;
+    });
+    if (!cooled) return;
+    const admins = await db.select({ userId: users.userId }).from(users).where(sql`${users.status} = 'active' and ${users.role} in ('admin', 'owner')`);
+    const month = now.toISOString().slice(0, 7);
+    await Promise.all(admins.map((admin) => notify({
+      userId: admin.userId,
+      kind: "ai_provider",
+      title: "AI Provider 配額已全部暫停",
+      body: `目前所有已設定的 AI Provider 都已確認配額用完，功能會保留排隊；系統不會因高流量或逾時預防性停用。來源功能：${feature}`,
+      link: "/admin/ai-health",
+      dedupeKey: `ai-all-quota-cooled:${month}:${admin.userId}`,
+    })));
+  } catch (error) {
+    console.error("[ai] failed to create all-provider cooldown notification", { feature, error: error instanceof Error ? error.message : "unknown" });
+  }
+}
+
 async function logUsage(entry: {
   userId?: string | null;
   provider: string;
@@ -358,7 +384,10 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       if (health?.enabled === false) return false;
       return !health?.cooldownUntil || new Date(health.cooldownUntil) <= new Date();
     });
-    if (!eligible.length) throw fail("AI_ALL_UNAVAILABLE", { message: "AI 服務暫時無法使用，請稍後再試。" });
+    if (!eligible.length) {
+      await notifyIfAllProvidersQuotaCooled(configs, req.feature);
+      throw fail("AI_ALL_UNAVAILABLE", { message: "AI 服務暫時無法使用，工作會保留排隊；若所有 Provider 都確認配額用完，已通知管理員。" });
+    }
 
     const attempts = await Promise.all(
       eligible.map(async ({ cfg }) => {
@@ -480,6 +509,8 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
             lastFailureAt: new Date(),
             lastFailureCategory: category,
             updatedAt: new Date(),
+            // Only an explicit provider quota response may create cooldown.
+            // High demand, timeout, network and server errors remain retryable.
             ...(category === "quota_exhausted" ? { cooldownUntil: nextUtcMonthStart() } : {}),
           })
           .where(eq(aiProviderHealth.provider, cfg.name));
@@ -520,6 +551,7 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       fallbackFrom = cfg.name;
     }
   }
+  await notifyIfAllProvidersQuotaCooled(configs, req.feature);
   const message = lastCategory === "quota_exhausted"
     ? "目前可用的 AI Provider 配額都已用完，請管理員檢查 AI Health 或切換 API Key。"
     : lastCategory === "cooldown"
