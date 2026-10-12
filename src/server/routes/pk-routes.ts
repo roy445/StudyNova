@@ -275,6 +275,7 @@ async function getPlayer(matchId: string, userId: string) {
 }
 
 async function accessMatch(matchId: string, userId: string) {
+  settingsError(await getPkConfig(), "customRoomEnabled");
   const match = await syncMatch(matchId);
   if (!match) throw notFound("找不到 PK 賽場");
   const player = await getPlayer(matchId, userId);

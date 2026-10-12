@@ -1,5 +1,7 @@
-import OnlinePkPage from "../online-pk/page";
+import { PkDisabledPage } from "@/components/PkDisabledPage";
 
 export const dynamic = "force-dynamic";
 
-export default OnlinePkPage;
+export default function PkPage() {
+  return <PkDisabledPage />;
+}

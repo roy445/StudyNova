@@ -78,7 +78,8 @@ function clampConfig(value: Record<string, unknown>): PkConfig {
 
 export async function getPkConfig() {
   const row = (await db.select().from(platformSettings).where(eq(platformSettings.key, "online_pk_config")).limit(1))[0];
-  return clampConfig((row?.value ?? {}) as Record<string, unknown>);
+  // 暫停期間強制關閉，避免資料庫內舊設定讓 PK API 被重新啟用。
+  return { ...clampConfig((row?.value ?? {}) as Record<string, unknown>), enabled: false };
 }
 
 export function normalizePkConfig(value: Record<string, unknown>) {
