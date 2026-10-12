@@ -5,7 +5,7 @@ import { aiProviderHealth, aiUsageLogs, users } from "@/db/schema";
 import { fail, monthStart, nextUtcMonthStart } from "./core";
 import { notify } from "./notify";
 
-export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "gemini_4" | "gemini_5" | "openai" | "openrouter";
+export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "gemini_4" | "gemini_5" | "gemini_6" | "gemini_7" | "gemini_8" | "gemini_9" | "gemini_10" | "openai" | "openrouter";
 
 export type ProviderConfig = {
   name: ProviderName;
@@ -115,15 +115,20 @@ export function providerConfigs(): ProviderConfig[] {
     { name: "gemini_3", priority: 3, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_3) },
     { name: "gemini_4", priority: 4, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_4) },
     { name: "gemini_5", priority: 5, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_5) },
+    { name: "gemini_6", priority: 6, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_6) },
+    { name: "gemini_7", priority: 7, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_7) },
+    { name: "gemini_8", priority: 8, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_8) },
+    { name: "gemini_9", priority: 9, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_9) },
+    { name: "gemini_10", priority: 10, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_10) },
     {
       name: "openai",
-      priority: 6,
+      priority: 11,
       model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
       apiKey: process.env.OPENAI_API_KEY,
     },
     {
       name: "openrouter",
-      priority: 7,
+      priority: 12,
       model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free",
       apiKey: process.env.OPENROUTER_API_KEY,
     },

@@ -41,6 +41,7 @@ import { processExamPrepImport } from "./exam-prep-import";
 import { processExamPrepDraftAnalysis } from "./exam-prep-draft-analysis";
 import { processConverterJob } from "./ai-question-converter";
 import { processExamVocabularyImport } from "./exam-vocabulary-import";
+import { runMonthlyActiveAccountPromotion } from "./routes/ai-governance-routes";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -68,7 +69,8 @@ export type JobName =
   | "exam_vocabulary_import"
   | "exam_prep_draft_analysis"
   | "ai_question_converter"
-  | "quiz_expiry_cleanup";
+  | "quiz_expiry_cleanup"
+  | "active_pro_monthly";
 
 
 export type JobPayload = Record<string, unknown>;
@@ -118,6 +120,11 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     if (!jobId) throw new Error("缺少 AI 題目互動化工作 ID");
     const result = await processConverterJob(jobId);
     return `AI 題目互動化 ${jobId}：${result.status}`;
+  },
+
+  async active_pro_monthly() {
+    const result = await runMonthlyActiveAccountPromotion();
+    return `每月活躍 Pro 評選完成：候選 ${result.selected.length} 位，授予 ${result.granted.length} 位`;
   },
 
   async daily_tasks_refresh() {
@@ -624,6 +631,7 @@ export const CRON_TASKS: Array<{ task: CronTask; label: string; schedule: string
   { task: "session_cleanup", label: "Session / 通知清理", schedule: "每日 03:00" },
   { task: "data_retention", label: "保守資料保留清理", schedule: "每日 03:30" },
   { task: "quiz_expiry_cleanup", label: "AI 題組三天期限清理", schedule: "每 30 分鐘" },
+  { task: "active_pro_monthly", label: "每月活躍帳號 Pro 評選", schedule: "每月 1 日 03:20" },
   { task: "name_moderation_scan", label: "使用者名稱巡檢", schedule: "每 6 小時" },
   { task: "study_reminder", label: "每日讀書提醒", schedule: "每日 20:00" },
 ];

@@ -1588,6 +1588,37 @@ export const aiUsageLogs = pgTable(
   (t) => [index("ai_logs_provider_idx").on(t.provider, t.createdAt), index("ai_logs_feature_idx").on(t.feature)],
 );
 
+export const activeAccountScores = pgTable(
+  "active_account_scores",
+  {
+    id: id(),
+    period: text("period").notNull(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    score: real("score").notNull().default(0),
+    rank: integer("rank").notNull().default(0),
+    selected: boolean("selected").notNull().default(false),
+    factors: jsonb("factors").$type<Record<string, number>>().notNull().default({}),
+    explanation: text("explanation").notNull().default(""),
+    proGranted: boolean("pro_granted").notNull().default(false),
+    computedAt: created(),
+  },
+  (t) => [uniqueIndex("active_account_score_period_user_uq").on(t.period, t.userId), index("active_account_score_period_idx").on(t.period, t.score)],
+);
+
+export const userTitles = pgTable(
+  "user_titles",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    assignedBy: uuid("assigned_by").references(() => users.userId, { onDelete: "set null" }),
+    assignedAt: created(),
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [index("user_titles_user_idx").on(t.userId, t.active)],
+);
+
 export const aiProviderHealth = pgTable("ai_provider_health", {
   provider: text("provider").primaryKey(),
   priority: integer("priority").notNull().default(1),
