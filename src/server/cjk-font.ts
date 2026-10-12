@@ -6,6 +6,7 @@ import { VISUAL_NOTE_ICONS } from "@/lib/visual-note-icons";
 
 const FONT_FILENAME = "NotoSansCJKTC-Regular.ttf";
 const FONT_PATH = path.join(process.cwd(), "src", "server", "fonts", FONT_FILENAME);
+const FALLBACK_FONT_PATH = path.join(process.cwd(), "public", "fonts", "NotoSansCJKsc-Light.otf");
 const MATH_FONT_FILENAME = "DejaVuSans.ttf";
 const MATH_FONT_PATH = path.join(process.cwd(), "src", "server", "fonts", MATH_FONT_FILENAME);
 export const PDF_MATH_REGRESSION_TEXT = "H₂O x² a₃ log₂x √ ∑ ∫ ≤ ≥ ∞ ⁿ";
@@ -22,8 +23,9 @@ export function cjkFontPath() {
 
 export function getCjkFont(): Buffer {
   if (!cachedFont) {
-    if (!fs.existsSync(FONT_PATH)) throw new Error(`CJK font unavailable: ${FONT_PATH}`);
-    cachedFont = fs.readFileSync(FONT_PATH);
+    const fontPath = fs.existsSync(FONT_PATH) ? FONT_PATH : FALLBACK_FONT_PATH;
+    if (!fs.existsSync(fontPath)) throw new Error(`CJK font unavailable: ${FONT_PATH}`);
+    cachedFont = fs.readFileSync(fontPath);
     if (cachedFont.length < 1_000_000) throw new Error("CJK font file is unexpectedly small");
   }
   return cachedFont;
@@ -36,8 +38,10 @@ function getCjkFontFace() {
 
 function getMathFont(): Buffer {
   if (!cachedMathFont) {
-    if (!fs.existsSync(MATH_FONT_PATH)) throw new Error(`Math fallback font unavailable: ${MATH_FONT_PATH}`);
-    cachedMathFont = fs.readFileSync(MATH_FONT_PATH);
+    // Some serverless bundles omit the secondary math font. The CJK font
+    // still covers the common ASCII/math glyphs, so use it as a safe fallback
+    // instead of failing the entire PDF export.
+    cachedMathFont = fs.existsSync(MATH_FONT_PATH) ? fs.readFileSync(MATH_FONT_PATH) : getCjkFont();
   }
   return cachedMathFont;
 }
