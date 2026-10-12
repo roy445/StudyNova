@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS exam_vocabulary_sets (
   enabled boolean NOT NULL DEFAULT true,
   published boolean NOT NULL DEFAULT false,
   sort_order integer NOT NULL DEFAULT 0,
-    created_by uuid REFERENCES users(user_id) ON DELETE SET NULL,
+  created_by uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
