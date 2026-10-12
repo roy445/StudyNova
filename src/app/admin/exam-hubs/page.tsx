@@ -3,6 +3,7 @@ import { formatTaipeiDateTime, parseTaipeiDateTimeInput } from "@/lib/date-time"
 import { useEffect, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost, useApi } from "@/lib/api";
 import { Badge, Button, Card, Field, Input, Select, Textarea, useToast } from "@/components/ui";
+import { FileImportProgress, type FileImportProgressState } from "@/components/file-import-progress";
 
 type Hub = { id: string; name: string; educationLevel: string; schoolName: string; grade: number; examNumber: string; targetScore: number; status: string; openAt: string | null; closeAt: string | null; questionBankId: string | null; allowVocabulary: boolean; allowSelfQuiz: boolean; allowTimedExam: boolean; allowScoreAnalysis: boolean };
 type GenerationJob = { id: string; status: string; requirements: Record<string, unknown>; qualitySummary: Record<string, unknown>; createdAt: string };
@@ -28,6 +29,7 @@ export default function AdminExamHubsPage() {
   const [loading, setLoading] = useState(false);
   const [previewJob, setPreviewJob] = useState<{ id: string; items: PreviewItem[] } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [materialProgress, setMaterialProgress] = useState<FileImportProgressState | null>(null);
   const [uploadedMaterialIds, setUploadedMaterialIds] = useState<string[]>([]);
   const [materialImports, setMaterialImports] = useState<Record<string, MaterialImport[]>>({});
   const [usage, setUsage] = useState<Record<string, Usage>>({});
@@ -52,15 +54,18 @@ export default function AdminExamHubsPage() {
   }
   async function uploadMaterials(hubId: string, files: FileList | null) {
     if (!files?.length) return;
+    const selectedFiles = Array.from(files);
     const form = new FormData();
-    Array.from(files).forEach((file) => form.append("files", file));
+    selectedFiles.forEach((file) => form.append("files", file));
     setUploading(true);
+    setMaterialProgress({ current: 0, total: selectedFiles.length, label: "正在匯入英文段考資料", fileName: selectedFiles[0]?.name, stage: "上傳並讀取檔案…" });
     try {
       const result = await apiPost<{ uploaded: number }>(`/admin/exam-hubs/${hubId}/materials/upload`, form);
+      setMaterialProgress({ current: selectedFiles.length, total: selectedFiles.length, label: "英文段考資料匯入完成", fileName: selectedFiles[selectedFiles.length - 1]?.name, stage: `已暫存 ${result.uploaded} 個來源，等待檢查` });
       const current = await apiGet<{ imports: MaterialImport[] }>(`/admin/exam-hubs/${hubId}/material-imports`);
       setMaterialImports((all) => ({ ...all, [hubId]: current.imports }));
       toast.push("success", `已解析 ${result.uploaded} 個檔案，請先檢查預覽後再確認匯入。`);
-    } catch (err) { toast.push("error", err instanceof Error ? err.message : "批次上傳失敗"); } finally { setUploading(false); }
+    } catch (err) { toast.push("error", err instanceof Error ? err.message : "批次上傳失敗"); } finally { setUploading(false); window.setTimeout(() => setMaterialProgress(null), 4000); }
   }
   async function confirmMaterialImports(hubId: string) {
     const pending = (materialImports[hubId] ?? []).filter((item) => item.status === "pending");
@@ -84,7 +89,8 @@ export default function AdminExamHubsPage() {
     } catch (err) { toast.push("error", err instanceof Error ? err.message : "原卷分析失敗"); }
   }
   async function analyzeVocabulary(hubId: string, item: MaterialImport) {
-    try { const result = await apiPost<{ analyzed: number; added: number }>(`/admin/exam-hubs/${hubId}/material-imports/${item.id}/analyze-vocabulary`, {}); toast.push("success", `已分析 ${result.analyzed} 個單字，新增 ${result.added} 個`); } catch (err) { toast.push("error", err instanceof Error ? err.message : "單字分析失敗"); }
+    setMaterialProgress({ current: 0, total: 1, label: "正在分析英文段考總單字", fileName: item.filename, stage: "AI 讀取原卷並擷取單字…" });
+    try { const result = await apiPost<{ analyzed: number; added: number }>(`/admin/exam-hubs/${hubId}/material-imports/${item.id}/analyze-vocabulary`, {}); setMaterialProgress({ current: 1, total: 1, label: "英文段考總單字分析完成", fileName: item.filename, stage: `讀取 ${result.analyzed} 個單字，新增 ${result.added} 個` }); toast.push("success", `已分析 ${result.analyzed} 個單字，新增 ${result.added} 個`); } catch (err) { toast.push("error", err instanceof Error ? err.message : "單字分析失敗"); } finally { window.setTimeout(() => setMaterialProgress(null), 4000); }
   }
   async function deleteHub(hub: Hub) {
     if (!window.confirm(`確定刪除「${hub.name}」？題庫、材料、作答紀錄也會一併刪除。`)) return;
