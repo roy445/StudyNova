@@ -43,6 +43,24 @@ const ACTION_LABEL: Record<string, string> = {
   create_artifact: "生成手寫重點／心智圖／PDF",
 };
 
+function TypewriterChatText({ content, animate }: { content: string; animate: boolean }) {
+  const [visible, setVisible] = useState(animate ? "" : content);
+  useEffect(() => {
+    if (!animate) {
+      return;
+    }
+    const characters = Array.from(content);
+    let index = 0;
+    const timer = window.setInterval(() => {
+      index += 1;
+      setVisible(characters.slice(0, index).join(""));
+      if (index >= characters.length) window.clearInterval(timer);
+    }, 18);
+    return () => window.clearInterval(timer);
+  }, [animate, content]);
+  return <ChatRichText content={visible || (animate ? "▌" : content)} />;
+}
+
 export default function AiPage() {
   const toast = useToast();
   const convs = useApi<{ conversations: Conversation[]; aiEnabled: boolean }>("/ai/conversations");
@@ -55,9 +73,11 @@ export default function AiPage() {
   const aiPracticeCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [latestAssistantId, setLatestAssistantId] = useState<string | null>(null);
   const [conv, setConv] = useState<Conversation | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [chatStage, setChatStage] = useState("讀取訊息");
   const [loadingMsg, setLoadingMsg] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noviState, setNoviState] = useState<NoviState>("idle");
@@ -77,6 +97,17 @@ export default function AiPage() {
   const conversationLoadRef = useRef(0);
 
   useEffect(() => {
+    if (!sending) return;
+    const stages = ["讀取訊息", "分析中", "整理重點中", "生成中..."];
+    let index = 0;
+    const timer = window.setInterval(() => {
+      index = (index + 1) % stages.length;
+      setChatStage(stages[index]);
+    }, 1100);
+    return () => window.clearInterval(timer);
+  }, [sending]);
+
+  useEffect(() => {
     const requestId = ++conversationLoadRef.current;
     if (!activeId) return;
     const loadingTimer = window.setTimeout(() => setLoadingMsg(true), 0);
@@ -86,6 +117,7 @@ export default function AiPage() {
         setLoadingMsg(false);
         setConv(res.conversation);
         setMessages(res.messages);
+        setLatestAssistantId(null);
         setAttachments((res.conversation.attachments ?? []).map((item) => ({ contextId: item.id, name: item.originalName, status: item.status })));
       })
       .catch((err) => {
@@ -121,12 +153,14 @@ export default function AiPage() {
     const sentAttachments = attachments;
     setAttachment(null);
     setSending(true);
+    setChatStage("讀取訊息");
     setNoviState("thinking");
     setError(null);
     setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content: content || "請分析這張圖片。", attachment: sentAttachment ?? undefined, action: null, actionStatus: "none", createdAt: new Date().toISOString() }]);
     try {
       const res = await apiPost<{ message: Message }>(`/ai/conversations/${activeId}/messages`, { content: content || "請分析這張圖片。", contextIds: sentAttachments.map((item) => item.contextId), contextId: sentAttachment?.contextId });
       setMessages((m) => [...m, res.message]);
+      setLatestAssistantId(res.message.id);
       setNoviState("happy");
       await convs.reload();
     } catch (err) {
@@ -339,7 +373,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
                   <div className={`min-w-0 max-w-[88%] rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed [overflow-wrap:anywhere] ${m.role === "user" ? "border-transparent bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : m.importance === "critical" ? "border-rose-300/60 bg-rose-400/15 text-rose-50 shadow-[0_0_24px_rgba(251,113,133,0.14)]" : m.importance === "important" ? "border-amber-300/50 bg-amber-400/12 text-amber-50" : "glass-soft border-transparent"}`}>
                     {m.attachment && <img src={m.attachment.previewUrl} alt={m.attachment.name} className="mb-2 max-h-64 max-w-full rounded-xl object-contain" />}
                     {m.role !== "user" && m.importance && m.importance !== "normal" && <p className={`mb-1 text-[10px] font-bold tracking-wide ${m.importance === "critical" ? "text-rose-200" : "text-amber-200"}`}>{m.importance === "critical" ? "⚠ 關鍵提醒" : "✦ 學習重點"}</p>}
-                    <ChatRichText content={m.content} />
+                    <TypewriterChatText content={m.content} animate={m.role !== "user" && m.id === latestAssistantId} />
                     {m.action && (
                       <div className="mt-2 rounded-xl border border-[#ffc857]/40 bg-[#ffc857]/10 p-2.5 text-xs">
                         <p className="font-medium text-[#ffd98a]">✦ Novi 想要：{ACTION_LABEL[m.action.type] ?? m.action.type} {m.action.type === "create_note" && <Badge tone="gold">Nova Pro 專屬</Badge>}</p>
@@ -366,7 +400,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
               ))}
               {sending && (
                 <div className="flex items-center gap-2 text-xs text-muted">
-                  <span className="h-2 w-2 animate-ping rounded-full bg-[#37d3ff]" /> Novi 思考中…
+                  <span className="h-2 w-2 animate-ping rounded-full bg-[#37d3ff]" /> Novi {chatStage}…
                 </div>
               )}
               {error && <ErrorState message={error} onRetry={() => setError(null)} />}

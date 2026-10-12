@@ -5,6 +5,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Selec
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { BrowserSpeechControls } from "@/components/BrowserSpeechControls";
+import { FileImportProgress, type FileImportProgressState } from "@/components/file-import-progress";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -22,6 +23,7 @@ export function MaterialsPanel() {
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [materialProgress, setMaterialProgress] = useState<FileImportProgressState | null>(null);
   const [detail, setDetail] = useState<Material | null>(null);
   const [analysis, setAnalysis] = useState<Record<string, unknown> | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -86,13 +88,16 @@ export function MaterialsPanel() {
       return;
     }
     setUploading(true);
+    setMaterialProgress({ current: 0, total: 1, label: "正在匯入教材", fileName: file?.name, stage: "準備上傳…" });
     try {
       const fd = new FormData();
       fd.append("title", title);
       fd.append("subject", subject);
       fd.append("content", content);
       if (file) fd.append("file", file);
+      setMaterialProgress({ current: 0, total: 1, label: "正在匯入教材", fileName: file?.name, stage: "上傳並擷取文字…" });
       await apiPost("/materials", fd);
+      setMaterialProgress({ current: 1, total: 1, label: "教材匯入完成", fileName: file?.name, stage: "文字擷取完成" });
       toast.push("success", "教材已上傳並完成文字擷取");
       setOpen(false);
       setTitle("");
@@ -104,6 +109,7 @@ export function MaterialsPanel() {
       toast.push("error", errorMessage(err));
     } finally {
       setUploading(false);
+      window.setTimeout(() => setMaterialProgress(null), 2500);
     }
   }
 
@@ -259,6 +265,7 @@ export function MaterialsPanel() {
           <Button full loading={uploading} onClick={upload}>
             上傳並處理
           </Button>
+          <FileImportProgress progress={materialProgress} />
         </div>
       </Modal>
 
@@ -418,6 +425,7 @@ export function OcrPanel() {
   const [selectedVisionItems, setSelectedVisionItems] = useState<string[]>([]);
   const [latestBatchIds, setLatestBatchIds] = useState<string[]>([]);
   const [latestBatchNumber, setLatestBatchNumber] = useState<number | null>(null);
+  const [ocrProgress, setOcrProgress] = useState<FileImportProgressState | null>(null);
   const currentOcrPages = latestBatchIds.length || detail.data?.pages.length || 0;
   const ocrTotalCost = typeof imageOcrCost === "number" ? imageOcrCost * currentOcrPages + (currentOcrPages > 1 ? (multiImageOcrCost ?? 0) : 0) : null;
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -522,10 +530,12 @@ export function OcrPanel() {
     }
     if (!confirmEnglishOcr()) return;
     setBusy(true);
+    setOcrProgress({ current: 0, total: files.length, label: "正在匯入 OCR 圖片", fileName: files[0]?.name, stage: "上傳圖片…" });
     try {
       const fd = new FormData();
       Array.from(files).forEach((f) => fd.append("files", f));
       const res = await apiPost<{ pages: Array<{ id: string }>; batchNumber: number }>(`/ocr/documents/${activeId}/pages`, fd);
+      setOcrProgress({ current: files.length, total: files.length, label: "OCR 圖片匯入完成", fileName: files[files.length - 1]?.name, stage: "已加入待辨識清單" });
       setLatestBatchIds(res.pages.map((page) => page.id));
       setLatestBatchNumber(res.batchNumber);
       toast.push("success", `第 ${res.batchNumber} 次上傳：已加入 ${files.length} 張圖片；接下來只會分析這一批`);
@@ -534,6 +544,7 @@ export function OcrPanel() {
       toast.push("error", errorMessage(err));
     } finally {
       setBusy(false);
+      window.setTimeout(() => setOcrProgress(null), 3500);
     }
   }
 
@@ -548,8 +559,11 @@ export function OcrPanel() {
     }
     if (!confirmNovaSpend(`AI OCR（${pageCount} 頁）`, cost)) return;
     setBusy(true);
+    setOcrProgress({ current: 0, total: pageCount, label: "正在進行 OCR 辨識", stage: "等待辨識結果…" });
     try {
       const res = await apiPost<{ results?: Array<{ ok: boolean; error?: string; errorCode?: string }> }>(`/ocr/documents/${activeId}/run`, { pageIds });
+      const results = res.results ?? [];
+      setOcrProgress({ current: results.length, total: pageCount, label: "OCR 辨識完成", stage: `成功 ${results.filter((item) => item.ok).length} 張，失敗 ${results.filter((item) => !item.ok).length} 張` });
       const ok = res.results?.filter((item) => item.ok).length ?? 0;
       const failed = (res.results?.length ?? 0) - ok;
       const failureDetail = res.results?.filter((item) => !item.ok).map((item) => `${item.error ?? "辨識失敗"}（${item.errorCode ?? "SN-SYS-9901"}）`).join("；");
@@ -786,6 +800,7 @@ export function OcrPanel() {
               ✨ 開始 AI 辨識{typeof ocrTotalCost === "number" ? `（扣 ${ocrTotalCost} Nova）` : ""}
             </Button>
             {(detail.data?.pages.length ?? 0) > 1 && <Button size="sm" variant="outline" loading={busy} onClick={() => runOcr(true)}>辨識全部 {detail.data?.pages.length} 張</Button>}
+            <FileImportProgress progress={ocrProgress} />
             <span className="w-full rounded-lg border border-amber-300/25 bg-amber-300/10 px-2 py-1.5 text-[11px] text-amber-100">目前僅分析英文科目。其他科目圖片可能無法正確分析；如要解題，請前往解題專區或詢問 Novi。</span>
             <Button size="sm" variant="ghost" disabled={!detail.data?.document.combinedText.trim()} onClick={addOcrToMaterial}>
               加入我的教材

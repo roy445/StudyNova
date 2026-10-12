@@ -5,6 +5,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Progr
 import { apiGet, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
 import { MathContent } from "@/components/MathContent";
+import { FileImportProgress, type FileImportProgressState } from "@/components/file-import-progress";
 
 const SUBJECTS = ["國文", "英文", "數學", "自然", "社會", "理化", "生物", "歷史", "地理", "公民", "其他"];
 
@@ -30,6 +31,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
   const [generationProgress, setGenerationProgress] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [checkedAnswers, setCheckedAnswers] = useState<Record<string, { isCorrect: boolean; answer: string[]; explanation: string }>>({});
+  const [fileProgress, setFileProgress] = useState<FileImportProgressState | null>(null);
 
   const submit = useCallback(
     async (attemptId: string, duration: number) => {
@@ -72,6 +74,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
     setBusy(true);
     setGenerationProgress(8);
     const progressTimer = window.setInterval(() => setGenerationProgress((value) => Math.min(92, value + Math.ceil((100 - value) / 8))), 900);
+    setFileProgress(sourceFile ? { current: 0, total: 1, label: "正在讀取 AI 出題檔案", fileName: sourceFile.name, stage: "準備上傳…" } : null);
     try {
       let materialId = form.materialId;
       if (sourceFile) {
@@ -79,8 +82,11 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
         materialForm.append("title", `AI出題教材・${sourceFile.name}`);
         materialForm.append("subject", form.subject);
         materialForm.append("file", sourceFile);
+        setFileProgress({ current: 0, total: 1, label: "正在讀取 AI 出題檔案", fileName: sourceFile.name, stage: "上傳並完整擷取教材…" });
         const created = await apiPost<{ material: { id: string } }>("/materials", materialForm);
+        setFileProgress({ current: 1, total: 1, label: "檔案讀取完成", fileName: sourceFile.name, stage: "開始依完整教材產生題目…" });
         materialId = created.material.id;
+        setFileProgress({ current: 1, total: 1, label: "檔案讀取完成", fileName: sourceFile.name, stage: "開始依完整教材產生題目…" });
         await materials.reload();
       }
       const payload: Record<string, unknown> = {
@@ -107,6 +113,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
       window.clearInterval(progressTimer);
       window.setTimeout(() => setGenerationProgress(0), 500);
       setBusy(false);
+      window.setTimeout(() => setFileProgress(null), 3500);
     }
   }
 
@@ -328,6 +335,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
           <Field label="直接上傳檔案（選填）" hint="支援 PDF、TXT、Markdown 與圖片；上傳後會先保存到教材專區，再用來出題">
             <input type="file" accept=".pdf,.txt,.md,image/*" onChange={(e) => { setSourceFile(e.target.files?.[0] ?? null); setForm({ ...form, materialId: "" }); }} className="w-full rounded-xl border border-[var(--line)] bg-black/20 px-3 py-2 text-xs" />
             {sourceFile && <p className="mt-1 text-xs text-[#7dd3fc]">已選擇：{sourceFile.name}</p>}
+            <FileImportProgress progress={fileProgress} />
           </Field>
           {!form.materialId && (
             <Field label="教材內容" hint="AI 會依你提供的內容出題，不再以固定字數擋下請求">
