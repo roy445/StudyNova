@@ -441,6 +441,26 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
         : 45_000
   );
   const timedOutGeminiModels = new Set<string>();
+  // Provider health is keyed by provider name, not by API-key fingerprint. If
+  // an admin replaces all Gemini keys, an old quota cooldown must not prevent
+  // OCR from probing the newly configured keys. Only bypass cooldowns when
+  // every configured provider is currently blocked; disabled providers remain
+  // disabled and are never probed.
+  let forceProbeCooldown = false;
+  if (req.feature === "learning_vocabulary_ocr") {
+    const healthStates = await Promise.all(configs.map(async (cfg) => {
+      try {
+        return await healthRow(cfg.name, cfg.model);
+      } catch {
+        return undefined;
+      }
+    }));
+    const hasAvailableProvider = healthStates.some((health) => health?.enabled !== false && (!health?.cooldownUntil || new Date(health.cooldownUntil) <= new Date()));
+    forceProbeCooldown = !hasAvailableProvider;
+    if (forceProbeCooldown) {
+      console.warn("[ai] OCR forcing a provider probe because all configured providers have stale cooldown state");
+    }
+  }
 
   for (const cfg of configs) {
     if (Date.now() >= deadline) {
@@ -466,7 +486,7 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       console.warn("[ai] provider skipped because it is disabled", { provider: cfg.name, model: cfg.model, feature: req.feature });
       continue;
     }
-    if (health?.cooldownUntil && new Date(health.cooldownUntil) > new Date()) {
+    if (!forceProbeCooldown && health?.cooldownUntil && new Date(health.cooldownUntil) > new Date()) {
       fallbackFrom = fallbackFrom || cfg.name;
       skippedProviders = skippedProviders ? `${skippedProviders},${cfg.name}:cooldown` : `${cfg.name}:cooldown`;
       lastCategory = "cooldown";
