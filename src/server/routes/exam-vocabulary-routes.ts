@@ -18,6 +18,10 @@ type ExtractedWord = { word?: string; meaning?: string; partOfSpeech?: string; p
 function normalizeWord(value: unknown) {
   return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 160);
 }
+function isDisplayableMeaning(value: unknown) {
+  const text = String(value ?? "").trim();
+  return Boolean(text) && !/不確定|不清楚|看不清|待確認|無法辨識|unknown|unclear|\?{1,}/i.test(text);
+}
 function publicSet(row: typeof examVocabularySets.$inferSelect, unitCount: number, itemCount: number) {
   return { id: row.id, title: row.title, description: row.description, examLabel: row.examLabel, enabled: row.enabled, published: row.published, unitCount, itemCount };
 }
@@ -143,7 +147,7 @@ export const routes: RouteDef[] = [
     const set = await getSet(ctx.params.id, true);
     const units = await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.setId, set.id), eq(examVocabularyUnits.enabled, true))).orderBy(asc(examVocabularyUnits.sortOrder));
     const items = await db.select().from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id)).orderBy(asc(examVocabularyItems.sortOrder), asc(examVocabularyItems.word));
-    return { set, units, items };
+    return { set, units, items: items.filter((item) => isDisplayableMeaning(item.meaning)) };
   }}),
   route({ method: "GET", path: "/exam-vocabulary/:id/pdf", auth: "user", handler: async (ctx) => {
     const set = await getSet(ctx.params.id, true);
