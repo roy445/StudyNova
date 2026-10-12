@@ -33,6 +33,7 @@ const releaseMigrations = [
   "0120_previous_exam_center.sql",
   "0121_ai_question_converter.sql",
   "0122_exam_vocabulary.sql",
+  "0123_exam_vocabulary_import_jobs.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

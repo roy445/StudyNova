@@ -1036,6 +1036,26 @@ export const examVocabularyItems = pgTable(
   (t) => [uniqueIndex("exam_vocab_items_set_word_uq").on(t.setId, t.word), index("exam_vocab_items_unit_idx").on(t.unitId, t.sortOrder), index("exam_vocab_items_set_idx").on(t.setId, t.sortOrder)],
 );
 
+export const examVocabularyImportJobs = pgTable(
+  "exam_vocabulary_import_jobs",
+  {
+    id: id(),
+    setId: uuid("set_id").notNull().references(() => examVocabularySets.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").notNull().references(() => examVocabularyUnits.id, { onDelete: "cascade" }),
+    uploadedBy: uuid("uploaded_by").references(() => users.userId, { onDelete: "set null" }),
+    objectId: uuid("object_id").notNull().references(() => storageObjects.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    status: text("status").notNull().default("queued"),
+    progress: integer("progress").notNull().default(0),
+    accepted: integer("accepted").notNull().default(0),
+    skipped: integer("skipped").notNull().default(0),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("exam_vocab_import_jobs_set_idx").on(t.setId, t.createdAt), index("exam_vocab_import_jobs_status_idx").on(t.status, t.updatedAt)],
+);
+
 /* -------------------------------------------------------- PLAN / STUDY */
 
 export const studyPlans = pgTable(

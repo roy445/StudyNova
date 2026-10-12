@@ -40,6 +40,7 @@ import { publishScheduledRelease } from "./release-publisher";
 import { processExamPrepImport } from "./exam-prep-import";
 import { processExamPrepDraftAnalysis } from "./exam-prep-draft-analysis";
 import { processConverterJob } from "./ai-question-converter";
+import { processExamVocabularyImport } from "./exam-vocabulary-import";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -64,6 +65,7 @@ export type JobName =
   | "name_moderation_scan"
   | "release_publish"
   | "exam_prep_import"
+  | "exam_vocabulary_import"
   | "exam_prep_draft_analysis"
   | "ai_question_converter"
   | "quiz_expiry_cleanup";
@@ -94,6 +96,13 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     if (!jobId) throw new Error("缺少段考考卷匯入工作 ID");
     const result = await processExamPrepImport(jobId);
     return `段考考卷匯入 ${jobId}：${result.status}，產生 ${result.draftCount} 題草稿`;
+  },
+
+  async exam_vocabulary_import(payload) {
+    const jobId = typeof payload.jobId === "string" ? payload.jobId : "";
+    if (!jobId) throw new Error("缺少英文段考單字匯入工作 ID");
+    const result = await processExamVocabularyImport(jobId);
+    return `英文段考單字匯入 ${jobId}：${result.status}，新增 ${result.accepted ?? 0} 字`;
   },
 
   async exam_prep_draft_analysis(payload) {
@@ -551,7 +560,7 @@ class PostgresQueue implements QueueAdapter {
         }
       }
     };
-    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : 1;
+    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : due.length > 1 && due.every((job) => job.name === "exam_vocabulary_import") ? 3 : 1;
     for (let index = 0; index < due.length; index += concurrency) await Promise.all(due.slice(index, index + concurrency).map(runOne));
     return { processed, failed, results };
   }

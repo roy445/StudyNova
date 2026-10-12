@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { examVocabularyItems, examVocabularySets, examVocabularyUnits } from "@/db/schema";
+import { examVocabularyImportJobs, examVocabularyItems, examVocabularySets, examVocabularyUnits } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
-import { putObject, readObject } from "../storage";
+import { deleteObject, putObject, readObject } from "../storage";
 import { runAiJson } from "../ai";
 import { embedCjkFont, embedMathFont, sanitizeTextForCjkPdf } from "../cjk-font";
 import { writeAudit } from "../audit";
@@ -171,14 +171,21 @@ export const routes: RouteDef[] = [
     for (const set of sets) {
       const units = await db.select().from(examVocabularyUnits).where(eq(examVocabularyUnits.setId, set.id)).orderBy(asc(examVocabularyUnits.sortOrder));
       const items = await db.select({ sourceFile: examVocabularyItems.sourceFile, metadata: examVocabularyItems.metadata }).from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id));
-      const sourceMap = new Map<string, { filename: string; itemCount: number; objectIds: string[] }>();
+      const jobs = await db.select({ filename: examVocabularyImportJobs.filename, status: examVocabularyImportJobs.status, progress: examVocabularyImportJobs.progress, accepted: examVocabularyImportJobs.accepted, skipped: examVocabularyImportJobs.skipped, errorMessage: examVocabularyImportJobs.errorMessage, objectId: examVocabularyImportJobs.objectId }).from(examVocabularyImportJobs).where(eq(examVocabularyImportJobs.setId, set.id)).orderBy(desc(examVocabularyImportJobs.createdAt));
+      const sourceMap = new Map<string, { filename: string; itemCount: number; objectIds: string[]; status: string; progress: number; accepted: number; skipped: number; errorMessage: string }>();
       for (const item of items) {
         const filename = item.sourceFile || "未命名來源";
-        const current = sourceMap.get(filename) ?? { filename, itemCount: 0, objectIds: [] };
+        const current = sourceMap.get(filename) ?? { filename, itemCount: 0, objectIds: [], status: "completed", progress: 100, accepted: 0, skipped: 0, errorMessage: "" };
         current.itemCount += 1;
         const objectId = typeof item.metadata?.objectId === "string" ? item.metadata.objectId : "";
         if (objectId && !current.objectIds.includes(objectId)) current.objectIds.push(objectId);
         sourceMap.set(filename, current);
+      }
+      for (const job of jobs) {
+        const current = sourceMap.get(job.filename) ?? { filename: job.filename, itemCount: 0, objectIds: [], status: job.status, progress: job.progress, accepted: 0, skipped: 0, errorMessage: job.errorMessage };
+        current.status = job.status; current.progress = Math.max(current.progress, job.progress); current.accepted += job.accepted; current.skipped += job.skipped; current.errorMessage = job.errorMessage || current.errorMessage;
+        if (!current.objectIds.includes(job.objectId)) current.objectIds.push(job.objectId);
+        sourceMap.set(job.filename, current);
       }
       result.push({ ...set, units, itemCount: items.length, sources: Array.from(sourceMap.values()) });
     }
@@ -208,8 +215,10 @@ export const routes: RouteDef[] = [
     const set = await getSet(ctx.params.id);
     const body = await ctx.json(z.object({ sourceFiles: z.array(z.string().min(1).max(500)).min(1).max(100) }));
     const rows = await db.delete(examVocabularyItems).where(and(eq(examVocabularyItems.setId, set.id), inArray(examVocabularyItems.sourceFile, body.sourceFiles))).returning({ id: examVocabularyItems.id });
+    const jobs = await db.delete(examVocabularyImportJobs).where(and(eq(examVocabularyImportJobs.setId, set.id), inArray(examVocabularyImportJobs.filename, body.sourceFiles))).returning({ objectId: examVocabularyImportJobs.objectId });
+    for (const job of jobs) await deleteObject(job.objectId, admin.userId, true).catch(() => undefined);
     await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "items.sources.delete", resourceId: set.id, ip: ctx.ip, metadata: { sourceFiles: JSON.stringify(body.sourceFiles), deleted: rows.length } });
-    return { deleted: rows.length, sourceFiles: body.sourceFiles };
+    return { deleted: rows.length, jobsDeleted: jobs.length, sourceFiles: body.sourceFiles };
   }}),
   route({ method: "POST", path: "/admin/exam-vocabulary/:id/upload", auth: "admin", handler: async (ctx) => {
     const admin = ctx.requireUser();
