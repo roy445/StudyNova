@@ -35,7 +35,7 @@ export default function FeaturesPage() {
     <main className="mx-auto w-full max-w-6xl py-1 sm:py-5">
       <header className="mb-4 border-b border-white/10 pb-4">
         <p className="text-[11px] font-semibold uppercase tracking-[.22em] text-cyan-200/80">StudyNova</p>
-        <h1 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl">功能總攬</h1>
+        <h1 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl">功能總覽</h1>
         <p className="mt-1 text-sm text-muted">選擇你現在要使用的學習工具</p>
       </header>
       <section aria-label="StudyNova 功能列表" className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
