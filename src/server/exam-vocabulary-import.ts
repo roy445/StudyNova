@@ -54,6 +54,14 @@ export async function processExamVocabularyImport(jobId: string) {
     return completed;
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "OCR 分析失敗";
+    console.error("[StudyNova][exam-vocabulary-ocr]", {
+      jobId: job.id,
+      objectId: job.objectId,
+      filename: job.filename,
+      setId: job.setId,
+      userId: job.uploadedBy,
+      error: message,
+    });
     const failed = (await db.update(examVocabularyImportJobs).set({ status: "failed", progress: 100, errorMessage: message, updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id)).returning())[0];
     return failed;
   }
