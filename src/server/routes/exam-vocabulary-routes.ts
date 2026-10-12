@@ -153,6 +153,8 @@ export const routes: RouteDef[] = [
     return new Response(pdf, { headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="studynova-exam-vocabulary-${set.id}.pdf"` } });
   }}),
   route({ method: "GET", path: "/admin/exam-vocabulary", auth: "admin", handler: async () => {
+    // Consume a few pending OCR jobs on page load/manual refresh so old queued jobs cannot remain stuck forever.
+    await queue().drain(3);
     const sets = await db.select().from(examVocabularySets).orderBy(asc(examVocabularySets.sortOrder), asc(examVocabularySets.createdAt));
     const result = [];
     for (const set of sets) {
