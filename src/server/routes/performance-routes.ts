@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { aiUsageLogs, systemLogs } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { todayStr } from "../core";
+import { getObservabilityAlerts } from "../observability-alerts";
 
 const metricSchema = z.object({
   name: z.enum(["FCP", "LCP", "CLS", "TBT", "TTI"]),
@@ -47,11 +48,14 @@ export const routes: RouteDef[] = [
         return [name, { count: values.length, p50: percentile(values, 0.5), p95: percentile(values, 0.95) }];
       }));
       const aiLatency = aiRows.map((row) => Number(row.latency ?? 0)).filter((value) => value > 0);
+      const apiP95 = percentile(durations, 0.95);
+      const alerts = getObservabilityAlerts({ apiRequests: durations.length, apiErrorRate: durations.length ? apiErrors / durations.length : 0, apiP95Ms: apiP95, aiRequests: aiRows.length, aiFailures: aiRows.filter((row) => !row.success).length });
       return {
         window: { since: since.toISOString(), until: new Date().toISOString() },
         homepage: vitals,
-        api: { requests: durations.length, p50: percentile(durations, 0.5), p95: percentile(durations, 0.95), p99: percentile(durations, 0.99), errorRate: durations.length ? apiErrors / durations.length : 0 },
+        api: { requests: durations.length, p50: percentile(durations, 0.5), p95: apiP95, p99: percentile(durations, 0.99), errorRate: durations.length ? apiErrors / durations.length : 0 },
         ai: { requests: aiRows.length, averageMs: aiLatency.length ? Math.round(aiLatency.reduce((a, b) => a + b, 0) / aiLatency.length) : null, p95: percentile(aiLatency, 0.95), failures: aiRows.filter((row) => !row.success).length },
+        health: { status: alerts.some((alert) => alert.severity === "critical") ? "critical" : alerts.length ? "warning" : "healthy", alerts },
         upload: { averageSpeedBytesPerSecond: null, failureRate: null },
         database: { p95: null },
         cache: { hitRate: null },
