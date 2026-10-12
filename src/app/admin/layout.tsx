@@ -21,18 +21,20 @@ const NAV_GROUPS: AdminNavGroup[] = [
   {
       label: "功能與服務",
     items: [
-      { href: "/admin/features", label: "功能總控台", icon: "admin" },
+      { href: "/admin/features", label: "功能總覽", icon: "admin" },
       { href: "/admin/testers", label: "✦ 測試員控制專區", icon: "spark" },
       { href: "/admin/testers/feedback", label: "測試心得回饋看板", icon: "report" },
       { href: "/admin/ai", label: "AI 控制台", icon: "nova" },
       { href: "/admin/members", label: "會員與權限", icon: "admin" },
       { href: "/admin/content-console", label: "內容控制台", icon: "study" },
       { href: "/admin/question-banks", label: "題庫控制台", icon: "question" },
+      { href: "/admin/previous-exams", label: "歷屆刷題管理", icon: "weekly" },
       { href: "/admin/announcements", label: "公告控制台", icon: "report" },
       { href: "/admin/economy", label: "獎勵與促銷", icon: "shop" },
       { href: "/admin/ops", label: "整合總控台（相容）", icon: "settings" },
       { href: "/admin/pro-renewals", label: "Nova Pro 續約", icon: "nova" },
       { href: "/admin/ai-jobs", label: "AI 背景工作", icon: "nova" },
+      { href: "/admin/ai-question-converter", label: "AI 題目互動化", icon: "weekly" },
     ],
   },
   {
@@ -41,7 +43,7 @@ const NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/reference-materials", label: "AI 參考資料", icon: "admin" },
       { href: "/admin/daily-knowledge", label: "每日知識", icon: "study" },
       { href: "/admin/content", label: "Content Studio", icon: "study" },
-      { href: "/admin/chemistry", label: "🧪 化學教學管理", icon: "study" },
+      { href: "/admin/online-learning", label: "📚 線上學習管理", icon: "study" },
       { href: "/admin/exam-vocabulary", label: "英文段考總單字", icon: "study" },
       { href: "/admin/customization", label: "客製化風格中心", icon: "spark" },
     ],
@@ -51,6 +53,9 @@ const NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { href: "/admin/challenges", label: "挑戰題庫・挑戰管理", icon: "challenge" },
       { href: "/admin/online-pk", label: "線上 PK・賽場監控", icon: "challenge" },
+      { href: "/admin/exam-prep", label: "段考衝刺活動", icon: "weekly" },
+      { href: "/admin/exam-prep/analytics", label: "段考衝刺分析", icon: "grades" },
+      { href: "/admin/exam-prep/imports", label: "段考考卷匯入", icon: "weekly" },
     ],
   },
   {
