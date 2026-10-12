@@ -392,8 +392,9 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   }
 
   let fallbackFrom = "";
-  let lastCategory: FailureCategory = "unknown";
+  let lastCategory: FailureCategory | "cooldown" | "disabled" = "unknown";
   let lastReason = "";
+  let skippedProviders = "";
   // Large admin file generation needs more time than an interactive answer,
   // but must not spend that time retrying the same Gemini model with several
   // keys. The old 45s deadline caused gemini_2/3/4 to time out in sequence
@@ -424,9 +425,19 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     } catch (error) {
       console.error("[ai] provider health table unavailable; continuing without health state", { provider: cfg.name, error: error instanceof Error ? error.message : "unknown" });
     }
-    if (health && health.enabled === false) continue;
+    if (health && health.enabled === false) {
+      skippedProviders = skippedProviders ? `${skippedProviders},${cfg.name}:disabled` : `${cfg.name}:disabled`;
+      lastCategory = "disabled";
+      lastReason = `provider ${cfg.name} is disabled`;
+      console.warn("[ai] provider skipped because it is disabled", { provider: cfg.name, model: cfg.model, feature: req.feature });
+      continue;
+    }
     if (health?.cooldownUntil && new Date(health.cooldownUntil) > new Date()) {
       fallbackFrom = fallbackFrom || cfg.name;
+      skippedProviders = skippedProviders ? `${skippedProviders},${cfg.name}:cooldown` : `${cfg.name}:cooldown`;
+      lastCategory = "cooldown";
+      lastReason = `provider ${cfg.name} is cooling down until ${new Date(health.cooldownUntil).toISOString()}`;
+      console.warn("[ai] provider skipped because it is cooling down", { provider: cfg.name, model: cfg.model, feature: req.feature, cooldownUntil: health.cooldownUntil });
       continue;
     }
     try {
@@ -510,11 +521,15 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     }
   }
   const message = lastCategory === "quota_exhausted"
-    ? "目前可用的 AI Provider 配額都已用完，請稍後再試。"
-    : lastCategory === "invalid_request"
-      ? "圖片格式或內容不符合目前 AI 模型要求，請改用清晰的 JPG、PNG 或 WebP 圖片後重試。"
-      : "AI 圖片分析暫時無法使用，請稍後再試。";
-  throw fail("AI_ALL_UNAVAILABLE", { message, details: { category: lastCategory, reason: lastReason } });
+    ? "目前可用的 AI Provider 配額都已用完，請管理員檢查 AI Health 或切換 API Key。"
+    : lastCategory === "cooldown"
+      ? "目前 AI Provider 都在冷卻中，請管理員到 AI Health 清除冷卻或確認配額。"
+      : lastCategory === "disabled"
+        ? "目前沒有啟用中的 AI Provider，請管理員到 AI Health 啟用服務。"
+        : lastCategory === "invalid_request"
+          ? "圖片格式或內容不符合目前 AI 模型要求，請改用清晰的 JPG、PNG 或 WebP 圖片後重試。"
+          : "AI 圖片分析暫時無法使用，請稍後再試。";
+  throw fail("AI_ALL_UNAVAILABLE", { message, details: { category: lastCategory, reason: lastReason, skippedProviders } });
 }
 
 export function extractJson<T>(raw: string | null | undefined, fallback: T): T {
