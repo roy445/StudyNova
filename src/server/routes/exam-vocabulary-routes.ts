@@ -251,6 +251,30 @@ export const routes: RouteDef[] = [
     if (!rows[0]) throw notFound("找不到段考單字總範圍");
     return { set: rows[0] };
   }}),
+  route({ method: "DELETE", path: "/admin/exam-vocabulary/:id/units/:unitId", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const set = await getSet(ctx.params.id);
+    const unit = (await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.id, ctx.params.unitId), eq(examVocabularyUnits.setId, set.id))).limit(1))[0];
+    if (!unit) throw notFound("找不到指定單元");
+    const jobs = await db.select({ id: examVocabularyImportJobs.id, objectId: examVocabularyImportJobs.objectId }).from(examVocabularyImportJobs).where(eq(examVocabularyImportJobs.unitId, unit.id));
+    const queueKeys = jobs.map((job) => `exam-vocabulary-import:${job.id}`);
+    for (const job of jobs) await deleteObject(job.objectId, admin.userId, true).catch(() => undefined);
+    if (queueKeys.length) await db.delete(jobQueue).where(inArray(jobQueue.uniqueKey, queueKeys));
+    await db.delete(examVocabularyUnits).where(eq(examVocabularyUnits.id, unit.id));
+    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "unit.delete", resourceId: unit.id, ip: ctx.ip, metadata: { setId: set.id, title: unit.title, jobs: jobs.length } });
+    return { deleted: true, unitId: unit.id, title: unit.title, jobsDeleted: jobs.length };
+  }}),
+  route({ method: "DELETE", path: "/admin/exam-vocabulary/:id", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const set = await getSet(ctx.params.id);
+    const jobs = await db.select({ id: examVocabularyImportJobs.id, objectId: examVocabularyImportJobs.objectId }).from(examVocabularyImportJobs).where(eq(examVocabularyImportJobs.setId, set.id));
+    const queueKeys = jobs.map((job) => `exam-vocabulary-import:${job.id}`);
+    for (const job of jobs) await deleteObject(job.objectId, admin.userId, true).catch(() => undefined);
+    if (queueKeys.length) await db.delete(jobQueue).where(inArray(jobQueue.uniqueKey, queueKeys));
+    await db.delete(examVocabularySets).where(eq(examVocabularySets.id, set.id));
+    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "set.delete", resourceId: set.id, ip: ctx.ip, metadata: { title: set.title, jobs: jobs.length } });
+    return { deleted: true, setId: set.id, title: set.title, jobsDeleted: jobs.length };
+  }}),
   route({ method: "DELETE", path: "/admin/exam-vocabulary/:id/sources", auth: "admin", handler: async (ctx) => {
     const admin = ctx.requireUser();
     const set = await getSet(ctx.params.id);
