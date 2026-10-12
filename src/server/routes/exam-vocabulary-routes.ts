@@ -228,7 +228,10 @@ export const routes: RouteDef[] = [
     const set = await getSet(ctx.params.id);
     const form = await ctx.formData();
     const unitTitle = String(form.get("unitTitle") ?? "未分類單元").trim().slice(0, 160) || "未分類單元";
-    const unit = (await db.insert(examVocabularyUnits).values({ setId: set.id, title: unitTitle, sortOrder: Number(form.get("unitSortOrder") ?? 0) || 0 }).returning())[0];
+    // Multiple client requests can upload files for the same unit. Reuse the existing
+    // unit by set + title instead of creating one unit per image.
+    const existingUnit = (await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.setId, set.id), eq(examVocabularyUnits.title, unitTitle))).orderBy(asc(examVocabularyUnits.sortOrder), asc(examVocabularyUnits.createdAt)).limit(1))[0];
+    const unit = existingUnit ?? (await db.insert(examVocabularyUnits).values({ setId: set.id, title: unitTitle, sortOrder: Number(form.get("unitSortOrder") ?? 0) || 0 }).returning())[0];
     const files = form.getAll("files").filter((value): value is File => typeof File !== "undefined" && value instanceof File).slice(0, 30);
     if (!files.length) throw fail("ADMIN_TEXTBOOK_REQUEST_INVALID", { message: "請至少選擇一張單字或片語圖片。" });
     let queued = 0; let failed = 0; const errors: string[] = [];
