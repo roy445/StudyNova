@@ -321,7 +321,7 @@ async function notifyIfAllProvidersQuotaCooled(configs: ProviderConfig[], featur
       kind: "ai_provider",
       title: "AI Provider 配額已全部暫停",
       body: `目前所有已設定的 AI Provider 都已確認配額用完，功能會保留排隊；系統不會因高流量或逾時預防性停用。來源功能：${feature}`,
-      link: "/admin/ai-health",
+      link: "/admin/ai-quiz",
       dedupeKey: `ai-all-quota-cooled:${month}:${admin.userId}`,
     })));
   } catch (error) {
