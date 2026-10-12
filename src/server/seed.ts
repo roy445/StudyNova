@@ -60,17 +60,17 @@ const ACHIEVEMENTS = [
 ];
 
 const FEATURES = [
-  { feature: "ai_context", label: "情境 AI", freeDailyLimit: 12, proDailyLimit: 80 },
-  { feature: "ai_practice", label: "AI 練習出題", freeDailyLimit: 3, proDailyLimit: 15 },
-  { feature: "material_organize", label: "教材整理", freeDailyLimit: 3, proDailyLimit: 15 },
-  { feature: "ai_study_plan", label: "AI 讀書計畫", freeDailyLimit: 0, proDailyLimit: 5 },
-  { feature: "wrong_review_ai", label: "錯題 AI 複習", freeDailyLimit: 5, proDailyLimit: 30 },
-  { feature: "ai_speech", label: "AI 朗讀 / 語音分析", freeDailyLimit: 0, proDailyLimit: 20 },
-  { feature: "ai_visual", label: "AI 重點心智圖", freeDailyLimit: 3, proDailyLimit: 20 },
-  { feature: "image_ocr", label: "圖片辨識", freeDailyLimit: 5, proDailyLimit: 50 },
-  { feature: "multi_image_ocr", label: "多圖片辨識", freeDailyLimit: 0, proDailyLimit: 10 },
-  { feature: "ai_solution", label: "AI 解題初次分析", freeDailyLimit: 3, proDailyLimit: 30 },
-  { feature: "ai_solution_upload", label: "AI 解題圖片／檔案上傳", freeDailyLimit: 8, proDailyLimit: 50 },
+  { feature: "ai_context", label: "情境 AI", freeDailyLimit: 12, proDailyLimit: 40 },
+  { feature: "ai_practice", label: "AI 練習出題", freeDailyLimit: 3, proDailyLimit: 8 },
+  { feature: "material_organize", label: "教材整理", freeDailyLimit: 3, proDailyLimit: 8 },
+  { feature: "ai_study_plan", label: "AI 讀書計畫", freeDailyLimit: 1, proDailyLimit: 3 },
+  { feature: "wrong_review_ai", label: "錯題 AI 複習", freeDailyLimit: 6, proDailyLimit: 15 },
+  { feature: "ai_speech", label: "AI 朗讀 / 語音分析", freeDailyLimit: 5, proDailyLimit: 12 },
+  { feature: "ai_visual", label: "AI 重點心智圖", freeDailyLimit: 3, proDailyLimit: 10 },
+  { feature: "image_ocr", label: "圖片辨識", freeDailyLimit: 5, proDailyLimit: 20 },
+  { feature: "multi_image_ocr", label: "多圖片辨識", freeDailyLimit: 2, proDailyLimit: 6 },
+  { feature: "ai_solution", label: "AI 解題初次分析", freeDailyLimit: 3, proDailyLimit: 15 },
+  { feature: "ai_solution_upload", label: "AI 解題圖片／檔案上傳", freeDailyLimit: 8, proDailyLimit: 25 },
 ];
 
 const WORDS = [

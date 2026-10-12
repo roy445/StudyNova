@@ -26,6 +26,7 @@ import {
   pkBotJobs,
   ttsJobs,
   aiQuestionConverterJobs,
+  examDatePolicies,
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
@@ -54,6 +55,7 @@ export type JobName =
   | "inactive_reminder"
   | "session_cleanup"
   | "study_reminder"
+  | "exam_date_reminder"
   | "compression_process"
   | "compression_batch"
   | "announcement_publish"
@@ -161,6 +163,32 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
       if (created) sent += 1;
     }
     return `寄出 ${sent} 則每日讀書提醒`;
+  },
+
+  async exam_date_reminder() {
+    const today = todayStr();
+    const tomorrow = addDaysStr(today, 1);
+    const policies = await db.select().from(examDatePolicies).where(and(eq(examDatePolicies.enabled, true), sql`${examDatePolicies.examDate} in (${today}, ${tomorrow})`));
+    if (!policies.length) return "今天與明天沒有符合條件的段考日期";
+    const students = await db.select({ userId: users.userId, displayName: users.displayName, schoolLevel: userSettings.schoolLevel, schoolName: userSettings.schoolName, grade: userSettings.grade }).from(users).innerJoin(userSettings, eq(userSettings.userId, users.userId)).where(eq(users.status, "active"));
+    let sent = 0;
+    for (const policy of policies) {
+      const examDay = policy.examDate === today;
+      for (const student of students) {
+        if (student.schoolLevel !== policy.educationLevel || student.grade !== policy.grade || (policy.schoolName && student.schoolName !== policy.schoolName)) continue;
+        const created = await notify({
+          userId: student.userId,
+          kind: "exam_date_reminder",
+          title: examDay ? "今天考試，祝你拿高分" : "你應該準備好了吧？",
+          body: examDay ? `${student.displayName}，今天是「${policy.examName}」的考試日。相信你的準備，祝你考試順利、穩穩拿高分！` : `${student.displayName}，明天就是「${policy.examName}」了。再複習一次重點、早點休息，你應該準備好了吧？`,
+          link: "/exam-hubs",
+          dedupeKey: `exam-date:${policy.id}:${student.userId}:${policy.examDate}:${examDay ? "day" : "eve"}`,
+          push: true,
+        });
+        if (created) sent += 1;
+      }
+    }
+    return `段考提醒完成：寄出 ${sent} 則站內通知與 Web Push`;
   },
 
   async review_reminder() {
@@ -634,6 +662,7 @@ export const CRON_TASKS: Array<{ task: CronTask; label: string; schedule: string
   { task: "active_pro_monthly", label: "每月活躍帳號 Pro 評選", schedule: "每月 1 日 03:20" },
   { task: "name_moderation_scan", label: "使用者名稱巡檢", schedule: "每 6 小時" },
   { task: "study_reminder", label: "每日讀書提醒", schedule: "每日 20:00" },
+  { task: "exam_date_reminder", label: "段考前一天／當日提醒", schedule: "每日 08:00" },
 ];
 
 export async function runCronTask(task: CronTask, taskUid: string) {

@@ -17,21 +17,21 @@ export type FeaturePermissionPolicy = {
  * They are not used to hide database/schema/connection failures.
  */
 export const SERVER_FEATURE_DEFAULTS: readonly FeaturePermissionPolicy[] = [
-  { feature: "ai_context", label: "情境 AI", enabled: true, proOnly: false, freeDailyLimit: 12, proDailyLimit: 80, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_practice", label: "AI 練習出題", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 15, monthlyLimit: 0, novaCost: 0 },
-  { feature: "material_organize", label: "教材整理", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 15, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_study_plan", label: "AI 讀書計畫", enabled: true, proOnly: false, freeDailyLimit: 0, proDailyLimit: 5, monthlyLimit: 0, novaCost: 0 },
-  { feature: "wrong_review_ai", label: "錯題 AI 複習", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 30, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_speech", label: "AI 朗讀／語音分析", enabled: true, proOnly: false, freeDailyLimit: 0, proDailyLimit: 20, monthlyLimit: 0, novaCost: 0 },
-  { feature: "ai_visual", label: "AI 重點心智圖", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 20, monthlyLimit: 0, novaCost: 0 },
-  { feature: "learning_ai_chat", label: "線上學習 AI 問答", enabled: true, proOnly: false, freeDailyLimit: 10, proDailyLimit: 80, monthlyLimit: 0, novaCost: 0 },
-  { feature: "learning_ai_question_generation", label: "線上學習 AI 出題", enabled: true, proOnly: false, freeDailyLimit: 2, proDailyLimit: 20, monthlyLimit: 0, novaCost: 5 },
-  { feature: "learning_chapter_pdf", label: "線上學習章節 PDF", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 30, monthlyLimit: 0, novaCost: 0 },
-  { feature: "image_ocr", label: "圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 50, monthlyLimit: 0, novaCost: 0 },
-  { feature: "multi_image_ocr", label: "多圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 0, proDailyLimit: 10, monthlyLimit: 0, novaCost: 0 },
-  { feature: AI_SOLUTION_FEATURE, label: "AI 解題初次分析", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 30, monthlyLimit: 0, novaCost: 10 },
-  { feature: AI_SOLUTION_UPLOAD_FEATURE, label: "AI 解題圖片／檔案上傳", enabled: true, proOnly: false, freeDailyLimit: 8, proDailyLimit: 50, monthlyLimit: 0, novaCost: 0 },
-  { feature: "essay_grading", label: "英文作文批改", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 10, monthlyLimit: 30, novaCost: 10 },
+  { feature: "ai_context", label: "情境 AI", enabled: true, proOnly: false, freeDailyLimit: 12, proDailyLimit: 40, monthlyLimit: 0, novaCost: 0 },
+  { feature: "ai_practice", label: "AI 練習出題", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 8, monthlyLimit: 0, novaCost: 0 },
+  { feature: "material_organize", label: "教材整理", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 8, monthlyLimit: 0, novaCost: 0 },
+  { feature: "ai_study_plan", label: "AI 讀書計畫", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 3, monthlyLimit: 0, novaCost: 0 },
+  { feature: "wrong_review_ai", label: "錯題 AI 複習", enabled: true, proOnly: false, freeDailyLimit: 6, proDailyLimit: 15, monthlyLimit: 0, novaCost: 0 },
+  { feature: "ai_speech", label: "AI 朗讀／語音分析", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 12, monthlyLimit: 0, novaCost: 0 },
+  { feature: "ai_visual", label: "AI 重點心智圖", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 10, monthlyLimit: 0, novaCost: 0 },
+  { feature: "learning_ai_chat", label: "線上學習 AI 問答", enabled: true, proOnly: false, freeDailyLimit: 10, proDailyLimit: 40, monthlyLimit: 0, novaCost: 0 },
+  { feature: "learning_ai_question_generation", label: "線上學習 AI 出題", enabled: true, proOnly: false, freeDailyLimit: 2, proDailyLimit: 8, monthlyLimit: 0, novaCost: 5 },
+  { feature: "learning_chapter_pdf", label: "線上學習章節 PDF", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 12, monthlyLimit: 0, novaCost: 0 },
+  { feature: "image_ocr", label: "圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 20, monthlyLimit: 0, novaCost: 0 },
+  { feature: "multi_image_ocr", label: "多圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 2, proDailyLimit: 6, monthlyLimit: 0, novaCost: 0 },
+  { feature: AI_SOLUTION_FEATURE, label: "AI 解題初次分析", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 15, monthlyLimit: 0, novaCost: 10 },
+  { feature: AI_SOLUTION_UPLOAD_FEATURE, label: "AI 解題圖片／檔案上傳", enabled: true, proOnly: false, freeDailyLimit: 8, proDailyLimit: 25, monthlyLimit: 0, novaCost: 0 },
+  { feature: "essay_grading", label: "英文作文批改", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 5, monthlyLimit: 20, novaCost: 10 },
 ];
 
 export function serverDefaultForFeature(feature: string) {
