@@ -6,6 +6,35 @@ import { runAiJson } from "./ai";
 
 export type ExtractedWord = { word?: string; meaning?: string; partOfSpeech?: string; phonetic?: string; phrase?: string; phraseMeaning?: string; example?: string; exampleZh?: string };
 
+function needsMeaning(value: unknown) {
+  const text = String(value ?? "").trim();
+  return !text || /不確定|不清楚|看不清|待確認|無法辨識|unknown|unclear|\?{1,}/i.test(text);
+}
+
+async function fillMissingMeanings(words: ExtractedWord[], userId: string) {
+  const targets = words.map((item, index) => ({ index, word: String(item.word ?? "").trim(), meaning: String(item.meaning ?? "").trim() }))
+    .filter((item) => item.word && needsMeaning(item.meaning));
+  if (!targets.length) return words;
+  try {
+    const { data } = await runAiJson<{ translations?: Array<{ index?: number; meaning?: string }> }>({
+      feature: "learning_vocabulary_translation",
+      userId,
+      system: "你是繁體中文英文字典。只補上英文單字或片語最常用、適合高中段考的繁體中文意思。不要輸出不確定、待確認、問號或英文原文。只回傳 JSON：{translations:[{index,meaning}]}。",
+      parts: [{ kind: "text", text: JSON.stringify(targets) }],
+      maxOutputTokens: 3000,
+      temperature: 0.1,
+    }, { translations: [] });
+    const translated = new Map((data.translations ?? []).map((item) => [Number(item.index), String(item.meaning ?? "").trim()]));
+    return words.map((item, index) => {
+      const replacement = translated.get(index);
+      return replacement && !needsMeaning(replacement) ? { ...item, meaning: replacement } : item;
+    });
+  } catch (error) {
+    console.warn("[StudyNova][exam-vocabulary-translation]", error instanceof Error ? error.message : error);
+    return words;
+  }
+}
+
 function normalizeWord(value: unknown) {
   return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 160);
 }
@@ -26,7 +55,8 @@ export async function processExamVocabularyImport(jobId: string) {
       parts: [{ kind: "image", mimeType: object.mimeType, base64: object.data.toString("base64") }],
       maxOutputTokens: 6000,
     }, { words: [], readable: true });
-    const rows = (data.words ?? []).map((item, index) => ({
+    const translatedWords = await fillMissingMeanings(data.words ?? [], job.uploadedBy);
+    const rows = translatedWords.map((item, index) => ({
       setId: job.setId,
       unitId: job.unitId,
       word: String(item.word ?? "").trim().slice(0, 160),
@@ -40,7 +70,7 @@ export async function processExamVocabularyImport(jobId: string) {
       sourceFile: job.filename,
       metadata: { objectId: job.objectId, readable: data.readable !== false },
       sortOrder: index,
-    } as const)).filter((item) => normalizeWord(item.word));
+    } as const)).filter((item) => normalizeWord(item.word) && !needsMeaning(item.meaning));
     let accepted = 0;
     let skipped = 0;
     for (const row of rows) {

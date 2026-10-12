@@ -789,3 +789,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
   [class*="border-white"], [class*="border-cyan"], [class*="border-violet"], [class*="border-emerald"], [class*="border-rose"] { border-color: #d1d5db !important; }
   .rounded-full[style*="conic-gradient"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
+.vocabulary-nav-item { position: relative; isolation: isolate; color: #d9f7ff; background: linear-gradient(135deg, rgba(55,211,255,.12), rgba(124,92,255,.12), rgba(255,200,87,.08)); }
+.vocabulary-nav-item::before { content: ""; position: absolute; inset: 4px 7%; z-index: -1; border-radius: 16px; background: radial-gradient(circle, rgba(55,211,255,.62), rgba(124,92,255,.32) 42%, transparent 72%); filter: blur(10px); opacity: .48; animation: vocabulary-nav-glow 2.8s ease-in-out infinite; }
+.vocabulary-nav-item-active { color: #fff; box-shadow: inset 0 0 0 1px rgba(55,211,255,.42), 0 0 22px rgba(55,211,255,.28); }
+.vocabulary-nav-item-active::before { opacity: .9; }
+.vocabulary-nav-sparkle { position: absolute; top: 2px; right: 17%; color: #ffe58a; font-size: 10px; animation: vocabulary-nav-sparkle 2.2s ease-in-out infinite; }
+.vocabulary-nav-hint { position: absolute; top: 1px; left: 50%; transform: translateX(-50%); border-radius: 999px; background: linear-gradient(90deg, #37d3ff, #8b7cff); padding: 1px 5px; color: #071426; font-size: 7px; font-weight: 900; line-height: 1.2; white-space: nowrap; box-shadow: 0 0 10px rgba(55,211,255,.55); animation: vocabulary-nav-pulse 2.6s ease-in-out infinite; }
+@keyframes vocabulary-nav-glow { 0%, 100% { opacity: .36; transform: scale(.96); } 50% { opacity: .82; transform: scale(1.04); } }
+@keyframes vocabulary-nav-sparkle { 0%, 70%, 100% { opacity: .2; transform: scale(.8) rotate(0deg); } 82% { opacity: 1; transform: scale(1.25) rotate(18deg); } }
+@keyframes vocabulary-nav-pulse { 0%, 100% { opacity: .72; } 50% { opacity: 1; transform: translateX(-50%) scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .vocabulary-nav-item::before, .vocabulary-nav-sparkle, .vocabulary-nav-hint { animation: none; } }

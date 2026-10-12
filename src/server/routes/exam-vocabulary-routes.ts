@@ -148,7 +148,8 @@ export const routes: RouteDef[] = [
   route({ method: "GET", path: "/exam-vocabulary/:id/pdf", auth: "user", handler: async (ctx) => {
     const set = await getSet(ctx.params.id, true);
     const units = await db.select().from(examVocabularyUnits).where(eq(examVocabularyUnits.setId, set.id)).orderBy(asc(examVocabularyUnits.sortOrder));
-    const items = await db.select().from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id)).orderBy(asc(examVocabularyItems.sortOrder), asc(examVocabularyItems.word));
+    const requestedUnitId = ctx.query.get("unitId");
+    const items = await db.select().from(examVocabularyItems).where(and(eq(examVocabularyItems.setId, set.id), requestedUnitId ? eq(examVocabularyItems.unitId, requestedUnitId) : undefined)).orderBy(asc(examVocabularyItems.sortOrder), asc(examVocabularyItems.word));
     const pdf = await createPdf(set, units, items);
     return new Response(pdf, { headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="studynova-exam-vocabulary-${set.id}.pdf"` } });
   }}),

@@ -429,6 +429,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
             const isExamPrep = item.href === "/exam-prep";
+            const isExamVocabulary = item.href === "/exam-vocabulary";
             return (
               <Link
                 key={item.href}
@@ -579,17 +580,18 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
             const isExamPrep = item.href === "/exam-prep";
+            const isExamVocabulary = item.href === "/exam-vocabulary";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
             return (
               <li key={item.href} className="flex-1">
                 <Link
                   href={item.href}
                   aria-label={item.label}
-                  className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""}`}
+                  className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : isExamVocabulary ? "vocabulary-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""} ${active && isExamVocabulary ? "vocabulary-nav-item-active" : ""}`}
                 >
-                  {item.special && !isPk && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}
+                  {(item.special && !isPk) && <span className="exam-nav-sparkle" aria-hidden="true">✦</span>}{isExamVocabulary && <span className="vocabulary-nav-sparkle" aria-hidden="true">✦</span>}
                   {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : isExamPrep ? <img src="/brand/exam-prep-icon.jpg" alt="段考衝刺" className="h-7 w-7 rounded-full object-cover ring-2 ring-cyan-300/70" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
-                  <span className="max-w-full truncate">{item.label}</span>
+                  <span className="max-w-full truncate">{item.label}</span>{isExamVocabulary && <span className="vocabulary-nav-hint">新內容</span>}
                   {isPk && <span className="pk-beta-badge pk-beta-mobile">BETA</span>}
                   {closingSoon && <span className="exam-nav-countdown">即將結束</span>}
                 </Link>
