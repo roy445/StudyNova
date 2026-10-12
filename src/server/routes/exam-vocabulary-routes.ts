@@ -195,6 +195,46 @@ export const routes: RouteDef[] = [
     const row = (await db.insert(examVocabularyUnits).values({ ...body, setId: ctx.params.id }).returning())[0];
     return { unit: row };
   }}),
+  route({ method: "POST", path: "/admin/exam-vocabulary/:id/items", auth: "admin", handler: async (ctx) => {
+    const admin = ctx.requireUser();
+    const set = await getSet(ctx.params.id);
+    const body = await ctx.json(z.object({
+      unitId: unitId.optional(),
+      unitTitle: z.string().trim().min(1).max(160).default("第一單元"),
+      word: z.string().trim().min(1).max(160),
+      meaning: z.string().trim().max(1000).default(""),
+      partOfSpeech: z.string().trim().max(80).default(""),
+      phonetic: z.string().trim().max(160).default(""),
+      phrase: z.string().trim().max(300).default(""),
+      phraseMeaning: z.string().trim().max(1000).default(""),
+      example: z.string().trim().max(1200).default(""),
+      exampleZh: z.string().trim().max(1200).default(""),
+      importantInfo: z.string().trim().max(2000).default(""),
+    }));
+    const unit = body.unitId
+      ? (await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.id, body.unitId), eq(examVocabularyUnits.setId, set.id))).limit(1))[0]
+      : (await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.setId, set.id), eq(examVocabularyUnits.title, body.unitTitle))).orderBy(asc(examVocabularyUnits.sortOrder), asc(examVocabularyUnits.createdAt)).limit(1))[0];
+    if (!unit) throw notFound("找不到指定單元");
+    const normalizedWord = normalizeWord(body.word);
+    const existing = (await db.select({ id: examVocabularyItems.id }).from(examVocabularyItems).where(and(eq(examVocabularyItems.setId, set.id), eq(examVocabularyItems.word, normalizedWord))).limit(1))[0];
+    if (existing) throw fail("ADMIN_TEXTBOOK_REQUEST_INVALID", { message: `「${body.word}」已存在，沒有重複新增。` });
+    const row = (await db.insert(examVocabularyItems).values({
+      setId: set.id,
+      unitId: unit.id,
+      word: normalizedWord,
+      meaning: body.meaning,
+      partOfSpeech: body.partOfSpeech,
+      phonetic: body.phonetic,
+      phrase: body.phrase,
+      phraseMeaning: body.phraseMeaning,
+      example: body.example,
+      exampleZh: body.exampleZh,
+      sourceFile: "手動新增",
+      metadata: { source: "manual", importantInfo: body.importantInfo, createdBy: admin.userId },
+    }).returning())[0];
+    await writeAudit({ userId: admin.userId, eventType: "admin_operation", module: "exam_vocabulary", action: "item.manual_create", resourceId: row.id, ip: ctx.ip, metadata: { setId: set.id, unitId: unit.id, word: row.word } });
+    return { item: row, unit };
+  }}),
   route({ method: "PATCH", path: "/admin/exam-vocabulary/:id", auth: "admin", handler: async (ctx) => {
     const body = await ctx.json(z.object({ title: z.string().min(1).max(160).optional(), description: z.string().max(2000).optional(), examLabel: z.string().max(120).optional(), enabled: z.boolean().optional(), published: z.boolean().optional(), sortOrder: z.number().int().optional() }));
     const rows = await db.update(examVocabularySets).set({ ...body, updatedAt: new Date() }).where(eq(examVocabularySets.id, ctx.params.id)).returning();
