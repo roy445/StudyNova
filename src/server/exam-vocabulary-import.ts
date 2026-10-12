@@ -53,14 +53,26 @@ export async function processExamVocabularyImport(jobId: string) {
     const completed = (await db.update(examVocabularyImportJobs).set({ status: "completed", progress: 100, accepted, skipped, updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id)).returning())[0];
     return completed;
   } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 500) : "OCR 分析失敗";
+    const raw = error instanceof Error ? error.message : "OCR 分析失敗";
+    const record = (error && typeof error === "object") ? error as { code?: unknown; requestId?: unknown; details?: unknown } : {};
+    const details = record.details && typeof record.details === "object" ? record.details as { category?: unknown; provider?: unknown; reason?: unknown } : {};
+    const category = typeof details.category === "string" ? details.category : "unknown";
+    const provider = typeof details.provider === "string" ? details.provider : "unknown";
+    const reason = typeof details.reason === "string" ? details.reason : "";
+    const message = `${raw}${reason ? `｜${reason}` : ""}`.slice(0, 500);
     console.error("[StudyNova][exam-vocabulary-ocr]", {
       jobId: job.id,
       objectId: job.objectId,
       filename: job.filename,
       setId: job.setId,
       userId: job.uploadedBy,
-      error: message,
+      code: typeof record.code === "string" ? record.code : "",
+      requestId: typeof record.requestId === "string" ? record.requestId : "",
+      category,
+      provider,
+      reason,
+      error: raw,
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const failed = (await db.update(examVocabularyImportJobs).set({ status: "failed", progress: 100, errorMessage: message, updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id)).returning())[0];
     return failed;
