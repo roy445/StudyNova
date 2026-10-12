@@ -22,6 +22,10 @@ function isDisplayableMeaning(value: unknown) {
   const text = String(value ?? "").trim();
   return Boolean(text) && !/不確定|不清楚|看不清|待確認|無法辨識|unknown|unclear|\?{1,}/i.test(text);
 }
+function uniqueUnits(units: Array<typeof examVocabularyUnits.$inferSelect>) {
+  const seen = new Set<string>();
+  return units.filter((unit) => { const key = unit.title.trim().toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; });
+}
 function publicSet(row: typeof examVocabularySets.$inferSelect, unitCount: number, itemCount: number) {
   return { id: row.id, title: row.title, description: row.description, examLabel: row.examLabel, enabled: row.enabled, published: row.published, unitCount, itemCount };
 }
@@ -145,15 +149,16 @@ export const routes: RouteDef[] = [
   }}),
   route({ method: "GET", path: "/exam-vocabulary/:id", auth: "user", handler: async (ctx) => {
     const set = await getSet(ctx.params.id, true);
-    const units = await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.setId, set.id), eq(examVocabularyUnits.enabled, true))).orderBy(asc(examVocabularyUnits.sortOrder));
+    const rawUnits = await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.setId, set.id), eq(examVocabularyUnits.enabled, true))).orderBy(asc(examVocabularyUnits.sortOrder));
+    const units = uniqueUnits(rawUnits);
     const items = await db.select().from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id)).orderBy(asc(examVocabularyItems.sortOrder), asc(examVocabularyItems.word));
     return { set, units, items: items.filter((item) => isDisplayableMeaning(item.meaning)) };
   }}),
   route({ method: "GET", path: "/exam-vocabulary/:id/pdf", auth: "user", handler: async (ctx) => {
     const set = await getSet(ctx.params.id, true);
-    const units = await db.select().from(examVocabularyUnits).where(eq(examVocabularyUnits.setId, set.id)).orderBy(asc(examVocabularyUnits.sortOrder));
-    const requestedUnitId = ctx.query.get("unitId");
-    const items = await db.select().from(examVocabularyItems).where(and(eq(examVocabularyItems.setId, set.id), requestedUnitId ? eq(examVocabularyItems.unitId, requestedUnitId) : undefined)).orderBy(asc(examVocabularyItems.sortOrder), asc(examVocabularyItems.word));
+    const rawUnits = await db.select().from(examVocabularyUnits).where(eq(examVocabularyUnits.setId, set.id)).orderBy(asc(examVocabularyUnits.sortOrder));
+    const units = uniqueUnits(rawUnits);
+    const items = await db.select().from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id)).orderBy(asc(examVocabularyItems.sortOrder), asc(examVocabularyItems.word));
     const pdf = await createPdf(set, units, items);
     return new Response(pdf, { headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="studynova-exam-vocabulary-${set.id}.pdf"` } });
   }}),
