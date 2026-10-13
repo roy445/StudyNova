@@ -2094,7 +2094,8 @@ export const proClaimGrants = pgTable(
     reason: text("reason").notNull().default(""),
     action: text("action").notNull().default("grant"),
     status: text("status").notNull().default("pending"),
-    grantedAt: created(),
+    // This table was created with granted_at (not the generic created_at column).
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
   },
@@ -3651,7 +3652,8 @@ export const examPkParticipants = pgTable(
     id: id(),
     roomId: uuid("room_id").notNull().references(() => examPkRooms.id, { onDelete: "cascade" }),
     userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
-    joinedAt: created(),
+    // The production migration names this timestamp joined_at.
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     status: text("status").notNull().default("JOINED"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     score: real("score"),
