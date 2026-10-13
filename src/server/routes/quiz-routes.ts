@@ -24,6 +24,7 @@ import { runAiJson, aiConfigured } from "../ai";
 import { recordStudy } from "../study-record-service";
 import { recordReviewOutcome } from "../review-service";
 import { signObjectUrl } from "../storage";
+import { cleanQuestionOptions } from "@/lib/question-options";
 
 const difficulty = z.enum(["easy", "normal", "hard", "exam", "advanced"]);
 const qType = z.enum(["single", "multiple", "fill", "truefalse", "short", "reading", "part_of_speech", "meaning", "mixed"]);
@@ -431,13 +432,13 @@ export const routes: RouteDef[] = [
           id: q!.id,
           type: q!.type,
           stem: q!.stem,
-          options: normalizeQuestionOptions(q!.options),
+          options: cleanQuestionOptions(normalizeQuestionOptions(q!.options)),
           subject: q!.subject,
           difficulty: q!.difficulty,
           metadata: (() => {
             const metadata = q!.metadata && typeof q!.metadata === "object" ? { ...q!.metadata } : {};
-            const ids = Array.isArray(metadata.assetObjectIds) ? metadata.assetObjectIds.filter((id): id is string => typeof id === "string") : [];
-            return { ...metadata, imageUrls: ids.slice(0, 4).map((id) => signObjectUrl(id, user.userId)) };
+            const ids = metadata.cropStatus === "ready" && Array.isArray(metadata.assetObjectIds) ? metadata.assetObjectIds.filter((id): id is string => typeof id === "string") : [];
+            return { ...metadata, imageUrls: ids.slice(0, 6).map((id) => signObjectUrl(id, user.userId)) };
           })(),
         })),
         attempt: attempt ?? null,

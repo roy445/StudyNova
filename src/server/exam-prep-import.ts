@@ -62,8 +62,9 @@ export async function processExamPrepImport(jobId: string) {
       if (!pageText) {
         try { pageText = (await extractText("image/png", pageData, job.uploadedBy, subject)).trim(); } catch { pageText = ""; }
       }
+      const dimensions = await sharp(pageData).metadata();
       const pageObject = await putObject({ userId: job.uploadedBy, filename: `exam-prep-${job.id}-page-${image.page}.png`, mimeType: "image/png", data: pageData, allow: ["image"] });
-      const page = (await db.insert(examPrepImportPages).values({ jobId, pageNumber: image.page, pageEnd: existingChunk?.pageEnd ?? image.page, objectId: pageObject.id, extractedText: pageText, status: pageText ? "ready" : "needs_ocr" }).returning({ id: examPrepImportPages.id, pageNumber: examPrepImportPages.pageNumber, pageEnd: examPrepImportPages.pageEnd, extractedText: examPrepImportPages.extractedText }))[0];
+      const page = (await db.insert(examPrepImportPages).values({ jobId, pageNumber: image.page, pageEnd: existingChunk?.pageEnd ?? image.page, objectId: pageObject.id, extractedText: pageText, width: dimensions.width ?? null, height: dimensions.height ?? null, status: pageText ? "ready" : "needs_ocr" }).returning({ id: examPrepImportPages.id, pageNumber: examPrepImportPages.pageNumber, pageEnd: examPrepImportPages.pageEnd, extractedText: examPrepImportPages.extractedText }))[0];
       await db.insert(examPrepImportAssets).values({ jobId, pageId: page.id, assetType: "image", objectId: pageObject.id, pageNumber: image.page, label: `原卷第 ${image.page} 頁`, metadata: { source: "pdf-render" } });
       pageRows.push(page);
     }
@@ -76,7 +77,7 @@ export async function processExamPrepImport(jobId: string) {
       chunks = ocrChunks.length ? ocrChunks : text ? [{ pageStart: 1, pageEnd: pageCount, text }] : [];
     }
     await updateJob(jobId, { stage: "question_split", progress: 60 });
-    const drafts = chunks.flatMap((chunk) => parseNumberedChoiceQuestionText(chunk.text).map((question) => ({ jobId, activityId: job.activityId, questionNumber: question.questionNumber, pageStart: question.sourcePage ?? chunk.pageStart, pageEnd: chunk.pageEnd, type: question.type, subject, stem: question.stem, options: question.options, answer: question.answer, explanation: question.explanation, confidence: question.confidence, sourceMetadata: { filename: job.filename, pageStart: chunk.pageStart, pageEnd: chunk.pageEnd, answerSource: question.answerSource, parser: "deterministic-numbered-choice" }, status: "needs_review" as const })));
+    const drafts = chunks.flatMap((chunk) => parseNumberedChoiceQuestionText(chunk.text).map((question) => ({ jobId, activityId: job.activityId, questionNumber: question.questionNumber, pageStart: question.sourcePage ?? chunk.pageStart, pageEnd: chunk.pageEnd, type: question.type, subject, stem: question.stem, options: question.options, answer: question.answer, explanation: question.explanation, confidence: question.confidence, sourceMetadata: { filename: job.filename, pageStart: chunk.pageStart, pageEnd: chunk.pageEnd, answerSource: question.answerSource, parser: "deterministic-numbered-choice", cropStatus: "queued", assetObjectIds: [] }, status: "needs_review" as const })));
     if (drafts.length) await db.insert(examPrepQuestionDrafts).values(drafts);
     await updateJob(jobId, { status: "pending_review", stage: "ready", progress: 100, draftCount: drafts.length, completedAt: new Date() });
     return { status: "pending_review", draftCount: drafts.length, pageCount };
