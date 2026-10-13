@@ -476,7 +476,8 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/pk/presence/heartbeat",
     auth: "user",
-    rate: { limit: 8, windowSec: 60, key: "pk-presence" },
+    // Presence is a lightweight keep-alive. Allow multiple tabs and visibility changes without blocking matchmaking.
+    rate: { limit: 30, windowSec: 60, key: "pk-presence" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ sessionKey: z.string().min(8).max(120), state: playerState.default("online"), currentMatchId: z.string().uuid().nullable().optional(), currentRoomId: z.string().uuid().nullable().optional(), metadata: z.record(z.string(), z.unknown()).optional() }));

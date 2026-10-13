@@ -306,7 +306,11 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     const sessionKey = sessionStorage.getItem(storageKey) ?? (window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
     sessionStorage.setItem(storageKey, sessionKey);
     let timer: ReturnType<typeof setTimeout>;
+    let lastHeartbeatAt = 0;
     const heartbeat = () => {
+      const now = Date.now();
+      if (now - lastHeartbeatAt < 10_000) return;
+      lastHeartbeatAt = now;
       const visible = document.visibilityState === "visible";
       void apiPost("/pk/presence/heartbeat", { sessionKey, state: visible ? "online" : "recently_active", metadata: { route: pathname, visibility: document.visibilityState } }).catch(() => {});
       timer = setTimeout(heartbeat, 30_000);
