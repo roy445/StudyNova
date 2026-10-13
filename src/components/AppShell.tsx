@@ -145,6 +145,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const [usageRules, setUsageRules] = useState<{ required: boolean; document: { version: string; title: string; body: string } | null } | null>(null);
   const [usageRulesRead, setUsageRulesRead] = useState(false);
   const [usageRulesAccepted, setUsageRulesAccepted] = useState(false);
+  const [claimingPro, setClaimingPro] = useState(false);
   const usageRulesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -181,6 +182,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const examPrep = useApi<{ activities: Array<{ id: string; closeAt: string | null; effectiveStatus: string }>; profile: { schoolLevel: string | null; grade: number | null } | null }>("/exam-prep/available");
   const examVocabulary = useApi<ExamVocabularyCatalog>("/exam-vocabulary/catalog");
   const account = useApi<{ membership: { tier: string; expiresAt: string | null } | null }>("/account/overview");
+  const proClaims = useApi<{ claims: Array<{ id: string; title: string; days: number; reason: string; status: string; grantedAt: string; claimedAt: string | null }> }>("/pro/claims/pending");
   const presence = useApi<{ online: number; asOf: string }>("/pk/presence/summary");
   const proDays = account.data?.membership?.expiresAt ? Math.max(0, Math.ceil((new Date(account.data.membership.expiresAt).getTime() - now) / 86400000)) : null;
 
@@ -798,6 +800,31 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           ))}
         </div>
       </Modal>
+
+      {proClaims.data?.claims[0] && (
+        <Modal open onClose={() => undefined} title={proClaims.data.claims[0].title}>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-violet-300/35 bg-gradient-to-br from-violet-400/15 to-cyan-300/10 p-5 text-center">
+              <p className="text-xs font-bold tracking-[.2em] text-cyan-200">NOVA PRO REWARD</p>
+              <p className="mt-3 text-4xl font-black text-white">{proClaims.data.claims[0].days} 天</p>
+              <p className="mt-1 text-sm text-muted">這份資格已準備好，點擊領取後才會正式啟用。</p>
+            </div>
+            {proClaims.data.claims[0].reason && <p className="text-sm leading-6 text-muted">授予原因：{proClaims.data.claims[0].reason}</p>}
+            <Button className="w-full !bg-gradient-to-r !from-violet-400 !to-cyan-300 !text-slate-950" loading={claimingPro} onClick={async () => {
+              setClaimingPro(true);
+              try {
+                await apiPost(`/pro/claims/${proClaims.data!.claims[0].id}/claim`, {});
+                await Promise.all([proClaims.reload(), account.reload()]);
+                toast.push("success", "Nova Pro 已啟用");
+              } catch (error) {
+                toast.push("error", error instanceof Error ? error.message : "Pro 領取失敗");
+              } finally {
+                setClaimingPro(false);
+              }
+            }}>立即領取</Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

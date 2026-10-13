@@ -14,6 +14,7 @@ import {
   novaProExchangePlans,
   memberships,
   membershipHistory,
+  proClaimGrants,
   coupons,
   couponRedemptions,
   featurePermissions,
@@ -21,7 +22,7 @@ import {
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, notFound, randomToken } from "../core";
-import { allFeatureStates, exchangeNovaForPro, grantLearningReward, grantNova, grantXp, isProUser } from "../economy";
+import { allFeatureStates, exchangeNovaForPro, grantLearningReward, grantMembership, grantNova, grantXp, isProUser } from "../economy";
 import { notify } from "../notify";
 
 function reindeerSignature(payload: string) {
@@ -33,6 +34,35 @@ function christmasSetting(value: Record<string, unknown> | undefined) {
 }
 
 export const routes: RouteDef[] = [
+  route({
+    method: "GET",
+    path: "/pro/claims/pending",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      return { claims: await db.select().from(proClaimGrants).where(and(eq(proClaimGrants.userId, user.userId), eq(proClaimGrants.status, "pending"))).orderBy(desc(proClaimGrants.grantedAt)).limit(10) };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/pro/claims/:id/claim",
+    auth: "user",
+    rate: { limit: 10, windowSec: 60, key: "pro-claim" },
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const claim = (await db.update(proClaimGrants).set({ status: "claimed", claimedAt: new Date() }).where(and(eq(proClaimGrants.id, ctx.params.id), eq(proClaimGrants.userId, user.userId), eq(proClaimGrants.status, "pending"))).returning())[0];
+      if (!claim) throw conflict("這份 Pro 資格已領取、已失效或不存在。");
+      try {
+        const membership = (await grantMembership({ userId: user.userId, days: claim.days, actorId: claim.grantedBy ?? user.userId, reason: claim.reason || claim.title, action: claim.action === "extend" ? "extend" : "grant" }))[0];
+        await db.update(proClaimGrants).set({ expiresAt: membership?.expiresAt ?? null }).where(eq(proClaimGrants.id, claim.id));
+        await notify({ userId: user.userId, kind: "membership_claimed", title: "Nova Pro 已啟用", body: `你已領取 ${claim.days} 天 Nova Pro 資格。`, link: "/profile?tab=pass", dedupeKey: `pro-claimed:${claim.id}` });
+        return { claimed: true, claim: { ...claim, expiresAt: membership?.expiresAt ?? null } };
+      } catch (error) {
+        await db.update(proClaimGrants).set({ status: "pending", claimedAt: null }).where(eq(proClaimGrants.id, claim.id));
+        throw error;
+      }
+    },
+  }),
   route({
     method: "GET",
     path: "/christmas/reindeer/event",

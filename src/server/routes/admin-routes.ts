@@ -65,6 +65,7 @@ import {
   pkPresence,
   pkRooms,
   userTitles,
+  proClaimGrants,
 } from "@/db/schema";
 import { normalizeQuestionRows, questionDedupeKey } from "../question-import";
 import { route, type RouteDef } from "../router";
@@ -418,7 +419,8 @@ export const routes: RouteDef[] = [
             }
             case "grant_pro":
             case "extend_pro": {
-              await grantMembership({ userId, days: body.days ?? 30, actorId: admin.userId, reason: body.reason, action: body.action === "grant_pro" ? "grant" : "extend" });
+              await db.insert(proClaimGrants).values({ userId, grantedBy: admin.userId, title: body.title?.trim() || "你收到一份 Nova Pro 資格", days: body.days ?? 30, reason: body.reason, action: body.action === "grant_pro" ? "grant" : "extend" });
+              await notify({ userId, kind: "membership_claim", title: body.title?.trim() || "你收到一份 Nova Pro 資格", body: `你收到 ${body.days ?? 30} 天 Nova Pro 資格，下一次上線時點擊「立即領取」即可啟用。`, link: "/profile?tab=pass", push: true, dedupeKey: `pro-claim:${userId}:${Date.now()}` });
               break;
             }
             case "revoke_pro": {
@@ -486,6 +488,13 @@ export const routes: RouteDef[] = [
       }
       return { results };
     },
+  }),
+
+  route({
+    method: "GET",
+    path: "/admin/pro-claims",
+    auth: "admin",
+    handler: async () => ({ claims: await db.select().from(proClaimGrants).orderBy(desc(proClaimGrants.grantedAt)).limit(300) }),
   }),
 
   route({

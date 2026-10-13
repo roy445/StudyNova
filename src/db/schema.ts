@@ -2083,6 +2083,24 @@ export const memberships = pgTable("memberships", {
   updatedAt: updated(),
 });
 
+export const proClaimGrants = pgTable(
+  "pro_claim_grants",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    grantedBy: uuid("granted_by").references(() => users.userId, { onDelete: "set null" }),
+    title: text("title").notNull().default("你收到一份 Nova Pro 資格"),
+    days: integer("days").notNull(),
+    reason: text("reason").notNull().default(""),
+    action: text("action").notNull().default("grant"),
+    status: text("status").notNull().default("pending"),
+    grantedAt: created(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  (t) => [index("pro_claim_user_status_idx").on(t.userId, t.status, t.grantedAt), index("pro_claim_status_idx").on(t.status, t.grantedAt)],
+);
+
 export const proRenewalRequests = pgTable(
   "pro_renewal_requests",
   {
