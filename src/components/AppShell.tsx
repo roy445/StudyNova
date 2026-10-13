@@ -7,6 +7,7 @@ import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
 import { SymbolIcon, type SymbolName } from "./Symbol";
 import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
 import { apiGet, apiPatch, apiPost, errorMessage, trackAnalytics, useApi } from "@/lib/api";
+import { APP_VERSION } from "@/lib/app-version";
 import { MaintenanceNotice } from "@/components/MaintenanceNotice";
 import type { MaintenanceState } from "@/server/maintenance";
 
@@ -110,8 +111,6 @@ const FEATURE_STEPS: Record<string, string[]> = {
 
 type SearchResult = { kind: string; id: string; title: string; subject?: string };
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.APP_VERSION ?? "1.1.0";
-
 export function AppShell({ user, children, maintenance }: { user: ShellUser; children: React.ReactNode; maintenance?: MaintenanceState | null }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -205,7 +204,29 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   useEffect(() => {
     let registration: ServiceWorkerRegistration | undefined;
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").then((value) => { registration = value; }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js").then((value) => {
+        registration = value;
+        void registration.update();
+        const alreadyUpdated = sessionStorage.getItem("studynova:auto-updated-version");
+        const activateUpdate = () => {
+          if (alreadyUpdated === "done" || !registration?.waiting) return;
+          sessionStorage.setItem("studynova:auto-updated-version", "pending");
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        };
+        if (registration.waiting) activateUpdate();
+        registration.addEventListener("updatefound", () => {
+          const installing = registration?.installing;
+          installing?.addEventListener("statechange", () => {
+            if (installing.state === "installed" && navigator.serviceWorker.controller) activateUpdate();
+          });
+        });
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (sessionStorage.getItem("studynova:auto-updated-version") === "pending") {
+            sessionStorage.setItem("studynova:auto-updated-version", "done");
+            window.location.reload();
+          }
+        });
+      }).catch(() => {});
     }
     const syncOfflineQueue = () => {
       registration?.active?.postMessage({ type: "STUDYNOVA_SYNC_NOW" });

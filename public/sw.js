@@ -1,5 +1,5 @@
 /* StudyNova service worker – push notifications + offline-first learning shell */
-const CACHE = "studynova-v3";
+const CACHE = "studynova-v4";
 const API_CACHE = "studynova-api-v1";
 const QUEUE_DB = "studynova-offline-queue";
 const QUEUE_STORE = "requests";

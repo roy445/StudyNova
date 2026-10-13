@@ -37,6 +37,15 @@ const GET_CACHE = new Map<string, { expiresAt: number; value: unknown }>();
 const GET_INFLIGHT = new Map<string, Promise<unknown>>();
 const LAST_SHELL_REFRESH = new Map<string, number>();
 
+function refreshOutdatedClient(status: number) {
+  if (typeof window === "undefined" || status !== 426) return;
+  const key = "studynova:auto-updated-version";
+  if (sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, "pending");
+  void navigator.serviceWorker?.getRegistration().then((registration) => registration?.update()).catch(() => undefined);
+  window.setTimeout(() => window.location.reload(), 80);
+}
+
 function clientSessionKey() {
   if (typeof window === "undefined") return "";
   try {
@@ -59,6 +68,7 @@ function clientVersionHeaders(): Record<string, string> {
 }
 
 async function parse<T>(res: Response): Promise<T> {
+  refreshOutdatedClient(res.status);
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
     if (!res.ok) {
