@@ -506,6 +506,21 @@ export const routes: RouteDef[] = [
 
   route({
     method: "POST",
+    path: "/attempts/:id/reset",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const attempt = (await db.select().from(quizAttempts).where(eq(quizAttempts.id, ctx.params.id)).limit(1))[0];
+      if (!attempt) throw notFound("找不到作答紀錄");
+      if (attempt.userId !== user.userId) throw forbidden();
+      if (attempt.status !== "in_progress") throw fail("WEEK_ALREADY_SUBMITTED", { message: "已交卷的測驗不能重新開始" });
+      await db.delete(answers).where(eq(answers.attemptId, attempt.id));
+      return { reset: true };
+    },
+  }),
+
+  route({
+    method: "POST",
     path: "/attempts/:id/submit",
     auth: "user",
     handler: async (ctx) => {
