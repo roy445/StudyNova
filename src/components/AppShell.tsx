@@ -128,6 +128,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const [advice, setAdvice] = useState<string>("");
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [notificationPromptStage, setNotificationPromptStage] = useState<0 | 1 | 2 | 3 | null>(null);
   const [usageGuideOpen, setUsageGuideOpen] = useState(false);
   const [inAppBrowser] = useState(() => typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|Line\/|Twitter|MicroMessenger|; wv\)|WebView/i.test(navigator.userAgent || ""));
   const [androidDevice] = useState(() => typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || ""));
@@ -234,10 +235,15 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     };
     window.addEventListener("online", syncOfflineQueue);
     const standalone = window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-    const guideTimer = !standalone && !localStorage.getItem("sn-install-guide-seen") ? window.setTimeout(() => setInstallGuideOpen(true), 0) : undefined;
+    const newAccountPending = sessionStorage.getItem("sn-new-account-notification-pending") === "1";
+    const guideTimer = !newAccountPending && !standalone && !localStorage.getItem("sn-install-guide-seen") ? window.setTimeout(() => setInstallGuideOpen(true), 0) : undefined;
+    const notificationTimer = newAccountPending ? window.setTimeout(() => {
+      sessionStorage.removeItem("sn-new-account-notification-pending");
+      if ("Notification" in window && Notification.permission !== "granted") setNotificationPromptStage(0);
+    }, 240) : undefined;
     const onInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", onInstall);
-    return () => { if (guideTimer) window.clearTimeout(guideTimer); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("online", syncOfflineQueue); };
+    return () => { if (guideTimer) window.clearTimeout(guideTimer); if (notificationTimer) window.clearTimeout(notificationTimer); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("online", syncOfflineQueue); };
   }, []);
 
   useEffect(() => {
@@ -474,6 +480,32 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     }
   }, [redeemCode, toast]);
 
+  async function enablePush(): Promise<boolean> {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+      toast.push("info", "此瀏覽器不支援 PWA 推播，請改用最新版 Chrome 或 Safari");
+      return false;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      toast.push("info", "目前沒有開啟通知；之後仍可到個人設定重新開啟。");
+      return false;
+    }
+    try {
+      const config = await apiGet<{ configured: boolean; publicKey: string }>("/push/config");
+      if (!config.configured || !config.publicKey) { toast.push("error", "管理員尚未設定 VAPID 推播金鑰"); return false; }
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      const subscription = existing ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyToUint8Array(config.publicKey) });
+      const json = subscription.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error("瀏覽器沒有回傳完整推播訂閱資料");
+      await apiPost("/push/subscribe", { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } });
+      toast.push("success", "PWA 推播已啟用；新的學習提醒會通知你");
+      return true;
+    } catch (error) {
+      toast.push("error", errorMessage(error));
+      return false;
+    }
+  }
   const unread = notif.data?.unread ?? 0;
   const nova = summary.data?.nova ?? 0;
   const level = summary.data?.novi?.level ?? 1;
@@ -819,6 +851,14 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           </div>
         </div>
       </Modal>
+      <Modal open={notificationPromptStage !== null} onClose={() => setNotificationPromptStage(null)} title={notificationPromptStage === 0 ? "要開啟 StudyNova 通知嗎？" : notificationPromptStage === 1 ? "😢 你確定嗎？" : notificationPromptStage === 2 ? "😠 你確定？" : "好吧，你贏了"}>
+        <div className="space-y-4 text-sm">
+          {notificationPromptStage === 0 && <><p className="leading-7 text-muted">開啟後可以收到段考提醒、每週小考、學習活動與 Novi 的重要通知。你也可以稍後在個人設定中開啟。</p><div className="flex gap-2"><Button full onClick={async () => { if (await enablePush()) setNotificationPromptStage(null); }}>開啟通知</Button><Button full variant="ghost" onClick={() => setNotificationPromptStage(1)}>不要</Button></div></>}
+          {notificationPromptStage === 1 && <><p className="text-center text-4xl" aria-hidden="true">😢</p><p className="text-center leading-7 text-muted">通知可以提醒你段考、學習活動和 Novi 訊息喔。你確定不要嗎？</p><div className="flex gap-2"><Button full onClick={async () => { if (await enablePush()) setNotificationPromptStage(null); }}>好啦，開啟通知</Button><Button full variant="ghost" onClick={() => setNotificationPromptStage(2)}>我還是不要</Button></div></>}
+          {notificationPromptStage === 2 && <><p className="text-center text-4xl" aria-hidden="true">😠</p><p className="text-center leading-7 text-muted">你確定？我不會再問一次囉！</p><div className="flex gap-2"><Button full onClick={async () => { if (await enablePush()) setNotificationPromptStage(null); }}>好啦，開啟通知</Button><Button full variant="ghost" onClick={() => setNotificationPromptStage(3)}>就是不要</Button></div></>}
+          {notificationPromptStage === 3 && <><p className="text-center text-4xl" aria-hidden="true">😮‍💨</p><p className="leading-7 text-muted">好吧，你贏了，不開就不開。<br />但是如果你隨時想通，都可以到個人設定去開啟喔。<span className="ml-1" aria-hidden="true">♥</span></p><div className="flex gap-2"><Link href="/profile?tab=profile" className="focus-ring flex min-h-11 flex-1 items-center justify-center rounded-xl border border-cyan-300/30 px-4 text-sm text-cyan-100 hover:bg-cyan-300/10" onClick={() => setNotificationPromptStage(null)}>前往個人設定</Link><Button full variant="ghost" onClick={() => setNotificationPromptStage(null)}>我知道了</Button></div></>}
+        </div>
+      </Modal>
             {/* First-login PWA and notification guide */}
       <Modal open={installGuideOpen} onClose={() => { localStorage.setItem("sn-install-guide-seen", "1"); setInstallGuideOpen(false); window.setTimeout(() => setUsageGuideOpen(true), 120); }} title="先把 StudyNova 加到主畫面">
         <div className="space-y-3 text-sm">
@@ -827,22 +867,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           <p className="text-muted">為了即時收到限定功能、每週小考與 Novi 提醒，請先開啟通知，再把網站安裝到手機主畫面。</p>
           {installPrompt && <Button full onClick={async () => { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); }}>📱 把 StudyNova 加到主畫面</Button>}
           {!installPrompt && <p className="rounded-xl border border-[var(--line)] bg-white/5 p-3 text-xs text-muted">目前瀏覽器沒有提供可操作的安裝流程。若要安裝，請使用瀏覽器原生的「加入主畫面／安裝應用程式」選單；StudyNova 不會製造假的安裝按鈕。</p>}
-          <Button full variant="ghost" onClick={async () => {
-            if (!("Notification" in window) || !("serviceWorker" in navigator)) return toast.push("info", "此瀏覽器不支援 PWA 推播，請改用最新版 Chrome 或 Safari");
-            const permission = await Notification.requestPermission();
-            if (permission !== "granted") return toast.push("info", "請在瀏覽器設定允許通知");
-            try {
-              const config = await apiGet<{ configured: boolean; publicKey: string }>("/push/config");
-              if (!config.configured || !config.publicKey) return toast.push("error", "管理員尚未設定 VAPID 推播金鑰");
-              const registration = await navigator.serviceWorker.ready;
-              const existing = await registration.pushManager.getSubscription();
-              const subscription = existing ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyToUint8Array(config.publicKey) });
-              const json = subscription.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
-              if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error("瀏覽器沒有回傳完整推播訂閱資料");
-              await apiPost("/push/subscribe", { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } });
-              toast.push("success", "PWA 推播已啟用；新的錯誤回報會立即通知管理員");
-            } catch (error) { toast.push("error", errorMessage(error)); }
-          }}>開啟通知</Button>
+          <Button full variant="ghost" onClick={() => void enablePush()}>開啟通知</Button>
           <div className="grid gap-2 text-xs text-muted sm:grid-cols-2">
             <div className="glass-soft p-3"><p className="font-semibold text-white">iPhone／iPad</p><p className="mt-1">使用 Safari 開啟網站 → 點底部分享按鈕 → 選「加入主畫面」→ 按「加入」。請先在 iOS 設定 → 通知 → Safari 開啟通知。</p></div>
             <div className="glass-soft p-3"><p className="font-semibold text-white">Android</p><p className="mt-1">使用 Chrome 開啟網站 → 點右上角 ⋮ → 選「安裝應用程式」或「加到主畫面」→ 確認安裝。出現通知提示時請選「允許」。</p></div>

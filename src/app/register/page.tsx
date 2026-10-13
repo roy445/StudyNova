@@ -60,6 +60,7 @@ export default function RegisterPage() {
     try {
       const res = await apiPost<{ novaId: string; displayName: string; tester?: boolean }>("/auth/register", { email, password, displayName, termsVersion: terms.version, termsReadComplete, termsAccepted, testerSignup });
       setCreated(res);
+      if (typeof window !== "undefined") sessionStorage.setItem("sn-new-account-notification-pending", "1");
       trackAnalytics("register_success", { route: "/register" });
       toast.push("success", "已建立 StudyNova 帳號");
       try {
