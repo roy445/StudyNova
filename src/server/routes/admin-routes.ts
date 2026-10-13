@@ -361,9 +361,9 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const admin = ctx.requireUser();
       const body = await ctx.json(z.object({ reason: z.string().min(1).max(300), feature: z.string().max(60).optional() }));
-      await db.delete(featureUsage).where(body.feature ? eq(featureUsage.feature, body.feature) : sql`true`);
+      const deleted = await db.delete(featureUsage).where(body.feature ? eq(featureUsage.feature, body.feature) : sql`true`).returning({ id: featureUsage.id });
       await adminLog({ actorId: admin.userId, action: "usage.reset_all", targetType: "system", targetId: "feature_usage", reason: body.reason, ip: ctx.ip });
-      return { ok: true };
+      return { ok: true, deletedCount: deleted.length, feature: body.feature ?? "all" };
     },
   }),
 

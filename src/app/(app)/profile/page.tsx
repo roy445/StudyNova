@@ -189,11 +189,8 @@ function ProfileInner() {
 
       {tab === "profile" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          {aiUsage.data && <Card className="border-[#37d3ff]/30 bg-gradient-to-br from-[#37d3ff]/10 to-transparent lg:col-span-2" title="◒ AI Token 使用量" subtitle={`目前方案：${aiUsage.data.budget.plan === "pro" ? "Nova Pro" : "一般使用者"}；所有數字來自實際 AI 使用紀錄。`}>
-            <div className="grid gap-4 md:grid-cols-2">
-              {([['daily', '今日 Token', aiUsage.data.budget.daily, aiUsage.data.budget.dailyResetAt], ['monthly', '本月 Token', aiUsage.data.budget.monthly, aiUsage.data.budget.monthlyResetAt]] as const).map(([key, label, item, resetAt]) => <div key={key} className="rounded-2xl border border-[var(--line)] bg-black/10 p-4"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{label}</span><span className="text-xs tabular-nums text-[#b9f2ff]">{item.used.toLocaleString()} / {item.limit.toLocaleString()}</span></div><Progress value={item.used} max={item.limit} tone={item.percent >= 90 ? "gold" : "cyan"} /><div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-muted"><span>剩餘 {item.remaining.toLocaleString()} Token（{item.percent}%）</span><span>刷新：{new Date(resetAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span></div></div>)}
-            </div>
-            <p className="mt-3 text-xs leading-5 text-muted">AI 對話、圖片分析、AI 出題等會依實際回傳的輸入與輸出 Token 計算；瀏覽器朗讀、作答、PDF 列印不會扣 AI Token。接近上限時請先查看剩餘量，額度會在指定時間自動恢復。</p>
+          {aiUsage.data && <Card className="border-[#37d3ff]/30 bg-gradient-to-br from-[#37d3ff]/10 to-transparent lg:col-span-2" title="◒ AI Token 使用紀錄" subtitle="僅供個人使用分析，不會因 Token 數量阻擋你的 AI 請求。">
+            <p className="text-xs leading-5 text-muted">這裡只記錄實際 AI 輸入／輸出 Token，方便你了解使用情形；目前網站採用功能每日次數控管，不採用 Token 上限制度。</p>
             {aiUsage.data.daily.length > 0 && <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[380px] text-xs"><thead className="text-left text-muted"><tr><th className="pb-2">日期</th><th className="pb-2 text-right">Token</th><th className="pb-2 text-right">AI 次數</th></tr></thead><tbody>{aiUsage.data.daily.map((item) => <tr key={item.day} className="border-t border-[var(--line)]"><td className="py-2">{item.day}</td><td className="py-2 text-right tabular-nums">{item.tokens.toLocaleString()}</td><td className="py-2 text-right tabular-nums">{item.calls}</td></tr>)}</tbody></table></div>}
           </Card>}
           {(me.data?.user.role === "admin" || me.data?.user.role === "owner") && (

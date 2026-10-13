@@ -418,7 +418,6 @@ async function logUsage(entry: {
 
 export async function runAi(req: AiRequest): Promise<AiResult> {
   const normalizedReq = await normalizeAiRequest(req);
-  await enforceAiTokenBudget(req.userId, normalizedReq);
   // OCR must not inherit GEMINI_FAST_MODEL: production logs showed that the
   // general 3.6 model was quota-limited and intermittently overloaded. Use a
   // dedicated OCR override when provided, otherwise use the lightweight
