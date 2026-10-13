@@ -32,9 +32,10 @@ export class ApiRequestError extends Error {
   }
 }
 
-const GET_CACHE_TTL_MS = 10_000;
+const GET_CACHE_TTL_MS = 15_000;
 const GET_CACHE = new Map<string, { expiresAt: number; value: unknown }>();
 const GET_INFLIGHT = new Map<string, Promise<unknown>>();
+const LAST_SHELL_REFRESH = new Map<string, number>();
 
 function clientSessionKey() {
   if (typeof window === "undefined") return "";
@@ -187,6 +188,9 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): QueryState
       if (document.visibilityState !== "visible") return;
       const activeTag = document.activeElement?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") return;
+      const now = Date.now();
+      if (now - (LAST_SHELL_REFRESH.get(path) ?? 0) < 4_000) return;
+      LAST_SHELL_REFRESH.set(path, now);
       // 事件代表頁面狀態可能已跨日、跨分頁或重新連線；不能沿用 10 秒 GET cache。
       GET_CACHE.delete(path);
       void load(true);
