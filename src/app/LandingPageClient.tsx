@@ -2,154 +2,89 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { LogoMark, NoviAvatar, StarField, Wordmark } from "@/components/brand";
-import { Badge, Button } from "@/components/ui";
+import { LogoMark, Wordmark } from "@/components/brand";
 import { SymbolIcon, type SymbolName } from "@/components/Symbol";
 
-const FEATURES: Array<{ icon: SymbolName; title: string; desc: string }> = [
-  { icon: "grades", title: "成績管理與 AI 分析", desc: "輸入每次段考、小考成績，自動計算平均、趨勢與弱科，AI 只根據真實數據給建議。" },
-  { icon: "camera", title: "拍照 OCR 轉學習內容", desc: "課本、講義、考卷、手寫筆記拍照即可辨識，一鍵變成筆記、題目、記憶卡或複習計畫。" },
-  { icon: "nova", title: "Novi AI 學習助理", desc: "學習教練／解題／提示／考試／筆記／錯題／複習／快速八種模式，可讀取你授權的學習資料。" },
-  { icon: "question", title: "AI 出題與錯題本", desc: "依教材與弱點自動出題，答錯自動進錯題本，間隔複習直到完全掌握。" },
-  { icon: "audio", title: "錄音分析與背誦測試", desc: "英文朗讀、國文背課文即時評分：流暢度、漏字、速度與完整度，附改善建議。" },
-  { icon: "weekly", title: "每週小考", desc: "管理員上傳考卷與答案，AI 辨識整理後人工確認發布，週末開放快速背誦與模擬測驗。" },
-  { icon: "social", title: "好友挑戰與讀書房", desc: "用 NOVA ID 加好友、單字 1v1、共享讀書房一起計時，排行榜即時更新。" },
-  { icon: "shop", title: "Nova 點數與 Novi 養成", desc: "學習就有 Nova 與 XP，升級 Novi、購買外觀特效，Nova Pro 學習獎勵雙倍。" },
+const FEATURES: Array<{ icon: SymbolName; eyebrow: string; title: string; desc: string; href: string; tone: string }> = [
+  { icon: "grades", eyebrow: "整理與回顧", title: "成績與學習紀錄", desc: "集中管理段考、小考與學習紀錄，回頭看見自己需要補強的地方。", href: "/login?next=%2Fgrades", tone: "cyan" },
+  { icon: "camera", eyebrow: "從教材開始", title: "教材與 OCR", desc: "上傳課本、講義或考卷，整理成可複習的學習內容。", href: "/login?next=%2Ftextbooks", tone: "violet" },
+  { icon: "nova", eyebrow: "遇到問題時", title: "Novi AI 助理", desc: "針對題目、教材與學習方法提問，從目前的內容開始理解。", href: "/login?next=%2Fai", tone: "blue" },
+  { icon: "question", eyebrow: "練習與複習", title: "AI 出題與錯題本", desc: "從教材建立練習，留下錯題，讓下一次複習更有方向。", href: "/login?next=%2Fstudy", tone: "gold" },
+  { icon: "weekly", eyebrow: "段考準備", title: "段考與每週小考", desc: "依照目前開放的考試內容，使用單字、題目與測驗功能準備。", href: "/login?next=%2Fexam-prep", tone: "cyan" },
+  { icon: "audio", eyebrow: "語音學習", title: "朗讀與背誦練習", desc: "使用現有的語音工具練習文章、單字與口說內容。", href: "/login?next=%2Fstudy", tone: "violet" },
 ];
 
-export default function LandingPage() {
-  const [phase, setPhase] = useState(0);
+const STEPS = [
+  ["01", "先選一個科目", "從學習中心、段考專區或教材開始，不必一次設定所有內容。"],
+  ["02", "選擇合適的工具", "依照今天的目的，使用閱讀、練習、單字或 AI 助理。"],
+  ["03", "留下你的學習紀錄", "登入後，學習內容與紀錄會保留在自己的 StudyNova 空間。"],
+] as const;
+
+export default function LandingPageClient() {
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduced";
-    if (reduce) {
-      const timer = setTimeout(() => setPhase(3), 0);
-      return () => clearTimeout(timer);
-    }
-    const t1 = setTimeout(() => setPhase(1), 380);
-    const t2 = setTimeout(() => setPhase(2), 900);
-    const t3 = setTimeout(() => setPhase(3), 1500);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
+    const timer = window.setTimeout(() => setReady(true), 60);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
-    <div className="relative min-h-dvh overflow-hidden">
-      <StarField count={34} />
-
-      {/* Intro overlay – never blocks for long */}
-      <div
-        className={`pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-[#060915] transition-opacity duration-700 ${phase >= 2 ? "opacity-0" : "opacity-100"}`}
-        style={{ visibility: phase >= 3 ? "hidden" : "visible" }}
-        aria-hidden
-      >
-        <div className={`flex flex-col items-center gap-3 transition-all duration-700 ${phase >= 1 ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}>
-          <LogoMark size={136} />
-          <span className="neon-text text-2xl font-extrabold tracking-tight">StudyNova AI</span>
-          <span className="text-xs tracking-[0.3em] text-muted">LOADING · 星軌同步中</span>
-        </div>
-      </div>
-
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Wordmark size={42} />
-        <nav className="flex items-center gap-2">
-          <Link href="/login" className="focus-ring rounded-xl border border-[var(--line)] px-3 py-2 text-sm hover:bg-white/5">
-            登入
-          </Link>
-          <Link href="/register" className="focus-ring rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-3 py-2 text-sm font-medium text-white">
-            免費註冊
-          </Link>
+    <div className={`landing-page ${ready ? "landing-ready" : ""}`}>
+      <div className="landing-orbit landing-orbit-one" aria-hidden="true" />
+      <div className="landing-orbit landing-orbit-two" aria-hidden="true" />
+      <header className="landing-nav">
+        <Link href="/" className="landing-brand focus-ring" aria-label="StudyNova 首頁"><Wordmark size={38} /></Link>
+        <nav className="hidden items-center gap-7 md:flex" aria-label="首頁導覽">
+          <a href="#features" className="landing-nav-link focus-ring">學習功能</a>
+          <a href="#start" className="landing-nav-link focus-ring">使用方式</a>
+          <Link href="/login?next=%2Flearning" className="landing-nav-link focus-ring">學習資源</Link>
+          <Link href="/faq" className="landing-nav-link focus-ring">常見問題</Link>
         </nav>
+        <div className="flex items-center gap-2">
+          <Link href="/login" className="landing-login focus-ring">登入</Link>
+          <Link href="/register" className="landing-signup focus-ring">免費註冊 <span aria-hidden="true">↗</span></Link>
+        </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-20">
-        <section className="grid items-center gap-8 py-10 lg:grid-cols-[1.15fr_0.85fr] lg:py-16">
-          <div className={`space-y-5 ${phase >= 3 ? "anim-in" : "opacity-0"}`}>
-            <Badge tone="cyan">專為台灣國中・高中生打造</Badge>
-            <h1 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-              讓學習更聰明，
-              <br />
-              <span className="neon-text">讓進步看得見。</span>
-            </h1>
-            <p className="max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-              StudyNova AI 把成績、教材、考卷、錯題、錄音、讀書計畫、好友與 AI 助理 Novi 全部整合在同一個平台。
-              不是普通的 AI 聊天網站，而是真正能陪你每天使用的學習管理系統。
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/register">
-                <Button size="lg">立即免費開始 →</Button>
-              </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline">
-                  我已經有 NOVA ID
-                </Button>
-              </Link>
+      <main>
+        <section className="landing-hero">
+          <div className="landing-hero-copy">
+            <p className="landing-kicker"><span className="landing-kicker-dot" /> YOUR STUDY SPACE</p>
+            <h1>讓學習更有方向，<br /><span>從今天開始進步。</span></h1>
+            <p className="landing-lead">StudyNova 把科目、教材、練習、成績與 AI 助理放在同一個學習空間。先找到現在需要的工具，再一步一步開始。</p>
+            <div className="landing-actions">
+              <Link href="/register" className="landing-primary focus-ring">開始使用 <span aria-hidden="true">→</span></Link>
+              <a href="#features" className="landing-secondary focus-ring">先了解功能</a>
             </div>
-            <ul className="grid gap-2 pt-2 text-xs text-muted sm:grid-cols-3">
-              <li><span className="mr-1 text-[#37d3ff]">✓</span>註冊即得專屬 NOVA ID</li>
-              <li><span className="mr-1 text-[#37d3ff]">✓</span>不需要 Email 驗證</li>
-              <li><span className="mr-1 text-[#37d3ff]">✓</span>資料預設完全私人</li>
-            </ul>
+            <p className="landing-note"><span aria-hidden="true">✓</span> 註冊後建立自己的 NOVA ID　·　登入即可保留學習內容</p>
           </div>
-
-          <div className={`glass relative flex flex-col items-center gap-3 p-6 ${phase >= 3 ? "anim-pop" : "opacity-0"}`}>
-            <NoviAvatar size={120} state="happy" level={5} effect="effect-orbit" />
-            <p className="text-center text-sm font-semibold">嗨，我是 Novi</p>
-            <p className="max-w-xs text-center text-xs leading-relaxed text-muted">
-              「你的數學最近進步很多，但英文文法錯題增加，我建議今天花 15 分鐘複習。」
-            </p>
-            <div className="grid w-full grid-cols-3 gap-2 pt-1 text-center text-[11px]">
-              <div className="glass-soft py-2">
-                <p className="text-base font-bold text-[#37d3ff]">8</p>
-                <p className="text-muted">AI 模式</p>
-              </div>
-              <div className="glass-soft py-2">
-                <p className="text-base font-bold text-[#a78bfa]">5</p>
-                <p className="text-muted">Novi 等級</p>
-              </div>
-              <div className="glass-soft py-2">
-                <p className="text-base font-bold text-[#ffc857]">∞</p>
-                <p className="text-muted">學習紀錄</p>
-              </div>
-            </div>
+          <div className="landing-preview" aria-label="StudyNova 學習空間示意">
+            <div className="landing-preview-top"><div><span className="landing-preview-label">MY STUDY SPACE</span><h2>今天，從一小步開始</h2></div><LogoMark size={38} glow={false} /></div>
+            <div className="landing-preview-rule" />
+            <div className="landing-preview-focus"><div className="landing-preview-check">✓</div><div><p>今日學習入口</p><span>先選擇一個想處理的科目</span></div><span className="landing-preview-arrow">→</span></div>
+            <div className="landing-preview-grid"><div><SymbolIcon name="grades" size={20} /><span>成績分析</span></div><div><SymbolIcon name="camera" size={20} /><span>教材 OCR</span></div><div><SymbolIcon name="nova" size={20} /><span>Novi AI</span></div></div>
+            <div className="landing-preview-footer"><span className="landing-pulse" />StudyNova learning space <span>可從這裡開始</span></div>
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((f, i) => (
-            <article key={f.title} className="glass anim-in p-4" style={{ animationDelay: `${i * 60}ms` }}>
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#37d3ff]/25 bg-[#37d3ff]/8 text-[#b8efff]"><SymbolIcon name={f.icon} size={22} /></span>
-              <h3 className="mt-2 text-sm font-semibold">{f.title}</h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted">{f.desc}</p>
-            </article>
-          ))}
+        <section id="features" className="landing-section">
+          <div className="landing-section-heading"><div><p className="landing-kicker">WHAT YOU CAN DO</p><h2>把需要的學習工具，放在同一個地方</h2></div><p>目前已開放的功能會依照登入身分、後台設定與資料內容顯示。</p></div>
+          <div className="landing-feature-grid">
+            {FEATURES.map((feature, index) => <Link key={feature.title} href={feature.href} className={`landing-feature landing-feature-${feature.tone} focus-ring`} style={{ "--delay": `${index * 55}ms` } as React.CSSProperties}>
+              <div className="landing-feature-icon"><SymbolIcon name={feature.icon} size={21} /></div><div className="landing-feature-content"><p>{feature.eyebrow}</p><h3>{feature.title}</h3><span>{feature.desc}</span><b>登入後使用 <i aria-hidden="true">↗</i></b></div>
+            </Link>)}
+          </div>
         </section>
 
-        <section className="glass mt-8 flex flex-col items-center gap-3 p-8 text-center">
-          <LogoMark size={102} />
-          <h2 className="text-xl font-bold sm:text-2xl">今天就開始，讓每一分鐘的努力都被看見</h2>
-          <p className="max-w-xl text-sm text-muted">
-            註冊只需要 Email、密碼與顯示名稱，系統會立即產生你的專屬 NOVA ID，把它分享給同學就能一起挑戰。
-          </p>
-          <Link href="/register">
-            <Button size="lg">建立我的 NOVA ID</Button>
-          </Link>
+        <section id="start" className="landing-section landing-start-section">
+          <div className="landing-section-heading"><div><p className="landing-kicker">A SIMPLE START</p><h2>第一次使用，從這裡開始</h2></div><p>不需要先熟悉所有功能，照著自己的需要選擇下一步即可。</p></div>
+          <div className="landing-steps">{STEPS.map(([number, title, desc]) => <div key={number} className="landing-step"><span>{number}</span><div><h3>{title}</h3><p>{desc}</p></div></div>)}</div>
         </section>
+
+        <section className="landing-cta"><div><p className="landing-kicker">READY WHEN YOU ARE</p><h2>準備好開始了嗎？</h2><p>建立帳號，從一個科目或一份教材開始。</p></div><div className="landing-cta-actions"><Link href="/register" className="landing-primary focus-ring">免費註冊 <span aria-hidden="true">→</span></Link><Link href="/login" className="landing-cta-login focus-ring">登入帳號</Link></div></section>
       </main>
 
-      <footer className="relative z-10 border-t border-[var(--line)] px-4 py-6 text-center text-xs text-muted">
-        <span className="flex flex-wrap items-center justify-center gap-3">
-          <span>StudyNova AI · 讓學習更聰明，讓進步看得見</span>
-          <Link href="/faq" className="underline">常見問題</Link>
-          <Link href="/support" className="underline">回報問題</Link>
-          <Link href="/privacy" className="underline">隱私條款</Link>
-          <Link href="/terms" className="underline">使用條款</Link>
-          <Link href="/login" className="underline">登入</Link>
-        </span>
-      </footer>
+      <footer className="landing-footer"><span>© StudyNova · 你的學習空間</span><span className="landing-footer-links"><Link href="/privacy">隱私條款</Link><Link href="/terms">使用條款</Link><Link href="/support">回報問題</Link></span></footer>
     </div>
   );
 }

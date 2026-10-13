@@ -75,14 +75,14 @@ export default function RegisterPage() {
   }
 
   if (registration && !registration.enabled) {
-    return <div className="relative grid min-h-dvh place-items-center overflow-hidden px-4 py-8"><StarField count={22} /><div className="glass anim-pop relative z-10 w-full max-w-md p-7 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-amber-300/40 bg-amber-300/10 text-3xl">🔒</div><h1 className="mt-4 text-2xl font-black">目前暫停新會員註冊</h1><p className="mt-3 text-sm leading-7 text-muted">StudyNova 目前暫時沒有開放新的會員註冊。</p>{registration.reason && <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/5 p-3 text-sm text-amber-100">{registration.reason}</p>}{registration.notice && <p className="mt-3 text-sm leading-6 text-muted">{registration.notice}</p>}{registration.reopeningAt && <p className="mt-4 text-xs text-muted">預計重新開放：{new Date(registration.reopeningAt).toLocaleString("zh-TW")}</p>}<Link href="/login" className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-4 py-3 text-sm font-bold text-white">返回登入</Link></div></div>;
+    return <div className="auth-screen relative grid min-h-dvh place-items-center overflow-hidden px-4 py-8"><StarField count={22} /><div className="auth-card anim-pop relative z-10 w-full max-w-md p-7 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-amber-300/40 bg-amber-300/10 text-3xl">🔒</div><h1 className="mt-4 text-2xl font-black">目前暫停新會員註冊</h1><p className="mt-3 text-sm leading-7 text-muted">StudyNova 目前暫時沒有開放新的會員註冊。</p>{registration.reason && <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/5 p-3 text-sm text-amber-100">{registration.reason}</p>}{registration.notice && <p className="mt-3 text-sm leading-6 text-muted">{registration.notice}</p>}{registration.reopeningAt && <p className="mt-4 text-xs text-muted">預計重新開放：{new Date(registration.reopeningAt).toLocaleString("zh-TW")}</p>}<Link href="/login" className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-4 py-3 text-sm font-bold text-white">返回登入</Link></div></div>;
   }
 
   if (created) {
     return (
-      <div className="relative grid min-h-dvh place-items-center overflow-hidden px-4 py-8">
+      <div className="auth-screen relative grid min-h-dvh place-items-center overflow-hidden px-4 py-8">
         <StarField count={26} />
-        <div className="glass anim-pop relative z-10 w-full max-w-md p-6 text-center">
+        <div className="auth-card anim-pop relative z-10 w-full max-w-md p-6 text-center">
           <div className="flex justify-center">
             <NoviAvatar size={92} state="cheer" />
           </div>
@@ -135,9 +135,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative grid min-h-dvh place-items-center overflow-hidden px-4 py-8">
+    <div className="auth-screen relative grid min-h-dvh place-items-center overflow-hidden px-4 py-8">
       <StarField count={22} />
-      <div className="glass anim-pop relative z-10 w-full max-w-md p-6">
+      <div className="auth-card anim-pop relative z-10 w-full max-w-md p-6">
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
           <Wordmark size={44} />
           <p className="text-xs text-muted">建立帳號後系統會自動產生你的 NOVA ID（不需要 Email 驗證）</p>
