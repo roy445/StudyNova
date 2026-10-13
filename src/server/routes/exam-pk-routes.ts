@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/db";
-import { examPkAnswerHistory, examPkAnswers, examPkParticipants, examPkQuestions, examPkRooms, examPrepActivities, examPrepSubjects, questions, users } from "@/db/schema";
+import { examPkAnswerHistory, examPkAnswers, examPkParticipants, examPkQuestions, examPkRooms, examPrepActivities, examPrepSubjects, questions } from "@/db/schema";
 import { fail, notFound } from "../core";
 import { route, type RouteDef } from "../router";
 
@@ -27,7 +27,7 @@ async function getRoom(roomId: string, userId: string) {
   if (!room) throw notFound("找不到這間段考 PK 房");
   const self = (await db.select().from(examPkParticipants).where(and(eq(examPkParticipants.roomId, roomId), eq(examPkParticipants.userId, userId))).limit(1))[0];
   if (!self) throw fail("SYS_CONFLICT", { message: "你尚未加入這間考試房。" });
-  const participants = await db.select({ id: examPkParticipants.id, userId: examPkParticipants.userId, displayName: users.displayName, avatarSeed: users.avatarSeed, status: examPkParticipants.status, joinedAt: examPkParticipants.joinedAt, score: examPkParticipants.score, correctCount: examPkParticipants.correctCount, wrongCount: examPkParticipants.wrongCount, unansweredCount: examPkParticipants.unansweredCount, rank: examPkParticipants.rank, lastSeenAt: examPkParticipants.lastSeenAt }).from(examPkParticipants).innerJoin(users, eq(users.userId, examPkParticipants.userId)).where(eq(examPkParticipants.roomId, roomId)).orderBy(asc(examPkParticipants.joinedAt));
+  const participants = (await db.execute(sql`select p.id, p.user_id as "userId", u.display_name as "displayName", u.avatar_seed as "avatarSeed", p.status, p.joined_at as "joinedAt", p.score, p.correct_count as "correctCount", p.wrong_count as "wrongCount", p.unanswered_count as "unansweredCount", p.rank, p.last_seen_at as "lastSeenAt" from exam_pk_participants p join users u on u.id = p.user_id where p.room_id = ${roomId} order by p.joined_at`)).rows as Array<{ id: string; userId: string; displayName: string; avatarSeed: string; status: string; joinedAt: string; score: number | null; correctCount: number; wrongCount: number; unansweredCount: number; rank: number | null; lastSeenAt: string | null }>;
   const roomQuestions = await db.select({ id: examPkQuestions.id, orderIndex: examPkQuestions.orderIndex, questionId: examPkQuestions.questionId, snapshot: examPkQuestions.snapshot }).from(examPkQuestions).where(eq(examPkQuestions.roomId, roomId)).orderBy(asc(examPkQuestions.orderIndex));
   const answers = await db.select({ questionId: examPkAnswers.questionId, answer: examPkAnswers.answer, isCorrect: examPkAnswers.isCorrect, submittedAt: examPkAnswers.submittedAt, changedCount: examPkAnswers.changedCount }).from(examPkAnswers).where(and(eq(examPkAnswers.roomId, roomId), eq(examPkAnswers.userId, userId)));
   return { room, self, participants, questions: roomQuestions.map(({ snapshot, ...question }) => ({ ...question, snapshot: Object.fromEntries(Object.entries(snapshot).filter(([key]) => key !== "answer")) })), answers };
@@ -42,7 +42,7 @@ async function ensureParticipant(roomId: string, userId: string) {
 async function statePayload(roomId: string) {
   const room = (await db.select().from(examPkRooms).where(eq(examPkRooms.id, roomId)).limit(1))[0];
   if (!room) return null;
-  const participants = await db.select({ userId: examPkParticipants.userId, displayName: users.displayName, avatarSeed: users.avatarSeed, status: examPkParticipants.status, score: examPkParticipants.score, correctCount: examPkParticipants.correctCount, wrongCount: examPkParticipants.wrongCount, unansweredCount: examPkParticipants.unansweredCount, lastSeenAt: examPkParticipants.lastSeenAt }).from(examPkParticipants).innerJoin(users, eq(users.userId, examPkParticipants.userId)).where(eq(examPkParticipants.roomId, roomId)).orderBy(desc(examPkParticipants.score), asc(examPkParticipants.joinedAt));
+  const participants = (await db.execute(sql`select p.user_id as "userId", u.display_name as "displayName", u.avatar_seed as "avatarSeed", p.status, p.score, p.correct_count as "correctCount", p.wrong_count as "wrongCount", p.unanswered_count as "unansweredCount", p.last_seen_at as "lastSeenAt" from exam_pk_participants p join users u on u.id = p.user_id where p.room_id = ${roomId} order by p.score desc nulls last, p.joined_at`)).rows as Array<{ userId: string; displayName: string; avatarSeed: string; status: string; score: number | null; correctCount: number; wrongCount: number; unansweredCount: number; lastSeenAt: string | null }>;
   return { room: { id: room.id, roomCode: room.roomCode, hostUserId: room.hostUserId, status: room.status, startedAt: room.startedAt, endsAt: room.endsAt, finishedAt: room.finishedAt, maxPlayers: room.maxPlayers, durationMinutes: room.durationMinutes, subject: room.subject, scope: room.scope }, participants };
 }
 

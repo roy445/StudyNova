@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS "exam_pk_rooms" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "room_code" text NOT NULL,
   "activity_id" uuid NOT NULL REFERENCES "exam_prep_activities"("id") ON DELETE RESTRICT,
-  "host_user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE RESTRICT,
+  "host_user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT,
   "subject" text NOT NULL,
   "scope" text NOT NULL DEFAULT '',
   "question_bank_id" uuid REFERENCES "question_banks"("id") ON DELETE RESTRICT,
@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS "exam_pk_rooms_activity_idx" ON "exam_pk_rooms" ("act
 CREATE TABLE IF NOT EXISTS "exam_pk_participants" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "room_id" uuid NOT NULL REFERENCES "exam_pk_rooms"("id") ON DELETE CASCADE,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "joined_at" timestamptz NOT NULL DEFAULT now(),
   "status" text NOT NULL DEFAULT 'JOINED',
   "submitted_at" timestamptz,
@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS "exam_pk_questions_room_idx" ON "exam_pk_questions" (
 CREATE TABLE IF NOT EXISTS "exam_pk_answers" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "room_id" uuid NOT NULL REFERENCES "exam_pk_rooms"("id") ON DELETE CASCADE,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "question_id" uuid NOT NULL REFERENCES "exam_pk_questions"("id") ON DELETE CASCADE,
   "answer" jsonb NOT NULL DEFAULT '[]'::jsonb,
   "is_correct" boolean NOT NULL DEFAULT false,
@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS "exam_pk_answers_user_idx" ON "exam_pk_answers" ("use
 CREATE TABLE IF NOT EXISTS "exam_pk_answer_history" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "room_id" uuid NOT NULL REFERENCES "exam_pk_rooms"("id") ON DELETE CASCADE,
-  "user_id" uuid NOT NULL REFERENCES "users"("user_id") ON DELETE CASCADE,
+  "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "question_id" uuid NOT NULL REFERENCES "exam_pk_questions"("id") ON DELETE CASCADE,
   "old_answer" jsonb NOT NULL DEFAULT '[]'::jsonb,
   "new_answer" jsonb NOT NULL DEFAULT '[]'::jsonb,
