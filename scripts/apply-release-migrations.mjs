@@ -34,6 +34,7 @@ const releaseMigrations = [
   "0121_ai_question_converter.sql",
   "0122_exam_vocabulary.sql",
   "0123_exam_vocabulary_import_jobs.sql",
+  "0128_exam_pk_rooms.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

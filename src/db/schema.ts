@@ -3603,6 +3603,92 @@ export const examPrepSubjects = pgTable(
   (t) => [uniqueIndex("exam_prep_subjects_activity_subject_uq").on(t.activityId, t.subject), index("exam_prep_subjects_activity_idx").on(t.activityId)],
 );
 
+/* ------------------------------------------ EXAM PREP MULTIPLAYER ROOMS */
+export const examPkRooms = pgTable(
+  "exam_pk_rooms",
+  {
+    id: id(),
+    roomCode: text("room_code").notNull(),
+    activityId: uuid("activity_id").notNull().references(() => examPrepActivities.id, { onDelete: "restrict" }),
+    hostUserId: uuid("host_user_id").notNull().references(() => users.userId, { onDelete: "restrict" }),
+    subject: text("subject").notNull(),
+    scope: text("scope").notNull().default(""),
+    questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("WAITING"),
+    maxPlayers: integer("max_players").notNull().default(50),
+    durationMinutes: integer("duration_minutes").notNull().default(50),
+    createdAt: created(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("exam_pk_rooms_code_uq").on(t.roomCode), index("exam_pk_rooms_status_idx").on(t.status, t.createdAt), index("exam_pk_rooms_activity_idx").on(t.activityId, t.createdAt)],
+);
+
+export const examPkParticipants = pgTable(
+  "exam_pk_participants",
+  {
+    id: id(),
+    roomId: uuid("room_id").notNull().references(() => examPkRooms.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    joinedAt: created(),
+    status: text("status").notNull().default("JOINED"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    score: real("score"),
+    correctCount: integer("correct_count").notNull().default(0),
+    wrongCount: integer("wrong_count").notNull().default(0),
+    unansweredCount: integer("unanswered_count").notNull().default(0),
+    rank: integer("rank"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("exam_pk_participants_room_user_uq").on(t.roomId, t.userId), index("exam_pk_participants_room_idx").on(t.roomId, t.joinedAt), index("exam_pk_participants_user_idx").on(t.userId, t.joinedAt)],
+);
+
+export const examPkQuestions = pgTable(
+  "exam_pk_questions",
+  {
+    id: id(),
+    roomId: uuid("room_id").notNull().references(() => examPkRooms.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "restrict" }),
+    orderIndex: integer("order_index").notNull(),
+    questionVersion: integer("question_version").notNull().default(1),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (t) => [uniqueIndex("exam_pk_questions_room_order_uq").on(t.roomId, t.orderIndex), uniqueIndex("exam_pk_questions_room_question_uq").on(t.roomId, t.questionId), index("exam_pk_questions_room_idx").on(t.roomId, t.orderIndex)],
+);
+
+export const examPkAnswers = pgTable(
+  "exam_pk_answers",
+  {
+    id: id(),
+    roomId: uuid("room_id").notNull().references(() => examPkRooms.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull().references(() => examPkQuestions.id, { onDelete: "cascade" }),
+    answer: jsonb("answer").$type<string[]>().notNull().default([]),
+    isCorrect: boolean("is_correct").notNull().default(false),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    timeSpent: integer("time_spent").notNull().default(0),
+    changedCount: integer("changed_count").notNull().default(0),
+    updatedAt: updated(),
+  },
+  (t) => [uniqueIndex("exam_pk_answers_room_user_question_uq").on(t.roomId, t.userId, t.questionId), index("exam_pk_answers_room_idx").on(t.roomId, t.updatedAt), index("exam_pk_answers_user_idx").on(t.userId, t.roomId)],
+);
+
+export const examPkAnswerHistory = pgTable(
+  "exam_pk_answer_history",
+  {
+    id: id(),
+    roomId: uuid("room_id").notNull().references(() => examPkRooms.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull().references(() => examPkQuestions.id, { onDelete: "cascade" }),
+    oldAnswer: jsonb("old_answer").$type<string[]>().notNull().default([]),
+    newAnswer: jsonb("new_answer").$type<string[]>().notNull().default([]),
+    changedAt: created(),
+  },
+  (t) => [index("exam_pk_answer_history_room_idx").on(t.roomId, t.changedAt), index("exam_pk_answer_history_user_idx").on(t.userId, t.roomId)],
+);
+
 export const examPrepImportJobs = pgTable(
   "exam_prep_import_jobs",
   {
