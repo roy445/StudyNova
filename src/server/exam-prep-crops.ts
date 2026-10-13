@@ -72,6 +72,10 @@ export async function cropExamPrepDraftAssets(draftId: string, userId: string) {
   const existingMetadata = draft.sourceMetadata && typeof draft.sourceMetadata === "object" ? draft.sourceMetadata as Record<string, unknown> : {};
   const existingIds = Array.isArray(existingMetadata.assetObjectIds) ? existingMetadata.assetObjectIds.filter((id): id is string => typeof id === "string") : [];
   if (existingMetadata.cropStatus === "ready" && existingIds.length) return { status: "ready" as const, assetObjectIds: existingIds, regions: existingMetadata.cropRegions ?? [] };
+  if (!rawRegions.length) {
+    await db.update(examPrepQuestionDrafts).set({ sourceMetadata: { ...existingMetadata, cropStatus: "not_needed", cropRegions: [], assetObjectIds: [] }, updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
+    return { status: "not_needed" as const, assetObjectIds: [], regions: [] };
+  }
 
   const questionRegions = rawRegions.filter((region) => region.role === "question" || !region.role);
   const figureRegions = rawRegions.filter((region) => region.role && region.role !== "question");
