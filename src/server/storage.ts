@@ -143,6 +143,11 @@ export async function readObject(objectId: string): Promise<{ data: Buffer; mime
     return { data: Buffer.from(bytes), mimeType: row.mimeType, filename: row.filename, userId: row.userId };
   }
   if (row.driver === "blob") {
+    if (/^https?:\/\//i.test(row.storageKey)) {
+      const response = await fetch(row.storageKey);
+      if (!response.ok) throw fail("FILE_READ_FAILED");
+      return { data: Buffer.from(await response.arrayBuffer()), mimeType: row.mimeType, filename: row.filename, userId: row.userId };
+    }
     const result = await getBlob(row.storageKey, { access: "private" });
     if (!result?.stream) throw fail("FILE_READ_FAILED");
     return { data: Buffer.from(await new Response(result.stream).arrayBuffer()), mimeType: row.mimeType, filename: row.filename, userId: row.userId };
