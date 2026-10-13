@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { examVocabularyImportJobs, examVocabularyItems } from "@/db/schema";
 import { readObject } from "./storage";
 import { runAiJson } from "./ai";
+import { normalizeKkPhonetic } from "./pronunciation";
 
 export type ExtractedWord = { word?: string; meaning?: string; partOfSpeech?: string; phonetic?: string; phrase?: string; phraseMeaning?: string; example?: string; exampleZh?: string };
 
@@ -55,7 +56,7 @@ export async function processExamVocabularyImport(jobId: string) {
     const { data } = await runAiJson<{ words?: ExtractedWord[]; readable?: boolean; message?: string }>({
       feature: "learning_vocabulary_ocr",
       userId: job.uploadedBy,
-      system: "你是高中英文段考單字 OCR 專家。請辨識圖片或 PDF 中所有單字與片語，不能只取幾個。只回傳 JSON：{words:[{word,meaning,partOfSpeech,phonetic,phrase,phraseMeaning,example,exampleZh}],readable:true}。word 必須是英文單字或片語的核心形式；中文意義保留繁體中文；看不清楚的項目不要猜。若圖片不是單字資料，words 回傳空陣列。",
+      system: "你是高中英文段考單字 OCR 專家。請辨識圖片或 PDF 中所有單字與片語，不能只取幾個。只回傳 JSON：{words:[{word,meaning,partOfSpeech,phonetic,phrase,phraseMeaning,example,exampleZh}],readable:true}。phonetic 必須是台灣常用 KK 音標，使用 Unicode 原始字元，可用 / / 或 [ ] 包住；不要輸出 IPA 標籤、KK音標文字、HTML、\\uXXXX、亂碼或不確定結果，看不清楚時 phonetic 請留空。word 必須是英文單字或片語的核心形式；中文意義保留繁體中文；看不清楚的項目不要猜。若圖片不是單字資料，words 回傳空陣列。",
       parts: [{ kind: "image", mimeType: object.mimeType, base64: object.data.toString("base64") }],
       maxOutputTokens: 6000,
     }, { words: [], readable: true });
@@ -66,7 +67,7 @@ export async function processExamVocabularyImport(jobId: string) {
       word: String(item.word ?? "").trim().slice(0, 160),
       meaning: primaryMeaning(item.meaning),
       partOfSpeech: String(item.partOfSpeech ?? "").trim().slice(0, 80),
-      phonetic: String(item.phonetic ?? "").trim().slice(0, 100),
+      phonetic: normalizeKkPhonetic(item.phonetic).slice(0, 100),
       phrase: String(item.phrase ?? "").trim().slice(0, 240),
       phraseMeaning: String(item.phraseMeaning ?? "").trim().slice(0, 300),
       example: String(item.example ?? "").trim().slice(0, 500),

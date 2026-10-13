@@ -10,6 +10,7 @@ import { deleteObject, putObject, readObject } from "../storage";
 import { embedCjkFont, embedMathFont, sanitizeTextForCjkPdf } from "../cjk-font";
 import { writeAudit } from "../audit";
 import { queue } from "../queue";
+import { normalizeKkPhonetic } from "../pronunciation";
 
 const setId = z.string().uuid();
 const unitId = z.string().uuid();
@@ -178,7 +179,7 @@ export const routes: RouteDef[] = [
         const filename = item.sourceFile || "未命名來源";
         const current = sourceMap.get(filename) ?? { filename, jobId: "", itemCount: 0, objectIds: [], status: "completed", progress: 100, accepted: 0, skipped: 0, errorMessage: "", items: [] };
         current.itemCount += 1;
-        current.items.push({ id: item.id, word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech, phonetic: item.phonetic, phrase: item.phrase, phraseMeaning: item.phraseMeaning, example: item.example, exampleZh: item.exampleZh, importantInfo: typeof item.metadata?.importantInfo === "string" ? item.metadata.importantInfo : "" });
+        current.items.push({ id: item.id, word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech, phonetic: normalizeKkPhonetic(item.phonetic), phrase: item.phrase, phraseMeaning: item.phraseMeaning, example: item.example, exampleZh: item.exampleZh, importantInfo: typeof item.metadata?.importantInfo === "string" ? item.metadata.importantInfo : "" });
         const objectId = typeof item.metadata?.objectId === "string" ? item.metadata.objectId : "";
         if (objectId && !current.objectIds.includes(objectId)) current.objectIds.push(objectId);
         sourceMap.set(filename, current);
@@ -235,7 +236,7 @@ export const routes: RouteDef[] = [
       word: normalizedWord,
       meaning: body.meaning,
       partOfSpeech: body.partOfSpeech,
-      phonetic: body.phonetic,
+      phonetic: normalizeKkPhonetic(body.phonetic),
       phrase: body.phrase,
       phraseMeaning: body.phraseMeaning,
       example: body.example,

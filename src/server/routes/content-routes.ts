@@ -34,6 +34,7 @@ import { recordStudy } from "./learning-routes";
 import { subjectStrategy } from "../subject-strategies";
 import { naturalExamplePrompt } from "../vocabulary-quality";
 import { extractPdfTextPages } from "../pdf-question-extract";
+import { normalizeKkPhonetic } from "../pronunciation";
 export async function extractText(mime: string, data: Buffer, userId: string, subject = "其他"): Promise<string> {
   if (mime.startsWith("text/") || mime === "application/json") return sanitizeText(data.toString("utf8"));
   if (mime === "application/pdf") {
@@ -671,7 +672,7 @@ export const contentRoutes: RouteDef[] = [
           const meanings = Array.isArray(item.meanings) ? item.meanings : Array.isArray(language.meanings) ? language.meanings : [];
           const meaning = String(item.meaning ?? (meanings[0] && typeof meanings[0] === "object" ? (meanings[0] as Record<string, unknown>).meaning : "") ?? "").slice(0, 1000);
           const normalizedWord = word.toLocaleLowerCase("en-US");
-          const inserted = await db.insert(userVocabularies).values({ userId: user.userId, word, normalizedWord, partOfSpeech: String(item.partOfSpeech ?? "").slice(0, 80), meaning, phonetic: String(item.phonetic ?? "").slice(0, 160), example: String(item.example ?? "").slice(0, 1000), exampleZh: String(item.exampleZh ?? "").slice(0, 1000), analysis: item, sourceDocumentId: doc.id, sourceObjectId: sourcePage?.objectId ?? sourceObjectId }).onConflictDoNothing().returning({ id: userVocabularies.id });
+          const inserted = await db.insert(userVocabularies).values({ userId: user.userId, word, normalizedWord, partOfSpeech: String(item.partOfSpeech ?? "").slice(0, 80), meaning, phonetic: normalizeKkPhonetic(item.phonetic).slice(0, 160), example: String(item.example ?? "").slice(0, 1000), exampleZh: String(item.exampleZh ?? "").slice(0, 1000), analysis: item, sourceDocumentId: doc.id, sourceObjectId: sourcePage?.objectId ?? sourceObjectId }).onConflictDoNothing().returning({ id: userVocabularies.id });
           if (inserted.length) saved += 1; else duplicates += 1;
         } else if (body.action === "note") {
           const title = String(item.label ?? item.title ?? `鏡頭分析 ${new Date().toLocaleDateString("zh-TW")}`).slice(0, 120);
@@ -748,7 +749,7 @@ export const contentRoutes: RouteDef[] = [
         solve: '逐題解題並說明步驟。JSON：{"title":"","body":"markdown"}',
         keypoints: '抓出重點條列。JSON：{"title":"重點整理","body":"markdown"}',
         flashcards: '製作記憶卡。JSON：{"cards":[{"front":"","back":""}]}',
-        vocabulary: `找出文字中的重要英文單字與片語，並為每個單字寫自然、完整、可直接學習的英文情境例句。${naturalExamplePrompt()} JSON：{"vocabulary":[{"word":"","meaning":"","partOfSpeech":"","phonetic":"","example":"","exampleZh":""}]}`,
+        vocabulary: `找出文字中的重要英文單字與片語，並為每個單字寫自然、完整、可直接學習的英文情境例句。音標欄位只填可靠的 Unicode KK 音標，可用 / / 或 [ ] 包住；不要填 IPA/KK 標籤、HTML、\\uXXXX、亂碼或猜測，不確定時留空。${naturalExamplePrompt()} JSON：{"vocabulary":[{"word":"","meaning":"","partOfSpeech":"","phonetic":"","example":"","exampleZh":""}]}`,
         translate: '翻譯成中英對照。JSON：{"title":"翻譯","body":"markdown"}',
         wrong: '找出可能的易錯點與陷阱。JSON：{"title":"易錯提醒","body":"markdown"}',
         plan: '建立 3 天複習計畫。JSON：{"title":"複習計畫","body":"markdown","tasks":["任務"]}',
@@ -820,7 +821,7 @@ stage = "ai_provider";
             normalizedWord: word.toLocaleLowerCase("en-US"),
             partOfSpeech: String(item.partOfSpeech ?? "").slice(0, 80),
             meaning: String(item.meaning ?? "").slice(0, 1000),
-            phonetic: String(item.phonetic ?? "").slice(0, 160),
+            phonetic: normalizeKkPhonetic(item.phonetic).slice(0, 160),
             example: String(item.example ?? "").slice(0, 1000),
             exampleZh: String(item.exampleZh ?? "").slice(0, 1000),
             analysis: item,
@@ -907,7 +908,7 @@ stage = "ai_provider";
         normalizedWord: word.toLocaleLowerCase("en-US"),
         meaning: body.meaning,
         partOfSpeech: body.partOfSpeech,
-        phonetic: body.phonetic,
+        phonetic: normalizeKkPhonetic(body.phonetic),
         example: body.example,
         exampleZh: body.exampleZh,
         analysis: body.analysis ?? {},

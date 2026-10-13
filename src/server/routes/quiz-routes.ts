@@ -251,16 +251,41 @@ export async function generateQuestions(params: {
   return ids;
 }
 
-function isCorrect(type: string, expected: string[], got: string[]) {
-  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+export function canonicalQuizAnswer(value: string, options: string[]): string {
+  const norm = normalizeQuizOption(value);
+  const optionIndex = options.findIndex((option) => {
+    const optionNorm = normalizeQuizOption(option);
+    const withoutLabel = optionNorm.replace(/^[a-z][\s.、:：)）-]+/i, "");
+    return optionNorm === norm || withoutLabel === norm;
+  });
+  if (optionIndex >= 0) return `option:${optionIndex}`;
+  const label = norm.match(/^(?:option|answer|選項)?([a-z])$/i)?.[1];
+  if (label) {
+    const index = label.toUpperCase().charCodeAt(0) - 65;
+    if (index >= 0 && index < options.length) return `option:${index}`;
+  }
+  const ordinal = norm.match(/^(?:option|answer|選項)?(\d+)$/i)?.[1];
+  if (ordinal) {
+    const index = Number(ordinal) - 1;
+    if (index >= 0 && index < options.length) return `option:${index}`;
+  }
+  return `text:${norm}`;
+}
+
+export function isCorrect(type: string, expected: string[], got: string[], options: string[] = []) {
+  const norm = (s: string) => canonicalQuizAnswer(s, options);
   if (type === "multiple") {
-    const a = [...expected].map(norm).sort();
-    const b = [...got].map(norm).sort();
+    const a = [...new Set(expected.map(norm))].sort();
+    const b = [...new Set(got.map(norm))].sort();
     return a.length === b.length && a.every((v, i) => v === b[i]);
   }
   if (type === "fill" || type === "short") {
     if (!got[0]) return false;
-    return expected.some((e) => norm(e) === norm(got[0]) || norm(got[0]).includes(norm(e)));
+    const gotValue = normalizeQuizOption(got[0]);
+    return expected.some((e) => {
+      const expectedValue = normalizeQuizOption(e);
+      return expectedValue === gotValue || gotValue.includes(expectedValue);
+    });
   }
   return Boolean(got[0]) && expected.some((e) => norm(e) === norm(got[0]));
 }
@@ -546,7 +571,7 @@ export const routes: RouteDef[] = [
       const review: Array<Record<string, unknown>> = [];
       for (const q of qs) {
         const got = saved.find((s) => s.questionId === q.id)?.response ?? [];
-        const ok = isCorrect(q.type, q.answer, got);
+        const ok = isCorrect(q.type, q.answer, got, normalizeQuestionOptions(q.options));
         if (ok) correct += 1;
         else await addWrongQuestion(user.userId, q.id, q.subject, "測驗答錯");
         await db
@@ -605,7 +630,7 @@ export const routes: RouteDef[] = [
       const quiz = (await db.select().from(quizzes).where(eq(quizzes.id, attempt.quizId)).limit(1))[0];
       const question = (await db.select().from(questions).where(eq(questions.id, body.questionId)).limit(1))[0];
       if (!quiz || !question || !quiz.questionIds.includes(question.id)) throw notFound("找不到這一題");
-      const isCorrectAnswer = isCorrect(question.type, question.answer, body.response);
+      const isCorrectAnswer = isCorrect(question.type, question.answer, body.response, normalizeQuestionOptions(question.options));
       await db.insert(answers).values({ attemptId: attempt.id, questionId: question.id, response: body.response, isCorrect: isCorrectAnswer, checkedAt: new Date() }).onConflictDoUpdate({ target: [answers.attemptId, answers.questionId], set: { response: body.response, isCorrect: isCorrectAnswer, checkedAt: new Date(), updatedAt: new Date() } });
       return { isCorrect: isCorrectAnswer, answer: question.answer, explanation: question.explanation };
     },

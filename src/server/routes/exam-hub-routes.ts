@@ -12,6 +12,7 @@ import { extractText } from "./content-routes";
 import { extractPdfQuestionChunks, parseNumberedChoiceQuestionText, renderPdfImagePages } from "../pdf-question-extract";
 import { runAiJson } from "../ai";
 import { recordQuestionAnswer, recordQuestionAppearance } from "../question-stats";
+import { normalizeKkPhonetic } from "../pronunciation";
 
 function openWindow() {
   const now = new Date();
@@ -240,8 +241,8 @@ export const routes: RouteDef[] = [
       }
     }
     if (!text && !visionParts.length) throw fail("SYS_CONFLICT", { message: "這份檔案尚未讀到文字或可分析頁面，無法分析單字。" });
-    const result = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_vocabulary_extract", userId: admin.userId, system: "你是台灣國高中英文單字範圍整理器。請閱讀原卷影像或文字，只擷取真正的英文單字，不要把句子、題號、選項或功能詞整段當單字。輸出 JSON 陣列，每項包含 word、meaning、partOfSpeech、example、exampleZh、phonetic、collocations、phrases、synonyms、antonyms。", parts: visionParts.length ? [{ kind: "text", text: "請從這份段考試卷中整理值得複習的英文單字。" }, ...visionParts] : [{ kind: "text", text: text.slice(0, 60_000) }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
-    const rows = result.data.map((row) => ({ hubId: ctx.params.id, word: String(row.word ?? "").trim(), normalizedWord: String(row.word ?? "").trim().toLocaleLowerCase("en-US"), meaning: String(row.meaning ?? ""), partOfSpeech: String(row.partOfSpeech ?? ""), example: String(row.example ?? ""), exampleZh: String(row.exampleZh ?? ""), phonetic: String(row.phonetic ?? ""), collocations: Array.isArray(row.collocations) ? row.collocations.map(String) : [], phrases: Array.isArray(row.phrases) ? row.phrases.map(String) : [], synonyms: Array.isArray(row.synonyms) ? row.synonyms.map(String) : [], antonyms: Array.isArray(row.antonyms) ? row.antonyms.map(String) : [], published: true })).filter((row) => /^[A-Za-z][A-Za-z' -]{1,80}$/.test(row.word));
+    const result = await runAiJson<Array<Record<string, unknown>>>({ feature: "exam_vocabulary_extract", userId: admin.userId, system: "你是台灣國高中英文單字範圍整理器。請閱讀原卷影像或文字，只擷取真正的英文單字，不要把句子、題號、選項或功能詞整段當單字。輸出 JSON 陣列，每項包含 word、meaning、partOfSpeech、example、exampleZh、phonetic、collocations、phrases、synonyms、antonyms。phonetic 必須是台灣常用 KK 音標，使用 Unicode 原始字元，可用 / / 或 [ ] 包住；不要輸出 IPA 標籤、KK音標文字、HTML、\\uXXXX、亂碼或不確定結果，看不清楚時 phonetic 請留空。", parts: visionParts.length ? [{ kind: "text", text: "請從這份段考試卷中整理值得複習的英文單字。" }, ...visionParts] : [{ kind: "text", text: text.slice(0, 60_000) }], maxOutputTokens: 10_000, temperature: 0.05 }, []);
+    const rows = result.data.map((row) => ({ hubId: ctx.params.id, word: String(row.word ?? "").trim(), normalizedWord: String(row.word ?? "").trim().toLocaleLowerCase("en-US"), meaning: String(row.meaning ?? ""), partOfSpeech: String(row.partOfSpeech ?? ""), example: String(row.example ?? ""), exampleZh: String(row.exampleZh ?? ""), phonetic: normalizeKkPhonetic(row.phonetic), collocations: Array.isArray(row.collocations) ? row.collocations.map(String) : [], phrases: Array.isArray(row.phrases) ? row.phrases.map(String) : [], synonyms: Array.isArray(row.synonyms) ? row.synonyms.map(String) : [], antonyms: Array.isArray(row.antonyms) ? row.antonyms.map(String) : [], published: true })).filter((row) => /^[A-Za-z][A-Za-z' -]{1,80}$/.test(row.word));
     const inserted = rows.length ? await db.insert(examHubWords).values(rows).onConflictDoNothing().returning() : [];
     return { analyzed: rows.length, added: inserted.length, words: inserted };
   }}),
