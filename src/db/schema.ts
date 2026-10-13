@@ -909,6 +909,7 @@ export const answers = pgTable(
     questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
     response: jsonb("response").$type<string[]>().notNull().default([]),
     isCorrect: boolean("is_correct").notNull().default(false),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
     updatedAt: updated(),
   },
   (t) => [uniqueIndex("answers_attempt_question_uq").on(t.attemptId, t.questionId)],

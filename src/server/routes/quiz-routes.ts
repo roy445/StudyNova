@@ -437,7 +437,11 @@ export const routes: RouteDef[] = [
         })),
         attempt: attempt ?? null,
         reviewAvailable,
-        saved: saved.map((s) => ({ questionId: s.questionId, response: s.response, isCorrect: reviewAvailable ? s.isCorrect : undefined })),
+        saved: saved.map((s) => ({ questionId: s.questionId, response: s.response, isCorrect: reviewAvailable ? s.isCorrect : undefined, checkedAt: s.checkedAt })),
+        checkedReviews: saved.filter((s) => s.checkedAt).map((s) => {
+          const q = ordered.find((item) => item!.id === s.questionId)!;
+          return { questionId: q.id, stem: q.stem, options: normalizeQuestionOptions(q.options), answer: q.answer, explanation: q.explanation, response: s.response, isCorrect: s.isCorrect };
+        }),
         review: reviewAvailable ? ordered.map((q) => {
           const savedAnswer = saved.find((s) => s.questionId === q!.id);
           return { questionId: q!.id, stem: q!.stem, options: normalizeQuestionOptions(q!.options), answer: q!.answer, explanation: q!.explanation, response: savedAnswer?.response ?? [], isCorrect: savedAnswer?.isCorrect ?? false };
@@ -580,7 +584,7 @@ export const routes: RouteDef[] = [
       const question = (await db.select().from(questions).where(eq(questions.id, body.questionId)).limit(1))[0];
       if (!quiz || !question || !quiz.questionIds.includes(question.id)) throw notFound("找不到這一題");
       const isCorrectAnswer = isCorrect(question.type, question.answer, body.response);
-      await db.insert(answers).values({ attemptId: attempt.id, questionId: question.id, response: body.response }).onConflictDoUpdate({ target: [answers.attemptId, answers.questionId], set: { response: body.response, updatedAt: new Date() } });
+      await db.insert(answers).values({ attemptId: attempt.id, questionId: question.id, response: body.response, isCorrect: isCorrectAnswer, checkedAt: new Date() }).onConflictDoUpdate({ target: [answers.attemptId, answers.questionId], set: { response: body.response, isCorrect: isCorrectAnswer, checkedAt: new Date(), updatedAt: new Date() } });
       return { isCorrect: isCorrectAnswer, answer: question.answer, explanation: question.explanation };
     },
   }),
