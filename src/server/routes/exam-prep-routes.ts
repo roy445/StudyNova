@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { answers, examPrepActivities, examPrepSubjects, questions, quizAttempts, quizzes, userSettings, users } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
+import { isHiddenEnglishListeningQuestion } from "../exam-prep-question-filter";
 
 const statusValues = ["draft", "analyzing", "pending_review", "scheduled", "open", "closed", "archived"] as const;
 type ActivityStatus = (typeof statusValues)[number];
@@ -146,6 +147,7 @@ export const routes: RouteDef[] = [
       if (!bankIds.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前還沒有正式題庫。" });
       const rawBankQuestions = await db.select({ id: questions.id, createdAt: questions.createdAt, metadata: questions.metadata }).from(questions).where(bankIds.length === 1 ? eq(questions.bankId, bankIds[0]) : inArray(questions.bankId, bankIds)).orderBy(asc(questions.createdAt));
       const bankQuestions = rawBankQuestions.filter((question) => {
+        if (isHiddenEnglishListeningQuestion(question)) return false;
         const metadata = question.metadata && typeof question.metadata === "object" ? question.metadata as Record<string, unknown> : {};
         const cropStatus = typeof metadata.cropStatus === "string" ? metadata.cropStatus : "";
         if (["queued", "analyzing", "manual_review", "failed"].includes(cropStatus)) return false;
@@ -158,10 +160,11 @@ export const routes: RouteDef[] = [
       });
       if (!bankQuestions.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前沒有可作答題目。" });
       const existing = (await db.select().from(quizzes).where(and(eq(quizzes.userId, user.userId), eq(quizzes.source, `exam_prep:${ctx.params.id}`))).orderBy(desc(quizzes.createdAt)).limit(1))[0];
-      const existingQuestionCount = existing?.questionIds.length ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, result.activity.questionBankId!), inArray(questions.id, existing.questionIds))))[0]?.count ?? 0) : 0;
+      const existingQuestionCount = existing?.questionIds.length ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(inArray(questions.bankId, bankIds), inArray(questions.id, existing.questionIds))))[0]?.count ?? 0) : 0;
       // A previous quiz can outlive a question-bank refresh. Never return that
       // stale quiz: the client would resume successfully but receive no items.
-      const reusable = existing && existingQuestionCount > 0 ? existing : null;
+      const currentQuestionIds = new Set(bankQuestions.map((question) => question.id));
+      const reusable = existing && existingQuestionCount === bankQuestions.length && existing.questionIds.length === bankQuestions.length && existing.questionIds.every((questionId) => currentQuestionIds.has(questionId)) ? existing : null;
       const quiz = reusable ?? (await db.insert(quizzes).values({ userId: user.userId, title: result.activity.name, subject: result.subjects.map((subject) => subject.subject).join("、") || "綜合", difficulty: "exam", source: `exam_prep:${ctx.params.id}`, timeLimitSec: Math.max(600, bankQuestions.length * 90), questionIds: bankQuestions.map((question) => question.id), expiresAt: result.activity.closeAt ?? new Date(Date.now() + 30 * 86_400_000) }).returning())[0];
       return { quizId: quiz.id, questionCount: quiz.questionIds.length, title: quiz.title };
     },

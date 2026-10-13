@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { examPkAnswerHistory, examPkAnswers, examPkParticipants, examPkQuestions, examPkRooms, examPrepActivities, examPrepSubjects, questions } from "@/db/schema";
 import { fail, notFound } from "../core";
 import { route, type RouteDef } from "../router";
+import { isHiddenEnglishListeningQuestion } from "../exam-prep-question-filter";
 
 const roomInput = z.object({
   activityId: z.string().uuid(),
@@ -95,7 +96,7 @@ export const routes: RouteDef[] = [
       if (!subject) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個段考活動尚未設定科目。" });
       const bankId = subject.questionBankId ?? activity.questionBankId;
       if (!bankId) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個科目尚未綁定可用題庫。" });
-      const bankQuestions = await db.select({ id: questions.id, subject: questions.subject, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, difficulty: questions.difficulty }).from(questions).where(and(eq(questions.bankId, bankId), eq(questions.status, "published"))).orderBy(sql`random()`).limit(50);
+      const bankQuestions = (await db.select({ id: questions.id, subject: questions.subject, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, difficulty: questions.difficulty, metadata: questions.metadata }).from(questions).where(and(eq(questions.bankId, bankId), eq(questions.status, "published"))).orderBy(sql`random()`).limit(100)).filter((question) => !isHiddenEnglishListeningQuestion(question)).slice(0, 50);
       if (!bankQuestions.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個科目目前沒有已發布題目，請先完成題庫審核。" });
       const room = await db.transaction(async (tx) => {
         // Serialize room creation per user so two fast clicks cannot bypass the one-room rule.
