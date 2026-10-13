@@ -43,7 +43,7 @@ async function statePayload(roomId: string) {
   const room = (await db.select().from(examPkRooms).where(eq(examPkRooms.id, roomId)).limit(1))[0];
   if (!room) return null;
   const participants = (await db.execute(sql`select p.user_id as "userId", u.display_name as "displayName", u.avatar_seed as "avatarSeed", p.status, p.score, p.correct_count as "correctCount", p.wrong_count as "wrongCount", p.unanswered_count as "unansweredCount", p.last_seen_at as "lastSeenAt" from exam_pk_participants p join users u on u.id = p.user_id where p.room_id = ${roomId} order by p.score desc nulls last, p.joined_at`)).rows as Array<{ userId: string; displayName: string; avatarSeed: string; status: string; score: number | null; correctCount: number; wrongCount: number; unansweredCount: number; lastSeenAt: string | null }>;
-  return { room: { id: room.id, roomCode: room.roomCode, hostUserId: room.hostUserId, status: room.status, startedAt: room.startedAt, endsAt: room.endsAt, finishedAt: room.finishedAt, maxPlayers: room.maxPlayers, durationMinutes: room.durationMinutes, subject: room.subject, scope: room.scope }, participants };
+  return { room: { id: room.id, activityId: room.activityId, roomCode: room.roomCode, hostUserId: room.hostUserId, status: room.status, startedAt: room.startedAt, endsAt: room.endsAt, finishedAt: room.finishedAt, maxPlayers: room.maxPlayers, durationMinutes: room.durationMinutes, subject: room.subject, scope: room.scope }, participants };
 }
 
 function sseRoomResponse(roomId: string, request: Request) {
@@ -71,6 +71,20 @@ function sseRoomResponse(roomId: string, request: Request) {
 
 export const routes: RouteDef[] = [
   route({
+    method: "GET", path: "/exam-pk/rooms/mine", auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const rows = (await db.execute(sql`select r.id, r.activity_id as "activityId", r.room_code as "roomCode", r.host_user_id as "hostUserId", r.subject, r.scope, r.status, r.max_players as "maxPlayers", r.duration_minutes as "durationMinutes", r.created_at as "createdAt", r.started_at as "startedAt", r.ends_at as "endsAt", a.name as "activityName", p.status as "participantStatus", p.joined_at as "joinedAt"
+        from exam_pk_rooms r
+        join exam_pk_participants p on p.room_id = r.id
+        join exam_prep_activities a on a.id = r.activity_id
+        where p.user_id = ${user.userId}
+        order by case when r.status in ('WAITING', 'RUNNING') then 0 else 1 end, r.created_at desc
+        limit 30`)).rows;
+      return { rooms: rows };
+    },
+  }),
+  route({
     method: "POST", path: "/exam-pk/rooms", auth: "user", rate: { limit: 12, windowSec: 60 },
     handler: async (ctx) => {
       const user = ctx.requireUser();
@@ -84,6 +98,10 @@ export const routes: RouteDef[] = [
       const bankQuestions = await db.select({ id: questions.id, subject: questions.subject, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, difficulty: questions.difficulty }).from(questions).where(and(eq(questions.bankId, bankId), eq(questions.status, "published"))).orderBy(sql`random()`).limit(50);
       if (!bankQuestions.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個科目目前沒有已發布題目，請先完成題庫審核。" });
       const room = await db.transaction(async (tx) => {
+        // Serialize room creation per user so two fast clicks cannot bypass the one-room rule.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${user.userId}))`);
+        const existing = (await tx.select({ id: examPkRooms.id, roomCode: examPkRooms.roomCode }).from(examPkRooms).where(and(eq(examPkRooms.hostUserId, user.userId), inArray(examPkRooms.status, ["WAITING", "RUNNING"]))).orderBy(desc(examPkRooms.createdAt)).limit(1))[0];
+        if (existing) throw fail("SYS_CONFLICT", { message: `你已經有一間進行中的 PK 房（房號 ${existing.roomCode}），請先使用「我的房間」回到該房。` });
         let code = roomCode();
         for (let attempt = 0; attempt < 5; attempt += 1) {
           const exists = (await tx.select({ id: examPkRooms.id }).from(examPkRooms).where(eq(examPkRooms.roomCode, code)).limit(1))[0];
@@ -95,7 +113,7 @@ export const routes: RouteDef[] = [
         await tx.insert(examPkQuestions).values(bankQuestions.map((question, index) => ({ roomId: created.id, questionId: question.id, orderIndex: index, snapshot: { subject: question.subject, type: question.type, stem: question.stem, options: question.options, answer: question.answer, explanation: question.explanation, difficulty: question.difficulty } })));
         return created;
       });
-      return { roomId: room.id, roomCode: room.roomCode, host: true };
+      return { roomId: room.id, roomCode: room.roomCode, activityId: room.activityId, host: true };
     },
   }),
   route({
@@ -112,7 +130,7 @@ export const routes: RouteDef[] = [
       const participantCount = Number((await db.select({ value: count() }).from(examPkParticipants).where(eq(examPkParticipants.roomId, room.id)))[0]?.value ?? 0);
       if (participantCount >= room.maxPlayers) throw fail("SYS_CONFLICT", { message: "這間房已達人數上限。" });
       await db.insert(examPkParticipants).values({ roomId: room.id, userId: user.userId, status: "JOINED", lastSeenAt: new Date() }).onConflictDoUpdate({ target: [examPkParticipants.roomId, examPkParticipants.userId], set: { status: "JOINED", lastSeenAt: new Date() } });
-      return { joined: true, roomId: room.id };
+      return { joined: true, roomId: room.id, activityId: room.activityId };
     },
   }),
   route({
@@ -125,7 +143,7 @@ export const routes: RouteDef[] = [
       const participantCount = Number((await db.select({ value: count() }).from(examPkParticipants).where(eq(examPkParticipants.roomId, room.id)))[0]?.value ?? 0);
       if (participantCount >= room.maxPlayers) throw fail("SYS_CONFLICT", { message: "這間房已達人數上限。" });
       await db.insert(examPkParticipants).values({ roomId: room.id, userId: user.userId, status: "JOINED", lastSeenAt: new Date() }).onConflictDoUpdate({ target: [examPkParticipants.roomId, examPkParticipants.userId], set: { status: "JOINED", lastSeenAt: new Date() } });
-      return { joined: true, roomId: room.id };
+      return { joined: true, roomId: room.id, activityId: room.activityId };
     },
   }),
   route({

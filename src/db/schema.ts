@@ -2107,7 +2107,7 @@ export const proRenewalRequests = pgTable(
   {
     id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
     wantsRenewal: boolean("wants_renewal").notNull(), reason: text("reason").notNull().default(""),
-    requestedFeatures: jsonb("requested_features").$type<string[]>().notNull().default([]), otherFeedback: text("other_feedback").notNull().default(""), submittedAt: created(), updatedAt: updated(),
+    requestedFeatures: jsonb("requested_features").$type<string[]>().notNull().default([]), otherFeedback: text("other_feedback").notNull().default(""), submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: updated(),
   },
   (t) => [uniqueIndex("pro_renewal_request_user_uq").on(t.userId), index("pro_renewal_request_date_idx").on(t.submittedAt)],
 );

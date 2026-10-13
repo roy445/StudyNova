@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, Field, Input, Select, Skeleton, useToast } from "@/components/ui";
 import { apiGet, apiPost, useApi } from "@/lib/api";
 
 type Subject = { id: string; subject: string; units: string[] };
 type ActivityResponse = { activity: { id: string; name: string; scope: string; status: string; effectiveStatus: string }; subjects: Subject[] };
-type RoomState = { room: { id: string; roomCode: string; hostUserId: string; status: "WAITING" | "RUNNING" | "FINISHED" | "CANCELLED"; startedAt: string | null; endsAt: string | null; maxPlayers: number; durationMinutes: number; subject: string; scope: string }; participants: Array<{ userId: string; displayName: string; avatarSeed: string; status: string; score: number | null; correctCount: number; wrongCount: number; unansweredCount: number; lastSeenAt: string | null }> };
+type RoomState = { room: { id: string; activityId: string; roomCode: string; hostUserId: string; status: "WAITING" | "RUNNING" | "FINISHED" | "CANCELLED"; startedAt: string | null; endsAt: string | null; maxPlayers: number; durationMinutes: number; subject: string; scope: string }; participants: Array<{ userId: string; displayName: string; avatarSeed: string; status: string; score: number | null; correctCount: number; wrongCount: number; unansweredCount: number; lastSeenAt: string | null }> };
 type RoomDetail = { room: RoomState["room"]; self: { userId: string }; participants: RoomState["participants"]; questions: Array<{ id: string; orderIndex: number; snapshot: { stem?: string; options?: string[]; type?: string; explanation?: string } }>; answers: Array<{ questionId: string; answer: string[]; isCorrect: boolean; submittedAt: string | null }> };
 
 export default function ExamPrepPkPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const activity = useApi<ActivityResponse>(id ? `/exam-prep/${id}` : null);
   const [subjectId, setSubjectId] = useState("");
@@ -38,18 +39,42 @@ export default function ExamPrepPkPage() {
     setBusy(true);
     try { const result = await apiPost<{ roomId: string }>(`/exam-pk/room-codes/${roomCode.trim()}/join`, {}); await loadRoom(result.roomId); toast.push("success", "已加入 PK 房"); } catch (error) { toast.push("error", error instanceof Error ? error.message : "加入 PK 房失敗"); } finally { setBusy(false); }
   }
-  async function loadRoom(roomId: string) {
-    try { const detail = await apiGet<RoomDetail>(`/exam-pk/rooms/${roomId}`, { fresh: true }); setRoom(detail); setState({ room: detail.room, participants: detail.participants }); setSelected(Object.fromEntries(detail.answers.map((item) => [item.questionId, item.answer]))); setAnswered(Object.fromEntries(detail.answers.filter((item) => item.submittedAt).map((item) => [item.questionId, true]))); } catch (error) { toast.push("error", error instanceof Error ? error.message : "無法載入 PK 房"); }
+  async function loadRoom(roomId: string, silent = false) {
+    try {
+      const detail = await apiGet<RoomDetail>(`/exam-pk/rooms/${roomId}`, { fresh: true });
+      setRoom(detail);
+      setState({ room: detail.room, participants: detail.participants });
+      setSelected(Object.fromEntries(detail.answers.map((item) => [item.questionId, item.answer])));
+      setAnswered(Object.fromEntries(detail.answers.filter((item) => item.submittedAt).map((item) => [item.questionId, true])));
+      window.localStorage.setItem(`studynova:exam-pk-room:${id}`, roomId);
+    } catch (error) {
+      if (!silent) toast.push("error", error instanceof Error ? error.message : "無法載入 PK 房");
+    }
   }
   async function startRoom() { if (!room) return; setBusy(true); try { await apiPost(`/exam-pk/rooms/${room.room.id}/start`, {}); await loadRoom(room.room.id); } catch (error) { toast.push("error", error instanceof Error ? error.message : "無法開始考試"); } finally { setBusy(false); } }
   async function submitAnswer(questionId: string) { if (!room || !selected[questionId]?.length || state?.room.status !== "RUNNING") return; setBusy(true); try { await apiPost(`/exam-pk/rooms/${room.room.id}/answers`, { questionId, answer: selected[questionId], timeSpent: 0 }); setAnswered((current) => ({ ...current, [questionId]: true })); } catch (error) { toast.push("error", error instanceof Error ? error.message : "答案保存失敗"); } finally { setBusy(false); } }
 
   useEffect(() => {
+    if (!id || room?.room.id) return;
+    const remembered = searchParams.get("roomId") || window.localStorage.getItem(`studynova:exam-pk-room:${id}`);
+    if (remembered) {
+      void loadRoom(remembered);
+      return;
+    }
+    void apiGet<{ rooms: Array<{ id: string; activityId: string; status: string }> }>("/exam-pk/rooms/mine", { fresh: true }).then((result) => {
+      const mine = result.rooms.find((item) => item.activityId === id && ["WAITING", "RUNNING"].includes(item.status));
+      if (mine) void loadRoom(mine.id);
+    }).catch(() => undefined);
+  }, [id, room?.room.id, searchParams]);
+
+  useEffect(() => {
     if (!room?.room.id) return;
-    const source = new EventSource(`/api/v1/exam-pk/rooms/${room.room.id}/events`);
-    source.addEventListener("state", (event) => { try { setState(JSON.parse((event as MessageEvent).data) as RoomState); } catch { /* reconnect handles malformed transient events */ } });
-    source.onerror = () => { /* EventSource automatically reconnects */ };
-    return () => source.close();
+    const roomId = room.room.id;
+    const source = new EventSource(`/api/v1/exam-pk/rooms/${roomId}/events?stream=${Date.now()}`);
+    source.addEventListener("state", (event) => { try { setState(JSON.parse((event as MessageEvent).data) as RoomState); } catch { /* ignore malformed transient events */ } });
+    source.onerror = () => { /* native EventSource reconnects; polling below is the fallback */ };
+    const fallback = window.setInterval(() => { void loadRoom(roomId, true); }, 2500);
+    return () => { source.close(); window.clearInterval(fallback); };
   }, [room?.room.id]);
   useEffect(() => {
     if (!room?.room.id) return;

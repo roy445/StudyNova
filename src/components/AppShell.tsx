@@ -19,6 +19,7 @@ export type ShellUser = {
   isPro: boolean;
   isTester?: boolean;
 };
+type MyExamPkRoom = { id: string; activityId: string; roomCode: string; hostUserId: string; subject: string; scope: string; status: string; maxPlayers: number; durationMinutes: number; activityName: string; participantStatus: string; joinedAt: string };
 
 function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -136,6 +137,11 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemCode, setRedeemCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+  const [pkRoomOpen, setPkRoomOpen] = useState(false);
+  const [pkRoomCode, setPkRoomCode] = useState("");
+  const [myPkRooms, setMyPkRooms] = useState<MyExamPkRoom[]>([]);
+  const [pkRoomLoading, setPkRoomLoading] = useState(false);
+  const [pkRoomJoining, setPkRoomJoining] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [quickChatId, setQuickChatId] = useState<string | null>(null);
   const [quickChatMode, setQuickChatMode] = useState("teacher");
@@ -390,6 +396,42 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     router.refresh();
   }, [router]);
 
+  const openPkRooms = useCallback(async () => {
+    setAccountMenuOpen(false);
+    setPkRoomOpen(true);
+    setPkRoomLoading(true);
+    try {
+      const result = await apiGet<{ rooms: MyExamPkRoom[] }>("/exam-pk/rooms/mine", { fresh: true });
+      setMyPkRooms(result.rooms);
+    } catch (error) {
+      toast.push("error", errorMessage(error));
+    } finally {
+      setPkRoomLoading(false);
+    }
+  }, [toast]);
+  const joinPkRoomByCode = useCallback(async () => {
+    const code = pkRoomCode.trim();
+    if (!/^\d{6}$/.test(code)) {
+      toast.push("error", "請輸入 6 位數房號");
+      return;
+    }
+    setPkRoomJoining(true);
+    try {
+      const result = await apiPost<{ roomId: string; activityId: string }>(`/exam-pk/room-codes/${code}/join`, {});
+      setPkRoomCode("");
+      setPkRoomOpen(false);
+      router.push(`/exam-prep/${result.activityId}/pk?roomId=${result.roomId}`);
+    } catch (error) {
+      toast.push("error", errorMessage(error));
+    } finally {
+      setPkRoomJoining(false);
+    }
+  }, [pkRoomCode, router, toast]);
+  const openMyPkRoom = useCallback((room: MyExamPkRoom) => {
+    setPkRoomOpen(false);
+    router.push(`/exam-prep/${room.activityId}/pk?roomId=${room.id}`);
+  }, [router]);
+
   const redeemCoupon = useCallback(async () => {
     const code = redeemCode.trim();
     if (!code) {
@@ -540,6 +582,15 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                       <span>我的單字</span><span aria-hidden="true">→</span>
                     </Link>
                     {user.isPro && <div className="px-3 py-2 text-xs text-[#ffd98a]">PRO 剩餘 {proDays === null ? "∞" : `${proDays} 天`}</div>}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void openPkRooms()}
+                      className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-cyan-100 transition hover:bg-cyan-400/10"
+                    >
+                      <span>加入 PK 房／我的房間</span><span aria-hidden="true">→</span>
+                    </button>
+
                     <Link href="/export?dataset=vocabulary" role="menuitem" onClick={() => setAccountMenuOpen(false)} className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-muted transition hover:bg-white/5 hover:text-[var(--text)]"><span>我的單字匯出（選格式）</span><span aria-hidden="true">↓</span></Link>
                     <button
                       type="button"
@@ -729,7 +780,25 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         </div>
       </Modal>
 
-      {/* First-login PWA and notification guide */}
+      <Modal open={pkRoomOpen} onClose={() => { if (!pkRoomJoining) { setPkRoomOpen(false); setPkRoomCode(""); } }} title="段考 PK 房">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-cyan-300/25 bg-cyan-300/[.07] p-4">
+            <p className="text-sm font-semibold text-cyan-100">加入同學的房間</p>
+            <p className="mt-1 text-xs leading-5 text-muted">輸入六位數房號；加入後會直接進入該房的等待室。</p>
+            <div className="mt-3 flex gap-2">
+              <Input inputMode="numeric" maxLength={6} value={pkRoomCode} onChange={(event) => setPkRoomCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="例如 482193" />
+              <Button loading={pkRoomJoining} disabled={pkRoomCode.length !== 6} onClick={() => void joinPkRoomByCode()}>加入</Button>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between"><p className="text-sm font-semibold">我的房間</p><Button size="sm" variant="ghost" onClick={() => void openPkRooms()} loading={pkRoomLoading}>重新整理</Button></div>
+            {pkRoomLoading && <Skeleton lines={3} />}
+            {!pkRoomLoading && myPkRooms.length === 0 && <p className="mt-3 rounded-xl border border-[var(--line)] p-4 text-center text-xs text-muted">目前沒有已建立或已加入的段考 PK 房。</p>}
+            <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">{myPkRooms.map((room) => <button key={room.id} type="button" onClick={() => openMyPkRoom(room)} className="focus-ring flex w-full items-center justify-between rounded-xl border border-[var(--line)] bg-white/[.03] p-3 text-left transition hover:border-cyan-300/50 hover:bg-cyan-300/[.06]"><span className="min-w-0"><span className="block truncate text-sm font-semibold">{room.activityName}・{room.subject}</span><span className="mt-1 block text-xs text-muted">房號 {room.roomCode}・{room.hostUserId === user.userId ? "我建立" : "我已加入"}</span></span><Badge tone={room.status === "RUNNING" ? "green" : room.status === "WAITING" ? "gold" : "muted"}>{room.status === "RUNNING" ? "進行中" : room.status === "WAITING" ? "等待中" : "已結束"}</Badge></button>)}</div>
+          </div>
+        </div>
+      </Modal>
+            {/* First-login PWA and notification guide */}
       <Modal open={installGuideOpen} onClose={() => { localStorage.setItem("sn-install-guide-seen", "1"); setInstallGuideOpen(false); window.setTimeout(() => setUsageGuideOpen(true), 120); }} title="先把 StudyNova 加到主畫面">
         <div className="space-y-3 text-sm">
           {inAppBrowser && <div className="rounded-xl border-2 border-rose-300/70 bg-rose-400/15 p-3 text-xs leading-5 text-rose-50"><p className="font-black">目前是在 App 內建瀏覽器中</p><p className="mt-1">為了避免安裝失敗或被誤判，請點右上角／右下角的「⋯」或分享按鈕，選擇「在 Chrome／Safari 開啟」，再回到這裡安裝。StudyNova 不會要求下載任何不明檔案。</p></div>}
