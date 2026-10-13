@@ -9,6 +9,8 @@ const studentTitle = (value: string) => value.replace(/^\s*\d{3,4}學年度\s*/,
 
 type Activity = { id: string; name: string; description: string; educationLevel: string; grade: number; semester: string; examName: string; scope: string; openAt: string | null; closeAt: string | null; effectiveStatus: string; subjects: Array<{ subject: string; chapters: string[]; units: string[] }> };
 
+function studentDescription() { return "依本次段考範圍整理題目，完成作答後可查看詳解與學習進度。" }
+
 const statusLabel: Record<string, { label: string; tone: "green" | "gold" | "rose" | "muted" | "cyan" }> = {
   open: { label: "開放中", tone: "green" },
   scheduled: { label: "預約開放", tone: "gold" },
@@ -24,6 +26,6 @@ export default function ExamPrepPage() {
     {api.loading && <Card><Skeleton lines={6} /></Card>}
     {api.error && <ErrorState message={api.error} onRetry={api.reload} />}
     {api.data && !api.data.activities.length && <EmptyState icon="⌁" title="目前沒有可查看的段考活動" hint="管理員建立並開放段考衝刺活動後，活動會出現在這裡。" />}
-    {api.data?.activities.map((activity) => { const status = statusLabel[activity.effectiveStatus] ?? statusLabel.draft; return <Link href={`/exam-prep/${activity.id}`} key={activity.id} className="group block"><Card className="transition group-hover:-translate-y-0.5 group-hover:border-cyan-300/50" title={studentTitle(activity.name)} subtitle={`${activity.examName}・${activity.educationLevel === "senior" ? "高中" : "國中"}${activity.grade}${activity.semester ? `・${activity.semester}` : ""}`}><div className="flex flex-wrap items-center gap-2"><Badge tone={status.tone}>{status.label}</Badge>{activity.openAt && <span className="text-xs text-muted">開放：{formatTaipeiDateTime(activity.openAt)}</span>}{activity.closeAt && <span className="text-xs text-muted">截止：{formatTaipeiDateTime(activity.closeAt)}</span>}</div><p className="mt-3 text-sm leading-6 text-muted">{activity.description || "本活動的題目與章節範圍將依管理員設定顯示。"}</p><div className="mt-4 flex flex-wrap gap-2">{activity.subjects.map((subject) => <span key={subject.subject} className="rounded-full bg-white/5 px-3 py-1 text-xs text-muted">{subject.subject}</span>)}</div><p className="mt-4 text-sm font-semibold text-cyan-200">查看活動資訊 →</p></Card></Link>; })}
+    {api.data?.activities.map((activity) => { const status = statusLabel[activity.effectiveStatus] ?? statusLabel.draft; return <Link href={`/exam-prep/${activity.id}`} key={activity.id} className="group block"><Card className="transition group-hover:-translate-y-0.5 group-hover:border-cyan-300/50" title={studentTitle(activity.name)} subtitle={`${activity.examName}・${activity.educationLevel === "senior" ? "高中" : "國中"}${activity.grade}${activity.semester ? `・${activity.semester}` : ""}`}><div className="flex flex-wrap items-center gap-2"><Badge tone={status.tone}>{status.label}</Badge>{activity.openAt && <span className="text-xs text-muted">開放：{formatTaipeiDateTime(activity.openAt)}</span>}{activity.closeAt && <span className="text-xs text-muted">截止：{formatTaipeiDateTime(activity.closeAt)}</span>}</div><p className="mt-3 text-sm leading-6 text-muted">{studentDescription()}</p><div className="mt-4 flex flex-wrap gap-2">{activity.subjects.map((subject) => <span key={subject.subject} className="rounded-full bg-white/5 px-3 py-1 text-xs text-muted">{subject.subject}</span>)}</div><p className="mt-4 text-sm font-semibold text-cyan-200">查看活動資訊 →</p></Card></Link>; })}
   </div>;
 }
