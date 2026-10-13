@@ -861,3 +861,31 @@ input:focus, textarea:focus, select:focus { border-color: var(--custom-secondary
 .auth-card button[type="submit"] { background: #5fe2d2; color: #05202d; box-shadow: 0 12px 26px rgba(73,220,204,.14); }
 .auth-card button[type="submit"]:hover { background: #8bf3e6; }
 @media (prefers-reduced-motion: reduce) { .auth-card { animation: none; } }
+
+/* ------------------------------------------------------- auth motion polish */
+.auth-screen { isolation: isolate; }
+.auth-screen::before { animation: auth-ambient-shift 14s ease-in-out infinite alternate; }
+.auth-screen::after { animation: auth-orbit-drift 18s linear infinite; }
+.auth-screen > .anim-pulse { opacity: .55; }
+.auth-screen .auth-card { animation: auth-card-enter .72s var(--ease-out) both; }
+.auth-card { position: relative; overflow: hidden; }
+.auth-card::before { content: ""; position: absolute; inset: -35% -15%; pointer-events: none; background: linear-gradient(115deg, transparent 34%, rgba(125,234,222,.08) 47%, rgba(125,234,222,.16) 50%, transparent 63%); transform: translateX(-70%) rotate(8deg); animation: auth-scan 8s 1.1s ease-in-out infinite; }
+.auth-card::after { content: ""; position: absolute; width: 150px; height: 150px; top: -84px; right: -64px; pointer-events: none; border: 1px solid rgba(110,231,218,.24); border-radius: 50%; box-shadow: 0 0 0 16px rgba(110,231,218,.035), 0 0 0 32px rgba(110,231,218,.025); animation: auth-orbit-drift 12s linear infinite reverse; }
+.auth-card > * { position: relative; z-index: 1; }
+.auth-card > div:first-child img { filter: drop-shadow(0 0 14px rgba(98,230,216,.24)); animation: auth-logo-breathe 4.2s ease-in-out infinite; }
+.auth-card label { transition: color 180ms var(--ease-out); }
+.auth-card label:focus-within { color: #baf8ef; }
+.auth-card input, .auth-card textarea, .auth-card select { transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), background 180ms var(--ease-out), transform 180ms var(--ease-out); }
+.auth-card input:hover, .auth-card textarea:hover, .auth-card select:hover { border-color: rgba(132,182,222,.42); background: rgba(8,28,49,.58); }
+.auth-card input:focus, .auth-card textarea:focus, .auth-card select:focus { transform: translateY(-1px); }
+.auth-card button[type="submit"] { position: relative; overflow: hidden; transition: transform 180ms var(--ease-out), background 180ms var(--ease-out), box-shadow 180ms var(--ease-out); }
+.auth-card button[type="submit"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 28%, rgba(255,255,255,.35) 49%, transparent 70%); transform: translateX(-125%); transition: transform .65s var(--ease-out); }
+.auth-card button[type="submit"]:hover { transform: translateY(-2px); box-shadow: 0 16px 32px rgba(73,220,204,.22); }
+.auth-card button[type="submit"]:hover::after { transform: translateX(125%); }
+.auth-card button[type="submit"]:active { transform: translateY(0) scale(.98); }
+@keyframes auth-card-enter { from { opacity: 0; transform: translateY(18px) scale(.975); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes auth-ambient-shift { from { transform: scale(1) translate3d(0,0,0); opacity: .92; } to { transform: scale(1.08) translate3d(1.5%, -1%, 0); opacity: 1; } }
+@keyframes auth-orbit-drift { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes auth-logo-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.025); } }
+@keyframes auth-scan { 0%, 18% { transform: translateX(-70%) rotate(8deg); opacity: 0; } 34%, 56% { transform: translateX(70%) rotate(8deg); opacity: 1; } 72%, 100% { transform: translateX(120%) rotate(8deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .auth-screen::before, .auth-screen::after, .auth-screen .auth-card, .auth-card::before, .auth-card::after, .auth-card > div:first-child img { animation: none; } }
