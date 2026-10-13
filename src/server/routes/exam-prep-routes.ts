@@ -144,7 +144,18 @@ export const routes: RouteDef[] = [
       const subjectBankIds = openSubjects.map((subject) => subject.questionBankId).filter((value): value is string => Boolean(value));
       const bankIds = subjectBankIds.length ? subjectBankIds : (result.activity.questionBankId ? [result.activity.questionBankId] : []);
       if (!bankIds.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前還沒有正式題庫。" });
-      const bankQuestions = await db.select({ id: questions.id, createdAt: questions.createdAt }).from(questions).where(bankIds.length === 1 ? eq(questions.bankId, bankIds[0]) : inArray(questions.bankId, bankIds)).orderBy(asc(questions.createdAt));
+      const rawBankQuestions = await db.select({ id: questions.id, createdAt: questions.createdAt, metadata: questions.metadata }).from(questions).where(bankIds.length === 1 ? eq(questions.bankId, bankIds[0]) : inArray(questions.bankId, bankIds)).orderBy(asc(questions.createdAt));
+      const bankQuestions = rawBankQuestions.filter((question) => {
+        const metadata = question.metadata && typeof question.metadata === "object" ? question.metadata as Record<string, unknown> : {};
+        const cropStatus = typeof metadata.cropStatus === "string" ? metadata.cropStatus : "";
+        if (["queued", "analyzing", "manual_review", "failed"].includes(cropStatus)) return false;
+        if (cropStatus === "ready" || cropStatus === "not_needed") return true;
+        const hasUncroppedImage = ["imageUrls", "assetObjectIds", "sourceFigures"].some((key) => {
+          const value = metadata[key];
+          return Array.isArray(value) ? value.length > 0 : Boolean(value);
+        });
+        return !hasUncroppedImage;
+      });
       if (!bankQuestions.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前沒有可作答題目。" });
       const existing = (await db.select().from(quizzes).where(and(eq(quizzes.userId, user.userId), eq(quizzes.source, `exam_prep:${ctx.params.id}`))).orderBy(desc(quizzes.createdAt)).limit(1))[0];
       const existingQuestionCount = existing?.questionIds.length ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, result.activity.questionBankId!), inArray(questions.id, existing.questionIds))))[0]?.count ?? 0) : 0;
