@@ -82,6 +82,7 @@ export default function AiPage() {
   const [error, setError] = useState<string | null>(null);
   const [noviState, setNoviState] = useState<NoviState>("idle");
   const [showMemory, setShowMemory] = useState(false);
+  const [mathNoticeDismissed, setMathNoticeDismissed] = useState(false);
   const [renaming, setRenaming] = useState<Conversation | null>(null);
   const [renameText, setRenameText] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -97,15 +98,19 @@ export default function AiPage() {
   const conversationLoadRef = useRef(0);
 
   useEffect(() => {
-    if (!sending) return;
-    const stages = ["讀取訊息", "分析中", "整理重點中", "生成中..."];
-    let index = 0;
-    const timer = window.setInterval(() => {
-      index = (index + 1) % stages.length;
-      setChatStage(stages[index]);
-    }, 1100);
-    return () => window.clearInterval(timer);
-  }, [sending]);
+    const timer = window.setTimeout(() => {
+      if (!activeId) {
+        setMathNoticeDismissed(false);
+        return;
+      }
+      try {
+        setMathNoticeDismissed(window.localStorage.getItem(`novi-math-notice-dismissed:${activeId}`) === "1");
+      } catch {
+        setMathNoticeDismissed(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeId]);
 
   useEffect(() => {
     const requestId = ++conversationLoadRef.current;
@@ -153,7 +158,7 @@ export default function AiPage() {
     const sentAttachments = attachments;
     setAttachment(null);
     setSending(true);
-    setChatStage("讀取訊息");
+    setChatStage(sentAttachments.length ? "正在分析附件" : "正在處理你的問題");
     setNoviState("thinking");
     setError(null);
     setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content: content || "請分析這張圖片。", attachment: sentAttachment ?? undefined, action: null, actionStatus: "none", createdAt: new Date().toISOString() }]);
@@ -362,11 +367,11 @@ async function resolveAction(messageId: string, confirm: boolean) {
             <div className="mb-3 rounded-xl border border-[#7c5cff]/25 bg-[#7c5cff]/8 px-3 py-2 text-xs leading-5 text-muted"><span className="font-semibold text-[#c4b5fd]">{activeMode.label}的用途：</span> {activeMode.description}</div>
 
             <div className="min-w-0 flex-1 space-y-3 overflow-y-auto scroll-thin pr-1">
-              <aside className="sticky top-0 z-10 rounded-2xl border border-amber-300/35 bg-[#2b2111]/95 px-3.5 py-3 text-xs leading-5 text-amber-50 shadow-lg shadow-black/10 backdrop-blur-md" aria-label="數學解答準確度提醒">
-                <p className="font-bold text-amber-200">📌 數學解答提醒</p>
+              {!mathNoticeDismissed && activeId && <aside className="sticky top-0 z-10 rounded-2xl border border-amber-300/35 bg-[#2b2111]/95 px-3.5 py-3 text-xs leading-5 text-amber-50 shadow-lg shadow-black/10 backdrop-blur-md" aria-label="數學解答準確度提醒">
+                <div className="flex items-start justify-between gap-3"><p className="font-bold text-amber-200">📌 數學解答提醒</p><button type="button" className="shrink-0 rounded-lg border border-amber-200/30 px-2 py-1 text-[11px] font-semibold text-amber-100 transition hover:bg-amber-200/10" onClick={() => { try { window.localStorage.setItem(`novi-math-notice-dismissed:${activeId}`, "1"); } catch { /* localStorage unavailable */ } setMathNoticeDismissed(true); }}>我了解了</button></div>
                 <p className="mt-1">數學題的解答錯誤機率可能比其他科目高，原因是數學需要精確辨識符號、括號、次方、單位與題目條件；照片或手寫內容若模糊、題意不完整，或同一題有多種解法時，AI 也可能在推理步驟中出現計算或判斷偏差。</p>
                 <p className="mt-1 text-amber-200/90">請把 Novi 的答案當作解題協助，務必逐步核對公式、代入與最後答案；重要作業或考試請再用課本、老師或計算機確認。數學解答若有不準確的地方，Novi 先跟你說聲抱歉 🙏 我們會持續改善。</p>
-              </aside>
+              </aside>}
               {loadingMsg && <Skeleton lines={4} />}
               {messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
