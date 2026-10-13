@@ -557,7 +557,10 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
-      const body = await ctx.json(z.object({ durationSec: z.number().int().min(0).max(36000).default(0) }));
+      const body = await ctx.json(z.object({
+        durationSec: z.number().int().min(0).max(36000).default(0),
+        responses: z.record(z.string().uuid(), z.array(z.string().max(500)).max(8)).default({}),
+      }));
       const attempt = (await db.select().from(quizAttempts).where(eq(quizAttempts.id, ctx.params.id)).limit(1))[0];
       if (!attempt) throw notFound("找不到作答紀錄");
       if (attempt.userId !== user.userId) throw forbidden();
@@ -569,17 +572,28 @@ export const routes: RouteDef[] = [
 
       let correct = 0;
       const review: Array<Record<string, unknown>> = [];
+      const answerRows: Array<{ attemptId: string; questionId: string; response: string[]; isCorrect: boolean; checkedAt: Date }> = [];
+      const wrongRows: Array<{ questionId: string; subject: string }> = [];
       for (const q of qs) {
-        const got = saved.find((s) => s.questionId === q.id)?.response ?? [];
+        const got = body.responses[q.id] ?? saved.find((s) => s.questionId === q.id)?.response ?? [];
         const ok = isCorrect(q.type, q.answer, got, normalizeQuestionOptions(q.options));
         if (ok) correct += 1;
-        else await addWrongQuestion(user.userId, q.id, q.subject, "測驗答錯");
-        await db
-          .insert(answers)
-          .values({ attemptId: attempt.id, questionId: q.id, response: got, isCorrect: ok })
-          .onConflictDoUpdate({ target: [answers.attemptId, answers.questionId], set: { isCorrect: ok, updatedAt: new Date() } });
+        else wrongRows.push({ questionId: q.id, subject: q.subject });
+        answerRows.push({ attemptId: attempt.id, questionId: q.id, response: got, isCorrect: ok, checkedAt: new Date() });
         review.push({ questionId: q.id, stem: q.stem, options: q.options, type: q.type, answer: q.answer, explanation: q.explanation, response: got, isCorrect: ok });
       }
+      if (answerRows.length) {
+        await db.insert(answers).values(answerRows).onConflictDoUpdate({
+          target: [answers.attemptId, answers.questionId],
+          set: {
+            response: sql`excluded.response`,
+            isCorrect: sql`excluded.is_correct`,
+            checkedAt: sql`excluded.checked_at`,
+            updatedAt: new Date(),
+          },
+        });
+      }
+      await Promise.all(wrongRows.map((row) => addWrongQuestion(user.userId, row.questionId, row.subject, "測驗答錯")));
       const total = qs.length || 1;
       const score = Math.round((correct / total) * 1000) / 10;
 
@@ -613,6 +627,34 @@ export const routes: RouteDef[] = [
         await bumpAchievement(user.userId, "questions_answered", answered[0]?.c ?? 0);
       }
       return { attempt: updated[0], score, correct, total: qs.length, review, reward };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/attempts/:id/summary",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const attempt = (await db.select().from(quizAttempts).where(eq(quizAttempts.id, ctx.params.id)).limit(1))[0];
+      if (!attempt) throw notFound("找不到作答紀錄");
+      if (attempt.userId !== user.userId) throw forbidden();
+      const quiz = (await db.select().from(quizzes).where(eq(quizzes.id, attempt.quizId)).limit(1))[0];
+      if (!quiz) throw notFound("找不到測驗");
+      const qs = quiz.questionIds.length ? await db.select().from(questions).where(inArray(questions.id, quiz.questionIds)) : [];
+      const saved = await db.select().from(answers).where(eq(answers.attemptId, attempt.id));
+      let correct = 0;
+      const review: Array<Record<string, unknown>> = [];
+      for (const q of qs) {
+        const answer = saved.find((item) => item.questionId === q.id);
+        const response = answer?.response ?? [];
+        const isCorrectAnswer = answer?.isCorrect ?? isCorrect(q.type, q.answer, response, normalizeQuestionOptions(q.options));
+        if (isCorrectAnswer) correct += 1;
+        review.push({ questionId: q.id, stem: q.stem, options: q.options, type: q.type, answer: q.answer, explanation: q.explanation, response, isCorrect: isCorrectAnswer });
+      }
+      const total = qs.length;
+      const score = total ? Math.round((correct / total) * 1000) / 10 : 0;
+      return { score, correct, total, review, summaryOnly: true };
     },
   }),
 
