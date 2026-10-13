@@ -37,6 +37,7 @@ const releaseMigrations = [
   "0128_exam_pk_rooms.sql",
   "0129_pro_claim_grants.sql",
   "0130_exam_prep_subject_windows.sql",
+  "0131_exam_prep_default_deadline.sql",
 ];
 
 if (!process.env.DATABASE_URL) {

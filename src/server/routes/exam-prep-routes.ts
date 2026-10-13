@@ -8,6 +8,7 @@ import { fail, notFound } from "../core";
 
 const statusValues = ["draft", "analyzing", "pending_review", "scheduled", "open", "closed", "archived"] as const;
 type ActivityStatus = (typeof statusValues)[number];
+const DEFAULT_EXAM_PREP_CLOSE_AT = new Date("2026-10-19T16:00:00.000Z"); // 2026/10/20 00:00 Asia/Taipei
 
 const subjectInput = z.object({
   subject: z.string().trim().min(1).max(60),
@@ -185,6 +186,31 @@ export const routes: RouteDef[] = [
       const subjects = activities.length ? await db.select().from(examPrepSubjects).where(or(...activities.map((row) => eq(examPrepSubjects.activityId, row.id)))) : [];
       const now = new Date();
       return { timezone: "Asia/Taipei", activities: activities.map((activity) => ({ ...activity, effectiveStatus: effectiveStatus(activity, now), subjects: subjects.filter((subject) => subject.activityId === activity.id).map((subject) => ({ ...subject, effectiveStatus: subjectEffectiveStatus(subject, activity, now) })) })) };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/set-default-deadline",
+    auth: "admin",
+    handler: async () => {
+      const activities = await db.select({ id: examPrepActivities.id }).from(examPrepActivities).where(sql`${examPrepActivities.status} <> 'archived'`);
+      if (!activities.length) return { updated: 0, closeAt: DEFAULT_EXAM_PREP_CLOSE_AT.toISOString() };
+      await db.transaction(async (tx) => {
+        await tx.update(examPrepActivities).set({ closeAt: DEFAULT_EXAM_PREP_CLOSE_AT, updatedAt: new Date() }).where(sql`${examPrepActivities.status} <> 'archived'`);
+        await tx.update(examPrepSubjects).set({ closeAt: DEFAULT_EXAM_PREP_CLOSE_AT, updatedAt: new Date() }).where(inArray(examPrepSubjects.activityId, activities.map((activity) => activity.id)));
+      });
+      return { updated: activities.length, closeAt: DEFAULT_EXAM_PREP_CLOSE_AT.toISOString() };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/exam-prep/close-all",
+    auth: "admin",
+    handler: async () => {
+      const now = new Date();
+      const result = await db.update(examPrepActivities).set({ status: "closed", closeAt: now, updatedAt: now }).where(sql`${examPrepActivities.status} <> 'archived'`).returning({ id: examPrepActivities.id });
+      if (result.length) await db.update(examPrepSubjects).set({ closeAt: now, updatedAt: now }).where(inArray(examPrepSubjects.activityId, result.map((activity) => activity.id)));
+      return { closed: result.length, closedAt: now.toISOString() };
     },
   }),
   route({
