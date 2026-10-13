@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNull, lte, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { db } from "@/db";
@@ -128,7 +128,11 @@ export const routes: RouteDef[] = [
       const bankQuestions = await db.select({ id: questions.id, createdAt: questions.createdAt }).from(questions).where(eq(questions.bankId, result.activity.questionBankId)).orderBy(asc(questions.createdAt));
       if (!bankQuestions.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前沒有可作答題目。" });
       const existing = (await db.select().from(quizzes).where(and(eq(quizzes.userId, user.userId), eq(quizzes.source, `exam_prep:${ctx.params.id}`))).orderBy(desc(quizzes.createdAt)).limit(1))[0];
-      const quiz = existing ?? (await db.insert(quizzes).values({ userId: user.userId, title: result.activity.name, subject: result.subjects.map((subject) => subject.subject).join("、") || "綜合", difficulty: "exam", source: `exam_prep:${ctx.params.id}`, timeLimitSec: Math.max(600, bankQuestions.length * 90), questionIds: bankQuestions.map((question) => question.id), expiresAt: result.activity.closeAt ?? new Date(Date.now() + 30 * 86_400_000) }).returning())[0];
+      const existingQuestionCount = existing?.questionIds.length ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, result.activity.questionBankId), inArray(questions.id, existing.questionIds))))[0]?.count ?? 0) : 0;
+      // A previous quiz can outlive a question-bank refresh. Never return that
+      // stale quiz: the client would resume successfully but receive no items.
+      const reusable = existing && existingQuestionCount > 0 ? existing : null;
+      const quiz = reusable ?? (await db.insert(quizzes).values({ userId: user.userId, title: result.activity.name, subject: result.subjects.map((subject) => subject.subject).join("、") || "綜合", difficulty: "exam", source: `exam_prep:${ctx.params.id}`, timeLimitSec: Math.max(600, bankQuestions.length * 90), questionIds: bankQuestions.map((question) => question.id), expiresAt: result.activity.closeAt ?? new Date(Date.now() + 30 * 86_400_000) }).returning())[0];
       return { quizId: quiz.id, questionCount: quiz.questionIds.length, title: quiz.title };
     },
   }),
