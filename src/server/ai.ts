@@ -1,8 +1,8 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db } from "@/db";
-import { aiProviderHealth, aiUsageLogs, users } from "@/db/schema";
-import { fail, monthStart, nextUtcMonthStart } from "./core";
+import { aiProviderHealth, aiUsageLogs, memberships, users } from "@/db/schema";
+import { fail, monthStart, nextUtcMonthStart, todayStr } from "./core";
 import { notify } from "./notify";
 
 export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "gemini_4" | "gemini_5" | "gemini_6" | "gemini_7" | "gemini_8" | "gemini_9" | "gemini_10" | "openai" | "openrouter";
@@ -169,6 +169,60 @@ function categorize(status: number, body: string): FailureCategory {
 }
 
 const estimate = (s: string) => Math.max(1, Math.ceil(s.length / 4));
+
+export const AI_TOKEN_LIMITS = {
+  free: { daily: 8_000, monthly: 120_000 },
+  pro: { daily: 16_000, monthly: 240_000 },
+} as const;
+
+export type AiTokenBudget = {
+  plan: "free" | "pro";
+  daily: { used: number; limit: number; remaining: number; percent: number };
+  monthly: { used: number; limit: number; remaining: number; percent: number };
+  dailyResetAt: string;
+  monthlyResetAt: string;
+};
+
+function nextTaipeiDayStart() {
+  const next = new Date(`${todayStr()}T00:00:00+08:00`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+function nextTaipeiMonthStart() {
+  const now = new Date();
+  const taipei = new Date(now.getTime() + 8 * 60 * 60_000);
+  return new Date(Date.UTC(taipei.getUTCFullYear(), taipei.getUTCMonth() + 1, 1) - 8 * 60 * 60_000);
+}
+
+export function aiTokenLimits(isPro: boolean) {
+  return isPro ? AI_TOKEN_LIMITS.pro : AI_TOKEN_LIMITS.free;
+}
+
+export async function getAiTokenBudget(userId: string): Promise<AiTokenBudget> {
+  const membership = (await db.select({ tier: memberships.tier, expiresAt: memberships.expiresAt }).from(memberships).where(eq(memberships.userId, userId)).limit(1))[0];
+  const isPro = membership?.tier === "pro" && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
+  const limits = aiTokenLimits(isPro);
+  const dayStart = new Date(`${todayStr()}T00:00:00+08:00`);
+  const month = monthStart();
+  const [dailyRows, monthlyRows] = await Promise.all([
+    db.select({ total: sql<number>`coalesce(sum(${aiUsageLogs.inputTokens} + ${aiUsageLogs.outputTokens}), 0)::int` }).from(aiUsageLogs).where(and(eq(aiUsageLogs.userId, userId), gte(aiUsageLogs.createdAt, dayStart))),
+    db.select({ total: sql<number>`coalesce(sum(${aiUsageLogs.inputTokens} + ${aiUsageLogs.outputTokens}), 0)::int` }).from(aiUsageLogs).where(and(eq(aiUsageLogs.userId, userId), gte(aiUsageLogs.createdAt, month))),
+  ]);
+  const used = { daily: Number(dailyRows[0]?.total ?? 0), monthly: Number(monthlyRows[0]?.total ?? 0) };
+  const progress = (value: number, limit: number) => ({ used: value, limit, remaining: Math.max(0, limit - value), percent: Math.min(100, Math.round((value / limit) * 100)) });
+  return { plan: isPro ? "pro" : "free", daily: progress(used.daily, limits.daily), monthly: progress(used.monthly, limits.monthly), dailyResetAt: nextTaipeiDayStart().toISOString(), monthlyResetAt: nextTaipeiMonthStart().toISOString() };
+}
+
+async function enforceAiTokenBudget(userId: string | null | undefined, request: AiRequest) {
+  if (!userId) return;
+  const budget = await getAiTokenBudget(userId);
+  const inputText = `${request.system ?? ""}${request.parts.map((part) => part.kind === "text" ? part.text : `[${part.kind}]`).join("")}`;
+  const estimated = estimate(inputText) + request.parts.filter((part) => part.kind !== "text").length * 1_500 + (request.maxOutputTokens ?? 2048);
+  if (budget.daily.remaining < estimated || budget.monthly.remaining < estimated) {
+    throw fail("QUOTA_EXHAUSTED", { message: `AI Token 額度不足：今日剩餘 ${budget.daily.remaining.toLocaleString()}，本月剩餘 ${budget.monthly.remaining.toLocaleString()}。`, details: { feature: request.feature, estimatedTokens: estimated, dailyRemaining: budget.daily.remaining, monthlyRemaining: budget.monthly.remaining, dailyResetAt: budget.dailyResetAt, monthlyResetAt: budget.monthlyResetAt } });
+  }
+}
 
 // A provider must not hold the whole learning flow for a full minute. The
 // caller can fall through to the next configured provider after 18 seconds.
@@ -364,6 +418,7 @@ async function logUsage(entry: {
 
 export async function runAi(req: AiRequest): Promise<AiResult> {
   const normalizedReq = await normalizeAiRequest(req);
+  await enforceAiTokenBudget(req.userId, normalizedReq);
   // OCR must not inherit GEMINI_FAST_MODEL: production logs showed that the
   // general 3.6 model was quota-limited and intermittently overloaded. Use a
   // dedicated OCR override when provided, otherwise use the lightweight

@@ -41,6 +41,7 @@ const ACTION_LABEL: Record<string, string> = {
   create_quiz: "建立測驗",
   update_plan: "修改今日讀書計畫",
   create_artifact: "生成手寫重點／心智圖／PDF",
+  save_memory: "加入全站 Novi 記憶",
 };
 
 function TypewriterChatText({ content, animate }: { content: string; animate: boolean }) {
@@ -67,6 +68,7 @@ export default function AiPage() {
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
   const memory = useApi<{ memory: MemoryItem[]; memoryEnabled?: boolean }>("/ai/memory");
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number; used?: number; limit?: number; remaining?: number; unlimited?: boolean }> }>("/quotas");
+  const aiUsage = useApi<{ budget: { daily: { used: number; limit: number; remaining: number }; monthly: { used: number; limit: number; remaining: number } } }>("/ai/usage");
   const contexts = useApi<{ contexts: FileContext[] }>("/ai/solution/contexts");
   const imageUploadQuota = quotas.data?.quotas.find((item) => item.feature === "ai_solution_upload");
   const aiContextCost = quotas.data?.quotas.find((item) => item.feature === "ai_context")?.novaCost ?? null;
@@ -424,6 +426,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
                   {!!solutionResult.steps?.length && <ol className="mt-1 list-decimal pl-5">{solutionResult.steps.map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}</ol>}
                 </div>
               )}
+              {aiUsage.data && <div className="mb-2 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 px-3 py-2 text-[11px] text-muted">AI Token：今日剩餘 {aiUsage.data.budget.daily.remaining.toLocaleString()}／{aiUsage.data.budget.daily.limit.toLocaleString()}・本月剩餘 {aiUsage.data.budget.monthly.remaining.toLocaleString()}／{aiUsage.data.budget.monthly.limit.toLocaleString()}；送出後依實際輸入／輸出 Token 計算。</div>}
               <NovaCostNotice cost={aiContextCost} action="Novi 回覆" />
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <select value={attachmentSubject} onChange={(e) => setAttachmentSubject(e.target.value)} className="h-10 min-w-0 w-full rounded-xl border border-[var(--line)] bg-black/20 px-2 text-xs" aria-label="附件科目">
@@ -431,7 +434,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
                 {SUBJECTS.map((subject) => <option key={subject}>{subject}</option>)}
               </select>
               <Button className="shrink-0" size="sm" variant="outline" loading={uploading} onClick={() => fileInput.current?.click()} title="加入圖片或檔案">＋</Button>
-              <div className="col-span-2 flex min-w-0 flex-wrap gap-x-2 text-[10px] text-muted"><span>最多 30 個檔案／批，每檔 18 MiB</span>{imageUploadQuota && <span>今日圖片：{imageUploadQuota.unlimited ? "不限量" : `${imageUploadQuota.used ?? 0}/${imageUploadQuota.limit ?? 0}`}</span>}</div>
+              <div className="col-span-2 flex min-w-0 flex-wrap gap-x-2 text-[10px] text-muted"><span>最多 30 個檔案／批，每檔 18 MiB</span>{imageUploadQuota && <span>今日圖片：{imageUploadQuota.unlimited ? "不限量（此功能未設每日上限）" : `${imageUploadQuota.used ?? 0}/${imageUploadQuota.limit ?? 0}，剩餘 ${imageUploadQuota.remaining ?? Math.max(0, (imageUploadQuota.limit ?? 0) - (imageUploadQuota.used ?? 0))}`}</span>}</div>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

@@ -3,9 +3,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { activeAccountScores, aiPolicies, aiProviderHealth, aiUsageLogs, featurePermissions, membershipHistory, memberships, notifications, platformSettings, userTitles, users, analyticsEvents } from "@/db/schema";
 import { route } from "../router";
-import { monthStart } from "../core";
+import { monthStart, todayStr } from "../core";
 import { notify } from "../notify";
-import { runAiJson } from "../ai";
+import { aiTokenLimits, runAiJson } from "../ai";
 import { SERVER_FEATURE_DEFAULTS } from "../quota-policy";
 
 const period = () => new Date().toISOString().slice(0, 7);
@@ -24,6 +24,12 @@ async function usageReport(days: number) {
     db.select({ provider: aiUsageLogs.provider, uses: sql<number>`count(*)::int`, successes: sql<number>`count(*) filter (where ${aiUsageLogs.success})::int`, failures: sql<number>`count(*) filter (where not ${aiUsageLogs.success})::int`, latencyMs: sql<number>`coalesce(avg(${aiUsageLogs.latencyMs}),0)::int` }).from(aiUsageLogs).where(gte(aiUsageLogs.createdAt, since)).groupBy(aiUsageLogs.provider).orderBy(asc(aiUsageLogs.provider)),
     db.select({ userId: users.userId, displayName: users.displayName, email: users.email, novaId: users.novaId, role: users.role, membership: memberships.tier, expiresAt: memberships.expiresAt }).from(users).leftJoin(memberships, eq(memberships.userId, users.userId)).where(eq(users.status, "active")).orderBy(asc(users.displayName)).limit(10_000),
   ]);
+  const [monthTokens, dayTokens] = await Promise.all([
+    db.select({ userId: aiUsageLogs.userId, total: sql<number>`coalesce(sum(${aiUsageLogs.inputTokens} + ${aiUsageLogs.outputTokens}), 0)::int` }).from(aiUsageLogs).where(gte(aiUsageLogs.createdAt, monthStart())).groupBy(aiUsageLogs.userId),
+    db.select({ userId: aiUsageLogs.userId, total: sql<number>`coalesce(sum(${aiUsageLogs.inputTokens} + ${aiUsageLogs.outputTokens}), 0)::int` }).from(aiUsageLogs).where(gte(aiUsageLogs.createdAt, new Date(`${todayStr()}T00:00:00+08:00`))).groupBy(aiUsageLogs.userId),
+  ]);
+  const monthTokenMap = new Map(monthTokens.filter((row) => row.userId).map((row) => [row.userId as string, Number(row.total ?? 0)]));
+  const dayTokenMap = new Map(dayTokens.filter((row) => row.userId).map((row) => [row.userId as string, Number(row.total ?? 0)]));
   const byUser = new Map<string, { uses: number; successes: number; failures: number; inputTokens: number; outputTokens: number; latencyMs: number; features: Map<string, number>; lastUsedAt: string | null }>();
   for (const row of logs) {
     if (!row.userId) continue;
@@ -31,7 +37,7 @@ async function usageReport(days: number) {
     current.uses += 1; current.successes += row.success ? 1 : 0; current.failures += row.success ? 0 : 1; current.inputTokens += row.inputTokens; current.outputTokens += row.outputTokens; current.latencyMs += row.latencyMs; current.features.set(row.feature, (current.features.get(row.feature) ?? 0) + 1); current.lastUsedAt = current.lastUsedAt ?? new Date(row.createdAt).toISOString();
     byUser.set(row.userId, current);
   }
-  const usersReport = userRows.map((user) => { const m = byUser.get(user.userId); return { ...user, uses: m?.uses ?? 0, successes: m?.successes ?? 0, failures: m?.failures ?? 0, successRate: m?.uses ? Number((m.successes / m.uses).toFixed(3)) : 0, inputTokens: m?.inputTokens ?? 0, outputTokens: m?.outputTokens ?? 0, avgLatencyMs: m?.uses ? Math.round((m.latencyMs ?? 0) / m.uses) : 0, featureCount: m?.features.size ?? 0, featureBreakdown: [...(m?.features.entries() ?? [])].map(([feature, uses]) => ({ feature, uses })).sort((a, b) => b.uses - a.uses), lastUsedAt: m?.lastUsedAt ?? null }; }).sort((a, b) => b.uses - a.uses);
+  const usersReport = userRows.map((user) => { const m = byUser.get(user.userId); const pro = user.membership === "pro" && (!user.expiresAt || new Date(user.expiresAt) > new Date()); const limits = aiTokenLimits(pro); return { ...user, uses: m?.uses ?? 0, successes: m?.successes ?? 0, failures: m?.failures ?? 0, successRate: m?.uses ? Number((m.successes / m.uses).toFixed(3)) : 0, inputTokens: m?.inputTokens ?? 0, outputTokens: m?.outputTokens ?? 0, dailyTokens: dayTokenMap.get(user.userId) ?? 0, monthlyTokens: monthTokenMap.get(user.userId) ?? 0, dailyTokenLimit: limits.daily, monthlyTokenLimit: limits.monthly, avgLatencyMs: m?.uses ? Math.round((m.latencyMs ?? 0) / m.uses) : 0, featureCount: m?.features.size ?? 0, featureBreakdown: [...(m?.features.entries() ?? [])].map(([feature, uses]) => ({ feature, uses })).sort((a, b) => b.uses - a.uses), lastUsedAt: m?.lastUsedAt ?? null }; }).sort((a, b) => b.uses - a.uses);
   return { range: { days, since: since.toISOString(), until: new Date().toISOString() }, totals: { users: usersReport.length, activeUsers: usersReport.filter((u) => u.uses > 0).length, uses: logs.length, successes: logs.filter((l) => l.success).length, failures: logs.filter((l) => !l.success).length, inputTokens: logs.reduce((n, l) => n + l.inputTokens, 0), outputTokens: logs.reduce((n, l) => n + l.outputTokens, 0), avgLatencyMs: logs.length ? Math.round(logs.reduce((n, l) => n + l.latencyMs, 0) / logs.length) : 0 }, users: usersReport, features: featureRows, providers: providerRows };
 }
 

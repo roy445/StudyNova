@@ -17,6 +17,7 @@ type Novi = {
   balance: number;
   isPro: boolean;
 };
+type AiUsage = { budget: { plan: "free" | "pro"; daily: { used: number; limit: number; remaining: number; percent: number }; monthly: { used: number; limit: number; remaining: number; percent: number }; dailyResetAt: string; monthlyResetAt: string }; daily: Array<{ day: string; tokens: number; calls: number }> };
 
 async function prepareAvatarImage(file: File): Promise<{ blob: Blob; filename: string }> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type.toLowerCase())) throw new Error("請選擇 JPEG、PNG 或 WebP 圖片。")
@@ -46,6 +47,7 @@ function ProfileInner() {
   const nova = useApi<{ account: { balance: number; lifetimeEarned: number; lifetimeSpent: number }; ledger: Array<{ id: string; amount: number; reason: string; createdAt: string; balanceAfter: number }>; xp: Array<{ id: string; amount: number; reason: string; createdAt: string }> }>("/nova");
   const achievements = useApi<{ achievements: Array<{ id: string; code: string; title: string; description: string; icon: string; target: number; progress: number; unlockedAt: string | null; rewardNova: number }> }>("/achievements");
   const membership = useApi<{ membership: { tier: string; expiresAt: string | null } | null; isPro: boolean; quotas: Array<{ feature: string; label: string; used: number; limit: number; unlimited: boolean; proOnly: boolean }>; comparison: Array<{ feature: string; label: string; free: number; pro: number; proOnly: boolean }>; history: Array<{ id: string; action: string; days: number; reason: string; createdAt: string }> }>("/membership");
+  const aiUsage = useApi<AiUsage>("/ai/usage");
   const renewal = useApi<{ membership: { expiresAt: string | null } | null; isPro: boolean; daysRemaining: number | null; request: { wantsRenewal: boolean; reason: string; requestedFeatures: string[]; otherFeedback: string } | null }>("/membership/renewal");
   const proPlans = useApi<{ plans: Array<{ id: string; days: number; priceNova: number }> }>("/membership/pro-exchange-plans");
   const push = useApi<{ configured: boolean; publicKey: string; subscriptions: number }>("/push/config");
@@ -187,6 +189,13 @@ function ProfileInner() {
 
       {tab === "profile" && (
         <div className="grid gap-4 lg:grid-cols-2">
+          {aiUsage.data && <Card className="border-[#37d3ff]/30 bg-gradient-to-br from-[#37d3ff]/10 to-transparent lg:col-span-2" title="◒ AI Token 使用量" subtitle={`目前方案：${aiUsage.data.budget.plan === "pro" ? "Nova Pro" : "一般使用者"}；所有數字來自實際 AI 使用紀錄。`}>
+            <div className="grid gap-4 md:grid-cols-2">
+              {([['daily', '今日 Token', aiUsage.data.budget.daily, aiUsage.data.budget.dailyResetAt], ['monthly', '本月 Token', aiUsage.data.budget.monthly, aiUsage.data.budget.monthlyResetAt]] as const).map(([key, label, item, resetAt]) => <div key={key} className="rounded-2xl border border-[var(--line)] bg-black/10 p-4"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{label}</span><span className="text-xs tabular-nums text-[#b9f2ff]">{item.used.toLocaleString()} / {item.limit.toLocaleString()}</span></div><Progress value={item.used} max={item.limit} tone={item.percent >= 90 ? "gold" : "cyan"} /><div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-muted"><span>剩餘 {item.remaining.toLocaleString()} Token（{item.percent}%）</span><span>刷新：{new Date(resetAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span></div></div>)}
+            </div>
+            <p className="mt-3 text-xs leading-5 text-muted">AI 對話、圖片分析、AI 出題等會依實際回傳的輸入與輸出 Token 計算；瀏覽器朗讀、作答、PDF 列印不會扣 AI Token。接近上限時請先查看剩餘量，額度會在指定時間自動恢復。</p>
+            {aiUsage.data.daily.length > 0 && <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[380px] text-xs"><thead className="text-left text-muted"><tr><th className="pb-2">日期</th><th className="pb-2 text-right">Token</th><th className="pb-2 text-right">AI 次數</th></tr></thead><tbody>{aiUsage.data.daily.map((item) => <tr key={item.day} className="border-t border-[var(--line)]"><td className="py-2">{item.day}</td><td className="py-2 text-right tabular-nums">{item.tokens.toLocaleString()}</td><td className="py-2 text-right tabular-nums">{item.calls}</td></tr>)}</tbody></table></div>}
+          </Card>}
           {(me.data?.user.role === "admin" || me.data?.user.role === "owner") && (
             <Card className="border-[#ffc857]/40 bg-gradient-to-br from-[#ffc857]/10 to-transparent lg:col-span-2" title="▣ 後台權力擁有者入口" subtitle="手機版也可以從這裡管理使用者、公告、推播、PRO 與每週小考。">
               <Link href="/admin" className="focus-ring flex items-center justify-between gap-3 rounded-xl border border-[#ffc857]/30 bg-[#ffc857]/10 px-4 py-3 text-sm text-[#ffe7a8] transition hover:bg-[#ffc857]/20">
