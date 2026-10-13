@@ -172,6 +172,9 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
     const optionLetters = ["A", "B", "C", "D", "E", "F"];
     const isChoice = ["single", "truefalse", "part_of_speech", "meaning", "multiple"].includes(question.type);
     const options = question.options.length ? question.options : question.type === "truefalse" ? ["正確", "錯誤"] : [];
+    const imageUrls = Array.isArray(question.metadata?.imageUrls) ? question.metadata.imageUrls.filter((value): value is string => typeof value === "string") : [];
+    const passage = typeof question.metadata?.passage === "string" ? question.metadata.passage : "";
+    const sharedOptions = Array.isArray(question.metadata?.sharedOptions) ? question.metadata.sharedOptions.filter((value): value is string => typeof value === "string") : [];
     const answeredPercent = Math.round(((questionIndex + 1) / active.questions.length) * 100);
     return (
       <Card
@@ -186,7 +189,9 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
           </div>
           <div className="rounded-2xl border border-[var(--line)] bg-[#0b1730]/70 p-4 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3"><Badge tone="cyan">第 {questionIndex + 1} 題</Badge><span className="text-xs text-muted">{question.type === "multiple" ? "可複選" : "請選出最適合的答案"}</span></div>
+            {passage && <div className="mb-4 whitespace-pre-wrap rounded-xl border border-violet-300/20 bg-violet-300/[0.06] p-4 text-sm leading-7 text-violet-50"><p className="mb-2 text-xs font-bold text-violet-200">閱讀題組文章</p>{passage}</div>}
             <h3 className="text-base font-semibold leading-7 sm:text-lg"><MathContent>{question.stem}</MathContent></h3>
+            {imageUrls.map((url) => <img key={url} src={url} alt="題目原始圖片" className="mt-4 max-h-[28rem] w-full rounded-xl border border-white/10 object-contain" />)}
             {typeof question.metadata?.imageUrl === "string" && <img src={question.metadata.imageUrl} alt="題目關聯圖片" className="mt-4 max-h-80 w-full rounded-xl border border-white/10 object-contain" />}
             {isChoice && options.length > 0 ? (
               <div className="mt-5 space-y-3">
@@ -200,7 +205,7 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
                   }} className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all ${selected ? "border-[#4c8dff] bg-[#4c8dff]/15 shadow-[0_0_0_2px_rgba(76,141,255,.12)]" : "border-white/15 bg-white/[.025] hover:border-[#4c8dff]/70 hover:bg-[#4c8dff]/10"} ${checked?.isCorrect && selected ? "border-emerald-400 bg-emerald-400/15" : checked && !checked.isCorrect && selected ? "border-rose-400 bg-rose-400/15" : ""}`}><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${selected ? "bg-[#377dff] text-white" : "bg-white/10 text-muted"}`}>{optionLetters[optionIndex]}</span><span className="text-sm leading-6"><MathContent>{option}</MathContent></span></button>;
                 })}
               </div>
-            ) : question.type === "single" ? <div className="mt-5 rounded-xl border border-rose-300/30 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">這一題的四個選項資料不完整，無法作答。請刪除這份測驗後重新產生。</div> : <Input value={answers[question.id]?.[0] ?? ""} disabled={Boolean(checked)} onChange={(e) => void saveAnswer(question.id, [e.target.value])} placeholder="輸入你的答案" />}
+            ) : question.type === "fill" && sharedOptions.length > 0 ? <div className="mt-5 space-y-3"><p className="text-xs font-bold text-cyan-200">本題組共同選項（請在下方填入代號）</p><div className="rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm leading-7">{sharedOptions.map((option, index) => <p key={`${option}-${index}`}><b className="mr-2 text-cyan-200">{String.fromCharCode(65 + index)}.</b>{option}</p>)}</div><Input value={answers[question.id]?.[0] ?? ""} disabled={Boolean(checked)} onChange={(e) => void saveAnswer(question.id, [e.target.value.trim().toUpperCase()])} placeholder="輸入答案代號，例如 A" /></div> : question.type === "single" ? <div className="mt-5 rounded-xl border border-rose-300/30 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">這一題的四個選項資料不完整，無法作答。請刪除這份測驗後重新產生。</div> : <Input value={answers[question.id]?.[0] ?? ""} disabled={Boolean(checked)} onChange={(e) => void saveAnswer(question.id, [e.target.value])} placeholder="輸入你的答案" />}
             {checked && <div className={`mt-5 rounded-2xl border p-4 ${checked.isCorrect ? "border-emerald-400/40 bg-emerald-400/10" : "border-rose-400/40 bg-rose-400/10"}`}><p className="font-semibold">{checked.isCorrect ? "回答正確" : "回答錯誤"}</p>{!checked.isCorrect && <p className="mt-1 text-sm">正確答案：<MathContent>{checked.answer.join("、")}</MathContent></p>}{checked.explanation && <p className="mt-2 text-sm leading-6 text-muted">解析：<MathContent>{checked.explanation}</MathContent></p>}</div>}
           </div>
           <div className="flex flex-wrap items-center gap-2 print:hidden">

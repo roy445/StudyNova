@@ -23,7 +23,7 @@ export default function ExamVocabularyPage() {
   const [pdfBusy, setPdfBusy] = useState(false); const [tipOpen, setTipOpen] = useState(false); const [aiItemId, setAiItemId] = useState<string | null>(null); const [aiReply, setAiReply] = useState(""); const [aiQuestion, setAiQuestion] = useState(""); const [aiBusy, setAiBusy] = useState(false);
   const items = useMemo(() => (detail.data?.items ?? []).filter((item) => unit === "all" || item.unitId === unit), [detail.data, unit]);
   const current = items[index % Math.max(items.length, 1)];
-  useEffect(() => { if (typeof window !== "undefined" && !window.localStorage.getItem("studynova.exam-vocabulary-tip-v3")) setTipOpen(true); }, []);
+  useEffect(() => { if (typeof window === "undefined" || window.localStorage.getItem("studynova.exam-vocabulary-tip-v3")) return; const timer = window.setTimeout(() => setTipOpen(true), 0); return () => window.clearTimeout(timer); }, []);
   const closeTip = () => { setTipOpen(false); window.localStorage.setItem("studynova.exam-vocabulary-tip-v3", "1"); };
   const resetCard = () => { setRevealed(false); setAnswer(""); setFeedback(null); setAiReply(""); setAiItemId(null); };
   const next = () => { if (locked) return; setIndex((value) => (value + 1) % Math.max(items.length, 1)); resetCard(); };

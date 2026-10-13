@@ -5,12 +5,13 @@ import { aiQuestionConverterItems, aiQuestionConverterJobs, fileContexts, platfo
 import { runAiJson } from "./ai";
 import { consumeFeature, featureState, isProUser } from "./economy";
 import { fail } from "./core";
-import { readObject } from "./storage";
+import { putObject, readObject } from "./storage";
+import { renderPdfImagePages } from "./pdf-question-extract";
 
 export type ConvertedItem = {
   ordinal: number;
   pageNumber: number;
-  type: "single" | "multiple" | "fill" | "short_answer" | "essay" | "image_question" | "handwritten" | "unknown";
+  type: "single" | "multiple" | "fill" | "translation" | "short_answer" | "essay" | "image_question" | "handwritten" | "unknown";
   stem: string;
   options: string[];
   answer: string[];
@@ -19,6 +20,12 @@ export type ConvertedItem = {
   skipReason: string;
   sourceText: string;
   confidence: number;
+  sourcePages?: number[];
+  assetObjectIds?: string[];
+  passage?: string;
+  passageGroupId?: string;
+  sharedOptions?: string[];
+  blankNumber?: number;
 };
 
 export const CONVERTER_FEATURE = "ai_question_converter";
@@ -53,9 +60,10 @@ export function cleanItems(items: ConvertedItem[], allowedTypes: string[], maxQu
     const stem = String(item.stem ?? "").trim();
     let skipReason = String(item.skipReason ?? "").trim();
     if (!stem) skipReason ||= "無法可靠辨識題目文字";
-    if (["image_question", "handwritten"].includes(type)) skipReason ||= type === "image_question" ? "圖片為解題必要資訊，目前無法可靠互動化" : "手寫內容目前無法可靠辨識";
-    if (["short_answer", "essay"].includes(type)) skipReason ||= "簡答／申論題，無法可靠自動判分";
-    if (!allowedTypes.includes(type)) skipReason ||= "目前未開放此題型";
+    if (type === "handwritten") skipReason ||= "手寫題依規則略過，不進行自動分析";
+    if (["translation", "short_answer", "essay"].includes(type)) skipReason ||= "翻譯／簡答／非選題依規則略過，不進行自動分析";
+    if (type === "image_question") skipReason ||= "圖片題需先擷取對應頁面圖片後才能分析";
+    if (type !== "image_question" && !allowedTypes.includes(type)) skipReason ||= "目前未開放此題型";
     if (!answer.length) skipReason ||= "找不到對應答案／解答";
     if ((type === "single" || type === "multiple") && options.length < 2) skipReason ||= "選項不足，無法建立客觀題";
     if (Number(item.confidence ?? 0) < 0.68) skipReason ||= "辨識信心不足，為避免猜測而略過";
@@ -71,6 +79,12 @@ export function cleanItems(items: ConvertedItem[], allowedTypes: string[], maxQu
       skipReason,
       sourceText: String(item.sourceText ?? stem).slice(0, 6000),
       confidence: Number(item.confidence ?? 0),
+      sourcePages: Array.isArray(item.sourcePages) ? item.sourcePages.map(Number).filter((page) => Number.isInteger(page) && page > 0).slice(0, 4) : [],
+      assetObjectIds: [] as string[],
+      passage: String(item.passage ?? "").trim().slice(0, 16000),
+      passageGroupId: String(item.passageGroupId ?? "").trim().slice(0, 120),
+      sharedOptions: Array.isArray(item.sharedOptions) ? item.sharedOptions.map(String).map((value) => value.trim()).filter(Boolean).slice(0, 12) : [],
+      blankNumber: Number.isInteger(item.blankNumber) ? item.blankNumber : undefined,
       status: skipReason ? "skipped" : "interactive",
     };
   });
@@ -84,6 +98,7 @@ async function sourceTextForContext(context: typeof fileContexts.$inferSelect, m
   const detected = Array.isArray(context.detected) ? context.detected.map((item) => `[${item.kind}] ${item.text}`).join("\n") : "";
   let extracted = "";
   let pageCount = 0;
+  let imageParts: Array<{ page: number; base64: string }> = [];
   try {
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const pdf = await pdfjs.getDocument({ data: new Uint8Array(object.data), useWorkerFetch: false, isEvalSupported: false }).promise;
@@ -100,7 +115,14 @@ async function sourceTextForContext(context: typeof fileContexts.$inferSelect, m
     // A scanned PDF can have no text layer; existing OCR is still passed to AI.
     console.warn("[ai-question-converter] PDF text extraction unavailable", { contextId: context.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
   }
-  return { text: `檔名：${object.filename}\n既有 OCR／版面文字：\n${detected}\nPDF 可讀文字：\n${extracted}`.slice(0, 90000), pageCount };
+  try {
+    imageParts = await renderPdfImagePages(object.data, 1.15);
+    if (imageParts.length > maxPages) imageParts = imageParts.slice(0, maxPages);
+    pageCount ||= imageParts.length;
+  } catch (error) {
+    console.warn("[ai-question-converter] PDF page rendering unavailable", { contextId: context.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+  }
+  return { text: `檔名：${object.filename}\n既有 OCR／版面文字：\n${detected}\nPDF 可讀文字：\n${extracted}`.slice(0, 90000), pageCount, imageParts };
 }
 
 export async function createConverterJob(params: { userId: string; contextId: string; title?: string }) {
@@ -143,20 +165,35 @@ export async function processConverterJob(jobId: string) {
         userId: job.userId,
         temperature: 0.05,
         maxOutputTokens: 12000,
-        system: `你是 StudyNova 的高可靠 PDF 題目轉換器。只能從來源 PDF/OCR 找到的內容建立題目，絕對不可補寫、猜答案或把簡答題改成選擇題。請辨識題號、頁碼、題目、選項、答案與原始解答。若圖片是解題必要資訊、文字模糊、答案無法配對、手寫內容、簡答／申論題，必須輸出 skipReason 並略過。只有有明確答案且 confidence >= 0.68 的單選、多選、填充題才可互動化。originalExplanation 必須保留 PDF 原始解答；aiExplanation 只能是整理文字，不能改寫官方答案。回傳 JSON。`,
-        parts: [{ kind: "text", text: `來源內容：\n${source}` }],
+        system: `你是 StudyNova 的高可靠 PDF 題目轉換器。只能從來源 PDF/OCR/頁面圖片找到的內容建立題目，絕對不可補寫、猜答案或把翻譯題、簡答題、申論題、作文題、任何非選擇客觀題、手寫題改成可作答題；這些題型必須輸出 type 與 skipReason 並略過。只接受 single（單選）、multiple（多選，可有兩個以上答案）、fill（填充／克漏字且答案可可靠判定）。若題目需要看圖，輸出 type=image_question、sourcePages（PDF 頁碼）；若圖形無法可靠讀取，必須略過，不可猜測。閱讀題組必須把共同文章放在 passage，輸出 passageGroupId，讓同組題目共用文章。填充／克漏字題若有共同選項，輸出 sharedOptions，並輸出 blankNumber。翻譯題一律 type=translation。請辨識題號、頁碼、題目、選項、答案與原始解答；originalExplanation 保留原始內容，aiExplanation 只能整理文字，不能改寫官方答案。只有有明確答案且 confidence >= 0.68 才可互動化。回傳 JSON。`,
+        parts: [{ kind: "text", text: `來源內容：\n${source}` }, ...extracted.imageParts.map((image) => ({ kind: "image" as const, mimeType: "image/png", base64: image.base64 }))],
       },
       { pageCount: 0, hasAnswerKey: false, items: [] },
     );
     await db.update(aiQuestionConverterJobs).set({ stage: "matching", updatedAt: new Date() }).where(eq(aiQuestionConverterJobs.id, jobId));
-    const items = cleanItems(Array.isArray(data.items) ? data.items : [], Array.isArray(config.allowedTypes) ? config.allowedTypes.map(String) : DEFAULT_CONVERTER_CONFIG.allowedTypes, Number(config.maxQuestions));
+    const renderedObjectIds = new Map<number, string>();
+    for (const image of extracted.imageParts) {
+      const stored = await putObject({ userId: job.userId, filename: `ai-converter-${job.id}-page-${image.page}.png`, mimeType: "image/png", data: Buffer.from(image.base64, "base64"), allow: ["image"] });
+      renderedObjectIds.set(image.page, stored.id);
+    }
+    const items = cleanItems(Array.isArray(data.items) ? data.items : [], Array.isArray(config.allowedTypes) ? config.allowedTypes.map(String) : DEFAULT_CONVERTER_CONFIG.allowedTypes, Number(config.maxQuestions)).map((item) => {
+      const pages = (item.sourcePages?.length ? item.sourcePages : [item.pageNumber]).filter((page) => renderedObjectIds.has(page));
+      item.assetObjectIds = pages.map((page) => renderedObjectIds.get(page)!).filter(Boolean);
+      if (item.type === "image_question" && !item.assetObjectIds.length) item.skipReason ||= "題目需要圖片，但無法可靠擷取對應頁面";
+      if (item.type === "image_question" && item.assetObjectIds.length) {
+        item.type = item.sharedOptions?.length ? "multiple" : "single";
+        if (item.skipReason === "圖片題需先擷取對應頁面圖片後才能分析") item.skipReason = "";
+      }
+      if (item.skipReason) item.status = "skipped";
+      return item;
+    });
     const answerMissing = !data.hasAnswerKey || !items.some((item) => item.answer.length > 0);
     if (answerMissing) {
       for (const item of items) { if (!item.skipReason) item.skipReason = "找不到題目與答案／解答的可靠配對"; item.status = "skipped"; }
     }
     const summary = items.reduce<Record<string, number>>((out, item) => { const key = item.skipReason ? item.skipReason.includes("圖片") ? "image_question" : item.skipReason.includes("簡答") || item.type === "essay" ? "written" : item.skipReason.includes("答案") ? "missing_answer" : "unreadable" : "interactive"; out[key] = (out[key] ?? 0) + 1; return out; }, {});
     await db.delete(aiQuestionConverterItems).where(eq(aiQuestionConverterItems.jobId, jobId));
-    if (items.length) await db.insert(aiQuestionConverterItems).values(items.map((item) => ({ jobId, ordinal: item.ordinal, pageNumber: item.pageNumber, type: item.type, status: item.status, stem: item.stem, options: item.options, answer: item.answer, originalExplanation: item.originalExplanation, aiExplanation: item.aiExplanation, skipReason: item.skipReason, sourceText: item.sourceText, metadata: { confidence: item.confidence } })));
+    if (items.length) await db.insert(aiQuestionConverterItems).values(items.map((item) => ({ jobId, ordinal: item.ordinal, pageNumber: item.pageNumber, type: item.type, status: item.status, stem: item.stem, options: item.sharedOptions?.length ? item.sharedOptions : item.options, answer: item.answer, originalExplanation: item.originalExplanation, aiExplanation: item.aiExplanation, skipReason: item.skipReason, sourceText: item.sourceText, metadata: { confidence: item.confidence, assetObjectIds: item.assetObjectIds ?? [], sourcePages: item.sourcePages ?? [], passage: item.passage ?? "", passageGroupId: item.passageGroupId ?? "", sharedOptions: item.sharedOptions ?? [], blankNumber: item.blankNumber ?? null } })));
     const interactiveCount = items.filter((item) => item.status === "interactive").length;
     const skippedCount = items.length - interactiveCount;
     await db.update(aiQuestionConverterJobs).set({ status: "preview", stage: "quality_check", pageCount: extracted.pageCount || Number(data.pageCount ?? 0), totalCount: items.length, interactiveCount, skippedCount, summary, aiUsage: 1, processingMs: Date.now() - started, updatedAt: new Date() }).where(eq(aiQuestionConverterJobs.id, jobId));
@@ -177,7 +214,8 @@ export async function confirmConverterJob(userId: string, jobId: string) {
   const ids: string[] = [];
   for (const item of rows) {
     const fingerprint = createHash("sha256").update(`${userId}\n${item.type}\n${item.stem}`.toLowerCase()).digest("hex");
-    const inserted = await db.insert(questions).values({ ownerId: userId, origin: "user", sourceLabel: job.sourceFileName, sourceType: "ai_question_converter", subject: "其他", topic: job.title, type: item.type === "multiple" ? "multiple" : item.type === "fill" ? "fill" : "single", stem: item.stem, options: item.options, answer: item.answer, explanation: item.originalExplanation || item.aiExplanation || "此題原始檔案只有答案，沒有提供解答。", metadata: { converterJobId: job.id, originalExplanation: item.originalExplanation, aiExplanation: item.aiExplanation, sourceText: item.sourceText }, fingerprint }).onConflictDoNothing().returning({ id: questions.id });
+    const itemMetadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const inserted = await db.insert(questions).values({ ownerId: userId, origin: "user", sourceLabel: job.sourceFileName, sourceType: "ai_question_converter", subject: "其他", topic: job.title, type: item.type === "multiple" ? "multiple" : item.type === "fill" ? "fill" : "single", stem: item.stem, options: item.options, answer: item.answer, explanation: item.originalExplanation || item.aiExplanation || "此題原始檔案只有答案，沒有提供解答。", metadata: { converterJobId: job.id, originalExplanation: item.originalExplanation, aiExplanation: item.aiExplanation, sourceText: item.sourceText, ...itemMetadata }, fingerprint }).onConflictDoNothing().returning({ id: questions.id });
     if (inserted[0]) ids.push(inserted[0].id);
   }
   const quiz = (await db.insert(quizzes).values({ userId, title: job.title, subject: "其他", source: "ai_question_converter", timeLimitSec: Math.max(60, ids.length * 90), questionIds: ids, expiresAt: job.expiresAt, visibility: "private" }).returning())[0];
