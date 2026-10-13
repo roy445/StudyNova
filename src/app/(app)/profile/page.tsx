@@ -614,11 +614,11 @@ function ProfileInner() {
               )}
             </div>
             <div className="mt-4 rounded-2xl border border-[#ffc857]/25 bg-[#ffc857]/5 p-3">
-              <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-[#ffd98a]">用 Nova 點數兌換 Nova Pro</p><Badge tone="gold">最多 30 天</Badge></div>
-              <p className="mt-1 text-xs text-muted">天數越長總價越高，30 天方案提供最多使用天數但價格也最高。按下兌換前會先顯示扣除的 Nova。</p>
+              <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-[#ffd98a]">用 Nova 點數兌換 Nova Pro</p><Badge tone="gold">可累加</Badge></div>
+              <p className="mt-1 text-xs text-muted">天數越長總價越高；如果目前仍是 Pro，兌換天數會接續到現有到期日，不會覆蓋原本期限。按下兌換前會先顯示扣除的 Nova。</p>
               <p className="mt-2 rounded-xl border border-[#ffc857]/25 bg-[#ffc857]/8 px-3 py-2 text-xs text-[#ffe4a3]">每個方案按鈕都會先顯示本次實際扣除的 Nova，確認後才會兌換。</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {proPlans.data?.plans.map((plan) => <Button key={plan.id} disabled={membership.data?.isPro === true} variant={plan.days === 30 ? "gold" : "ghost"} onClick={async () => { if (!confirmNovaSpend(`兌換 Nova Pro ${plan.days} 天`, plan.priceNova, nova.data?.account.balance ?? null)) return; try { const res = await apiPost<{ plan: { days: number; priceNova: number }; balance: number }>("/membership/pro-exchange", { planId: plan.id, requestId: crypto.randomUUID() }); toast.push("success", `已兌換 Nova Pro ${res.plan.days} 天，剩餘 ${res.balance} Nova`); await Promise.all([nova.reload(), membership.reload(), me.reload()]); } catch (err) { toast.push("error", errorMessage(err)); } }}>{membership.data?.isPro ? "目前為 Pro" : `${plan.days} 天・✦ ${plan.priceNova} Nova`}</Button>)}
+                {proPlans.data?.plans.map((plan) => <Button key={plan.id} variant={plan.days >= 30 ? "gold" : "ghost"} onClick={async () => { if (!confirmNovaSpend(`兌換 Nova Pro ${plan.days} 天`, plan.priceNova, nova.data?.account.balance ?? null)) return; try { const res = await apiPost<{ plan: { days: number; priceNova: number }; balance: number }>("/membership/pro-exchange", { planId: plan.id, requestId: crypto.randomUUID() }); toast.push("success", `已累加 Nova Pro ${res.plan.days} 天，剩餘 ${res.balance} Nova`); await Promise.all([nova.reload(), membership.reload(), me.reload()]); } catch (err) { toast.push("error", errorMessage(err)); } }}>{membership.data?.isPro ? `再加 ${plan.days} 天・✦ ${plan.priceNova} Nova` : `${plan.days} 天・✦ ${plan.priceNova} Nova`}</Button>)}
               </div>
             </div>
             <div className="mt-3">

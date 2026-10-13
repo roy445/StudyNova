@@ -141,9 +141,10 @@ export const routes: RouteDef[] = [
     const sets = await db.select().from(examVocabularySets).where(and(eq(examVocabularySets.enabled, true), eq(examVocabularySets.published, true))).orderBy(asc(examVocabularySets.sortOrder), asc(examVocabularySets.createdAt));
     const result = [];
     for (const set of sets) {
-      const [{ unitCount }] = await db.select({ unitCount: count() }).from(examVocabularyUnits).where(and(eq(examVocabularyUnits.setId, set.id), eq(examVocabularyUnits.enabled, true)));
+      const rawUnits = await db.select().from(examVocabularyUnits).where(and(eq(examVocabularyUnits.setId, set.id), eq(examVocabularyUnits.enabled, true))).orderBy(asc(examVocabularyUnits.sortOrder), asc(examVocabularyUnits.createdAt));
+      const unitCount = uniqueUnits(rawUnits).length;
       const [{ itemCount }] = await db.select({ itemCount: count() }).from(examVocabularyItems).where(eq(examVocabularyItems.setId, set.id));
-      result.push(publicSet(set, Number(unitCount ?? 0), Number(itemCount ?? 0)));
+      result.push(publicSet(set, unitCount, Number(itemCount ?? 0)));
     }
     return { enabled: result.length > 0, sets: result, totalItems: result.reduce((sum, item) => sum + item.itemCount, 0) };
   }}),

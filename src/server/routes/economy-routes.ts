@@ -244,11 +244,9 @@ export const routes: RouteDef[] = [
       const body = await ctx.json(z.object({ planId: z.string().uuid(), requestId: z.string().uuid().optional() }));
       const plan = (await db.select().from(novaProExchangePlans).where(and(eq(novaProExchangePlans.id, body.planId), eq(novaProExchangePlans.enabled, true))).limit(1))[0];
       if (!plan) throw notFound("找不到可用的 Nova Pro 方案");
-      if (plan.days > 30) throw badRequest("Nova Pro 兌換方案最多 30 天");
       const idempotencyKey = body.requestId ?? crypto.randomUUID();
       const result = await exchangeNovaForPro({ userId: user.userId, days: plan.days, priceNova: plan.priceNova, requestId: idempotencyKey });
       if (result.status === "conflict") throw conflict("此兌換請求識別碼已被使用");
-      if (result.status === "active") throw conflict("Nova Pro 有效期間不可兌換，請於會員到期後再試");
       const transaction = result.transaction;
       await notify({ userId: user.userId, kind: "membership", title: "✨ Nova Pro 兌換成功", body: `已使用 ${plan.priceNova} Nova 兌換 ${plan.days} 天 Nova Pro。`, link: "/profile?tab=pass", dedupeKey: `proexchange-notify:${transaction.id}` });
       return { exchanged: result.status === "exchanged", plan, transaction, balance: (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0 };

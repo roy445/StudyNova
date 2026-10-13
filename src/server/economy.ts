@@ -184,8 +184,6 @@ export async function exchangeNovaForPro(params: { userId: string; days: number;
     const membership = (await tx.select().from(memberships).where(eq(memberships.userId, params.userId)).for("update").limit(1))[0];
     const previous = (await tx.select().from(novaProExchangeTransactions).where(eq(novaProExchangeTransactions.idempotencyKey, params.requestId)).limit(1))[0];
     if (previous) return previous.userId === params.userId ? { status: "existing" as const, transaction: previous } : { status: "conflict" as const, transaction: previous };
-    if (membership?.tier === "pro" && (!membership.expiresAt || membership.expiresAt > new Date())) return { status: "active" as const, transaction: null };
-
     if (params.priceNova > 0) {
       const ledgerKey = `proexchange:${params.requestId}`;
       const priorDebit = (await tx.select({ id: novaTransactions.id }).from(novaTransactions).where(eq(novaTransactions.idempotencyKey, ledgerKey)).limit(1))[0];
@@ -198,7 +196,10 @@ export async function exchangeNovaForPro(params: { userId: string; days: number;
     }
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + params.days * 86_400_000);
+    const base = membership?.tier === "pro" && membership.expiresAt && new Date(membership.expiresAt) > now
+      ? new Date(membership.expiresAt)
+      : now;
+    const expiresAt = new Date(base.getTime() + params.days * 86_400_000);
     await tx.update(memberships).set({ tier: "pro", expiresAt, grantedBy: params.userId, updatedAt: now }).where(eq(memberships.userId, params.userId));
     await tx.insert(membershipHistory).values({ userId: params.userId, action: "extend", tier: "pro", days: params.days, reason: `Nova 點數兌換 ${params.days} 天`, actorId: params.userId });
     const transaction = (await tx.insert(novaProExchangeTransactions).values({ userId: params.userId, days: params.days, priceNova: params.priceNova, idempotencyKey: params.requestId }).returning())[0];
