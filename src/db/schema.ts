@@ -3615,6 +3615,8 @@ export const examPrepSubjects = pgTable(
     questionTypes: jsonb("question_types").$type<string[]>().notNull().default([]),
     difficulty: text("difficulty").notNull().default("normal"),
     questionBankId: uuid("question_bank_id").references(() => questionBanks.id, { onDelete: "set null" }),
+    openAt: timestamp("open_at", { withTimezone: true }),
+    closeAt: timestamp("close_at", { withTimezone: true }),
     createdAt: created(),
     updatedAt: updated(),
   },

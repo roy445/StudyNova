@@ -10,6 +10,15 @@ const studentTitle = (value: string) => value.replace(/^\s*\d{3,4}學年度\s*/,
 type Activity = { id: string; name: string; description: string; educationLevel: string; grade: number; semester: string; examName: string; scope: string; openAt: string | null; closeAt: string | null; effectiveStatus: string; subjects: Array<{ subject: string; chapters: string[]; units: string[] }> };
 
 function studentDescription() { return "依本次段考範圍整理題目，完成作答後可查看詳解與學習進度。" }
+function subjectBackground(subject: string) {
+  const value = subject.toLocaleLowerCase();
+  if (value.includes("國文") || value.includes("語文")) return "/assets/exam-subject-cards/chinese.png";
+  if (value.includes("英文") || value.includes("英語")) return "/assets/exam-subject-cards/english.png";
+  if (value.includes("數學")) return "/assets/exam-subject-cards/math.png";
+  if (value.includes("自然") || value.includes("理化") || value.includes("生物")) return "/assets/exam-subject-cards/natural-science.png";
+  if (value.includes("社會") || value.includes("歷史") || value.includes("地理") || value.includes("公民")) return "/assets/exam-subject-cards/social-studies.png";
+  return "/assets/exam-subject-cards/math.png";
+}
 
 const statusLabel: Record<string, { label: string; tone: "green" | "gold" | "rose" | "muted" | "cyan" }> = {
   open: { label: "開放中", tone: "green" },
@@ -26,6 +35,6 @@ export default function ExamPrepPage() {
     {api.loading && <Card><Skeleton lines={6} /></Card>}
     {api.error && <ErrorState message={api.error} onRetry={api.reload} />}
     {api.data && !api.data.activities.length && <EmptyState icon="⌁" title="目前沒有可查看的段考活動" hint="管理員建立並開放段考衝刺活動後，活動會出現在這裡。" />}
-    {api.data?.activities.map((activity) => { const status = statusLabel[activity.effectiveStatus] ?? statusLabel.draft; return <Link href={`/exam-prep/${activity.id}`} key={activity.id} className="group block"><Card className="transition group-hover:-translate-y-0.5 group-hover:border-cyan-300/50" title={studentTitle(activity.name)} subtitle={`${activity.examName}・${activity.educationLevel === "senior" ? "高中" : "國中"}${activity.grade}${activity.semester ? `・${activity.semester}` : ""}`}><div className="flex flex-wrap items-center gap-2"><Badge tone={status.tone}>{status.label}</Badge>{activity.openAt && <span className="text-xs text-muted">開放：{formatTaipeiDateTime(activity.openAt)}</span>}{activity.closeAt && <span className="text-xs text-muted">截止：{formatTaipeiDateTime(activity.closeAt)}</span>}</div><p className="mt-3 text-sm leading-6 text-muted">{studentDescription()}</p><div className="mt-4 flex flex-wrap gap-2">{activity.subjects.map((subject) => <span key={subject.subject} className="rounded-full bg-white/5 px-3 py-1 text-xs text-muted">{subject.subject}</span>)}</div><p className="mt-4 text-sm font-semibold text-cyan-200">查看活動資訊 →</p></Card></Link>; })}
+    {api.data?.activities.map((activity) => { const status = statusLabel[activity.effectiveStatus] ?? statusLabel.draft; return <Link href={`/exam-prep/${activity.id}`} key={activity.id} className="group block"><Card className="transition group-hover:-translate-y-0.5 group-hover:border-cyan-300/50" title={studentTitle(activity.name)} subtitle={`${activity.examName}・${activity.educationLevel === "senior" ? "高中" : "國中"}${activity.grade}${activity.semester ? `・${activity.semester}` : ""}`}><div className="flex flex-wrap items-center gap-2"><Badge tone={status.tone}>{status.label}</Badge>{activity.openAt && <span className="text-xs text-muted">開放：{formatTaipeiDateTime(activity.openAt)}</span>}{activity.closeAt && <span className="text-xs text-muted">截止：{formatTaipeiDateTime(activity.closeAt)}</span>}</div><p className="mt-3 text-sm leading-6 text-muted">{studentDescription()}</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{activity.subjects.map((subject) => <span key={subject.subject} className="relative min-h-16 overflow-hidden rounded-xl border border-white/15 bg-[#071226] bg-cover bg-center px-4 py-3 text-sm font-semibold text-white shadow-inner" style={{ backgroundImage: `linear-gradient(90deg, rgba(4,12,29,.96) 0%, rgba(4,12,29,.78) 55%, rgba(4,12,29,.35) 100%), url(${subjectBackground(subject.subject)})` }}>{subject.subject}</span>)}</div><p className="mt-4 text-sm font-semibold text-cyan-200">查看活動資訊 →</p></Card></Link>; })}
   </div>;
 }

@@ -16,6 +16,8 @@ const subjectInput = z.object({
   questionTypes: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
   difficulty: z.string().trim().min(1).max(30).default("normal"),
   questionBankId: z.string().uuid().nullable().optional(),
+  openAt: z.string().datetime().nullable().optional(),
+  closeAt: z.string().datetime().nullable().optional(),
 });
 
 const activityInput = z.object({
@@ -58,6 +60,14 @@ function dateOrNull(value: string | null | undefined) {
   return value ? new Date(value) : null;
 }
 
+function subjectEffectiveStatus(subject: typeof examPrepSubjects.$inferSelect, activity: typeof examPrepActivities.$inferSelect, now = new Date()): ActivityStatus {
+  const activityStatus = effectiveStatus(activity, now);
+  if (activityStatus === "archived" || activityStatus === "closed") return activityStatus;
+  if (subject.closeAt && subject.closeAt <= now) return "closed";
+  if (subject.openAt && subject.openAt > now) return "scheduled";
+  return activityStatus;
+}
+
 function effectiveStatus(activity: typeof examPrepActivities.$inferSelect, now = new Date()): ActivityStatus {
   if (activity.status === "archived") return "archived";
   if (activity.closeAt && activity.closeAt <= now) return "closed";
@@ -83,7 +93,8 @@ async function activityWithSubjects(id: string) {
   const activity = (await db.select().from(examPrepActivities).where(eq(examPrepActivities.id, id)).limit(1))[0];
   if (!activity) throw notFound("找不到段考衝刺活動");
   const subjects = await db.select().from(examPrepSubjects).where(eq(examPrepSubjects.activityId, id)).orderBy(asc(examPrepSubjects.subject));
-  return { activity: { ...activity, effectiveStatus: effectiveStatus(activity) }, subjects };
+  const now = new Date();
+  return { activity: { ...activity, effectiveStatus: effectiveStatus(activity, now) }, subjects: subjects.map((subject) => ({ ...subject, effectiveStatus: subjectEffectiveStatus(subject, activity, now) })) };
 }
 
 export const routes: RouteDef[] = [
@@ -100,7 +111,7 @@ export const routes: RouteDef[] = [
       const subjects = rows.length ? await db.select().from(examPrepSubjects).where(or(...rows.map((row) => eq(examPrepSubjects.activityId, row.id)))).orderBy(asc(examPrepSubjects.subject)) : [];
       const subjectMap = new Map<string, typeof subjects>();
       for (const subject of subjects) subjectMap.set(subject.activityId, [...(subjectMap.get(subject.activityId) ?? []), subject]);
-      return { timezone: "Asia/Taipei", profile: settings ?? null, activities: rows.map((activity) => ({ ...activity, effectiveStatus: effectiveStatus(activity, now), subjects: subjectMap.get(activity.id) ?? [] })) };
+      return { timezone: "Asia/Taipei", profile: settings ?? null, activities: rows.map((activity) => ({ ...activity, effectiveStatus: effectiveStatus(activity, now), subjects: (subjectMap.get(activity.id) ?? []).map((subject) => ({ ...subject, effectiveStatus: subjectEffectiveStatus(subject, activity, now) })) })) };
     },
   }),
   route({
@@ -114,7 +125,10 @@ export const routes: RouteDef[] = [
       // Do not expose the legacy whole-quiz resume flow. The activity page
       // always opens the mode selector; per-question state is restored only
       // after the student explicitly starts the current question set.
-      return { ...result, resume: null, access: { canEnter: status === "open", reason: status === "scheduled" ? "活動尚未開放" : status === "closed" ? "活動已關閉，目前只能查看複習資源" : status === "archived" ? "活動已封存" : status === "open" ? "" : "活動尚未準備完成" } };
+      const openSubjects = result.subjects.filter((subject) => subject.effectiveStatus === "open");
+      const hasSubjectWindows = result.subjects.some((subject) => subject.openAt || subject.closeAt);
+      const canEnter = status === "open" && (!hasSubjectWindows || openSubjects.length > 0);
+      return { ...result, resume: null, access: { canEnter, reason: status === "scheduled" ? "活動尚未開放" : status === "closed" ? "活動已關閉，目前只能查看複習資源" : status === "archived" ? "活動已封存" : !canEnter && hasSubjectWindows ? "目前沒有科目在開放時間內" : status === "open" ? "" : "活動尚未準備完成" } };
     },
   }),
   route({
@@ -125,11 +139,14 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const result = await activityWithSubjects(ctx.params.id);
       if (result.activity.effectiveStatus !== "open") throw fail("REQ_VALIDATION", { message: "這個段考衝刺活動目前不在開放作答時間。" });
-      if (!result.activity.questionBankId) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前還沒有正式題庫。" });
-      const bankQuestions = await db.select({ id: questions.id, createdAt: questions.createdAt }).from(questions).where(eq(questions.bankId, result.activity.questionBankId)).orderBy(asc(questions.createdAt));
+      const openSubjects = result.subjects.filter((subject) => subject.effectiveStatus === "open");
+      const subjectBankIds = openSubjects.map((subject) => subject.questionBankId).filter((value): value is string => Boolean(value));
+      const bankIds = subjectBankIds.length ? subjectBankIds : (result.activity.questionBankId ? [result.activity.questionBankId] : []);
+      if (!bankIds.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前還沒有正式題庫。" });
+      const bankQuestions = await db.select({ id: questions.id, createdAt: questions.createdAt }).from(questions).where(bankIds.length === 1 ? eq(questions.bankId, bankIds[0]) : inArray(questions.bankId, bankIds)).orderBy(asc(questions.createdAt));
       if (!bankQuestions.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個活動目前沒有可作答題目。" });
       const existing = (await db.select().from(quizzes).where(and(eq(quizzes.userId, user.userId), eq(quizzes.source, `exam_prep:${ctx.params.id}`))).orderBy(desc(quizzes.createdAt)).limit(1))[0];
-      const existingQuestionCount = existing?.questionIds.length ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, result.activity.questionBankId), inArray(questions.id, existing.questionIds))))[0]?.count ?? 0) : 0;
+      const existingQuestionCount = existing?.questionIds.length ? Number((await db.select({ count: sql<number>`count(*)::int` }).from(questions).where(and(eq(questions.bankId, result.activity.questionBankId!), inArray(questions.id, existing.questionIds))))[0]?.count ?? 0) : 0;
       // A previous quiz can outlive a question-bank refresh. Never return that
       // stale quiz: the client would resume successfully but receive no items.
       const reusable = existing && existingQuestionCount > 0 ? existing : null;
@@ -166,7 +183,8 @@ export const routes: RouteDef[] = [
     handler: async () => {
       const activities = await db.select().from(examPrepActivities).orderBy(desc(examPrepActivities.createdAt));
       const subjects = activities.length ? await db.select().from(examPrepSubjects).where(or(...activities.map((row) => eq(examPrepSubjects.activityId, row.id)))) : [];
-      return { timezone: "Asia/Taipei", activities: activities.map((activity) => ({ ...activity, effectiveStatus: effectiveStatus(activity), subjects: subjects.filter((subject) => subject.activityId === activity.id) })) };
+      const now = new Date();
+      return { timezone: "Asia/Taipei", activities: activities.map((activity) => ({ ...activity, effectiveStatus: effectiveStatus(activity, now), subjects: subjects.filter((subject) => subject.activityId === activity.id).map((subject) => ({ ...subject, effectiveStatus: subjectEffectiveStatus(subject, activity, now) })) })) };
     },
   }),
   route({
@@ -244,7 +262,7 @@ export const routes: RouteDef[] = [
       if (body.openMode === "scheduled" && !openAt) throw fail("SYS_CONFLICT", { message: "預約開放必須設定開放時間" });
       const created = await db.transaction(async (tx) => {
         const activity = (await tx.insert(examPrepActivities).values({ slug: body.slug ? slugify(body.slug) : slugify(body.name), name: body.name, description: body.description, educationLevel: body.educationLevel, grade: body.grade, semester: body.semester, examName: body.examName, scope: body.scope, openMode: body.openMode, status: body.openMode === "scheduled" ? "scheduled" : "draft", openAt, closeAt, questionBankId: body.questionBankId ?? null, settings: body.settings, createdBy: admin.userId }).returning())[0];
-        if (body.subjects.length) await tx.insert(examPrepSubjects).values(body.subjects.map((subject) => ({ ...subject, activityId: activity.id, questionBankId: subject.questionBankId ?? null })));
+        if (body.subjects.length) await tx.insert(examPrepSubjects).values(body.subjects.map((subject) => ({ ...subject, activityId: activity.id, openAt: dateOrNull(subject.openAt), closeAt: dateOrNull(subject.closeAt), questionBankId: subject.questionBankId ?? null })));
         return activity;
       });
       return await activityWithSubjects(created.id);
@@ -284,7 +302,10 @@ export const routes: RouteDef[] = [
       const activity = (await db.select({ id: examPrepActivities.id }).from(examPrepActivities).where(eq(examPrepActivities.id, ctx.params.id)).limit(1))[0];
       if (!activity) throw notFound("找不到段考衝刺活動");
       const body = await ctx.json<z.infer<typeof subjectInput>>(subjectInput);
-      const subject = (await db.insert(examPrepSubjects).values({ ...body, activityId: activity.id, questionBankId: body.questionBankId ?? null }).onConflictDoUpdate({ target: [examPrepSubjects.activityId, examPrepSubjects.subject], set: { chapters: body.chapters, units: body.units, questionTypes: body.questionTypes, difficulty: body.difficulty, questionBankId: body.questionBankId ?? null, updatedAt: new Date() } }).returning())[0];
+      const openAt = dateOrNull(body.openAt);
+      const closeAt = dateOrNull(body.closeAt);
+      if (openAt && closeAt && closeAt <= openAt) throw fail("SYS_CONFLICT", { message: "科目截止時間必須晚於開放時間" });
+      const subject = (await db.insert(examPrepSubjects).values({ ...body, activityId: activity.id, openAt, closeAt, questionBankId: body.questionBankId ?? null }).onConflictDoUpdate({ target: [examPrepSubjects.activityId, examPrepSubjects.subject], set: { chapters: body.chapters, units: body.units, questionTypes: body.questionTypes, difficulty: body.difficulty, openAt, closeAt, questionBankId: body.questionBankId ?? null, updatedAt: new Date() } }).returning())[0];
       return { subject };
     },
   }),
