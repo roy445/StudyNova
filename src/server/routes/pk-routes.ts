@@ -375,7 +375,9 @@ async function matchPayload(matchId: string, userId: string) {
   }
   const players = await db.select({ player: pkMatchPlayers, displayName: users.displayName, novaId: users.novaId, avatarSeed: users.avatarSeed, botName: pkBotProfiles.displayName }).from(pkMatchPlayers).leftJoin(users, eq(users.userId, pkMatchPlayers.userId)).leftJoin(pkBotProfiles, eq(pkBotProfiles.id, pkMatchPlayers.botProfileId)).where(eq(pkMatchPlayers.matchId, matchId)).orderBy(asc(pkMatchPlayers.rank), desc(pkMatchPlayers.score));
   const questionRows = await db.select().from(pkMatchQuestions).where(eq(pkMatchQuestions.matchId, matchId)).orderBy(asc(pkMatchQuestions.orderIndex));
-  const room = match.roomId ? (await db.select().from(pkRooms).where(eq(pkRooms.id, match.roomId)).limit(1))[0] ?? null : null;
+  const room = (match.roomId
+    ? (await db.select().from(pkRooms).where(eq(pkRooms.id, match.roomId)).limit(1))[0]
+    : (await db.select().from(pkRooms).where(eq(pkRooms.matchId, match.id)).limit(1))[0]) ?? null;
   const answerCount = await db.select({ count: sql<number>`count(*)::int` }).from(pkPlayerAnswers).where(and(eq(pkPlayerAnswers.matchId, matchId), eq(pkPlayerAnswers.userId, userId)));
   return {
     match: { id: match.id, roomId: match.roomId, status: match.status, mode: match.mode, teamMode: match.teamMode, subject: match.subject, grade: match.grade, unit: match.unit, difficulty: match.difficulty, questionCount: match.questionCount, questionTimeSec: match.questionTimeSec, currentQuestion: match.currentQuestion, startsAt: match.startsAt, endsAt: match.endsAt, finishedAt: match.finishedAt, allowLateJoin: match.allowLateJoin, allowSpectators: match.allowSpectators, showRanking: match.showRanking },
