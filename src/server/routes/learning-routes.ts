@@ -1190,7 +1190,6 @@ export const routes: RouteDef[] = [
     path: "/vocabulary-overview/catalog",
     auth: "user",
     handler: async () => {
-      await ensureSeeded();
       const rows = await db.execute(sql`select level, count(*)::int as count from daily_words where level in ('junior', 'senior') group by level`);
       const counts = new Map(rows.rows.map((row) => [String(row.level), Number(row.count)]));
       return {
@@ -1210,7 +1209,8 @@ export const routes: RouteDef[] = [
       const user = ctx.requireUser();
       const level = ctx.params.level === "senior" || ctx.params.level === "junior" ? ctx.params.level : null;
       if (!level) throw badRequest("單字程度只能選擇 junior 或 senior");
-      const letter = (ctx.query.get("letter") ?? "all").toUpperCase();
+      const letter = (ctx.query.get("letter") ?? "all").trim().toUpperCase();
+      if (letter !== "ALL" && !/^[A-Z]$/.test(letter)) throw badRequest("字母只能選擇 A 到 Z 或 all");
       const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(${dailyWords.word}, 1)) = ${letter}` : sql``;
       const rows = await db.execute(sql`
         select

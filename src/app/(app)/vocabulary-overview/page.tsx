@@ -76,7 +76,7 @@ export default function VocabularyOverviewPage() {
       {displayMode === "card" && <div className="mt-4 flex flex-wrap gap-2">{([ ["learn", "學習卡"], ["zh2en", "中翻英"], ["en2zh", "英翻中"] ] as const).map(([key, label]) => <Button key={key} size="sm" variant={studyMode === key ? "gold" : "ghost"} onClick={() => { setStudyMode(key); setRevealed(false); }}>{label}</Button>)}</div>}
     </Card>
 
-    {wordsApi.loading && <Skeleton lines={8} />}
+    {wordsApi.loading && <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.06] p-4 text-sm text-cyan-100" role="status" aria-live="polite">正在載入{letter === "all" ? "全部" : `字母 ${letter}`} 單字…</div>}
     {wordsApi.error && <ErrorState message={wordsApi.error} onRetry={wordsApi.reload} />}
     {wordsApi.data && !words.length && <EmptyState icon="⌁" title={`${letter === "all" ? "這個程度" : `字母 ${letter}`} 尚無單字`} hint="請稍後再試，或切換其他程度與字母。" />}
 
