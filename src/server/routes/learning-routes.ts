@@ -1211,7 +1211,10 @@ export const routes: RouteDef[] = [
       if (!level) throw badRequest("單字程度只能選擇 junior 或 senior");
       const letter = (ctx.query.get("letter") ?? "all").trim().toUpperCase();
       if (letter !== "ALL" && !/^[A-Z]$/.test(letter)) throw badRequest("字母只能選擇 A 到 Z 或 all");
-      const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(${dailyWords.word}, 1)) = ${letter}` : sql``;
+      // The raw queries below alias daily_words as `dw`; referencing the
+      // Drizzle column here emits "daily_words"."word", which PostgreSQL
+      // rejects because only the `dw` alias is visible in these queries.
+      const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(dw.word, 1)) = ${letter}` : sql``;
       const requestedLimit = Number(ctx.query.get("limit") ?? 120);
       const requestedOffset = Number(ctx.query.get("offset") ?? 0);
       const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 200) : 120;
