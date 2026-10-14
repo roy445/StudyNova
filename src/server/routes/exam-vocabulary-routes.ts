@@ -7,7 +7,7 @@ import { examVocabularyImportJobs, examVocabularyItems, examVocabularySets, exam
 import { route, type RouteDef } from "../router";
 import { fail, notFound } from "../core";
 import { deleteObject, putObject, readObject } from "../storage";
-import { embedCjkFont, embedMathFont, sanitizeTextForCjkPdf } from "../cjk-font";
+import { embedCjkFont, embedMathFont, hasCjkGlyph, hasMathGlyph, sanitizeTextForCjkPdf } from "../cjk-font";
 import { writeAudit } from "../audit";
 import { queue } from "../queue";
 import { normalizeKkPhonetic } from "../pronunciation";
@@ -127,7 +127,14 @@ async function createPdf(set: typeof examVocabularySets.$inferSelect, units: Arr
     let x = left;
     page.drawRectangle({ x: left, y: y - rowHeight, width: tableWidth, height: rowHeight, color: index % 2 === 0 ? rgb(0.97, 0.985, 1) : rgb(0.91, 0.95, 0.98), borderColor: rgb(0.68, 0.78, 0.86), borderWidth: 0.5 });
     wrapped.forEach((lines, cellIndex) => {
-      lines.forEach((line, lineIndex) => page.drawText(line, { x: x + cellPadding, y: y - cellPadding - lineIndex * lineHeight - fontSize, size: fontSize, font, color: cellIndex === 0 ? rgb(0.18, 0.32, 0.46) : rgb(0.08, 0.12, 0.2) }));
+      lines.forEach((line, lineIndex) => {
+        // Noto Sans CJK TC renders the Chinese table correctly but does not
+        // contain every KK/IPA extension glyph. Select the embedded DejaVu
+        // Sans face for a line made of phonetic/math glyphs instead of letting
+        // PDF viewers replace them with tofu boxes.
+        const lineFont = Array.from(line).some((character) => !hasCjkGlyph(character) && hasMathGlyph(character)) ? mathFont : font;
+        page.drawText(line, { x: x + cellPadding, y: y - cellPadding - lineIndex * lineHeight - fontSize, size: fontSize, font: lineFont, color: cellIndex === 0 ? rgb(0.18, 0.32, 0.46) : rgb(0.08, 0.12, 0.2) });
+      });
       x += columns[cellIndex].width;
       page.drawLine({ start: { x, y: y - rowHeight }, end: { x, y }, thickness: 0.45, color: rgb(0.68, 0.78, 0.86) });
     });
