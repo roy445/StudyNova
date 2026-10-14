@@ -379,13 +379,22 @@ async function matchPayload(matchId: string, userId: string) {
     ? (await db.select().from(pkRooms).where(eq(pkRooms.id, match.roomId)).limit(1))[0]
     : (await db.select().from(pkRooms).where(eq(pkRooms.matchId, match.id)).limit(1))[0]) ?? null;
   const answerCount = await db.select({ count: sql<number>`count(*)::int` }).from(pkPlayerAnswers).where(and(eq(pkPlayerAnswers.matchId, matchId), eq(pkPlayerAnswers.userId, userId)));
+  const ownAnsweredCount = Number(answerCount[0]?.count ?? 0);
+  const answerReview = ownAnsweredCount >= match.questionCount || match.status === "completed"
+    ? await db.select({ questionId: pkPlayerAnswers.questionId, selectedOption: pkPlayerAnswers.selectedOption, isCorrect: pkPlayerAnswers.isCorrect, correctAnswer: pkMatchQuestions.canonicalAnswer, explanation: pkMatchQuestions.explanation })
+      .from(pkPlayerAnswers)
+      .innerJoin(pkMatchQuestions, eq(pkMatchQuestions.id, pkPlayerAnswers.questionId))
+      .where(and(eq(pkPlayerAnswers.matchId, matchId), eq(pkPlayerAnswers.userId, userId)))
+      .orderBy(asc(pkMatchQuestions.orderIndex))
+    : [];
   return {
     match: { id: match.id, roomId: match.roomId, status: match.status, mode: match.mode, teamMode: match.teamMode, subject: match.subject, grade: match.grade, unit: match.unit, difficulty: match.difficulty, questionCount: match.questionCount, questionTimeSec: match.questionTimeSec, currentQuestion: match.currentQuestion, startsAt: match.startsAt, endsAt: match.endsAt, finishedAt: match.finishedAt, allowLateJoin: match.allowLateJoin, allowSpectators: match.allowSpectators, showRanking: match.showRanking },
     room: room ? { id: room.id, name: room.name, roomCode: room.roomCode, shareToken: room.shareToken, visibility: room.visibility, maxPlayers: room.maxPlayers, status: room.status, hostId: room.hostId } : null,
-    me: { userId, score: player.score, combo: player.combo, maxCombo: player.maxCombo, correctCount: player.correctCount, answeredCount: Number(answerCount[0]?.count ?? 0), rank: player.rank },
+    me: { userId, score: player.score, combo: player.combo, maxCombo: player.maxCombo, correctCount: player.correctCount, answeredCount: ownAnsweredCount, rank: player.rank },
     reconnectToken,
     players: players.map((row) => ({ ...row.player, userId: row.player.role === "bot" ? `bot:${row.player.botProfileId ?? row.player.id}` : row.player.userId, displayName: row.player.role === "bot" ? `${row.botName || "PK Bot"} 🤖` : row.displayName, novaId: row.player.role === "bot" ? `${row.botName || "PK-BOT"}-BOT` : row.novaId, avatarSeed: row.player.role === "bot" ? "nova" : row.avatarSeed, optionOrders: undefined })),
     questions: questionRows.map((question) => publicQuestion(question, userId, matchId)),
+    answerReview,
   };
 }
 
@@ -789,8 +798,9 @@ export const routes: RouteDef[] = [
       if (existing) return { accepted: false, replay: true, isCorrect: existing.isCorrect, scoreAwarded: existing.scoreAwarded, combo: existing.comboAfter, score: access.player.score };
       const serverElapsedMs = access.player.currentQuestionStartedAt ? Math.max(0, Date.now() - access.player.currentQuestionStartedAt.getTime()) : access.match.questionTimeSec * 1000;
       const withinTime = serverElapsedMs <= access.match.questionTimeSec * 1000 + 1_000;
-      const isCorrect = withinTime && normalizePkText(body.selectedOption) === normalizePkText(question.canonicalAnswer);
-      const result = calculatePkScore({ correct: isCorrect, elapsedMs: serverElapsedMs, comboBefore: access.player.combo, questionTimeSec: access.match.questionTimeSec });
+      const skipped = body.selectedOption === "__SKIPPED__";
+      const isCorrect = !skipped && withinTime && normalizePkText(body.selectedOption) === normalizePkText(question.canonicalAnswer);
+      const result = skipped ? { points: 0, combo: 0 } : calculatePkScore({ correct: isCorrect, elapsedMs: serverElapsedMs, comboBefore: access.player.combo, questionTimeSec: access.match.questionTimeSec });
       const answerRows = await db.insert(pkPlayerAnswers).values({ matchId: ctx.params.id, playerId: access.player.id, questionId: question.id, userId: user.userId, selectedOption: body.selectedOption, responseMs: serverElapsedMs, isCorrect, scoreAwarded: result.points, comboAfter: result.combo, idempotencyKey: body.idempotencyKey }).onConflictDoNothing().returning();
       if (!answerRows[0]) return { accepted: false, replay: true, isCorrect: false, scoreAwarded: 0, combo: access.player.combo, score: access.player.score };
       if (question.sourceQuestionId) await recordQuestionAnswer(question.sourceQuestionId, isCorrect, serverElapsedMs);
