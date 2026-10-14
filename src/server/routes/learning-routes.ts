@@ -1214,7 +1214,7 @@ export const routes: RouteDef[] = [
       // The raw queries below alias daily_words as `dw`; referencing the
       // Drizzle column here emits "daily_words"."word", which PostgreSQL
       // rejects because only the `dw` alias is visible in these queries.
-      const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(dw.word, 1)) = ${letter}` : sql``;
+      const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(trim(dw.word), 1)) = ${letter}` : sql``;
       const requestedLimit = Number(ctx.query.get("limit") ?? 120);
       const requestedOffset = Number(ctx.query.get("offset") ?? 0);
       const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 200) : 120;
@@ -1238,7 +1238,7 @@ export const routes: RouteDef[] = [
         from daily_words dw
         left join word_progress wp on wp.word_id = dw.id and wp.user_id = ${user.userId}
         where dw.level = ${level} ${letterFilter}
-        order by lower(dw.word)
+        order by lower(trim(dw.word)), dw.id
         limit ${limit} offset ${offset}
       `);
       return { level, letter: letter === "ALL" ? "all" : letter, count: rows.rows.length, total, hasMore: offset + rows.rows.length < total, words: rows.rows };

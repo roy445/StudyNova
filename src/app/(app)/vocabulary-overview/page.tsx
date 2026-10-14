@@ -55,8 +55,16 @@ export default function VocabularyOverviewPage() {
     if (!wordsApi.data?.hasMore || loadingMore) return;
     setLoadingMore(true);
     try {
-      const nextPage = await apiGet<WordResponse>(`/vocabulary-overview/${level}?letter=${letter}&offset=${words.length}&limit=120`);
-      wordsApi.setData((previous) => previous ? { ...previous, words: [...previous.words, ...nextPage.words], count: previous.count + nextPage.count, hasMore: nextPage.hasMore, total: nextPage.total } : nextPage);
+      const loadedCount = wordsApi.data.words.length;
+      const nextPage = await apiGet<WordResponse>(`/vocabulary-overview/${level}?letter=${letter}&offset=${loadedCount}&limit=120`);
+      wordsApi.setData((previous) => {
+        if (!previous) return nextPage;
+        // Keep the UI idempotent if a browser/cache retry returns an item that
+        // is already visible. The backend also uses a stable id tie-breaker.
+        const existingIds = new Set(previous.words.map((word) => word.id));
+        const appended = nextPage.words.filter((word) => !existingIds.has(word.id));
+        return { ...previous, words: [...previous.words, ...appended], count: previous.count + appended.length, hasMore: nextPage.hasMore, total: nextPage.total };
+      });
     } finally {
       setLoadingMore(false);
     }
