@@ -603,8 +603,57 @@ export const routes: RouteDef[] = [
       settingsError(config, "customRoomEnabled");
       const body = await ctx.json(z.object({ name: z.string().min(1).max(80), visibility, password: z.string().max(80).default(""), maxPlayers: z.number().int().min(2).max(12).default(8), mode: matchMode, teamMode: teamMode.default("solo"), gradeLevel: pkGrade, difficulty: z.enum(["easy", "normal", "hard"]).default("normal"), allowLateJoin: z.boolean().default(false), allowSpectators: z.boolean().default(false), showRanking: z.boolean().default(true), inviteIds: z.array(z.string().uuid()).max(20).default([]), sourceType: z.enum(["bank", "vocabulary", "material"]).default("bank"), sourceId: z.string().uuid().nullable().optional(), questionBankId: z.string().uuid().nullable().optional() }));
       if (body.visibility === "private" && !body.password) throw badRequest("私人房間請設定房間密碼，或使用分享連結邀請");
+      const activeRooms = await db.select({ count: sql<number>`count(*)::int` }).from(pkRooms).where(and(eq(pkRooms.hostId, user.userId), sql`${pkRooms.status} in ('waiting', 'started', 'locked')`));
+      if (Number(activeRooms[0]?.count ?? 0) >= 5) throw conflict("每個帳號最多同時建立 5 個 PK 房間，請先刪除或結束現有房間");
       const result = await createMatch(user.userId, { mode: body.mode, teamMode: body.teamMode, gradeLevel: body.gradeLevel, subject: "全站題目", unit: "", difficulty: body.difficulty, questionCount: config.minQuestions, questionTimeSec: config.minTimeSec, allowLateJoin: body.allowLateJoin, allowSpectators: body.allowSpectators, showRanking: body.showRanking, rewardNova: config.defaultRewardNova, rewardXp: config.defaultRewardXp, sourceType: body.sourceType, sourceId: body.sourceId ?? null, questionBankId: body.questionBankId ?? null }, { name: body.name, visibility: body.visibility, password: body.password, maxPlayers: Math.min(config.maxPlayers, body.maxPlayers), inviteIds: body.inviteIds, roomMode: body.teamMode });
       return { match: result.match, room: result.room, shareUrl: `/pk?room=${result.room?.shareToken ?? ""}` };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/pk/rooms/mine",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const rooms = await db.select({ room: pkRooms, matchStatus: pkMatches.status, playerCount: sql<number>`count(${pkMatchPlayers.id}) filter (where ${pkMatchPlayers.role} = 'player')::int` }).from(pkRooms).innerJoin(pkMatches, eq(pkMatches.id, pkRooms.matchId)).leftJoin(pkMatchPlayers, eq(pkMatchPlayers.matchId, pkMatches.id)).where(eq(pkRooms.hostId, user.userId)).groupBy(pkRooms.id, pkMatches.id).orderBy(desc(pkRooms.createdAt)).limit(20);
+      return { rooms: rooms.map((row) => ({ ...row.room, passwordHash: undefined, matchStatus: row.matchStatus, playerCount: Number(row.playerCount ?? 0) })) };
+    },
+  }),
+  route({
+    method: "DELETE",
+    path: "/pk/rooms/:id",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const room = (await db.select().from(pkRooms).where(and(eq(pkRooms.id, ctx.params.id), eq(pkRooms.hostId, user.userId))).limit(1))[0];
+      if (!room) throw notFound("找不到你建立的 PK 房間");
+      if (!room.matchId) throw conflict("這個房間目前沒有對應賽場");
+      const match = (await db.select().from(pkMatches).where(eq(pkMatches.id, room.matchId)).limit(1))[0];
+      if (match && ["in_progress", "countdown", "paused"].includes(match.status)) throw conflict("PK 已開始，不能刪除進行中的房間");
+      await db.transaction(async (tx) => {
+        await tx.update(pkRooms).set({ status: "closed", updatedAt: new Date() }).where(eq(pkRooms.id, room.id));
+        await tx.update(pkMatches).set({ status: "cancelled", finishedAt: new Date(), updatedAt: new Date() }).where(eq(pkMatches.id, room.matchId!));
+      });
+      publishPkEvent(room.matchId, { type: "room_deleted", payload: { roomId: room.id } });
+      return { deleted: true, roomId: room.id };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/pk/rooms/:id/kick",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ userId: z.string().uuid() }));
+      const room = (await db.select().from(pkRooms).where(and(eq(pkRooms.id, ctx.params.id), eq(pkRooms.hostId, user.userId))).limit(1))[0];
+      if (!room || !room.matchId) throw notFound("找不到你建立的 PK 房間");
+      if (body.userId === user.userId) throw badRequest("房主不能踢出自己");
+      const match = (await db.select().from(pkMatches).where(eq(pkMatches.id, room.matchId)).limit(1))[0];
+      if (!match || ["completed", "cancelled"].includes(match.status)) throw conflict("這個房間已經結束");
+      const removed = await db.update(pkMatchPlayers).set({ role: "spectator", connectionState: "disconnected", finishedAt: new Date() }).where(and(eq(pkMatchPlayers.matchId, room.matchId), eq(pkMatchPlayers.userId, body.userId), eq(pkMatchPlayers.role, "player"))).returning({ id: pkMatchPlayers.id });
+      if (!removed[0]) throw notFound("找不到這位房間成員");
+      await emitMatchEvent(room.matchId, "player_kicked", user.userId, { userId: body.userId, roomId: room.id });
+      return { kicked: true, userId: body.userId };
     },
   }),
   route({

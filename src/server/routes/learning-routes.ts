@@ -1203,6 +1203,28 @@ export const routes: RouteDef[] = [
 
   route({
     method: "GET",
+    path: "/vocabulary-overview/suggestions",
+    auth: "user",
+    handler: async (ctx) => {
+      const level = ctx.query.get("level") === "senior" ? "senior" : "junior";
+      const query = (ctx.query.get("q") ?? "").trim().slice(0, 60);
+      if (!query) return { suggestions: [] };
+      const pattern = `%${query}%`;
+      const prefix = `${query}%`;
+      const rows = await db.execute(sql`
+        select dw.word, dw.meaning, dw.level
+        from daily_words dw
+        where dw.level = ${level}
+          and (dw.word ilike ${pattern} or dw.meaning ilike ${pattern})
+        order by case when dw.word ilike ${prefix} then 0 else 1 end, lower(trim(dw.word)), dw.id
+        limit 8
+      `);
+      return { suggestions: rows.rows.map((row) => ({ word: String(row.word ?? ""), meaning: String(row.meaning ?? ""), level: String(row.level ?? level) })) };
+    },
+  }),
+
+  route({
+    method: "GET",
     path: "/vocabulary-overview/:level",
     auth: "user",
     handler: async (ctx) => {

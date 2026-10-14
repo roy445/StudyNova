@@ -8,6 +8,7 @@ type Level = { id: "junior" | "senior"; label: string; description: string; coun
 type Word = { id: string; word: string; meaning: string; meanings?: string[]; phrases?: string[]; partOfSpeech: string; phonetic: string; example: string; exampleZh: string; familiarity: number; correctCount: number; wrongCount: number };
 type Catalog = { levels: Level[] };
 type WordResponse = { level: string; letter: string; count: number; total: number; hasMore: boolean; words: Word[] };
+type Suggestion = { word: string; meaning: string; level: string };
 type DisplayMode = "overview" | "card";
 type StudyMode = "learn" | "zh2en" | "en2zh";
 
@@ -29,6 +30,8 @@ export default function VocabularyOverviewPage() {
   const [letter, setLetter] = useState("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const wordsPath = `/vocabulary-overview/${level}?letter=${encodeURIComponent(letter)}${search ? `&search=${encodeURIComponent(search)}` : ""}`;
   const wordsApi = useApi<WordResponse>(wordsPath, [level, letter, search]);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("overview");
@@ -46,6 +49,19 @@ export default function VocabularyOverviewPage() {
   const selectedLevel = catalog.data?.levels.find((item) => item.id === level);
 
   useEffect(() => { setIndex(0); setRevealed(false); setAiWordId(null); setAiReply(""); }, [level, letter, search]);
+
+  useEffect(() => {
+    const query = searchInput.trim();
+    if (query.length < 1) { setSuggestions([]); return; }
+    const timer = window.setTimeout(() => {
+      void apiGet<{ suggestions: Suggestion[] }>(`/vocabulary-overview/suggestions?level=${level}&q=${encodeURIComponent(query)}`)
+        .then((result) => { setSuggestions(result.suggestions); setSuggestionsOpen(true); })
+        .catch(() => setSuggestions([]));
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [level, searchInput]);
+
+  const applySearch = (value: string) => { setSearchInput(value); setSearch(value.trim()); setSuggestionsOpen(false); };
 
   const progressText = useMemo(() => {
     if (!current) return "尚無單字";
@@ -94,11 +110,16 @@ export default function VocabularyOverviewPage() {
     </Card>
 
     <Card title="搜尋、選擇字母與學習模式" subtitle="可搜尋英文單字、中文解釋、詞性與例句；切換字母會重新載入該分類的完整單字。">
-      <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); setSearch(searchInput.trim()); }}>
-        <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="搜尋單字、中文意思或例句…" aria-label="搜尋單字" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-muted focus:border-cyan-300/60" />
+      <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); applySearch(searchInput); }}>
+        <div className="relative min-w-0 flex-1">
+          <input value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setSuggestionsOpen(true); }} onFocus={() => { if (suggestions.length) setSuggestionsOpen(true); }} placeholder="搜尋單字、中文意思或例句…" aria-label="搜尋單字" aria-autocomplete="list" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-muted focus:border-cyan-300/60" />
+          {suggestionsOpen && suggestions.length > 0 && <div role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-cyan-300/25 bg-[#101a32] p-1 shadow-2xl">
+            {suggestions.map((item) => <button key={`${item.level}:${item.word}`} type="button" role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => applySearch(item.word)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-cyan-300/10"><span className="font-bold text-cyan-100">{item.word}</span><span className="min-w-0 truncate text-xs text-muted">{item.meaning}</span></button>)}
+          </div>}
+        </div>
         <div className="flex gap-2">
           <Button type="submit" variant="outline">搜尋</Button>
-          {search && <Button type="button" variant="ghost" onClick={() => { setSearchInput(""); setSearch(""); }}>清除</Button>}
+          {search && <Button type="button" variant="ghost" onClick={() => { setSearchInput(""); setSearch(""); setSuggestions([]); setSuggestionsOpen(false); }}>清除</Button>}
         </div>
       </form>
       <div className="flex flex-wrap gap-1.5">{LETTERS.map((item) => <button key={item} type="button" onClick={() => setLetter(item)} className={`min-w-9 rounded-lg border px-2.5 py-2 text-xs font-bold transition ${letter === item ? "border-cyan-300 bg-cyan-300/20 text-cyan-100" : "border-white/10 bg-white/[.03] text-muted hover:border-cyan-300/40"}`}>{item === "all" ? "全部" : item}</button>)}</div>
