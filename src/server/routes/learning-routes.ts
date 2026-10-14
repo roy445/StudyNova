@@ -1187,6 +1187,57 @@ export const routes: RouteDef[] = [
 
   route({
     method: "GET",
+    path: "/vocabulary-overview/catalog",
+    auth: "user",
+    handler: async () => {
+      await ensureSeeded();
+      const rows = await db.execute(sql`select level, count(*)::int as count from daily_words where level in ('junior', 'senior') group by level`);
+      const counts = new Map(rows.rows.map((row) => [String(row.level), Number(row.count)]));
+      return {
+        levels: [
+          { id: "junior", label: "國中 2000 單", description: "國中英文核心字彙，適合基礎累積與複習", count: counts.get("junior") ?? 0, target: 2000 },
+          { id: "senior", label: "高中 7000 單", description: "高中英文參考詞彙，適合段考與大考準備", count: counts.get("senior") ?? 0, target: 7000 },
+        ],
+      };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/vocabulary-overview/:level",
+    auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const level = ctx.params.level === "senior" || ctx.params.level === "junior" ? ctx.params.level : null;
+      if (!level) throw badRequest("單字程度只能選擇 junior 或 senior");
+      const letter = (ctx.query.get("letter") ?? "all").toUpperCase();
+      const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(${dailyWords.word}, 1)) = ${letter}` : sql``;
+      const rows = await db.execute(sql`
+        select
+          dw.id,
+          dw.word,
+          dw.meaning,
+          dw.meanings,
+          dw.phrases,
+          dw.part_of_speech as "partOfSpeech",
+          dw.us_phonetic as phonetic,
+          dw.example,
+          dw.example_zh as "exampleZh",
+          coalesce(wp.familiarity, 0)::int as familiarity,
+          coalesce(wp.correct_count, 0)::int as "correctCount",
+          coalesce(wp.wrong_count, 0)::int as "wrongCount"
+        from daily_words dw
+        left join word_progress wp on wp.word_id = dw.id and wp.user_id = ${user.userId}
+        where dw.level = ${level} ${letterFilter}
+        order by lower(dw.word)
+        limit 7000
+      `);
+      return { level, letter: letter === "ALL" ? "all" : letter, count: rows.rows.length, words: rows.rows };
+    },
+  }),
+
+  route({
+    method: "GET",
     path: "/words/daily",
     auth: "user",
     handler: async (ctx) => {
