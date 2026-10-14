@@ -101,10 +101,11 @@ export const routes: RouteDef[] = [
       const bankQuestions = (await db.select({ id: questions.id, subject: questions.subject, type: questions.type, stem: questions.stem, options: questions.options, answer: questions.answer, explanation: questions.explanation, difficulty: questions.difficulty, metadata: questions.metadata }).from(questions).where(and(eq(questions.bankId, bankId), eq(questions.status, "published"))).orderBy(sql`random()`).limit(100)).filter((question) => !isHiddenEnglishListeningQuestion(question)).slice(0, 50);
       if (!bankQuestions.length) throw fail("REQ_NOTHING_TO_REVIEW", { message: "這個科目目前沒有已發布題目，請先完成題庫審核。" });
       const room = await db.transaction(async (tx) => {
-        // Serialize room creation per user so two fast clicks cannot bypass the one-room rule.
+        // Serialize room creation per user so fast clicks cannot bypass the
+        // five-active-room limit.
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${user.userId}))`);
-        const existing = (await tx.select({ id: examPkRooms.id, roomCode: examPkRooms.roomCode }).from(examPkRooms).where(and(eq(examPkRooms.hostUserId, user.userId), inArray(examPkRooms.status, ["WAITING", "RUNNING"]))).orderBy(desc(examPkRooms.createdAt)).limit(1))[0];
-        if (existing) throw fail("SYS_CONFLICT", { message: `你已經有一間進行中的 PK 房（房號 ${existing.roomCode}），請先使用「我的房間」回到該房。` });
+        const activeRooms = await tx.select({ id: examPkRooms.id }).from(examPkRooms).where(and(eq(examPkRooms.hostUserId, user.userId), inArray(examPkRooms.status, ["WAITING", "RUNNING"]))).limit(5);
+        if (activeRooms.length >= 5) throw fail("SYS_CONFLICT", { message: "每個帳號最多同時建立 5 間進行中的 PK 房，請先刪除或結束其中一間。" });
         let code = roomCode();
         for (let attempt = 0; attempt < 5; attempt += 1) {
           const exists = (await tx.select({ id: examPkRooms.id }).from(examPkRooms).where(eq(examPkRooms.roomCode, code)).limit(1))[0];

@@ -47,7 +47,9 @@ export const routes: RouteDef[] = [
   route({
     method: "GET",
     path: "/customization/active",
-    auth: "user",
+    // Published theme tokens are non-sensitive public configuration. This must
+    // remain readable while the application is restoring an expired session.
+    auth: "none",
     handler: async () => {
       const categories = await db.select().from(customizationCategories).where(and(eq(customizationCategories.enabled, true), eq(customizationCategories.status, "published"))).orderBy(customizationCategories.sortOrder);
       const versions = await db.select().from(customizationVersions).where(eq(customizationVersions.status, "published"));
