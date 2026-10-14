@@ -27,7 +27,7 @@ import { badRequest, fail, forbidden, notFound, sanitizeText, slugToken, todaySt
 import { putObject, readObject, deleteObject, signObjectUrl } from "../storage";
 import { consumeFeature, grantLearningReward, progressDailyTask, bumpAchievement } from "../economy";
 import { runAi, runAiJson, aiConfigured, type AiPart } from "../ai";
-import { solveOcrImage } from "../ocr-solver";
+import { prepareOcrImage, solveOcrImage } from "../ocr-solver";
 import { AppError } from "../errors";
 import { routes as quizRoutes } from "./quiz-routes";
 import { recordStudy } from "./learning-routes";
@@ -44,13 +44,14 @@ export async function extractText(mime: string, data: Buffer, userId: string, su
     throw badRequest("這份 PDF 沒有可確認的完整文字層，請先到圖片 OCR 逐頁辨識後，再交給 AI幫你出題。");
   }
   if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED", { hint: "此檔案需要 AI 視覺辨識。你可以改上傳純文字檔，或請管理員設定 AI Provider。" });
+  const prepared = await prepareOcrImage(data);
   const res = await runAi({
     feature: mime === "application/pdf" ? "material_pdf_extract" : "ocr",
     userId,
             system: `你是精準的全科 OCR 與文件解析引擎。${subjectStrategy(subject)}請完整輸出文件中的文字，保留段落、題號與公式；公式與化學式必須直接使用可閱讀的 Unicode（例如 H₂O、x²、√x、a⁄b），不要輸出 LaTeX 或美元符號。只輸出文字，不要加入說明。`,
     parts: [
       { kind: "text", text: "請完整輸出這份文件的文字內容。" },
-      { kind: mime === "application/pdf" ? "image" : "image", mimeType: mime, base64: data.toString("base64") },
+      { kind: "image", mimeType: prepared.mimeType, base64: prepared.data.toString("base64") },
     ],
     maxOutputTokens: 4000,
     temperature: 0.1,

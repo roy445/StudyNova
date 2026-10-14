@@ -4,6 +4,7 @@ import { examVocabularyImportJobs, examVocabularyItems } from "@/db/schema";
 import { readObject } from "./storage";
 import { runAiJson } from "./ai";
 import { normalizeKkPhonetic } from "./pronunciation";
+import { prepareOcrImage } from "./ocr-solver";
 
 export type ExtractedWord = { word?: string; meaning?: string; partOfSpeech?: string; phonetic?: string; phrase?: string; phraseMeaning?: string; example?: string; exampleZh?: string };
 
@@ -52,13 +53,14 @@ export async function processExamVocabularyImport(jobId: string) {
   await db.update(examVocabularyImportJobs).set({ status: "processing", progress: 10, errorMessage: "", updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id));
   try {
     const object = await readObject(job.objectId);
+    const prepared = await prepareOcrImage(object.data);
     await db.update(examVocabularyImportJobs).set({ progress: 35, updatedAt: new Date() }).where(eq(examVocabularyImportJobs.id, job.id));
     const { data } = await runAiJson<{ words?: ExtractedWord[]; readable?: boolean; message?: string }>({
       feature: "learning_vocabulary_ocr",
       userId: job.uploadedBy,
       system: "你是高中英文段考單字 OCR 專家。請辨識圖片或 PDF 中所有單字與片語，不能只取幾個。只回傳 JSON：{words:[{word,meaning,partOfSpeech,phonetic,phrase,phraseMeaning,example,exampleZh}],readable:true}。phonetic 必須是台灣常用 KK 音標，使用 Unicode 原始字元，可用 / / 或 [ ] 包住；不要輸出 IPA 標籤、KK音標文字、HTML、\\uXXXX、亂碼或不確定結果，看不清楚時 phonetic 請留空。word 必須是英文單字或片語的核心形式；中文意義保留繁體中文；看不清楚的項目不要猜。若圖片不是單字資料，words 回傳空陣列。",
-      parts: [{ kind: "image", mimeType: object.mimeType, base64: object.data.toString("base64") }],
-      maxOutputTokens: 6000,
+      parts: [{ kind: "image", mimeType: prepared.mimeType, base64: prepared.data.toString("base64") }],
+      maxOutputTokens: 4500,
     }, { words: [], readable: true });
     const translatedWords = await fillMissingMeanings(data.words ?? [], job.uploadedBy);
     const rows = translatedWords.map((item, index) => ({

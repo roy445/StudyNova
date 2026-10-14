@@ -1,9 +1,11 @@
 import { fail } from "./errors";
-import { runAi, runAiJson } from "./ai";
+import { runAiJson } from "./ai";
 import { subjectStrategy } from "./subject-strategies";
+import sharp from "sharp";
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const OCR_MAX_SIDE = 1800;
 
 export type OcrBlock = { content: string; x: number; y: number; width: number; height: number; confidence: number; page: number; line: number; block: number };
 
@@ -20,16 +22,31 @@ export function validateOcrImage(data: Buffer, mimeType: string) {
   if (data.length < 128) throw fail("IMAGE_INVALID");
 }
 
+/** Normalize an image once before sending it to a vision provider. */
+export async function prepareOcrImage(data: Buffer) {
+  try {
+    const compressed = await sharp(data)
+      .rotate()
+      .resize({ width: OCR_MAX_SIDE, height: OCR_MAX_SIDE, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 72, mozjpeg: true })
+      .toBuffer();
+    return { data: compressed, mimeType: "image/jpeg" } as const;
+  } catch {
+    return { data, mimeType: "image/jpeg" } as const;
+  }
+}
+
 export async function solveOcrImage(params: { userId: string; data: Buffer; mimeType: string; feature: string; prompt?: string; subject?: string }) {
-  validateOcrImage(params.data, params.mimeType);
+  const prepared = await prepareOcrImage(params.data);
+  validateOcrImage(prepared.data, prepared.mimeType);
   const { data, meta } = await runAiJson<{ text?: string; blocks?: OcrBlock[] }>(
     {
       feature: params.feature,
       userId: params.userId,
       system: `你是高精度全科教育 OCR 引擎。${subjectStrategy(params.subject)}只能辨識影像中實際可見的文字，不得猜測。保留題號、選項、段落、表格、公式與標點；公式使用 LaTeX；不確定文字請標記 [不確定:候選]。只輸出 JSON：{text:string,blocks:[{content:string,x:number,y:number,width:number,height:number,confidence:number,page:number,line:number,block:number}]}。座標為 0 到 1。`,
-      parts: [{ kind: "text", text: params.prompt ?? "辨識圖片全部可見文字。" }, { kind: "image", mimeType: params.mimeType, base64: params.data.toString("base64") }],
+      parts: [{ kind: "text", text: params.prompt ?? "辨識圖片全部可見文字。" }, { kind: "image", mimeType: prepared.mimeType, base64: prepared.data.toString("base64") }],
       temperature: 0.05,
-      maxOutputTokens: 2200,
+      maxOutputTokens: 1600,
     },
     { text: "", blocks: [] },
   );
@@ -43,24 +60,6 @@ export async function solveOcrImage(params: { userId: string; data: Buffer; mime
   // instruction. Preserve that text instead of converting it to SN-AI-6013.
   const providerText = String(meta.text ?? "").replace(/^```(?:text|json)?/i, "").replace(/```$/i, "").trim();
   let text = String(data.text ?? (blocks.map((block) => block.content).join("\n") || providerText)).trim();
-  if (!text && !blocks.length) {
-    // A few providers return an empty/invalid structured response for vision
-    // requests but can still answer a plain-text OCR request. Retry once with
-    // a small text-only contract before reporting an OCR failure.
-    try {
-      const plain = await runAi({
-        feature: `${params.feature}_text_fallback`,
-        userId: params.userId,
-        system: "你是 OCR 引擎。只輸出圖片中實際看得到的文字，保留題號、選項、段落與標點；不要輸出 JSON、Markdown 或說明。看不清楚的地方標記為 [不確定]。",
-        parts: [{ kind: "image", mimeType: params.mimeType, base64: params.data.toString("base64") }],
-        temperature: 0,
-        maxOutputTokens: 2200,
-      });
-      text = plain.text.trim();
-    } catch (fallbackError) {
-      console.error("[ocr] structured and plain-text fallback failed", { feature: params.feature, error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) });
-    }
-  }
   if (!text && !blocks.length) {
     console.error("[ocr] provider returned no usable text", { feature: params.feature, outputTokens: meta.outputTokens, provider: meta.provider, model: meta.model });
     throw fail("AI_OCR_EMPTY", { details: { provider: meta.provider, model: meta.model, outputTokens: meta.outputTokens } });
