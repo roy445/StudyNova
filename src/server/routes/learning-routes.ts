@@ -1212,6 +1212,12 @@ export const routes: RouteDef[] = [
       const letter = (ctx.query.get("letter") ?? "all").trim().toUpperCase();
       if (letter !== "ALL" && !/^[A-Z]$/.test(letter)) throw badRequest("字母只能選擇 A 到 Z 或 all");
       const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(${dailyWords.word}, 1)) = ${letter}` : sql``;
+      const requestedLimit = Number(ctx.query.get("limit") ?? 120);
+      const requestedOffset = Number(ctx.query.get("offset") ?? 0);
+      const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 200) : 120;
+      const offset = Number.isFinite(requestedOffset) ? Math.max(Math.trunc(requestedOffset), 0) : 0;
+      const totalRows = await db.execute(sql`select count(*)::int as count from daily_words dw where dw.level = ${level} ${letterFilter}`);
+      const total = Number(totalRows.rows[0]?.count ?? 0);
       const rows = await db.execute(sql`
         select
           dw.id,
@@ -1230,9 +1236,9 @@ export const routes: RouteDef[] = [
         left join word_progress wp on wp.word_id = dw.id and wp.user_id = ${user.userId}
         where dw.level = ${level} ${letterFilter}
         order by lower(dw.word)
-        limit 7000
+        limit ${limit} offset ${offset}
       `);
-      return { level, letter: letter === "ALL" ? "all" : letter, count: rows.rows.length, words: rows.rows };
+      return { level, letter: letter === "ALL" ? "all" : letter, count: rows.rows.length, total, hasMore: offset + rows.rows.length < total, words: rows.rows };
     },
   }),
 
