@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoMark, NoviAvatar, Wordmark, type NoviState } from "./brand";
 import { SymbolIcon, type SymbolName } from "./Symbol";
 import { Badge, Button, Field, Input, Modal, Skeleton, useToast } from "./ui";
-import { apiGet, apiPatch, apiPost, errorMessage, trackAnalytics, useApi } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, trackAnalytics, useApi } from "@/lib/api";
 import { APP_VERSION } from "@/lib/app-version";
 import { MaintenanceNotice } from "@/components/MaintenanceNotice";
 import type { MaintenanceState } from "@/server/maintenance";
@@ -458,6 +458,16 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     setPkRoomOpen(false);
     router.push(`/exam-prep/${room.activityId}/pk?roomId=${room.id}`);
   }, [router]);
+  const deleteMyPkRoom = useCallback(async (room: MyExamPkRoom) => {
+    if (room.hostUserId !== user.userId || !window.confirm(`確定要刪除房間「${room.roomCode}」嗎？`)) return;
+    try {
+      await apiDelete(`/exam-pk/rooms/${room.id}`);
+      toast.push("success", "PK 房已刪除");
+      await openPkRooms();
+    } catch (error) {
+      toast.push("error", errorMessage(error));
+    }
+  }, [openPkRooms, toast, user.userId]);
 
   const redeemCoupon = useCallback(async () => {
     const code = redeemCode.trim();
@@ -847,7 +857,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
             <div className="flex items-center justify-between"><p className="text-sm font-semibold">我的房間</p><Button size="sm" variant="ghost" onClick={() => void openPkRooms()} loading={pkRoomLoading}>重新整理</Button></div>
             {pkRoomLoading && <Skeleton lines={3} />}
             {!pkRoomLoading && myPkRooms.length === 0 && <p className="mt-3 rounded-xl border border-[var(--line)] p-4 text-center text-xs text-muted">目前沒有已建立或已加入的段考 PK 房。</p>}
-            <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">{myPkRooms.map((room) => <button key={room.id} type="button" onClick={() => openMyPkRoom(room)} className="focus-ring flex w-full items-center justify-between rounded-xl border border-[var(--line)] bg-white/[.03] p-3 text-left transition hover:border-cyan-300/50 hover:bg-cyan-300/[.06]"><span className="min-w-0"><span className="block truncate text-sm font-semibold">{room.activityName}・{room.subject}</span><span className="mt-1 block text-xs text-muted">房號 {room.roomCode}・{room.hostUserId === user.userId ? "我建立" : "我已加入"}</span></span><Badge tone={room.status === "RUNNING" ? "green" : room.status === "WAITING" ? "gold" : "muted"}>{room.status === "RUNNING" ? "進行中" : room.status === "WAITING" ? "等待中" : "已結束"}</Badge></button>)}</div>
+            <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">{myPkRooms.map((room) => <div key={room.id} className="rounded-xl border border-[var(--line)] bg-white/[.03] p-3 transition hover:border-cyan-300/50 hover:bg-cyan-300/[.06]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{room.activityName}・{room.subject}</p><p className="mt-1 text-xs text-muted">房號 {room.roomCode}・{room.hostUserId === user.userId ? "我建立" : "我已加入"}</p></div><Badge tone={room.status === "RUNNING" ? "green" : room.status === "WAITING" ? "gold" : "muted"}>{room.status === "RUNNING" ? "進行中" : room.status === "WAITING" ? "等待中" : "已結束"}</Badge></div><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => openMyPkRoom(room)}>查看房間</Button>{room.hostUserId === user.userId && ["WAITING", "RUNNING"].includes(room.status) && <Button size="sm" variant="danger" onClick={() => void deleteMyPkRoom(room)}>刪除房間</Button>}</div></div>)}</div>
           </div>
         </div>
       </Modal>

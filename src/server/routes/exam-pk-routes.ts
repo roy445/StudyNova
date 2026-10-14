@@ -28,6 +28,7 @@ async function getRoom(roomId: string, userId: string) {
   if (!room) throw notFound("找不到這間段考 PK 房");
   const self = (await db.select().from(examPkParticipants).where(and(eq(examPkParticipants.roomId, roomId), eq(examPkParticipants.userId, userId))).limit(1))[0];
   if (!self) throw fail("SYS_CONFLICT", { message: "你尚未加入這間考試房。" });
+  if (self.status === "KICKED") throw fail("SYS_CONFLICT", { message: "你已被房主移出這間考試房。" });
   const participants = (await db.execute(sql`select p.id, p.user_id as "userId", u.display_name as "displayName", u.avatar_seed as "avatarSeed", p.status, p.joined_at as "joinedAt", p.score, p.correct_count as "correctCount", p.wrong_count as "wrongCount", p.unanswered_count as "unansweredCount", p.rank, p.last_seen_at as "lastSeenAt" from exam_pk_participants p join users u on u.id = p.user_id where p.room_id = ${roomId} order by p.joined_at`)).rows as Array<{ id: string; userId: string; displayName: string; avatarSeed: string; status: string; joinedAt: string; score: number | null; correctCount: number; wrongCount: number; unansweredCount: number; rank: number | null; lastSeenAt: string | null }>;
   const roomQuestions = await db.select({ id: examPkQuestions.id, orderIndex: examPkQuestions.orderIndex, questionId: examPkQuestions.questionId, snapshot: examPkQuestions.snapshot }).from(examPkQuestions).where(eq(examPkQuestions.roomId, roomId)).orderBy(asc(examPkQuestions.orderIndex));
   const answers = await db.select({ questionId: examPkAnswers.questionId, answer: examPkAnswers.answer, isCorrect: examPkAnswers.isCorrect, submittedAt: examPkAnswers.submittedAt, changedCount: examPkAnswers.changedCount }).from(examPkAnswers).where(and(eq(examPkAnswers.roomId, roomId), eq(examPkAnswers.userId, userId)));
@@ -37,6 +38,7 @@ async function getRoom(roomId: string, userId: string) {
 async function ensureParticipant(roomId: string, userId: string) {
   const row = (await db.select().from(examPkParticipants).where(and(eq(examPkParticipants.roomId, roomId), eq(examPkParticipants.userId, userId))).limit(1))[0];
   if (!row) throw fail("SYS_CONFLICT", { message: "請先加入這間考試房。" });
+  if (row.status === "KICKED") throw fail("SYS_CONFLICT", { message: "你已被房主移出這間考試房。" });
   return row;
 }
 
@@ -128,6 +130,8 @@ export const routes: RouteDef[] = [
       const room = (await db.select().from(examPkRooms).where(eq(examPkRooms.id, ctx.params.id)).limit(1))[0];
       if (!room) throw notFound("找不到這間段考 PK 房");
       if (room.status !== "WAITING") throw fail("SYS_CONFLICT", { message: "這間房已經開始或已結束，無法加入。" });
+      const existing = (await db.select({ status: examPkParticipants.status }).from(examPkParticipants).where(and(eq(examPkParticipants.roomId, room.id), eq(examPkParticipants.userId, user.userId))).limit(1))[0];
+      if (existing?.status === "KICKED") throw fail("SYS_CONFLICT", { message: "你已被房主移出這間房，無法再次加入。" });
       const participantCount = Number((await db.select({ value: count() }).from(examPkParticipants).where(eq(examPkParticipants.roomId, room.id)))[0]?.value ?? 0);
       if (participantCount >= room.maxPlayers) throw fail("SYS_CONFLICT", { message: "這間房已達人數上限。" });
       await db.insert(examPkParticipants).values({ roomId: room.id, userId: user.userId, status: "JOINED", lastSeenAt: new Date() }).onConflictDoUpdate({ target: [examPkParticipants.roomId, examPkParticipants.userId], set: { status: "JOINED", lastSeenAt: new Date() } });
@@ -141,6 +145,8 @@ export const routes: RouteDef[] = [
       const room = (await db.select().from(examPkRooms).where(eq(examPkRooms.roomCode, ctx.params.code)).limit(1))[0];
       if (!room) throw notFound("找不到這個房號");
       if (room.status !== "WAITING") throw fail("SYS_CONFLICT", { message: "這間房已經開始或已結束，無法加入。" });
+      const existing = (await db.select({ status: examPkParticipants.status }).from(examPkParticipants).where(and(eq(examPkParticipants.roomId, room.id), eq(examPkParticipants.userId, user.userId))).limit(1))[0];
+      if (existing?.status === "KICKED") throw fail("SYS_CONFLICT", { message: "你已被房主移出這間房，無法再次加入。" });
       const participantCount = Number((await db.select({ value: count() }).from(examPkParticipants).where(eq(examPkParticipants.roomId, room.id)))[0]?.value ?? 0);
       if (participantCount >= room.maxPlayers) throw fail("SYS_CONFLICT", { message: "這間房已達人數上限。" });
       await db.insert(examPkParticipants).values({ roomId: room.id, userId: user.userId, status: "JOINED", lastSeenAt: new Date() }).onConflictDoUpdate({ target: [examPkParticipants.roomId, examPkParticipants.userId], set: { status: "JOINED", lastSeenAt: new Date() } });
@@ -158,6 +164,42 @@ export const routes: RouteDef[] = [
       await db.update(examPkRooms).set({ status: "RUNNING", startedAt: now, endsAt: ends }).where(eq(examPkRooms.id, room.id));
       await db.update(examPkParticipants).set({ status: "ANSWERING", lastSeenAt: now }).where(eq(examPkParticipants.roomId, room.id));
       return { started: true, startedAt: now.toISOString(), endsAt: ends.toISOString() };
+    },
+  }),
+  route({
+    method: "DELETE", path: "/exam-pk/rooms/:id", auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const deleted = await db.delete(examPkRooms).where(and(eq(examPkRooms.id, ctx.params.id), eq(examPkRooms.hostUserId, user.userId))).returning({ id: examPkRooms.id });
+      if (!deleted[0]) throw fail("SYS_CONFLICT", { message: "只有房主可以刪除這間房，或房間已不存在。" });
+      return { deleted: true, roomId: deleted[0].id };
+    },
+  }),
+  route({
+    method: "POST", path: "/exam-pk/rooms/:id/end", auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const room = (await db.select().from(examPkRooms).where(and(eq(examPkRooms.id, ctx.params.id), eq(examPkRooms.hostUserId, user.userId))).limit(1))[0];
+      if (!room) throw fail("SYS_CONFLICT", { message: "只有房主可以結束這間房。" });
+      if (!["WAITING", "RUNNING"].includes(room.status)) throw fail("SYS_CONFLICT", { message: "這間房目前已經結束。" });
+      const now = new Date();
+      await db.update(examPkRooms).set({ status: "FINISHED", finishedAt: now }).where(eq(examPkRooms.id, room.id));
+      await db.update(examPkParticipants).set({ status: "SUBMITTED", submittedAt: now, lastSeenAt: now }).where(and(eq(examPkParticipants.roomId, room.id), inArray(examPkParticipants.status, ["JOINED", "READY", "ANSWERING"])));
+      return { finished: true, finishedAt: now.toISOString() };
+    },
+  }),
+  route({
+    method: "POST", path: "/exam-pk/rooms/:id/kick", auth: "user",
+    handler: async (ctx) => {
+      const user = ctx.requireUser();
+      const body = await ctx.json(z.object({ userId: z.string().uuid() }));
+      const room = (await db.select({ id: examPkRooms.id, hostUserId: examPkRooms.hostUserId, status: examPkRooms.status }).from(examPkRooms).where(eq(examPkRooms.id, ctx.params.id)).limit(1))[0];
+      if (!room || room.hostUserId !== user.userId) throw fail("SYS_CONFLICT", { message: "只有房主可以踢出參賽者。" });
+      if (body.userId === user.userId) throw fail("REQ_VALIDATION", { message: "房主不能踢出自己。" });
+      if (!["WAITING", "RUNNING"].includes(room.status)) throw fail("SYS_CONFLICT", { message: "這間房已經結束。" });
+      const kicked = await db.update(examPkParticipants).set({ status: "KICKED", lastSeenAt: new Date() }).where(and(eq(examPkParticipants.roomId, room.id), eq(examPkParticipants.userId, body.userId))).returning({ userId: examPkParticipants.userId });
+      if (!kicked[0]) throw notFound("找不到這位參賽者");
+      return { kicked: true, userId: kicked[0].userId };
     },
   }),
   route({
