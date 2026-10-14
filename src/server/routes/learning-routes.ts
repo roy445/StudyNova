@@ -1195,8 +1195,8 @@ export const routes: RouteDef[] = [
       const counts = new Map(rows.rows.map((row) => [String(row.level), Number(row.count)]));
       return {
         levels: [
-          { id: "junior", label: "國中 2000 單", description: "國中英文核心字彙，適合基礎累積與複習", count: counts.get("junior") ?? 0, target: 2000 },
-          { id: "senior", label: "高中 7000 單", description: "高中英文參考詞彙，適合段考與大考準備", count: counts.get("senior") ?? 0, target: 7000 },
+          { id: "junior", label: "國中 2000 字", description: "教育部 108 課綱附錄五常用 2,000 字參考字彙", count: counts.get("junior") ?? 0, target: 2000, sourceUrl: "https://cirn.k12ea.gov.tw/TWELVE/List.aspx?fid=11064" },
+          { id: "senior", label: "高中官方約 6000 字", description: "大考中心 111 學年度起適用高中英文參考詞彙表；官方文件載明約 6,000 詞條", count: counts.get("senior") ?? 0, target: 6000, sourceUrl: "https://www.ceec.edu.tw/xmdoc?xsmsid=0K213553204833715309" },
         ],
       };
     },
