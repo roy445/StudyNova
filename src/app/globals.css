@@ -110,6 +110,14 @@ body {
 @keyframes maintenance-tape-slide { from { transform: translateX(-18%); } to { transform: translateX(18%); } }
 @media (max-width: 640px) { .maintenance-tape { font-size: 8px; letter-spacing: .1em; } .maintenance-tape-top { top: 4%; } .maintenance-tape-bottom { bottom: 4%; } }
 @media (prefers-reduced-motion: reduce) { .maintenance-warning, .maintenance-fade-in, .maintenance-tape span { animation: none; } }
+.quota-screen { background: radial-gradient(720px 520px at 50% 35%, rgba(244, 63, 94, .17), transparent 68%), radial-gradient(620px 460px at 8% 90%, rgba(124, 92, 255, .14), transparent 70%), #050812; }
+.quota-screen::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .3; background-image: linear-gradient(rgba(244, 63, 94, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(244, 63, 94, .06) 1px, transparent 1px); background-size: 36px 36px; mask-image: radial-gradient(ellipse at center, #000, transparent 72%); }
+.quota-orb { position: absolute; width: 22rem; height: 22rem; border-radius: 999px; filter: blur(72px); opacity: .18; pointer-events: none; }
+.quota-orb-one { top: -8rem; left: -8rem; background: #f43f5e; }
+.quota-orb-two { right: -8rem; bottom: -8rem; background: #7c5cff; }
+.quota-alert-icon { animation: quota-alert-pulse 2.4s ease-in-out infinite; }
+@keyframes quota-alert-pulse { 0%, 100% { transform: scale(.96); box-shadow: 0 0 45px rgba(244, 63, 94, .18); } 50% { transform: scale(1); box-shadow: 0 0 78px rgba(244, 63, 94, .38); } }
+@media (prefers-reduced-motion: reduce) { .quota-alert-icon { animation: none; } }
 
 body::before {
   content: "";
