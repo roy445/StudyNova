@@ -1211,15 +1211,17 @@ export const routes: RouteDef[] = [
       if (!level) throw badRequest("單字程度只能選擇 junior 或 senior");
       const letter = (ctx.query.get("letter") ?? "all").trim().toUpperCase();
       if (letter !== "ALL" && !/^[A-Z]$/.test(letter)) throw badRequest("字母只能選擇 A 到 Z 或 all");
+      const search = (ctx.query.get("search") ?? "").trim().slice(0, 80);
       // The raw queries below alias daily_words as `dw`; referencing the
       // Drizzle column here emits "daily_words"."word", which PostgreSQL
       // rejects because only the `dw` alias is visible in these queries.
       const letterFilter = letter !== "ALL" && /^[A-Z]$/.test(letter) ? sql`and upper(left(trim(dw.word), 1)) = ${letter}` : sql``;
+      const searchFilter = search ? sql`and (dw.word ilike ${`%${search}%`} or dw.meaning ilike ${`%${search}%`} or coalesce(dw.example, '') ilike ${`%${search}%`} or coalesce(dw.example_zh, '') ilike ${`%${search}%`} or coalesce(dw.part_of_speech, '') ilike ${`%${search}%`} or cast(coalesce(dw.meanings, '[]'::jsonb) as text) ilike ${`%${search}%`} or cast(coalesce(dw.phrases, '[]'::jsonb) as text) ilike ${`%${search}%`})` : sql``;
       const requestedLimit = Number(ctx.query.get("limit") ?? 120);
       const requestedOffset = Number(ctx.query.get("offset") ?? 0);
       const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 200) : 120;
       const offset = Number.isFinite(requestedOffset) ? Math.max(Math.trunc(requestedOffset), 0) : 0;
-      const totalRows = await db.execute(sql`select count(*)::int as count from daily_words dw where dw.level = ${level} ${letterFilter}`);
+      const totalRows = await db.execute(sql`select count(*)::int as count from daily_words dw where dw.level = ${level} ${letterFilter} ${searchFilter}`);
       const total = Number(totalRows.rows[0]?.count ?? 0);
       const rows = await db.execute(sql`
         select
@@ -1237,7 +1239,7 @@ export const routes: RouteDef[] = [
           coalesce(wp.wrong_count, 0)::int as "wrongCount"
         from daily_words dw
         left join word_progress wp on wp.word_id = dw.id and wp.user_id = ${user.userId}
-        where dw.level = ${level} ${letterFilter}
+        where dw.level = ${level} ${letterFilter} ${searchFilter}
         order by lower(trim(dw.word)), dw.id
         limit ${limit} offset ${offset}
       `);
