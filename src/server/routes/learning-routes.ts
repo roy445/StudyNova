@@ -1370,10 +1370,13 @@ export const routes: RouteDef[] = [
       const baseLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
       const [{ total: totalRow }] = await db.select({ total: count() }).from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined);
       const totalWords = Number(totalRow ?? 0);
-      const appearanceRows = unlockedOnly ? await db.select({ wordId: dailyWordAppearances.wordId }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), track ? eq(dailyWords.level, track) : undefined)) : [];
-      const unlockedIds = [...new Set(appearanceRows.map((row) => row.wordId))];
-      const unlockedCount = unlockedIds.length;
+      const unlockedCount = unlockedOnly
+        ? Number((await db.select({ total: sql<number>`count(distinct ${dailyWordAppearances.wordId})::int` }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), track ? eq(dailyWords.level, track) : undefined)))[0]?.total ?? 0)
+        : totalWords;
       const limit = baseLimit;
+      const unlockedCondition = unlockedOnly
+        ? sql`exists (select 1 from daily_word_appearances dwa where dwa.word_id = ${dailyWords.id} and dwa.user_id = ${user.userId})`
+        : undefined;
       const rows = await db.select({
         id: dailyWords.id,
         word: dailyWords.word,
@@ -1385,7 +1388,7 @@ export const routes: RouteDef[] = [
         exampleZh: dailyWords.exampleZh,
         level: dailyWords.level,
         familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
-      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(and(track ? eq(dailyWords.level, track) : undefined, unlockedOnly ? (unlockedIds.length ? inArray(dailyWords.id, unlockedIds) : sql`false`) : undefined)).orderBy(asc(dailyWords.word)).limit(limit);
+      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(and(track ? eq(dailyWords.level, track) : undefined, unlockedCondition)).orderBy(asc(dailyWords.word)).limit(limit);
       return { words: rows, unlockedCount, totalWords, unlockedOnly };
     },
   }),

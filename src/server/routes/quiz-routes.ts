@@ -944,7 +944,7 @@ export const routes: RouteDef[] = [
       const rows = await db.execute(sql`
         select s.id, s.en, s.zh, s.level, s.keywords, coalesce(p.familiarity,0) as familiarity, p.memory_tip
         from sentences s left join sentence_progress p on p.sentence_id = s.id and p.user_id = ${user.userId}
-        order by coalesce(p.familiarity, -1) asc, random() limit 40`);
+        order by coalesce(p.familiarity, -1) asc, s.id limit 40`);
       return { sentences: rows.rows };
     },
   }),

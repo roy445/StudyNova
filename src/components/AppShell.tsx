@@ -198,7 +198,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void presence.reload(); }, 30_000);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void presence.reload(); }, 120_000);
     return () => window.clearInterval(timer);
   }, [presence.reload]);
 
@@ -326,10 +326,10 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
     if (typeof window === "undefined") return;
     let timer: ReturnType<typeof setTimeout>;
     const sync = () => {
-      window.dispatchEvent(new Event("studynova:sync"));
-      timer = setTimeout(sync, 10_000);
+      if (document.visibilityState === "visible") window.dispatchEvent(new Event("studynova:sync"));
+      timer = setTimeout(sync, 60_000);
     };
-    timer = setTimeout(sync, 10_000);
+    timer = setTimeout(sync, 60_000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -346,7 +346,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       lastHeartbeatAt = now;
       const visible = document.visibilityState === "visible";
       void apiPost("/pk/presence/heartbeat", { sessionKey, state: visible ? "online" : "recently_active", metadata: { route: pathname, visibility: document.visibilityState } }).catch(() => {});
-      timer = setTimeout(heartbeat, 30_000);
+      timer = setTimeout(heartbeat, 120_000);
     };
     const onVisibility = () => heartbeat();
     heartbeat();
