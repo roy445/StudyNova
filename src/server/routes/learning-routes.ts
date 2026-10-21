@@ -1364,12 +1364,17 @@ export const routes: RouteDef[] = [
         if (setting.manualOpen !== true && Number(vocabularyTotal ?? 0) < minimumWords) throw badRequest(`字詞百科題庫尚未開放，目前 ${Number(vocabularyTotal ?? 0)}/${minimumWords} 個單字`);
       }
       const track = requestedTrack === "senior" || requestedTrack === "junior" ? requestedTrack : null;
+      const q = (ctx.query.get("q") ?? "").trim().slice(0, 80);
       const requestedLimit = Number(ctx.query.get("limit") ?? 500);
+      const requestedOffset = Number(ctx.query.get("offset") ?? 0);
       // 只有明確開放且透過 source=vocabulary 的百科挑戰可讀取全庫；一般查詢不可用 query 參數繞過解鎖。
       const unlockedOnly = source !== "vocabulary";
-      const baseLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(7000, Math.floor(requestedLimit))) : 500;
-      const [{ total: totalRow }] = await db.select({ total: count() }).from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined);
-      const totalWords = Number(totalRow ?? 0);
+      const baseLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(100, Math.floor(requestedLimit))) : 60;
+      const offset = Number.isFinite(requestedOffset) ? Math.max(0, Math.floor(requestedOffset)) : 0;
+      const searchCondition = q ? sql`(${dailyWords.word} ilike ${`%${q}%`} or ${dailyWords.meaning} ilike ${`%${q}%`})` : undefined;
+      const [{ total: catalogTotalRow }] = await db.select({ total: count() }).from(dailyWords).where(track ? eq(dailyWords.level, track) : undefined);
+      const [{ total: totalRow }] = await db.select({ total: count() }).from(dailyWords).where(and(track ? eq(dailyWords.level, track) : undefined, searchCondition));
+      const totalWords = Number(catalogTotalRow ?? 0);
       const unlockedCount = unlockedOnly
         ? Number((await db.select({ total: sql<number>`count(distinct ${dailyWordAppearances.wordId})::int` }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), track ? eq(dailyWords.level, track) : undefined)))[0]?.total ?? 0)
         : totalWords;
@@ -1388,8 +1393,8 @@ export const routes: RouteDef[] = [
         exampleZh: dailyWords.exampleZh,
         level: dailyWords.level,
         familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
-      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(and(track ? eq(dailyWords.level, track) : undefined, unlockedCondition)).orderBy(asc(dailyWords.word)).limit(limit);
-      return { words: rows, unlockedCount, totalWords, unlockedOnly };
+      }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(and(track ? eq(dailyWords.level, track) : undefined, searchCondition, unlockedCondition)).orderBy(asc(dailyWords.word)).limit(limit).offset(offset);
+      return { words: rows, unlockedCount, totalWords, totalMatchingWords: Number(totalRow ?? 0), offset, limit, hasMore: offset + rows.length < Number(totalRow ?? 0), unlockedOnly };
     },
   }),
   route({

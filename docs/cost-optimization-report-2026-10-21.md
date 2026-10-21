@@ -98,3 +98,25 @@
 - AI 與檔案服務：各 provider 的使用量與計費報表。
 
 本輪沒有直接更改以上平台設定，也沒有執行刪除歷史資料或壓縮使用者檔案的不可逆操作。
+
+## 第二、三階段追加結果（2026-10-21）
+
+### Neon Auto-suspend
+
+已透過 Neon MCP 核對 `studynova` 專案：project `small-heart-63542205`、production branch `production`、compute endpoint `ep-sweet-hall-azbpw64b`，region 為 `aws-ap-southeast-1`。目前 `suspend_timeout_seconds = 0`，依 Neon 官方文件代表使用預設 300 秒（5 分鐘），不是永不暫停。production compute 目前為 idle；production branch 在 Neon API 顯示為 archived，本輪沒有恢復或重建資料庫。專案方案回傳為 Free。
+
+曾依使用者確認嘗試將既有 endpoint 的 Auto-suspend 改為 60 秒，但 Neon API 回覆 `modifying the suspend interval is not permitted on this account`（HTTP 412）。因此沒有繞過方案限制，也沒有改動任何 Neon 設定。依 Neon 官方文件，Free plan 的 scale-to-zero 固定為 5 分鐘；可自訂 1 分鐘起的 suspend interval 僅適用於符合條件的付費方案。官方來源：https://neon.com/docs/guides/scale-to-zero-guide、https://neon.com/docs/introduction/plans。
+
+目前採用的替代策略是減少應用程式不必要的資料庫喚醒，而不是增加 health check 或預熱 Ping。若未來方案允許，可由管理員在 Neon Console／API 將 endpoint 設為 60 秒；本輪不再重試。
+
+### 大型列表與分頁
+
+在 `src/server/routes/content-routes.ts` 的 `/my-vocabulary` 中，預設每頁 60 筆、伺服器上限 100 筆，並新增 `limit`、`offset`、`hasMore` 與資料庫端 `count(distinct ...)`。`total` 不再只是目前回傳筆數；使用者權限、資料夾隔離、搜尋及排序行為均保留，資料夾 JOIN 也使用 distinct count，避免關聯資料造成總數誤計。
+
+在 `src/server/routes/learning-routes.ts` 的 `/words/all` 中，新增伺服器端 `q` 搜尋、`offset`、`totalMatchingWords` 與 `hasMore`；預設每頁 60 筆、伺服器上限 100 筆。原本的 `totalWords` 詞庫總數、`unlockedCount` 解鎖數與資料庫內 `EXISTS` 解鎖條件均保留。
+
+在 `src/features/study/panels-c.tsx` 中，字詞百科移除 `limit=7000` 一次載入，兩個大型列表均改為每頁 60 筆，加入上一頁／下一頁，並將搜尋交給伺服器處理。搜尋輸入使用 `useDeferredValue`，避免每次鍵盤輸入都立即建立高成本查詢。原本的篩選、資料夾、排序、記憶卡、分享與詳細資訊功能保留；挑戰頁面使用的 `limit=questionCount` 呼叫仍相容。
+
+### 本輪驗證
+
+`git diff --check`、`./node_modules/.bin/tsc --noEmit` 與 `./node_modules/.bin/next build` 均通過。Vitest 共 173 項測試中 170 項通過；3 個失敗仍是既有 `ai-solution` 額度預設值測試，與本輪分頁檔案無關。沒有執行資料刪除、schema migration 或 Neon branch restore。

@@ -932,11 +932,20 @@ stage = "ai_provider";
       const q = (ctx.query.get("q") ?? "").trim().slice(0, 80);
       const folderId = ctx.query.get("folderId");
       const sort = ctx.query.get("sort") ?? "recent";
+      const requestedLimit = Number(ctx.query.get("limit") ?? 60);
+      const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 60;
+      const requestedOffset = Number(ctx.query.get("offset") ?? 0);
+      const offset = Number.isFinite(requestedOffset) ? Math.max(0, Math.floor(requestedOffset)) : 0;
       const conditions = [eq(userVocabularies.userId, user.userId), q ? sql`(${userVocabularies.word} ilike ${`%${q}%`} or ${userVocabularies.meaning} ilike ${`%${q}%`})` : sql`true`];
       const base = db.select({ item: userVocabularies }).from(userVocabularies);
-      const query = folderId ? base.innerJoin(vocabularyFolderItems, eq(vocabularyFolderItems.vocabularyId, userVocabularies.id)).innerJoin(vocabularyFolders, and(eq(vocabularyFolders.id, vocabularyFolderItems.folderId), eq(vocabularyFolders.userId, user.userId))).where(and(...conditions, eq(vocabularyFolderItems.folderId, folderId))) : base.where(and(...conditions));
-      const rows = await query.orderBy(sort === "name" ? asc(userVocabularies.word) : sort === "familiarity" ? desc(userVocabularies.familiarity) : sort === "lastReviewed" ? desc(userVocabularies.lastReviewedAt) : desc(userVocabularies.updatedAt)).limit(300);
-      return { items: rows.map((row) => "item" in row ? row.item : row), total: rows.length };
+      const query = folderId ? base.innerJoin(vocabularyFolderItems, eq(vocabularyFolderItems.vocabularyId, userVocabularies.id)).innerJoin(vocabularyFolders, and(eq(vocabularyFolders.id, folderId), eq(vocabularyFolders.userId, user.userId))).where(and(...conditions, eq(vocabularyFolderItems.folderId, folderId))) : base.where(and(...conditions));
+      const countBase = db.select({ total: sql<number>`count(distinct ${userVocabularies.id})::int` }).from(userVocabularies);
+      const countQuery = folderId
+        ? countBase.innerJoin(vocabularyFolderItems, eq(vocabularyFolderItems.vocabularyId, userVocabularies.id)).innerJoin(vocabularyFolders, and(eq(vocabularyFolders.id, folderId), eq(vocabularyFolders.userId, user.userId))).where(and(...conditions, eq(vocabularyFolderItems.folderId, folderId)))
+        : countBase.where(and(...conditions));
+      const total = Number((await countQuery)[0]?.total ?? 0);
+      const rows = await query.orderBy(sort === "name" ? asc(userVocabularies.word) : sort === "familiarity" ? desc(userVocabularies.familiarity) : sort === "lastReviewed" ? desc(userVocabularies.lastReviewedAt) : desc(userVocabularies.updatedAt)).limit(limit).offset(offset);
+      return { items: rows.map((row) => "item" in row ? row.item : row), total, offset, limit, hasMore: offset + rows.length < total };
     },
   }),
   route({
