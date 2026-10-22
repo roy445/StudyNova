@@ -394,17 +394,27 @@ export const routes: RouteDef[] = [
       await consumeFeature(user.userId, body.featureKey);
 
       await db.insert(aiMessages).values({ conversationId: conv.id, role: "user", content: body.content });
-        // 先取最新 16 筆，再恢復成時間順序；不能用 asc + limit，否則長聊天室會一直把最早的舊對話送給 AI。
-        const historyRows = await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(desc(aiMessages.createdAt)).limit(16);
-        const history = latestConversationMessages(historyRows);
+        // 先取最新 12 筆，再恢復成時間順序；長聊天室不應把整段歷史反覆送給模型。
+        const historyRows = await db.select({ role: aiMessages.role, content: aiMessages.content }).from(aiMessages).where(eq(aiMessages.conversationId, conv.id)).orderBy(desc(aiMessages.createdAt)).limit(12);
+        const history = latestConversationMessages(historyRows, 12);
       const context = await buildContext(user.userId, conv.allowContext, conv.contextMaterialId);
       const policy = await getAiPolicy("ai_chat");
       const requestedContextIds = [...new Set([...(body.contextIds ?? []), ...(body.contextId ? [body.contextId] : [])])];
       if (requestedContextIds.length) await db.insert(aiConversationFileContexts).values(requestedContextIds.map((fileContextId) => ({ conversationId: conv.id, fileContextId }))).onConflictDoNothing();
-      const linked = await db.select({ context: fileContexts }).from(aiConversationFileContexts).innerJoin(fileContexts, eq(fileContexts.id, aiConversationFileContexts.fileContextId)).where(and(eq(aiConversationFileContexts.conversationId, conv.id), eq(fileContexts.userId, user.userId))).orderBy(asc(aiConversationFileContexts.createdAt)).limit(30);
-      const attachments = linked.map((row) => row.context);
-      const attachmentText = attachments.flatMap((attachment) => Array.isArray(attachment.detected) ? attachment.detected.map((item) => `[${attachment.originalName} · ${item.kind ?? "內容"}] ${item.text ?? ""}`) : []).join("\n").slice(0, 24000);
-      const attachmentParts = (await Promise.all(attachments.map(async (attachment) => attachment.objectId ? readObject(attachment.objectId) : null))).filter((object): object is NonNullable<typeof object> => Boolean(object?.mimeType.startsWith("image/"))).map((object) => ({ kind: "image" as const, mimeType: object.mimeType, base64: object.data.toString("base64") }));
+      const linked = await db.select({
+        id: fileContexts.id,
+        objectId: fileContexts.objectId,
+        originalName: fileContexts.originalName,
+        detected: fileContexts.detected,
+        status: fileContexts.status,
+        uploadBatch: fileContexts.uploadBatch,
+      }).from(aiConversationFileContexts).innerJoin(fileContexts, eq(fileContexts.id, aiConversationFileContexts.fileContextId)).where(and(eq(aiConversationFileContexts.conversationId, conv.id), eq(fileContexts.userId, user.userId))).orderBy(asc(aiConversationFileContexts.createdAt)).limit(8);
+      const attachments = linked;
+      const attachmentText = attachments.flatMap((attachment) => Array.isArray(attachment.detected) ? attachment.detected.map((item) => `[${attachment.originalName} · ${item.kind ?? "內容"}] ${item.text ?? ""}`) : []).join("\n").slice(0, 12000);
+      // Most conversations have one relevant image; sending every historical
+      // attachment on every turn multiplies input tokens and request size.
+      const imageAttachments = attachments.filter((attachment) => attachment.objectId).slice(-4);
+      const attachmentParts = (await Promise.all(imageAttachments.map(async (attachment) => attachment.objectId ? readObject(attachment.objectId) : null))).filter((object): object is NonNullable<typeof object> => Boolean(object?.mimeType.startsWith("image/"))).map((object) => ({ kind: "image" as const, mimeType: object.mimeType, base64: object.data.toString("base64") }));
 
       const { data, meta } = await runAiJson<{ reply?: string; importance?: string; action?: { type?: string; payload?: Record<string, unknown>; preview?: string } | null; memory?: Array<{ key: string; value: string }> }>(
         {
@@ -424,7 +434,7 @@ export const routes: RouteDef[] = [
             "繁體中文回答。不得杜撰使用者資料。若本次訊息附有圖片，必須實際查看圖片；圖片是主要證據，OCR 文字只是輔助。不要回答使用者沒有傳圖片。",
           parts: [
             { kind: "text", text: context ? `使用者已授權的學習資料：\n${context}` : "使用者未授權任何個人資料，只能根據對話內容回答。" },
-            { kind: "text", text: `對話紀錄：\n${history.map((m) => `${m.role === "user" ? "學生" : "Novi"}：${m.content}`).join("\n").slice(-5000)}${attachmentText ? `\n\n本次訊息附圖辨識內容：\n${attachmentText}` : ""}` },
+            { kind: "text", text: `對話紀錄：\n${history.map((m) => `${m.role === "user" ? "學生" : "Novi"}：${m.content}`).join("\n").slice(-3500)}${attachmentText ? `\n\n本次訊息附圖辨識內容：\n${attachmentText}` : ""}` },
             ...attachmentParts,
           ],
           maxOutputTokens: 2400,

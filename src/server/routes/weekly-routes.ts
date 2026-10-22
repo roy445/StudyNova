@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -699,13 +700,27 @@ export const routes: RouteDef[] = [
       const files = await db.select().from(weeklyExamFiles).where(eq(weeklyExamFiles.weekId, week.id)).orderBy(asc(weeklyExamFiles.orderIndex));
       if (!files.length) throw fail("WEEK_NO_FILES");
 
-      // 1) OCR each file
+      // 1) OCR each file. Files may be attached more than once (for example as
+      // both a paper and an extra source). Reuse the result when the object and
+      // highlight instructions are identical; this avoids a duplicate AI call
+      // without changing the persisted OCR contract.
+      const ocrReuse = new Map<string, string>();
       for (const f of files) {
-        if (!f.objectId || f.ocrStatus === "completed") continue;
+        if (!f.objectId) continue;
+        const highlightEnabled = Object.keys(week.highlightMap ?? {}).length > 0;
+        const ocrReuseKey = `${f.objectId}:${highlightEnabled ? JSON.stringify(week.highlightMap ?? {}) : "off"}:${JSON.stringify(f.highlights ?? [])}`;
+        if (f.ocrStatus === "completed") {
+          ocrReuse.set(ocrReuseKey, f.ocrText);
+          continue;
+        }
+        const reusedOcr = ocrReuse.get(ocrReuseKey);
+        if (reusedOcr !== undefined) {
+          await db.update(weeklyExamFiles).set({ ocrText: reusedOcr, ocrStatus: "completed" }).where(eq(weeklyExamFiles.id, f.id));
+          continue;
+        }
         try {
           const obj = await readObject(f.objectId);
           if (!obj.mimeType.startsWith("image/") && obj.mimeType !== "application/pdf") continue;
-          const highlightEnabled = Object.keys(week.highlightMap ?? {}).length > 0;
           const hl = highlightEnabled && f.highlights.length
             ? `螢光筆已開啟，請優先分析螢光筆標記區域（相對座標 0-1，顏色語意 ${JSON.stringify(week.highlightMap)}）：${JSON.stringify(f.highlights)}。`
             : highlightEnabled
@@ -722,7 +737,9 @@ export const routes: RouteDef[] = [
             temperature: 0.1,
             maxOutputTokens: 3500,
           });
-          await db.update(weeklyExamFiles).set({ ocrText: sanitizeText(res.text), ocrStatus: "completed" }).where(eq(weeklyExamFiles.id, f.id));
+          const ocrText = sanitizeText(res.text);
+          ocrReuse.set(ocrReuseKey, ocrText);
+          await db.update(weeklyExamFiles).set({ ocrText, ocrStatus: "completed" }).where(eq(weeklyExamFiles.id, f.id));
         } catch {
           await db.update(weeklyExamFiles).set({ ocrStatus: "failed" }).where(eq(weeklyExamFiles.id, f.id));
         }
@@ -737,6 +754,21 @@ export const routes: RouteDef[] = [
       if (!sourceText.trim()) throw fail("AI_OCR_EMPTY", { message: body.scope === "vocabulary" ? "請先上傳單字來源或雜誌" : body.scope === "sentences" ? "請先上傳句子來源或雜誌" : "請先上傳考卷" });
       const templateVersion = week.templateVersionId ? (await db.select().from(weeklyExamTemplateVersions).where(and(eq(weeklyExamTemplateVersions.id, week.templateVersionId), inArray(weeklyExamTemplateVersions.status, ["validated", "active"]))).limit(1))[0] : null;
       const templateInstruction = templateVersion ? `本次正式考試必須依照範本版本 v${templateVersion.version} 生成，不可使用固定題數。範本結構：${JSON.stringify(templateVersion.questionStructure)}。生成結果必須符合各大題 questionCount、percentage、pointsPerQuestion、answerMode 與 questionLogic；若來源不足，標記 validationErrors，不得自行補造。` : "目前未指定考試範本；依既有資料產生草稿，但不要假設 Unit 2 的固定格式。";
+      const sourceFingerprint = createHash("sha256").update(JSON.stringify({
+        scope: body.scope,
+        paperText,
+        vocabularyText,
+        sentenceText,
+        answerText,
+        templateVersionId: templateVersion?.id ?? null,
+        templateInstruction,
+      })).digest("hex");
+      const recentDrafts = await db.select().from(weeklyExamDrafts).where(eq(weeklyExamDrafts.weekId, week.id)).orderBy(desc(weeklyExamDrafts.createdAt)).limit(10);
+      const reusableDraft = recentDrafts.find((item) => item.status === "draft" && (item.payload as { sourceFingerprint?: string } | null)?.sourceFingerprint === sourceFingerprint);
+      if (reusableDraft) {
+        await adminLog({ actorId: admin.userId, action: "weekly.analyze.reuse", targetType: "week", targetId: week.id, after: { draftId: reusableDraft.id, sourceFingerprint }, ip: ctx.ip });
+        return { draft: reusableDraft, reused: true };
+      }
 
       // 2) Structure into a draft (never auto-published)
       const { data } = await runAiJson<{
@@ -773,7 +805,7 @@ export const routes: RouteDef[] = [
           : 0.4;
       const draft = await db
         .insert(weeklyExamDrafts)
-        .values({ weekId: week.id, templateVersionId: templateVersion?.id ?? null, payload: { ...data, templateVersionId: templateVersion?.id ?? null, templateStructure: templateVersion?.questionStructure ?? null } as Record<string, unknown>, confidence })
+        .values({ weekId: week.id, templateVersionId: templateVersion?.id ?? null, payload: { ...data, sourceFingerprint, templateVersionId: templateVersion?.id ?? null, templateStructure: templateVersion?.questionStructure ?? null } as Record<string, unknown>, confidence })
         .returning();
       await adminLog({ actorId: admin.userId, action: "weekly.analyze", targetType: "week", targetId: week.id, after: { draftId: draft[0].id }, ip: ctx.ip });
       return { draft: draft[0] };

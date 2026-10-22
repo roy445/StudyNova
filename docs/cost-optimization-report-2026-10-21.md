@@ -120,3 +120,38 @@
 ### 本輪驗證
 
 `git diff --check`、`./node_modules/.bin/tsc --noEmit` 與 `./node_modules/.bin/next build` 均通過。Vitest 共 173 項測試中 170 項通過；3 個失敗仍是既有 `ai-solution` 額度預設值測試，與本輪分頁檔案無關。沒有執行資料刪除、schema migration 或 Neon branch restore。
+
+
+## 第四階段追加結果（2026-10-22）
+
+### AI 對話 Token 與附件傳輸
+
+在 `src/server/routes/ai-routes.ts`：
+
+- 對話歷史由每次最多 16 筆調整為最近 12 筆，並只查詢 `role`、`content`，不再把訊息的其他欄位帶入 Serverless 記憶體。
+- 傳給模型的歷史文字上限由 5,000 字元降為 3,500 字元；仍保留最新內容，避免長聊天室每一輪重送大量舊上下文。
+- 聊天室附件查詢由最多 30 個調整為最多 8 個，且只讀取建立 prompt 所需的中繼資料與辨識內容。
+- 實際讀取二進位圖片時最多帶入最近 4 個附件，避免歷史圖片在每次對話重複傳給模型；文字 OCR 摘要上限由 24,000 降為 12,000 字元。
+- 沒有改變對話保存、action 確認、權限檢查、AI 額度扣除或使用者資料隔離。
+
+這些修改降低的是每次 AI chat 的 input token、request body、物件儲存讀取與 Serverless 記憶體；實際節省量仍需以 provider usage 與 Vercel Analytics 對照量測。
+
+### OCR 與每週考卷分析去重
+
+在 `src/server/routes/weekly-routes.ts`：
+
+- 同一週中若多個檔案使用相同 `objectId`、相同螢光筆設定與相同標記區域，後續檔案直接重用第一份 OCR 結果，不再次呼叫 AI。
+- 已完成 OCR 的檔案也會加入本次請求的重用表，因此重跑分析時，同來源的 pending 檔案仍可避免重複 OCR。
+- 每週結構分析會以來源文字、分析範圍、範本版本與規則建立 SHA-256 fingerprint；相同來源與設定且仍為 draft 時，直接回傳既有草稿，不重複消耗結構分析 AI 呼叫。
+- fingerprint 保存在既有 `weekly_exam_drafts.payload` JSON，不新增資料表或 migration；已確認、已發布或來源改變的草稿不會被錯誤重用。
+
+### 第四階段驗證
+
+- `git diff --check`：通過。
+- `./node_modules/.bin/tsc --noEmit`：通過。
+- `./node_modules/.bin/next build`：通過。
+- Vitest：173 項測試中 170 項通過；3 項既有 `ai-solution` 額度預設值測試失敗，差異為測試期待 Pro 上限 30／50，而目前既有程式預設為 15／25；本輪沒有修改額度設定，故未擴大變更範圍。
+
+### 尚未直接修改的項目
+
+本階段沒有把 AI 回覆做跨使用者或跨對話快取，因為個人學習資料、權限上下文與附件內容不同，直接共享結果會有資料外洩風險。也沒有把 OCR 結果搬到新資料表，避免未經 migration 審查就改變 production schema；目前以既有檔案狀態、objectId 與 draft payload 實作安全去重。
