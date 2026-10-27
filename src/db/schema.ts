@@ -364,6 +364,39 @@ export const studyMaterialHighlights = pgTable(
   (t) => [index("material_highlights_user_idx").on(t.userId, t.createdAt), index("material_highlights_material_idx").on(t.materialId, t.pageNumber)],
 );
 
+export const englishReadingDocuments = pgTable(
+  "english_reading_documents",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    sourceKind: text("source_kind").notNull().default("text"), // text | pdf | image
+    sourceObjectId: uuid("source_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+    originalText: text("original_text").notNull().default(""),
+    summary: text("summary").notNull().default(""),
+    status: text("status").notNull().default("ready"), // analyzing | ready | failed
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [index("english_reader_documents_user_idx").on(t.userId, t.updatedAt)],
+);
+export const englishReadingItems = pgTable(
+  "english_reading_items",
+  {
+    id: id(),
+    documentId: uuid("document_id").notNull().references(() => englishReadingDocuments.id, { onDelete: "cascade" }),
+    itemType: text("item_type").notNull().default("vocabulary"), // vocabulary | sentence
+    orderIndex: integer("order_index").notNull().default(0),
+    word: text("word").notNull().default(""),
+    meaning: text("meaning").notNull().default(""),
+    partOfSpeech: text("part_of_speech").notNull().default(""),
+    phonetic: text("phonetic").notNull().default(""),
+    sentence: text("sentence").notNull().default(""),
+    sentenceZh: text("sentence_zh").notNull().default(""),
+    createdAt: created(),
+  },
+  (t) => [index("english_reader_items_document_idx").on(t.documentId, t.itemType, t.orderIndex)],
+);
 export const contentUnderstandingDocuments = pgTable(
   "content_understanding_documents",
   {

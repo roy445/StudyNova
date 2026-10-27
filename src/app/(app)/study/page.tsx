@@ -13,6 +13,7 @@ import { learningSubjects } from "@/content/learning/ch1";
 const MORE_TOOLS = [
   { key: "one-page", label: "考前一頁紙", icon: "▤", description: "把重點整理成一頁" },
   { key: "materials", label: "教材", icon: "▦", description: "管理與閱讀教材" },
+  { key: "english-reader", label: "英文閱讀器", icon: "🔊", description: "PRO・文章分析與逐句朗讀" },
   { key: "ocr", label: "圖片 OCR", icon: "▧", description: "從圖片辨識內容" },
   { key: "visual-notes", label: "重點心智圖", icon: "✦", description: "把內容整理成視覺重點" },
   { key: "voice", label: "錄音", icon: "◉", description: "用語音複習" },
@@ -78,6 +79,7 @@ function StudyInner() {
         <button type="button" onClick={() => { setTab("quiz"); setAutoGenerate(true); }} className="group col-span-2 flex items-center justify-between rounded-2xl border-2 border-violet-300/45 bg-[radial-gradient(circle_at_85%_15%,rgba(55,211,255,.25),transparent_35%),linear-gradient(135deg,rgba(124,92,255,.25),rgba(7,22,42,.92))] p-4 text-left transition hover:-translate-y-0.5 hover:border-violet-200/80 sm:p-5"><div><span className="text-xs font-bold uppercase tracking-[.2em] text-violet-200">主打功能</span><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">AI幫你出</h2><p className="mt-1 text-xs leading-5 text-slate-200 sm:text-sm">上傳檔案、選擇教材，快速產生專屬測驗</p><p className="mt-3 text-xs font-semibold text-violet-200">立即開始 AI 出題 →</p></div><span className="text-6xl opacity-80 sm:text-7xl">✦</span></button>
         <Link href="/learning" className="group rounded-2xl border border-cyan-300/30 bg-cyan-300/[0.06] p-3 transition hover:-translate-y-0.5 hover:border-cyan-200/70 sm:p-4"><span className="text-2xl sm:text-3xl">📚</span><h2 className="mt-1.5 font-black sm:mt-2">繼續學習</h2><p className="mt-1 text-[11px] leading-4 text-muted sm:text-xs">回到線上課程</p></Link>
         <button type="button" onClick={() => setTab("ocr")} className="group rounded-2xl border border-emerald-300/35 bg-emerald-300/[0.06] p-3 text-left transition hover:-translate-y-0.5 hover:border-emerald-200/75 sm:p-4"><span className="text-2xl sm:text-3xl">▧</span><h2 className="mt-1.5 font-black sm:mt-2">圖片 OCR</h2><p className="mt-1 text-[11px] leading-4 text-muted sm:text-xs">拍照辨識講義與題目</p></button>
+        <Link href="/english-reader" className="group col-span-2 rounded-2xl border-2 border-cyan-300/40 bg-cyan-300/[0.07] p-3 transition hover:-translate-y-0.5 hover:border-cyan-200/80 sm:p-4"><span className="text-2xl sm:text-3xl">🔊</span><h2 className="mt-1.5 font-black sm:mt-2">英文閱讀器 <Badge tone="gold">PRO</Badge></h2><p className="mt-1 text-[11px] leading-4 text-muted sm:text-xs">上傳雜誌、PDF 或句子，分析單字並逐句朗讀高亮</p></Link>
         <button type="button" onClick={() => { setTab("quiz"); setAutoGenerate(false); }} className="group rounded-2xl border border-amber-300/30 bg-amber-300/[0.05] p-3 text-left transition hover:-translate-y-0.5 hover:border-amber-200/70 sm:p-4"><span className="text-2xl sm:text-3xl">✓</span><h2 className="mt-1.5 font-black sm:mt-2">練習與單字</h2><p className="mt-1 text-[11px] leading-4 text-muted sm:text-xs">測驗與錯題複習</p></button>
         <Link href="/ai-question-converter" className="group col-span-2 rounded-2xl border border-fuchsia-300/35 bg-fuchsia-300/[0.06] p-3 transition hover:-translate-y-0.5 hover:border-fuchsia-200/75 sm:p-4"><span className="text-2xl sm:text-3xl">🧩</span><h2 className="mt-1.5 font-black sm:mt-2">AI 題目互動化</h2><p className="mt-1 text-[11px] leading-4 text-muted sm:text-xs">上傳含答案的 PDF，先預覽再建立互動題組</p></Link>
         <button type="button" onClick={() => setTab("more")} className="group rounded-2xl border border-white/15 bg-white/[0.03] p-3 text-left transition hover:-translate-y-0.5 hover:border-white/35 sm:p-4"><span className="text-2xl sm:text-3xl">⋯</span><h2 className="mt-1.5 font-black sm:mt-2">更多功能</h2><p className="mt-1 text-[11px] leading-4 text-muted sm:text-xs">筆記、專注與工具</p></button>
@@ -89,6 +91,7 @@ function StudyInner() {
         {tab === "online-courses" && <OnlineCoursesPanel />}
         {tab === "one-page" && <OnePagePanel />}
         {tab === "materials" && <MaterialsPanel />}
+        {tab === "english-reader" && <EnglishReaderEntry />}
         {tab === "ocr" && <OcrPanel />}
         {tab === "quiz" && <QuizPanel key={autoGenerate ? "ai-generate" : "quiz"} autoGenerate={autoGenerate} />}
         {tab === "wrong" && <WrongPanel />}
@@ -106,6 +109,9 @@ function StudyInner() {
   );
 }
 
+function EnglishReaderEntry() {
+  return <Card title="🔊 英文閱讀分析室" subtitle="英文雜誌、PDF、圖片或文字都可以交給 PRO 閱讀器分析。"><Link href="/english-reader" className="inline-flex rounded-xl bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] px-4 py-3 text-sm font-bold text-white">開啟英文閱讀器 →</Link></Card>;
+}
 function OnlineCoursesPanel() {
   return <Card title="📚 線上學習" subtitle="從學習專區直接進入互動教材、詳細知識、AI 問答與課後練習。">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
