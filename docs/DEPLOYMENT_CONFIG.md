@@ -290,3 +290,12 @@ Neon 完成 `database/neon-init.sql` 後，請再於同一個 SQL Editor 執行 
 ### 詞庫來源說明
 
 本次匯入以使用者提供的國中 2000 字教材與高中英文／學測教材為來源。國中教材擷取約 1,938 筆具中文釋義的詞彙，高中學測教材擷取約 76 筆具中文釋義的進階詞彙；高中參考詞彙表中只有英文與詞性、沒有逐字中文釋義的項目未直接寫入，以避免產生未經核對的翻譯。
+
+
+## NVIDIA hosted AI
+
+設定 `NVIDIA_API_KEY` 後，StudyNova 會把 NVIDIA Provider 放在 fallback 優先序第一位，並依 AI 任務自動選擇一般推理或 Vision 模型。預設模型是 `nvidia/nemotron-3.5-lightning-30b-a3b`，管理員可在 `/admin/ai-models` 切換任務綁定。NVIDIA Build 是免費原型方案，受 RPM／帳戶限額與官方條款限制；正式生產流量仍需監控與 fallback。
+
+`NVIDIA_MODEL` 只作為初始 Provider 模型值；實際任務路由由 Admin 的模型設定控制。Nemotron OCR v2、Nemotron Parse 與 Nemotron Embed 1B 不會被誤送到 Chat Completions：它們分別需要 `/v1/ocr`、`/v1/parse` 與 `/v1/embeddings` 專用介面。
+
+若使用自託管 Ollama，可設定 `OLLAMA_BASE_URL`、`OLLAMA_MODEL`，系統會以 OpenAI-compatible `/v1/chat/completions` 作為較後順位 fallback。

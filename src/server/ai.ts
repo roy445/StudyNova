@@ -4,8 +4,9 @@ import { db } from "@/db";
 import { aiProviderHealth, aiUsageLogs, memberships, users } from "@/db/schema";
 import { fail, monthStart, nextUtcMonthStart, todayStr } from "./core";
 import { notify } from "./notify";
+import { nvidiaModelForFeature } from "./nvidia-ai";
 
-export type ProviderName = "gemini_1" | "gemini_2" | "gemini_3" | "gemini_4" | "gemini_5" | "gemini_6" | "gemini_7" | "gemini_8" | "gemini_9" | "gemini_10" | "openai" | "openrouter";
+export type ProviderName = "nvidia" | "gemini_1" | "gemini_2" | "gemini_3" | "gemini_4" | "gemini_5" | "gemini_6" | "gemini_7" | "gemini_8" | "gemini_9" | "gemini_10" | "openai" | "openrouter" | "ollama";
 
 export type ProviderConfig = {
   name: ProviderName;
@@ -105,32 +106,39 @@ export async function normalizeAiRequest(req: AiRequest): Promise<AiRequest> {
 export function providerConfigs(): ProviderConfig[] {
   const geminiModel = cleanModel(process.env.GEMINI_MODEL);
   return [
+    { name: "nvidia", priority: 1, model: cleanModel(process.env.NVIDIA_MODEL || "nvidia/nemotron-3.5-lightning-30b-a3b"), apiKey: cleanEnv(process.env.NVIDIA_API_KEY) },
     {
       name: "gemini_1",
-      priority: 1,
+      priority: 2,
       model: geminiModel,
       apiKey: cleanEnv(process.env.GEMINI_API_KEY_1 || process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY),
     },
-    { name: "gemini_2", priority: 2, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_2) },
-    { name: "gemini_3", priority: 3, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_3) },
-    { name: "gemini_4", priority: 4, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_4) },
-    { name: "gemini_5", priority: 5, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_5) },
-    { name: "gemini_6", priority: 6, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_6) },
-    { name: "gemini_7", priority: 7, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_7) },
-    { name: "gemini_8", priority: 8, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_8) },
-    { name: "gemini_9", priority: 9, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_9) },
-    { name: "gemini_10", priority: 10, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_10) },
-    {
-      name: "openai",
-      priority: 11,
-      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      apiKey: process.env.OPENAI_API_KEY,
-    },
+    { name: "gemini_2", priority: 3, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_2) },
+    { name: "gemini_3", priority: 4, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_3) },
+    { name: "gemini_4", priority: 5, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_4) },
+    { name: "gemini_5", priority: 6, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_5) },
+    { name: "gemini_6", priority: 7, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_6) },
+    { name: "gemini_7", priority: 8, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_7) },
+    { name: "gemini_8", priority: 9, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_8) },
+    { name: "gemini_9", priority: 10, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_9) },
+    { name: "gemini_10", priority: 11, model: geminiModel, apiKey: cleanEnv(process.env.GEMINI_API_KEY_10) },
     {
       name: "openrouter",
       priority: 12,
       model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free",
       apiKey: process.env.OPENROUTER_API_KEY,
+    },
+    {
+      name: "ollama",
+      priority: 13,
+      model: process.env.OLLAMA_MODEL || "llama3.2",
+      apiKey: process.env.OLLAMA_API_KEY || (process.env.OLLAMA_BASE_URL ? "local" : undefined),
+    },
+    {
+      name: "openai",
+      priority: 14,
+      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      apiKey: process.env.OPENAI_API_KEY,
     },
   ];
 }
@@ -150,11 +158,16 @@ class ProviderError extends Error {
 }
 
 function safeProviderReason(body: string) {
+  const redact = (value: string) => {
+    let out = value;
+    for (const secret of [process.env.NVIDIA_API_KEY, process.env.OPENAI_API_KEY, process.env.OPENROUTER_API_KEY, process.env.OLLAMA_API_KEY].map(cleanEnv).filter(Boolean) as string[]) out = out.split(secret).join("[redacted]");
+    return out;
+  };
   try {
     const parsed = JSON.parse(body) as { error?: { message?: string; status?: string } };
-    return String(parsed.error?.message || parsed.error?.status || "").replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").slice(0, 180);
+    return redact(String(parsed.error?.message || parsed.error?.status || "").replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")).slice(0, 180);
   } catch {
-    return body.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]").replace(/\s+/g, " ").trim().slice(0, 180);
+    return redact(body.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")).replace(/\s+/g, " ").trim().slice(0, 180);
   }
 }
 
@@ -321,6 +334,7 @@ async function callOpenAiCompatible(cfg: ProviderConfig, req: AiRequest, endpoin
     headers["HTTP-Referer"] = process.env.APP_URL || "https://studynova.ai";
     headers["X-Title"] = "StudyNova AI";
   }
+  if (cfg.name === "ollama" && cfg.apiKey === "local") delete headers.authorization;
 
   const json = (await fetchJson(endpoint, {
     method: "POST",
@@ -418,6 +432,7 @@ async function logUsage(entry: {
 
 export async function runAi(req: AiRequest): Promise<AiResult> {
   const normalizedReq = await normalizeAiRequest(req);
+  const nvidiaModel = process.env.NVIDIA_API_KEY ? await nvidiaModelForFeature(req.feature, isImageTask(normalizedReq)) : null;
   // OCR must not inherit GEMINI_FAST_MODEL: production logs showed that the
   // general 3.6 model was quota-limited and intermittently overloaded. Use a
   // dedicated OCR override when provided, otherwise use the lightweight
@@ -429,7 +444,7 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     // Use the same known-good model for every Gemini feature so a text request
     // generated from an uploaded image does not silently fall back to 3.6.
     .map((config) => config.name.startsWith("gemini_") ? { ...config, model: imageModel } : config)
-    .filter((c) => Boolean(c.apiKey))
+    .filter((c) => Boolean(c.apiKey) && !(c.name === "nvidia" && !nvidiaModel))
     .sort((a, b) => a.priority - b.priority);
 
   if (!configs.length) {
@@ -449,9 +464,10 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     const attempts = await Promise.all(
       eligible.map(async ({ cfg }) => {
         try {
-          const out = cfg.name.startsWith("gemini_")
-            ? await callGemini(cfg, req)
-            : await callOpenAiCompatible(cfg, req, cfg.name === "openai" ? "https://api.openai.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions");
+          const requestCfg = cfg.name === "nvidia" && nvidiaModel ? { ...cfg, model: nvidiaModel } : cfg;
+          const out = requestCfg.name.startsWith("gemini_")
+            ? await callGemini(requestCfg, req)
+            : await callOpenAiCompatible(requestCfg, req, requestCfg.name === "nvidia" ? "https://integrate.api.nvidia.com/v1/chat/completions" : requestCfg.name === "openai" ? "https://api.openai.com/v1/chat/completions" : requestCfg.name === "ollama" ? `${process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434"}/v1/chat/completions` : "https://openrouter.ai/api/v1/chat/completions");
           return { cfg, out, error: null as ProviderError | null };
         } catch (error) {
           return { cfg, out: null, error: error instanceof ProviderError ? error : new ProviderError("unknown", "provider request failed") };
@@ -547,18 +563,24 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       continue;
     }
     try {
-      const requestConfig = cfg.name.startsWith("gemini_") && isImageTask(normalizedReq)
-        ? { ...cfg, model: imageModel }
-        : cfg;
+      const requestConfig = cfg.name === "nvidia" && nvidiaModel
+        ? { ...cfg, model: nvidiaModel }
+        : cfg.name.startsWith("gemini_") && isImageTask(normalizedReq)
+          ? { ...cfg, model: imageModel }
+          : cfg;
       const out =
           requestConfig.name.startsWith("gemini_")
           ? await callGemini(requestConfig, normalizedReq)
           : await callOpenAiCompatible(
               requestConfig,
               normalizedReq,
-              requestConfig.name === "openai"
-                ? "https://api.openai.com/v1/chat/completions"
-                : "https://openrouter.ai/api/v1/chat/completions",
+              requestConfig.name === "nvidia"
+                ? "https://integrate.api.nvidia.com/v1/chat/completions"
+                : requestConfig.name === "openai"
+                  ? "https://api.openai.com/v1/chat/completions"
+                  : requestConfig.name === "ollama"
+                    ? `${process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434"}/v1/chat/completions`
+                    : "https://openrouter.ai/api/v1/chat/completions",
             );
       try {
         await db

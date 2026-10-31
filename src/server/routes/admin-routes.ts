@@ -83,6 +83,7 @@ import { getPkConfig, normalizePkConfig } from "../pk-config";
 import { finishPkMatch } from "./pk-routes";
 import { publishPkEvent } from "../pk-realtime";
 import { renderCjkHealthPng } from "../image-rendering/renderer";
+import { NVIDIA_DEFAULT_TASK_MODELS, NVIDIA_MODEL_REGISTRY, getNvidiaRoutingSettings, nvidiaModelDefinition } from "../nvidia-ai";
 
 function validateCustomizationTokens(tokens: Record<string, string>) {
   const allowed = new Set(["primary", "secondary", "accent", "surface", "line", "radius", "shadow", "glow", "buttonRadius", "motion", "pageBackground", "fontSize", "fontWeight", "spacing"]);
@@ -2257,6 +2258,34 @@ export const routes: RouteDef[] = [
       }
       await adminLog({ actorId: admin.userId, action: "push.test", targetType: "audience", targetId: body?.audience ?? "all", after: { title, message, targets: targets.length, subscribedUsers: subscribedUsers.size, pushAttempted, pushFailed, notified, pushSent, configured: pushConfigured() }, ip: ctx.ip });
       return { targets: targets.length, subscribedUsers: subscribedUsers.size, pushAttempted, pushFailed, notified, pushSent, configured: pushConfigured() };
+    },
+  }),
+  route({
+    method: "GET",
+    path: "/admin/ai/models",
+    auth: "admin",
+    handler: async () => ({
+      models: NVIDIA_MODEL_REGISTRY,
+      taskModels: await getNvidiaRoutingSettings(),
+      endpoint: "https://integrate.api.nvidia.com/v1/chat/completions",
+      configured: Boolean(process.env.NVIDIA_API_KEY),
+      apiKeyConfigured: Boolean(process.env.NVIDIA_API_KEY),
+    }),
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/ai/models/routing",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ task: z.string().min(1).max(80), modelId: z.string().min(1).max(160) }));
+      const model = nvidiaModelDefinition(body.modelId);
+      if (!model || !model.chatCompatible) throw badRequest("此模型不是 NVIDIA hosted Chat Completions 模型，不能綁定到文字或 Vision 任務。OCR、Parse、Embedding 必須走專用 endpoint。");
+      const current = await getNvidiaRoutingSettings();
+      const value = { ...NVIDIA_DEFAULT_TASK_MODELS, ...current, [body.task]: body.modelId };
+      const row = (await db.insert(platformSettings).values({ key: "ai_nvidia_routing", value }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } }).returning())[0];
+      await adminLog({ actorId: admin.userId, action: "ai.nvidia-routing.update", targetType: "ai_nvidia_routing", targetId: body.task, after: { task: body.task, modelId: body.modelId }, ip: ctx.ip });
+      return { taskModels: row.value };
     },
   }),
   route({
