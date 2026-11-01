@@ -20,7 +20,7 @@ import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
 import vocabulary from "@/data/vocabulary.json";
 
-const SEED_VERSION = 12;
+const SEED_VERSION = 13;
 
 const ENGLISH_READER_ANNOUNCEMENT_TITLE = "📖 英文雜誌閱讀器正式開放";
 
@@ -225,12 +225,14 @@ export async function runSeed(force = false) {
   }
 
   const existingEnglishReaderAnnouncement = await db.select({ id: announcements.id }).from(announcements).where(eq(announcements.title, ENGLISH_READER_ANNOUNCEMENT_TITLE)).limit(1);
-  if (!existingEnglishReaderAnnouncement[0]) {
+  if (existingEnglishReaderAnnouncement[0]) {
+    await db.update(announcements).set({ image: "/brand/english-reader-feature.png", targetFeature: "all", pinned: true, showHome: true }).where(eq(announcements.id, existingEnglishReaderAnnouncement[0].id));
+  } else {
     await db.insert(announcements).values({
       title: ENGLISH_READER_ANNOUNCEMENT_TITLE,
       body: "StudyNova 全新英文雜誌閱讀器登場！上傳英文雜誌圖片、PDF 或文字內容，AI 會自動整理單字、繁體中文意思、詞性、音標、完整句子與中文翻譯；閱讀時還能逐句朗讀，並同步標示目前播放中的句子。立即開啟你的英文閱讀資料庫，讓每一篇文章都變成可複習的學習素材。",
       link: "/english-reader",
-      targetFeature: "english-reader",
+      targetFeature: "all",
       category: "feature",
       announcementType: "feature",
       importance: "high",
@@ -243,6 +245,7 @@ export async function runSeed(force = false) {
       notify: true,
       push: false,
       email: false,
+      image: "/brand/english-reader-feature.png",
       showHome: true,
       showPwa: true,
       ctaLabel: "開啟英文閱讀器",

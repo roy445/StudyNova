@@ -29,12 +29,12 @@ function vapidKeyToUint8Array(base64String: string): ArrayBuffer {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0)).buffer as ArrayBuffer;
 }
 
-type NavItem = { href: string; label: string; icon: SymbolName; special?: boolean; closeAt?: string | null };
+type NavItem = { href: string; label: string; icon: SymbolName; special?: boolean; featured?: boolean; closeAt?: string | null };
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "首頁", icon: "home" },
   { href: "/study", label: "學習", icon: "study" },
   { href: "/ai", label: "Novi AI", icon: "nova" },
-  { href: "/pk", label: "線上 PK", icon: "duel", special: true },
+  { href: "/english-reader", label: "英文閱讀", icon: "study", featured: true },
   { href: "/weekly", label: "小考", icon: "weekly" },
   { href: "/profile", label: "我的", icon: "profile" },
 ];
@@ -184,7 +184,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
   const notif = useApi<{ notifications: Array<{ id: string; title: string; body: string; link: string; readAt: string | null; createdAt: string }>; unread: number }>(
     "/notifications",
   );
-  const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string }> }>(
+  const summary = useApi<{ nova: number; novi: { level: number; xp: number; skin: string; core: string; effect: string; float: string } | null; greeting: string; dueWrong: number; tasks: Array<{ id: string; title: string; progress: number; target: number }>; announcements?: Array<{ id: string; title: string; body: string; link: string; pinned: boolean; targetFeature?: string; category?: string; image?: string }> }>(
     "/dashboard",
   );
   const examPrep = useApi<{ activities: Array<{ id: string; closeAt: string | null; effectiveStatus: string }>; profile: { schoolLevel: string | null; grade: number | null } | null }>("/exam-prep/available");
@@ -682,7 +682,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
         </header>
 
         <main className="app-main mx-auto min-w-0 max-w-6xl overflow-x-clip px-3 py-4 sm:px-5 sm:py-6">
-          {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p><p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>)}</section>}
+          {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p>{notice.image ? <img src={notice.image} alt="英文雜誌閱讀器主視覺" className="mt-3 max-h-72 w-full rounded-2xl border border-cyan-200/30 object-cover object-top shadow-[0_0_28px_rgba(55,211,255,.22)]" /> : null}<p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>)}</section>}
           {FEATURE_GUIDANCE[featureKey] && <div className="mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
           {children}
           <footer aria-label="網站資訊" className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
@@ -701,6 +701,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           {([...NAV, ...(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [{ href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities.find((activity) => activity.effectiveStatus === "open")?.closeAt }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPk = item.href === "/pk";
+            const isEnglishReader = item.href === "/english-reader";
             const isExamPrep = item.href === "/exam-prep";
             const isExamVocabulary = item.href === "/exam-vocabulary";
             const closingSoon = Boolean(item.special && item.closeAt && new Date(item.closeAt).getTime() - now < 3 * 24 * 60 * 60 * 1000);
@@ -709,11 +710,12 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
                 <Link
                   href={item.href}
                   aria-label={item.label}
-                  className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : isExamVocabulary ? "vocabulary-nav-item" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""} ${active && isExamVocabulary ? "vocabulary-nav-item-active" : ""}`}
+                  className={`mobile-nav-item focus-ring relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1 text-[10px] font-medium leading-none sm:px-1 sm:text-[11px] ${active ? "bg-white/10 text-[#37d3ff]" : "text-muted"} ${isEnglishReader ? "english-reader-nav-item" : isPk ? "pk-nav-item" : item.special ? "exam-nav-item" : isExamVocabulary ? "vocabulary-nav-item" : ""} ${active && isEnglishReader ? "english-reader-nav-item-active" : ""} ${active && isPk ? "pk-nav-item-active" : ""} ${active && item.special && !isPk ? "exam-nav-item-active" : ""} ${active && isExamVocabulary ? "vocabulary-nav-item-active" : ""}`}
                 >
                   {isExamVocabulary && <span className="vocabulary-nav-sparkle" aria-hidden="true">✦</span>}
-                  {isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : isExamPrep ? <img src="/brand/exam-prep-icon.png" alt="段考衝刺中心" className="h-11 w-11 rounded-2xl object-contain shadow-[0_0_20px_rgba(55,211,255,.52)]" /> : isExamVocabulary ? <img src="/brand/exam-vocabulary-icon.png" alt="段考總單字" className="h-11 w-11 rounded-2xl object-contain shadow-[0_0_20px_rgba(55,211,255,.52)]" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
+                  {isEnglishReader ? <img src="/brand/english-reader-feature.png" alt="英文雜誌閱讀器" className="english-reader-nav-image" /> : isPk ? <img src="/brand/pk-icon-beta.webp" alt="PK" className="pk-nav-image" /> : isExamPrep ? <img src="/brand/exam-prep-icon.png" alt="段考衝刺中心" className="h-11 w-11 rounded-2xl object-contain shadow-[0_0_20px_rgba(55,211,255,.52)]" /> : isExamVocabulary ? <img src="/brand/exam-vocabulary-icon.png" alt="段考總單字" className="h-11 w-11 rounded-2xl object-contain shadow-[0_0_20px_rgba(55,211,255,.52)]" /> : <span className={item.special ? "exam-nav-icon" : ""}><SymbolIcon name={item.icon} size={18} active={active} className="shrink-0 sm:h-5 sm:w-5" /></span>}
                   {isExamPrep || isExamVocabulary ? null : <span className="max-w-full truncate">{item.label}</span>}{isExamVocabulary && <span className="vocabulary-nav-hint">新內容</span>}
+                  {isEnglishReader && <span className="english-reader-nav-badge">PRO・朗讀</span>}
                   {isPk && <span className="pk-beta-badge pk-beta-mobile">BETA</span>}
                   {closingSoon && !isExamPrep && <span className="exam-nav-countdown">即將結束</span>}
                 </Link>
