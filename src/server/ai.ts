@@ -53,6 +53,7 @@ export type FailureCategory =
   | "unknown";
 
 const RETRYABLE: FailureCategory[] = ["rate_limited", "quota_exhausted", "server_error", "timeout", "network"];
+const TRANSIENT_PROVIDER_COOLDOWN_MS = 2 * 60_000;
 
 function cleanEnv(value?: string) {
   return value?.trim().replace(/^([\"']).*\1$/, (quoted) => quoted.slice(1, -1)).trim() || undefined;
@@ -605,7 +606,8 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       const category: FailureCategory = err instanceof ProviderError ? err.category : "unknown";
       lastReason = err instanceof ProviderError ? err.reason || err.message : err instanceof Error ? err.message : "unknown";
       lastCategory = category;
-      console.error("[ai] provider attempt failed", { provider: cfg.name, model: cfg.model, feature: req.feature, category, reason: lastReason });
+      const logProviderFailure = RETRYABLE.includes(category) ? console.warn : console.error;
+      logProviderFailure("[ai] provider attempt failed", { provider: cfg.name, model: cfg.model, feature: req.feature, category, reason: lastReason });
       // All Gemini keys for a feature point at the same model endpoint. A
       // timeout is therefore an endpoint/model latency problem, not a key
       // problem; trying gemini_3/4/5 would only burn the remaining deadline.
@@ -617,9 +619,15 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
             lastFailureAt: new Date(),
             lastFailureCategory: category,
             updatedAt: new Date(),
-            // Only an explicit provider quota response may create cooldown.
-            // High demand, timeout, network and server errors remain retryable.
-            ...(category === "quota_exhausted" ? { cooldownUntil: nextUtcMonthStart() } : {}),
+            // Quota exhaustion is cooled until the next UTC month. Transient
+            // failures get a short circuit-breaker cooldown: they remain
+            // retryable later, but concurrent queue jobs should use fallback
+            // instead of repeatedly waiting on a known-slow provider.
+            ...(category === "quota_exhausted"
+              ? { cooldownUntil: nextUtcMonthStart() }
+              : RETRYABLE.includes(category)
+                ? { cooldownUntil: new Date(Date.now() + TRANSIENT_PROVIDER_COOLDOWN_MS) }
+                : {}),
           })
           .where(eq(aiProviderHealth.provider, cfg.name));
         await logUsage({
