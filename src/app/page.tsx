@@ -1,7 +1,7 @@
-import { DatabaseQuotaScreen } from "@/components/DatabaseQuotaScreen";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  return <DatabaseQuotaScreen />;
+export default function HomePage() {
+  redirect("/login");
 }
