@@ -43,17 +43,22 @@ export type AiResult = {
 };
 
 export type FailureCategory =
-  | "rate_limited"
-  | "quota_exhausted"
-  | "server_error"
-  | "timeout"
+| "rate_limited"
+| "quota_exhausted"
+| "server_error"
+| "bad_gateway"
+| "service_unavailable"
+| "gateway_timeout"
+| "timeout"
   | "network"
   | "configuration"
   | "invalid_request"
   | "unknown";
 
-const RETRYABLE: FailureCategory[] = ["rate_limited", "quota_exhausted", "server_error", "timeout", "network"];
+const RETRYABLE: FailureCategory[] = ["rate_limited", "quota_exhausted", "server_error", "bad_gateway", "service_unavailable", "gateway_timeout", "timeout", "network"];
 const TRANSIENT_PROVIDER_COOLDOWN_MS = 2 * 60_000;
+const DEFAULT_PROVIDER_TIMEOUT_MS = 15_000;
+const EXAM_PROVIDER_TIMEOUT_MS = 12_000;
 
 function cleanEnv(value?: string) {
   return value?.trim().replace(/^([\"']).*\1$/, (quoted) => quoted.slice(1, -1)).trim() || undefined;
@@ -172,14 +177,29 @@ function safeProviderReason(body: string) {
   }
 }
 
-function categorize(status: number, body: string): FailureCategory {
+export function categorizeProviderResponse(status: number, body: string): FailureCategory {
   if (status === 429) return /quota|exceeded your current quota|billing/i.test(body) ? "quota_exhausted" : "rate_limited";
+  if (status === 502) return "bad_gateway";
+  if (status === 503) return "service_unavailable";
+  if (status === 504) return "gateway_timeout";
   if (status >= 500) return "server_error";
   if (status === 401 || status === 403) return "configuration";
   if (status === 400 && /(api[ _-]?key|invalid.*key|key.*valid|model.*not found)/i.test(body)) return "configuration";
   if (status === 404 && /model|not found/i.test(body)) return "configuration";
   if (status === 400 || status === 404 || status === 422) return "invalid_request";
   return "unknown";
+}
+
+export function providerRetryDelayMs(attempt: number, random = Math.random) {
+  const base = Math.min(4_000, 350 * 2 ** Math.max(0, attempt));
+  return Math.round(base * (0.75 + random() * 0.5));
+}
+
+function providerTimeoutMs(request: AiRequest) {
+  if (request.timeoutMs) return request.timeoutMs;
+  return request.feature === "exam_prep_draft_analysis" || request.feature === "exam_prep_draft_analysis_quality_repair"
+    ? EXAM_PROVIDER_TIMEOUT_MS
+    : DEFAULT_PROVIDER_TIMEOUT_MS;
 }
 
 const estimate = (s: string) => Math.max(1, Math.ceil(s.length / 4));
@@ -240,7 +260,7 @@ async function enforceAiTokenBudget(userId: string | null | undefined, request: 
 
 // A provider must not hold the whole learning flow for a full minute. The
 // caller can fall through to the next configured provider after 18 seconds.
-async function fetchJson(url: string, init: RequestInit, timeoutMs = 15_000) {
+async function fetchJson(url: string, init: RequestInit, timeoutMs = DEFAULT_PROVIDER_TIMEOUT_MS) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -248,9 +268,9 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs = 15_000) {
       const res = await fetch(url, { ...init, signal: controller.signal });
       const text = await res.text();
       if (!res.ok) {
-        const error = new ProviderError(categorize(res.status, text), `provider responded ${res.status}`, safeProviderReason(text));
-        if (attempt === 0 && ["server_error", "network"].includes(error.category)) {
-          await new Promise((resolve) => setTimeout(resolve, 350));
+        const error = new ProviderError(categorizeProviderResponse(res.status, text), `provider responded ${res.status}`, safeProviderReason(text));
+        if (attempt === 0 && ["server_error", "bad_gateway", "service_unavailable", "gateway_timeout", "network"].includes(error.category)) {
+          await new Promise((resolve) => setTimeout(resolve, providerRetryDelayMs(attempt)));
           continue;
         }
         throw error;
@@ -266,8 +286,8 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs = 15_000) {
         : err instanceof Error && err.name === "AbortError"
           ? new ProviderError("timeout", "provider timeout")
           : new ProviderError("network", "provider network error");
-      if (attempt === 0 && error.category === "network") {
-        await new Promise((resolve) => setTimeout(resolve, 350));
+      if (attempt === 0 && ["network", "server_error", "bad_gateway", "service_unavailable", "gateway_timeout"].includes(error.category)) {
+        await new Promise((resolve) => setTimeout(resolve, providerRetryDelayMs(attempt)));
         continue;
       }
       throw error;
@@ -298,7 +318,7 @@ async function callGemini(cfg: ProviderConfig, req: AiRequest): Promise<Omit<AiR
   const json = (await fetchJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent`,
     { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": cfg.apiKey! }, body: JSON.stringify(body) },
-    req.timeoutMs,
+    providerTimeoutMs(req),
   )) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
@@ -347,7 +367,7 @@ async function callOpenAiCompatible(cfg: ProviderConfig, req: AiRequest, endpoin
       max_tokens: req.maxOutputTokens ?? 2048,
       ...(req.json ? { response_format: { type: "json_object" } } : {}),
     }),
-  }, req.timeoutMs)) as {
+  }, providerTimeoutMs(req))) as {
     choices?: Array<{ message?: { content?: string } }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
@@ -756,6 +776,9 @@ export async function providerMetrics() {
       outputTokens: sql<number>`coalesce(sum(${aiUsageLogs.outputTokens}),0)::int`,
       avgLatency: sql<number>`coalesce(avg(${aiUsageLogs.latencyMs}),0)::int`,
       fallbacks: sql<number>`sum(case when ${aiUsageLogs.fallbackFrom} <> '' then 1 else 0 end)::int`,
+      timeouts: sql<number>`sum(case when ${aiUsageLogs.failureCategory} in ('timeout', 'gateway_timeout') then 1 else 0 end)::int`,
+      rateLimits: sql<number>`sum(case when ${aiUsageLogs.failureCategory} in ('rate_limited', 'quota_exhausted') then 1 else 0 end)::int`,
+      serverErrors: sql<number>`sum(case when ${aiUsageLogs.failureCategory} in ('server_error', 'bad_gateway', 'service_unavailable') then 1 else 0 end)::int`,
     })
     .from(aiUsageLogs)
     .where(gte(aiUsageLogs.createdAt, since))
@@ -783,6 +806,9 @@ export async function providerMetrics() {
       outputTokens,
       avgLatencyMs: u?.avgLatency ?? 0,
       fallbacks: u?.fallbacks ?? 0,
+      timeouts: u?.timeouts ?? 0,
+      rateLimits: u?.rateLimits ?? 0,
+      serverErrors: u?.serverErrors ?? 0,
       lastSuccessAt: h?.lastSuccessAt ?? null,
       lastFailureAt: h?.lastFailureAt ?? null,
       lastFailureCategory: h?.lastFailureCategory ?? "",

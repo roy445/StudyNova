@@ -579,18 +579,23 @@ class PostgresQueue implements QueueAdapter {
       } catch (err) {
         const message = err instanceof Error ? err.message.slice(0, 300) : "unknown";
         const attemptNumber = job.attempts + 1;
-        const retryableQueue = Boolean(err && typeof err === "object" && (err as { retryableQueue?: unknown }).retryableQueue);
-        const maxAttempts = 5;
-        if (retryableQueue) {
+        const errorDetails = err && typeof err === "object" ? (err as { details?: { category?: unknown } }).details : undefined;
+        const providerCategory = typeof errorDetails?.category === "string" ? errorDetails.category : "";
+        const providerTransient = ["timeout", "rate_limited", "quota_exhausted", "server_error", "bad_gateway", "service_unavailable", "gateway_timeout", "network"].includes(providerCategory);
+        const retryableQueue = Boolean(err && typeof err === "object" && (err as { retryableQueue?: unknown }).retryableQueue) || providerTransient;
+        const maxAttempts = providerTransient ? 3 : 5;
+        if (retryableQueue && attemptNumber < maxAttempts) {
           // Provider load, rate limits and timeouts are not OCR failures. Keep
           // the import queued and retry with backoff without surfacing a red
           // failure state to the admin.
-          const delayMs = Math.min(15 * 60_000, 60_000 * 2 ** Math.min(attemptNumber - 1, 4));
+          const baseDelayMs = Math.min(15 * 60_000, 60_000 * 2 ** Math.min(attemptNumber - 1, 4));
+          const delayMs = Math.round(baseDelayMs * (0.75 + Math.random() * 0.5));
           await db.update(jobQueue).set({ status: "pending", lastError: message, runAt: new Date(Date.now() + delayMs), startedAt: null, finishedAt: null }).where(eq(jobQueue.id, job.id));
           results.push({ name: job.name, ok: false, detail: `暫時忙碌，已排隊重試（${Math.ceil(delayMs / 60000)} 分鐘後）` });
           console.warn("[queue] job retry scheduled", { jobId: job.id, name: job.name, attempts: attemptNumber, maxAttempts, retryableQueue: true, retryAt: new Date(Date.now() + delayMs).toISOString(), error: message });
-        } else if (attemptNumber < maxAttempts) {
-          const delayMs = Math.min(15 * 60_000, 30_000 * 2 ** (attemptNumber - 1));
+        } else if (!retryableQueue && attemptNumber < maxAttempts) {
+          const baseDelayMs = Math.min(15 * 60_000, 30_000 * 2 ** (attemptNumber - 1));
+          const delayMs = Math.round(baseDelayMs * (0.75 + Math.random() * 0.5));
           await db.update(jobQueue).set({ status: "pending", lastError: message, runAt: new Date(Date.now() + delayMs), startedAt: null, finishedAt: null }).where(eq(jobQueue.id, job.id));
           results.push({ name: job.name, ok: false, detail: `retry ${attemptNumber + 1}/${maxAttempts} scheduled in ${Math.ceil(delayMs / 1000)}s: ${message}` });
           console.warn("[queue] job retry scheduled", { jobId: job.id, name: job.name, attempts: attemptNumber, maxAttempts, retryableQueue: false, retryAt: new Date(Date.now() + delayMs).toISOString(), error: message });
@@ -602,7 +607,7 @@ class PostgresQueue implements QueueAdapter {
         }
       }
     };
-    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : due.length > 1 && due.every((job) => job.name === "exam_vocabulary_import") ? 20 : due.length > 1 && due.every((job) => job.name === "english_reader_analyze") ? 3 : 1;
+    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_vocabulary_import") ? 20 : due.length > 1 && due.every((job) => job.name === "english_reader_analyze") ? 3 : 1;
     for (let index = 0; index < due.length; index += concurrency) await Promise.all(due.slice(index, index + concurrency).map(runOne));
     return { processed, failed, results };
   }

@@ -72,7 +72,25 @@ export function draftQualityGate(draft: Draft, analysis: Partial<DraftAnalysis>)
     noAnswerConflict: !answerConflict,
   };
   const failed = Object.entries(checks).filter(([, passed]) => !passed).map(([name]) => name);
-  return { passed: failed.length === 0, score: Math.round((Object.values(checks).filter(Boolean).length / Object.values(checks).length) * 100), checks, failed, answerConflict, answerConflictStatus: answerConflict ? "ANSWER_CONFLICT" : "MATCHED" };
+  return { passed: failed.length === 0, score: Math.round((Object.values(checks).filter(Boolean).length / Object.values(checks).length) * 100), checks, failed, answerConflict, answerConflictStatus: answerConflict ? "ANSWER_CONFLICT" : "MATCHED", qualityRepairAttempted: false, qualityRepairPassed: false };
+}
+
+function normalizeDraftAnalysis(value: Partial<DraftAnalysis>): DraftAnalysis {
+  return {
+    understanding: String(value.understanding ?? ""),
+    verifiedAnswer: Array.isArray(value.verifiedAnswer) ? value.verifiedAnswer.map(String) : [],
+    answerReason: String(value.answerReason ?? ""),
+    approach: String(value.approach ?? ""),
+    detailedExplanation: String(value.detailedExplanation ?? ""),
+    optionAnalysis: Array.isArray(value.optionAnalysis) ? value.optionAnalysis.filter((item): item is { option: string; reason: string } => Boolean(item && typeof item === "object")).map((item) => ({ option: String(item.option ?? ""), reason: String(item.reason ?? "") })) : [],
+    coreConcept: String(value.coreConcept ?? ""),
+    commonErrors: Array.isArray(value.commonErrors) ? value.commonErrors.map(String) : [],
+    memoryTip: String(value.memoryTip ?? ""),
+    imageRegions: Array.isArray(value.imageRegions) ? value.imageRegions.map((item) => {
+      const bbox = item.bbox && typeof item.bbox === "object" ? item.bbox as Record<string, unknown> : {};
+      return { pageNumber: Number(item.pageNumber), role: String(item.role ?? "question") as DraftAnalysis["imageRegions"][number]["role"], bbox: { x: Number(bbox.x), y: Number(bbox.y), width: Number(bbox.width), height: Number(bbox.height) }, coordinateSpace: item.coordinateSpace === "pixels" ? "pixels" as const : "normalized" as const, confidence: Number(item.confidence ?? 0), ...(item.sharedGroupId ? { sharedGroupId: String(item.sharedGroupId) } : {}) };
+    }).filter((item) => Number.isInteger(item.pageNumber) && item.pageNumber > 0 && Object.values(item.bbox).every(Number.isFinite)) : [],
+  };
 }
 
 export async function analyzeExamPrepDraft(draft: Draft, userId: string, imageParts: AiPart[] = []) {
@@ -86,21 +104,7 @@ export async function analyzeExamPrepDraft(draft: Draft, userId: string, imagePa
     maxOutputTokens: 3200,
     temperature: 0.1,
   }, {});
-  const analysis: DraftAnalysis = {
-    understanding: String(response.data.understanding ?? ""),
-    verifiedAnswer: Array.isArray(response.data.verifiedAnswer) ? response.data.verifiedAnswer.map(String) : [],
-    answerReason: String(response.data.answerReason ?? ""),
-    approach: String(response.data.approach ?? ""),
-    detailedExplanation: String(response.data.detailedExplanation ?? ""),
-    optionAnalysis: Array.isArray(response.data.optionAnalysis) ? response.data.optionAnalysis.filter((item): item is { option: string; reason: string } => Boolean(item && typeof item === "object")).map((item) => ({ option: String(item.option ?? ""), reason: String(item.reason ?? "") })) : [],
-    coreConcept: String(response.data.coreConcept ?? ""),
-    commonErrors: Array.isArray(response.data.commonErrors) ? response.data.commonErrors.map(String) : [],
-    memoryTip: String(response.data.memoryTip ?? ""),
-    imageRegions: Array.isArray(response.data.imageRegions) ? response.data.imageRegions.map((item) => {
-      const bbox = item.bbox && typeof item.bbox === "object" ? item.bbox as Record<string, unknown> : {};
-      return { pageNumber: Number(item.pageNumber), role: String(item.role ?? "question") as DraftAnalysis["imageRegions"][number]["role"], bbox: { x: Number(bbox.x), y: Number(bbox.y), width: Number(bbox.width), height: Number(bbox.height) }, coordinateSpace: item.coordinateSpace === "pixels" ? "pixels" as const : "normalized" as const, confidence: Number(item.confidence ?? 0), ...(item.sharedGroupId ? { sharedGroupId: String(item.sharedGroupId) } : {}) };
-    }).filter((item) => Number.isInteger(item.pageNumber) && item.pageNumber > 0 && Object.values(item.bbox).every(Number.isFinite)) : [],
-  };
+  const analysis = normalizeDraftAnalysis(response.data);
   const quality = draftQualityGate(draft, analysis);
   return { analysis, quality, provider: response.meta };
 }
@@ -128,11 +132,36 @@ export async function processExamPrepDraftAnalysis(draftId: string, userId: stri
         }
       } catch { /* 圖片遺失時仍可用 OCR 文字分析 */ }
     }
-    const result = await analyzeExamPrepDraft({ subject: draft.subject, type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation }, userId, imageParts);
+    let result = await analyzeExamPrepDraft({ subject: draft.subject, type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation }, userId, imageParts);
+    let qualityRepairAttempted = false;
+    if (!result.quality.passed) {
+      qualityRepairAttempted = true;
+      const repair = await runAiJson<Partial<DraftAnalysis>>({
+        feature: "exam_prep_draft_analysis_quality_repair",
+        userId,
+        system: "你是 StudyNova 的嚴格品質修復器。只修復列出的品質缺失，不得降低標準、不得捏造資訊、不得改寫已確認且沒有衝突的答案。只輸出 JSON。",
+        parts: [{ kind: "text", text: `原題目：${JSON.stringify({ subject: draft.subject, type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation })}\n目前分析：${JSON.stringify(result.analysis)}\n品質失敗欄位：${result.quality.failed.join(", ")}\n請輸出完整分析欄位，補足可安全補足的內容；無法確認的答案維持空陣列。` }, ...imageParts],
+        maxOutputTokens: 3200,
+        temperature: 0.05,
+      }, {});
+      const repaired = normalizeDraftAnalysis(repair.data);
+      result = { analysis: repaired, quality: draftQualityGate({ subject: draft.subject, type: draft.type, stem: draft.stem, options: draft.options, answer: draft.answer, explanation: draft.explanation }, repaired), provider: repair.meta };
+    }
+    result.quality = { ...result.quality, qualityRepairAttempted, qualityRepairPassed: qualityRepairAttempted ? result.quality.passed : false };
     const analysisStatus = result.quality.passed ? "completed" : "quality_failed";
     const reviewStatus = result.quality.passed && !result.quality.answerConflict ? "approved" : "needs_review";
     const verifiedAnswer = result.analysis.verifiedAnswer.length ? result.analysis.verifiedAnswer : draft.answer;
     const explanation = draft.explanation.trim() || result.analysis.detailedExplanation.trim();
+    if (!result.quality.passed) {
+      console.warn("[exam-prep] quality failed after bounded repair", {
+        draftId: draft.id,
+        jobId: draft.jobId,
+        failed: result.quality.failed,
+        score: result.quality.score,
+        answerConflict: result.quality.answerConflict,
+        repairAttempted: Boolean((result.quality as { qualityRepairAttempted?: boolean }).qualityRepairAttempted),
+      });
+    }
     await db.update(examPrepQuestionDrafts).set({ answer: verifiedAnswer, explanation, analysis: result.analysis, quality: { ...result.quality, provider: result.provider, imageCount: imageParts.length }, analysisStatus, status: reviewStatus, analyzedAt: new Date(), updatedAt: new Date() }).where(eq(examPrepQuestionDrafts.id, draft.id));
     try {
       const cropResult = await cropExamPrepDraftAssets(draft.id, userId);
