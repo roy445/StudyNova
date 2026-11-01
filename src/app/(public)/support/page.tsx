@@ -95,11 +95,22 @@ function SupportInner() {
     }
     setPending(true);
     try {
-      const fd = new FormData();
-      Object.entries({ ...form, title, description }).forEach(([k, v]) => fd.append(k, v));
-      fd.append("pageUrl", typeof window !== "undefined" ? window.location.href : "");
-      if (file) fd.append("attachment", file);
-      const res = await apiSend<{ ticketNo: string }>("/support/issues", "POST", fd);
+      const fields = {
+        ...form,
+        title,
+        description,
+        pageUrl: typeof window !== "undefined" ? window.location.href : "",
+      };
+      let body: FormData | typeof fields;
+      if (file) {
+        const fd = new FormData();
+        Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
+        fd.append("attachment", file);
+        body = fd;
+      } else {
+        body = fields;
+      }
+      const res = await apiSend<{ ticketNo: string }>("/support/issues", "POST", body);
       setCreated(res);
       toast.push("success", `已送出，單號 ${res.ticketNo}`);
       setForm({ category: "bug", severity: "normal", title: "", description: "", errorCode: "", requestId: "", contactEmail: "" });
