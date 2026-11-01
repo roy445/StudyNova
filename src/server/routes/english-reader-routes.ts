@@ -36,6 +36,9 @@ export const routes: RouteDef[] = [
       title: englishReadingDocuments.title,
       sourceKind: englishReadingDocuments.sourceKind,
       status: englishReadingDocuments.status,
+      progress: englishReadingDocuments.progress,
+      progressStage: englishReadingDocuments.progressStage,
+      errorMessage: englishReadingDocuments.errorMessage,
       createdAt: englishReadingDocuments.createdAt,
       updatedAt: englishReadingDocuments.updatedAt,
     }).from(englishReadingDocuments).where(eq(englishReadingDocuments.userId, user.userId)).orderBy(desc(englishReadingDocuments.updatedAt)).limit(30);
@@ -57,7 +60,7 @@ export const routes: RouteDef[] = [
     const object = (await db.select().from(storageObjects).where(and(eq(storageObjects.userId, user.userId), eq(storageObjects.storageKey, body.pathname))).limit(1))[0];
     if (!object || object.driver !== "blob") throw notFound("找不到剛上傳的雲端檔案，請稍候再試");
     const sourceKind = object.mimeType === "application/pdf" ? "pdf" : object.mimeType.startsWith("image/") ? "image" : "text";
-    const document = (await db.insert(englishReadingDocuments).values({ userId: user.userId, title: body.title || "英文閱讀文章", sourceKind, sourceObjectId: object.id, originalText: "", status: "analyzing" }).returning())[0];
+    const document = (await db.insert(englishReadingDocuments).values({ userId: user.userId, title: body.title || "英文閱讀文章", sourceKind, sourceObjectId: object.id, originalText: "", status: "queued", progress: 0, progressStage: "等待背景工作", errorMessage: "" }).returning())[0];
     await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id }, uniqueKey: `english-reader:${document.id}` });
     return { document, queued: true, message: "已上傳，背景分析中；你可以繼續上傳其他檔案。" };
   }}),

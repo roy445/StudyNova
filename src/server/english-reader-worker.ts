@@ -7,6 +7,10 @@ import { readObject } from "./storage";
 import { runAiJson } from "./ai";
 import { extractText } from "./routes/content-routes";
 
+async function setProgress(documentId: string, progress: number, status: string, progressStage: string) {
+  await db.update(englishReadingDocuments).set({ progress, status, progressStage, errorMessage: "", updatedAt: new Date() }).where(eq(englishReadingDocuments.id, documentId));
+}
+
 const wordSchema = z.object({ word: z.string().trim().min(1).max(120), meaning: z.string().max(500).default(""), partOfSpeech: z.string().max(80).default(""), phonetic: z.string().max(120).default("") });
 const sentenceSchema = z.object({ sentence: z.string().trim().min(3).max(2000), meaning: z.string().max(1000).default("") });
 const analysisSchema = z.object({ summary: z.string().max(4000).default(""), vocabulary: z.array(wordSchema).max(120).default([]), sentences: z.array(sentenceSchema).max(80).default([]) });
@@ -15,10 +19,13 @@ export async function processEnglishReaderDocument(documentId: string) {
   const document = (await db.select().from(englishReadingDocuments).where(eq(englishReadingDocuments.id, documentId)).limit(1))[0];
   if (!document) throw new Error("找不到英文閱讀文件");
   if (!document.sourceObjectId) throw new Error("英文閱讀文件缺少雲端檔案");
+  await setProgress(documentId, 10, "extracting", "正在讀取雲端檔案");
   const object = await readObject(document.sourceObjectId);
+  await setProgress(documentId, 25, "extracting", "正在擷取英文文字");
   const extracted = await extractText(object.mimeType, object.data, document.userId, "英文");
   const sourceText = sanitizeText(extracted).slice(0, 120_000);
   if (sourceText.length < 20) throw new Error("沒有取得足夠英文文字；請確認圖片清楚或 PDF 有文字層");
+  await setProgress(documentId, 40, "analyzing", "文字擷取完成，AI 正在分析單字與句子");
   const { data } = await runAiJson<z.infer<typeof analysisSchema>>({
     feature: "english_reader",
     userId: document.userId,
@@ -30,15 +37,17 @@ export async function processEnglishReaderDocument(documentId: string) {
   const analysis = analysisSchema.parse(data);
   const vocabulary = analysis.vocabulary.filter((item) => /[A-Za-z]/.test(item.word));
   const sentences = analysis.sentences.filter((item) => /[A-Za-z]/.test(item.sentence));
+  await setProgress(documentId, 82, "saving", "AI 分析完成，正在整理學習清單");
   await db.delete(englishReadingItems).where(eq(englishReadingItems.documentId, document.id));
   await db.insert(englishReadingItems).values([
     ...vocabulary.map((item, index) => ({ documentId: document.id, itemType: "vocabulary", orderIndex: index, word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech, phonetic: item.phonetic, sentence: "", sentenceZh: "" })),
     ...sentences.map((item, index) => ({ documentId: document.id, itemType: "sentence", orderIndex: vocabulary.length + index, word: "", meaning: "", partOfSpeech: "", phonetic: "", sentence: item.sentence, sentenceZh: item.meaning })),
   ]);
-  await db.update(englishReadingDocuments).set({ originalText: sourceText, summary: analysis.summary, status: "ready", updatedAt: new Date() }).where(eq(englishReadingDocuments.id, document.id));
+  await db.update(englishReadingDocuments).set({ originalText: sourceText, summary: analysis.summary, status: "ready", progress: 100, progressStage: "分析完成", errorMessage: "", updatedAt: new Date() }).where(eq(englishReadingDocuments.id, document.id));
   return { vocabulary: vocabulary.length, sentences: sentences.length };
 }
 
 export async function markEnglishReaderFailed(documentId: string, message: string) {
-  await db.update(englishReadingDocuments).set({ status: "failed", summary: message.slice(0, 4000), updatedAt: new Date() }).where(eq(englishReadingDocuments.id, documentId));
+  const errorMessage = message.slice(0, 4000);
+  await db.update(englishReadingDocuments).set({ status: "failed", progressStage: "分析失敗", errorMessage, summary: errorMessage, updatedAt: new Date() }).where(eq(englishReadingDocuments.id, documentId));
 }

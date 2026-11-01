@@ -6,7 +6,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Skeleton, Textarea, useT
 import { apiDelete, apiGet, apiPost, errorMessage } from "@/lib/api";
 import { inferSpeechLanguage, stripPronunciationAnnotations } from "@/lib/browser-speech";
 
-type DocumentRow = { id: string; title: string; sourceKind: string; summary: string; status: string; createdAt: string; updatedAt: string };
+type DocumentRow = { id: string; title: string; sourceKind: string; summary: string; status: string; progress: number; progressStage: string; errorMessage: string; createdAt: string; updatedAt: string };
 type Item = { id: string; itemType: "vocabulary" | "sentence"; orderIndex: number; word: string; meaning: string; partOfSpeech: string; phonetic: string; sentence: string; sentenceZh: string };
 type Detail = { document: DocumentRow & { originalText: string }; items: Item[] };
 
@@ -38,14 +38,22 @@ export default function EnglishReaderPage() {
   const sentences = useMemo(() => detail?.items.filter((item) => item.itemType === "sentence") ?? [], [detail]);
   const vocabulary = useMemo(() => detail?.items.filter((item) => item.itemType === "vocabulary") ?? [], [detail]);
 
-  async function loadDocuments() {
-    setLoading(true);
-    try { const result = await apiGet<{ documents: DocumentRow[] }>("/english-reader/documents", { fresh: true }); setDocuments(result.documents); }
-    catch (error) { toast.push("error", errorMessage(error)); }
-    finally { setLoading(false); }
+  async function loadDocuments(options: { silent?: boolean } = {}) {
+    if (!options.silent) setLoading(true);
+    try {
+      const result = await apiGet<{ documents: DocumentRow[] }>("/english-reader/documents", { fresh: true });
+      setDocuments(result.documents);
+      const current = detail?.document;
+      if (!current) return;
+      const latest = result.documents.find((row) => row.id === current.id);
+      if (!latest) return;
+      if (latest.status === "ready" && current.status !== "ready") await openDocument(latest.id);
+      if (latest.status === "failed" && current.status !== "failed") setDetail((previous) => previous ? { ...previous, document: { ...previous.document, ...latest } } : previous);
+    } catch (error) { if (!options.silent) toast.push("error", errorMessage(error)); }
+    finally { if (!options.silent) setLoading(false); }
   }
   useEffect(() => { void loadDocuments(); return () => { if (typeof window !== "undefined") window.speechSynthesis?.cancel(); }; }, []);
-  useEffect(() => { const timer = window.setInterval(() => void loadDocuments(), 8_000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { const timer = window.setInterval(() => void loadDocuments({ silent: true }), 3_000); return () => window.clearInterval(timer); }, [detail]);
 
   async function openDocument(id: string) {
     try { setDetail(await apiGet<Detail>(`/english-reader/documents/${id}`, { fresh: true })); setActiveSentence(-1); }
@@ -104,7 +112,7 @@ export default function EnglishReaderPage() {
         <div className="space-y-3"><Field label="文章名稱"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：The future of clean energy" /></Field><Field label="上傳檔案" hint="Vercel Blob 直傳，最大 100MB；上傳後背景分析，可連續處理多份"><Input id="english-reader-file" type="file" accept=".pdf,.txt,.md,.json,image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field><Field label="或直接貼上英文"><Textarea rows={8} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Paste an English article, dialogue, or study passage here…" /></Field><p className="rounded-xl border border-amber-300/25 bg-amber-300/[.06] p-3 text-xs leading-5 text-amber-100">這是 Nova Pro 專屬功能。檔案會先直接上傳到雲端，再由背景工作分析；你可以同時建立多份閱讀工作。</p><Button full loading={busy} onClick={analyze}>{file ? "上傳並開始背景分析" : "分析英文內容"}</Button></div>
       </Card>
       <Card title="我的英文閱讀紀錄" subtitle="點選左側紀錄即可重新開啟分析結果。">
-        {loading ? <Skeleton lines={5} /> : !documents.length ? <EmptyState icon="▤" title="還沒有英文閱讀內容" hint="上傳一份英文文章開始建立你的閱讀資料庫。" /> : <div className="space-y-2">{documents.map((row) => <div key={row.id} className={`flex items-center gap-3 rounded-2xl border p-3 transition ${detail?.document.id === row.id ? "border-cyan-300/60 bg-cyan-300/10" : "border-[var(--line)] bg-white/[.03]"}`}><button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openDocument(row.id)}><p className="truncate font-semibold text-cyan-100">{row.title}</p><p className="mt-1 text-xs text-muted">{row.sourceKind.toUpperCase()}・{row.status === "analyzing" ? "背景分析中…" : row.status === "failed" ? "分析失敗" : "已完成"}・{new Date(row.updatedAt).toLocaleString("zh-TW")}</p></button><Button size="sm" variant="ghost" onClick={() => void remove(row.id)}>刪除</Button></div>)}</div>}
+        {loading ? <Skeleton lines={5} /> : !documents.length ? <EmptyState icon="▤" title="還沒有英文閱讀內容" hint="上傳一份英文文章開始建立你的閱讀資料庫。" /> : <div className="space-y-2">{documents.map((row) => <div key={row.id} className={`flex items-center gap-3 rounded-2xl border p-3 transition ${detail?.document.id === row.id ? "border-cyan-300/60 bg-cyan-300/10" : "border-[var(--line)] bg-white/[.03]"}`}><button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openDocument(row.id)}><p className="truncate font-semibold text-cyan-100">{row.title}</p><p className="mt-1 text-xs text-muted">{row.sourceKind.toUpperCase()}・{["queued", "extracting", "analyzing", "saving"].includes(row.status) ? "背景分析中…" : row.status === "failed" ? "分析失敗" : "已完成"}・{new Date(row.updatedAt).toLocaleString("zh-TW")}</p>{["queued", "extracting", "analyzing", "saving"].includes(row.status) ? <div className="mt-2 space-y-1.5"><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-violet-400 to-fuchsia-400 transition-[width] duration-500" style={{ width: `${Math.max(2, Math.min(100, row.progress ?? 0))}%` }} /></div><p className="text-[11px] font-semibold text-cyan-200">{row.progress ?? 0}%・{row.progressStage || "處理中"}</p></div> : row.status === "failed" ? <p className="mt-2 rounded-lg border border-rose-300/25 bg-rose-300/10 p-2 text-xs leading-5 text-rose-200">失敗原因：{row.errorMessage || row.summary || "分析工作未完成"}</p> : null}</button><Button size="sm" variant="ghost" onClick={() => void remove(row.id)}>刪除</Button></div>)}</div>}
       </Card>
     </div>
     {detail && <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,.8fr)]">

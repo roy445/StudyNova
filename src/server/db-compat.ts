@@ -82,8 +82,11 @@ export function ensureIdentityGroupSchema() {
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
         "user_id" uuid NOT NULL, "title" text NOT NULL, "source_kind" text NOT NULL DEFAULT 'text',
         "source_object_id" uuid, "original_text" text NOT NULL DEFAULT '', "summary" text NOT NULL DEFAULT '',
-        "status" text NOT NULL DEFAULT 'ready', "created_at" timestamptz NOT NULL DEFAULT now(), "updated_at" timestamptz NOT NULL DEFAULT now()
+        "status" text NOT NULL DEFAULT 'ready', "progress" integer NOT NULL DEFAULT 0, "progress_stage" text NOT NULL DEFAULT '等待處理', "error_message" text NOT NULL DEFAULT '', "created_at" timestamptz NOT NULL DEFAULT now(), "updated_at" timestamptz NOT NULL DEFAULT now()
       );
+      ALTER TABLE "english_reading_documents" ADD COLUMN IF NOT EXISTS "progress" integer NOT NULL DEFAULT 0;
+      ALTER TABLE "english_reading_documents" ADD COLUMN IF NOT EXISTS "progress_stage" text NOT NULL DEFAULT '等待處理';
+      ALTER TABLE "english_reading_documents" ADD COLUMN IF NOT EXISTS "error_message" text NOT NULL DEFAULT '';
       CREATE INDEX IF NOT EXISTS "english_reader_documents_user_idx" ON "english_reading_documents" ("user_id", "updated_at");
       CREATE TABLE IF NOT EXISTS "english_reading_items" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -118,8 +121,11 @@ export function ensureEnglishReaderSchema() {
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL, "user_id" uuid NOT NULL,
         "title" text NOT NULL, "source_kind" text NOT NULL DEFAULT 'text', "source_object_id" uuid,
         "original_text" text NOT NULL DEFAULT '', "summary" text NOT NULL DEFAULT '',
-        "status" text NOT NULL DEFAULT 'ready', "created_at" timestamptz NOT NULL DEFAULT now(), "updated_at" timestamptz NOT NULL DEFAULT now()
+        "status" text NOT NULL DEFAULT 'ready', "progress" integer NOT NULL DEFAULT 0, "progress_stage" text NOT NULL DEFAULT '等待處理', "error_message" text NOT NULL DEFAULT '', "created_at" timestamptz NOT NULL DEFAULT now(), "updated_at" timestamptz NOT NULL DEFAULT now()
       );
+      ALTER TABLE "english_reading_documents" ADD COLUMN IF NOT EXISTS "progress" integer NOT NULL DEFAULT 0;
+      ALTER TABLE "english_reading_documents" ADD COLUMN IF NOT EXISTS "progress_stage" text NOT NULL DEFAULT '等待處理';
+      ALTER TABLE "english_reading_documents" ADD COLUMN IF NOT EXISTS "error_message" text NOT NULL DEFAULT '';
       CREATE INDEX IF NOT EXISTS "english_reader_documents_user_idx" ON "english_reading_documents" ("user_id", "updated_at");
       CREATE TABLE IF NOT EXISTS "english_reading_items" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

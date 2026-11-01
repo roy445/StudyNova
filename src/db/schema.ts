@@ -374,7 +374,10 @@ export const englishReadingDocuments = pgTable(
     sourceObjectId: uuid("source_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
     originalText: text("original_text").notNull().default(""),
     summary: text("summary").notNull().default(""),
-    status: text("status").notNull().default("ready"), // analyzing | ready | failed
+    status: text("status").notNull().default("ready"), // queued | extracting | analyzing | saving | ready | failed
+    progress: integer("progress").notNull().default(0),
+    progressStage: text("progress_stage").notNull().default("等待處理"),
+    errorMessage: text("error_message").notNull().default(""),
     createdAt: created(),
     updatedAt: updated(),
   },
