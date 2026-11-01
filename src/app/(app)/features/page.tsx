@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { SymbolIcon, type SymbolName } from "@/components/Symbol";
 
-type Feature = { href: string; icon: SymbolName; title: string; description: string; tone: string };
+type Feature = { href: string; icon: SymbolName; image?: string; title: string; description: string; tone: string };
 
 const FEATURES: Feature[] = [
   { href: "/ai", icon: "nova", title: "Novi AI 助教", description: "提問、解析與執行學習操作", tone: "violet" },
   { href: "/study", icon: "study", title: "學習中心", description: "教材、AI 出題、錯題與單字", tone: "cyan" },
+  { href: "/english-reader", icon: "book", image: "/brand/english-reader-feature.png", title: "英文雜誌閱讀器", description: "上傳英文雜誌、PDF 或句子，AI 分析單字並逐句朗讀高亮（PRO）", tone: "rose" },
   { href: "/vocabulary-overview", icon: "book", title: "單字總覽", description: "A～Z、國中 2000 單、高中 7000 單，支援單字卡、朗讀與 AI", tone: "cyan" },
   { href: "/ai-question-converter", icon: "weekly", title: "AI 題目互動化", description: "PDF 題目先預覽，再建立互動題組", tone: "violet" },
   { href: "/ai-quiz", icon: "question", title: "AI 測驗", description: "建立互動測驗並查看解析", tone: "violet" },
@@ -42,7 +43,7 @@ export default function FeaturesPage() {
       <section aria-label="StudyNova 功能列表" className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
         {FEATURES.map((feature) => (
           <Link key={feature.href} href={feature.href} className={`group flex min-h-[104px] items-center gap-2 rounded-2xl border p-3 transition duration-150 hover:-translate-y-0.5 hover:bg-white/[.1] focus:outline-none focus:ring-2 focus:ring-cyan-300/60 sm:min-h-[92px] sm:gap-3 sm:p-4 ${toneClass[feature.tone]}`}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/20 text-cyan-100 sm:h-11 sm:w-11"><SymbolIcon name={feature.icon} size={20} /></span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-black/20 text-cyan-100 sm:h-11 sm:w-11">{feature.image ? <img src={feature.image} alt="" className="h-full w-full object-cover" /> : <SymbolIcon name={feature.icon} size={20} />}</span>
             <span className="min-w-0">
               <span className="block text-xs font-bold text-white sm:text-sm">{feature.title}</span>
               <span className="mt-1 block text-[10px] leading-4 text-muted sm:text-xs sm:leading-5">{feature.description}</span>
