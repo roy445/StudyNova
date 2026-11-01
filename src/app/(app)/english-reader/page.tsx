@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { Badge, Button, Card, EmptyState, Field, Input, Skeleton, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPost, errorMessage } from "@/lib/api";
 import { inferSpeechLanguage, stripPronunciationAnnotations } from "@/lib/browser-speech";
@@ -44,6 +45,7 @@ export default function EnglishReaderPage() {
     finally { setLoading(false); }
   }
   useEffect(() => { void loadDocuments(); return () => { if (typeof window !== "undefined") window.speechSynthesis?.cancel(); }; }, []);
+  useEffect(() => { const timer = window.setInterval(() => void loadDocuments(), 8_000); return () => window.clearInterval(timer); }, []);
 
   async function openDocument(id: string) {
     try { setDetail(await apiGet<Detail>(`/english-reader/documents/${id}`, { fresh: true })); setActiveSentence(-1); }
@@ -53,8 +55,22 @@ export default function EnglishReaderPage() {
     if (!file && content.trim().length < 20) { toast.push("info", "請上傳檔案或貼上至少 20 個英文單字。"); return; }
     setBusy(true);
     try {
+      if (file) {
+        const blob = await upload(file.name, file, {
+          access: "private",
+          handleUploadUrl: "/api/blob/english-reader",
+          clientPayload: JSON.stringify({ filename: file.name }),
+          multipart: file.size > 5 * 1024 * 1024,
+        });
+        const queued = await apiPost<{ document: DocumentRow; queued: boolean; message: string }>("/english-reader/documents/from-blob", { title: title.trim() || file.name.replace(/\.[^.]+$/, "") || "英文閱讀文章", pathname: blob.pathname });
+        setDocuments((rows) => [queued.document, ...rows.filter((row) => row.id !== queued.document.id)]);
+        setTitle(""); setContent(""); setFile(null);
+        const input = document.getElementById("english-reader-file") as HTMLInputElement | null; if (input) input.value = "";
+        toast.push("success", "檔案已上傳，背景分析中；可以繼續上傳其他檔案。");
+        return;
+      }
       const form = new FormData();
-      form.append("title", title.trim() || file?.name.replace(/\.[^.]+$/, "") || "英文閱讀文章");
+      form.append("title", title.trim() || "英文閱讀文章");
       form.append("content", content);
       if (file) form.append("file", file);
       const result = await apiPost<{ document: DocumentRow; items: Item[]; counts: { vocabulary: number; sentences: number } }>("/english-reader/documents", form);
@@ -85,10 +101,10 @@ export default function EnglishReaderPage() {
     </header>
     <div className="grid gap-5 lg:grid-cols-[minmax(300px,.78fr)_minmax(0,1.5fr)]">
       <Card title="新增英文內容" subtitle="限定英文科目；圖片與 PDF 會先進行文字擷取。">
-        <div className="space-y-3"><Field label="文章名稱"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：The future of clean energy" /></Field><Field label="上傳檔案" hint="PDF、TXT、Markdown、JSON、JPG、PNG、WebP，最大 15MB"><Input id="english-reader-file" type="file" accept=".pdf,.txt,.md,.json,image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field><Field label="或直接貼上英文"><Textarea rows={8} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Paste an English article, dialogue, or study passage here…" /></Field><p className="rounded-xl border border-amber-300/25 bg-amber-300/[.06] p-3 text-xs leading-5 text-amber-100">這是 Nova Pro 專屬功能。AI 只會根據你上傳的內容整理，不會保證辨識結果等同老師正式講義，請自行核對原文。</p><Button full loading={busy} onClick={analyze}>分析英文內容</Button></div>
+        <div className="space-y-3"><Field label="文章名稱"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：The future of clean energy" /></Field><Field label="上傳檔案" hint="Vercel Blob 直傳，最大 100MB；上傳後背景分析，可連續處理多份"><Input id="english-reader-file" type="file" accept=".pdf,.txt,.md,.json,image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field><Field label="或直接貼上英文"><Textarea rows={8} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Paste an English article, dialogue, or study passage here…" /></Field><p className="rounded-xl border border-amber-300/25 bg-amber-300/[.06] p-3 text-xs leading-5 text-amber-100">這是 Nova Pro 專屬功能。檔案會先直接上傳到雲端，再由背景工作分析；你可以同時建立多份閱讀工作。</p><Button full loading={busy} onClick={analyze}>{file ? "上傳並開始背景分析" : "分析英文內容"}</Button></div>
       </Card>
       <Card title="我的英文閱讀紀錄" subtitle="點選左側紀錄即可重新開啟分析結果。">
-        {loading ? <Skeleton lines={5} /> : !documents.length ? <EmptyState icon="▤" title="還沒有英文閱讀內容" hint="上傳一份英文文章開始建立你的閱讀資料庫。" /> : <div className="space-y-2">{documents.map((row) => <div key={row.id} className={`flex items-center gap-3 rounded-2xl border p-3 transition ${detail?.document.id === row.id ? "border-cyan-300/60 bg-cyan-300/10" : "border-[var(--line)] bg-white/[.03]"}`}><button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openDocument(row.id)}><p className="truncate font-semibold text-cyan-100">{row.title}</p><p className="mt-1 text-xs text-muted">{row.sourceKind.toUpperCase()}・{new Date(row.updatedAt).toLocaleString("zh-TW")}</p></button><Button size="sm" variant="ghost" onClick={() => void remove(row.id)}>刪除</Button></div>)}</div>}
+        {loading ? <Skeleton lines={5} /> : !documents.length ? <EmptyState icon="▤" title="還沒有英文閱讀內容" hint="上傳一份英文文章開始建立你的閱讀資料庫。" /> : <div className="space-y-2">{documents.map((row) => <div key={row.id} className={`flex items-center gap-3 rounded-2xl border p-3 transition ${detail?.document.id === row.id ? "border-cyan-300/60 bg-cyan-300/10" : "border-[var(--line)] bg-white/[.03]"}`}><button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openDocument(row.id)}><p className="truncate font-semibold text-cyan-100">{row.title}</p><p className="mt-1 text-xs text-muted">{row.sourceKind.toUpperCase()}・{row.status === "analyzing" ? "背景分析中…" : row.status === "failed" ? "分析失敗" : "已完成"}・{new Date(row.updatedAt).toLocaleString("zh-TW")}</p></button><Button size="sm" variant="ghost" onClick={() => void remove(row.id)}>刪除</Button></div>)}</div>}
       </Card>
     </div>
     {detail && <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,.8fr)]">

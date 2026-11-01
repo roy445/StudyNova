@@ -1,7 +1,7 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { englishReadingDocuments, englishReadingItems } from "@/db/schema";
+import { englishReadingDocuments, englishReadingItems, storageObjects } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, sanitizeText } from "../core";
 import { putObject, deleteObject } from "../storage";
@@ -9,6 +9,7 @@ import { runAiJson, aiConfigured } from "../ai";
 import { extractText } from "./content-routes";
 import { isProUser } from "../economy";
 import { ensureEnglishReaderSchema } from "../db-compat";
+import { queue } from "../queue";
 
 const allowedMime = new Set(["application/pdf", "text/plain", "text/markdown", "application/json", "image/png", "image/jpeg", "image/webp"]);
 const wordSchema = z.object({ word: z.string().trim().min(1).max(120), meaning: z.string().max(500).default(""), partOfSpeech: z.string().max(80).default(""), phonetic: z.string().max(120).default("") });
@@ -47,6 +48,18 @@ export const routes: RouteDef[] = [
     const document = await ownDocument(ctx.params.id, user.userId);
     const items = await db.select().from(englishReadingItems).where(eq(englishReadingItems.documentId, document.id)).orderBy(asc(englishReadingItems.orderIndex));
     return { document, items };
+  }}),
+  route({ method: "POST", path: "/english-reader/documents/from-blob", auth: "user", rate: { limit: 30, windowSec: 3600, key: "english-reader-blob" }, handler: async (ctx) => {
+    const user = ctx.requireUser();
+    await ensureEnglishReaderSchema();
+    await requirePro(user.userId);
+    const body = await ctx.json(z.object({ title: z.string().trim().max(160).default("英文閱讀文章"), pathname: z.string().trim().min(1).max(500) }));
+    const object = (await db.select().from(storageObjects).where(and(eq(storageObjects.userId, user.userId), eq(storageObjects.storageKey, body.pathname))).limit(1))[0];
+    if (!object || object.driver !== "blob") throw notFound("找不到剛上傳的雲端檔案，請稍候再試");
+    const sourceKind = object.mimeType === "application/pdf" ? "pdf" : object.mimeType.startsWith("image/") ? "image" : "text";
+    const document = (await db.insert(englishReadingDocuments).values({ userId: user.userId, title: body.title || "英文閱讀文章", sourceKind, sourceObjectId: object.id, originalText: "", status: "analyzing" }).returning())[0];
+    await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id }, uniqueKey: `english-reader:${document.id}` });
+    return { document, queued: true, message: "已上傳，背景分析中；你可以繼續上傳其他檔案。" };
   }}),
   route({ method: "POST", path: "/english-reader/documents", auth: "user", rate: { limit: 12, windowSec: 3600, key: "english-reader" }, handler: async (ctx) => {
     const user = ctx.requireUser();

@@ -43,6 +43,7 @@ import { processExamPrepDraftAnalysis } from "./exam-prep-draft-analysis";
 import { processConverterJob } from "./ai-question-converter";
 import { processExamVocabularyImport } from "./exam-vocabulary-import";
 import { runMonthlyActiveAccountPromotion } from "./routes/ai-governance-routes";
+import { processEnglishReaderDocument, markEnglishReaderFailed } from "./english-reader-worker";
 
 export type JobName =
   | "daily_tasks_refresh"
@@ -72,7 +73,8 @@ export type JobName =
   | "exam_prep_draft_analysis"
   | "ai_question_converter"
   | "quiz_expiry_cleanup"
-  | "active_pro_monthly";
+  | "active_pro_monthly"
+  | "english_reader_analyze";
 
 
 export type JobPayload = Record<string, unknown>;
@@ -127,6 +129,18 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
   async active_pro_monthly() {
     const result = await runMonthlyActiveAccountPromotion();
     return `每月活躍 Pro 評選完成：候選 ${result.selected.length} 位，授予 ${result.granted.length} 位`;
+  },
+
+  async english_reader_analyze(payload) {
+    const documentId = typeof payload.documentId === "string" ? payload.documentId : "";
+    if (!documentId) throw new Error("缺少英文閱讀文件 ID");
+    try {
+      const result = await processEnglishReaderDocument(documentId);
+      return `英文閱讀分析完成：${result.vocabulary} 個單字、${result.sentences} 個句子`;
+    } catch (error) {
+      await markEnglishReaderFailed(documentId, error instanceof Error ? error.message : "英文閱讀分析失敗");
+      throw error;
+    }
   },
 
   async daily_tasks_refresh() {
@@ -603,7 +617,7 @@ class PostgresQueue implements QueueAdapter {
         }
       }
     };
-    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : due.length > 1 && due.every((job) => job.name === "exam_vocabulary_import") ? 20 : 1;
+    const concurrency = due.length > 1 && due.every((job) => job.name === "exam_prep_draft_analysis") ? 4 : due.length > 1 && due.every((job) => job.name === "exam_vocabulary_import") ? 20 : due.length > 1 && due.every((job) => job.name === "english_reader_analyze") ? 3 : 1;
     for (let index = 0; index < due.length; index += concurrency) await Promise.all(due.slice(index, index + concurrency).map(runOne));
     return { processed, failed, results };
   }
