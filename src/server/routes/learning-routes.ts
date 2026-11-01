@@ -377,12 +377,12 @@ export const routes: RouteDef[] = [
       const upcomingExams = await db
         .select()
         .from(exams)
-        .where(and(eq(exams.userId, user.userId), gte(exams.examDate, today)))
+        .where(and(eq(exams.userId, user.userId), sql`${exams.examDate} > ${today}`))
         .orderBy(asc(exams.examDate))
         .limit(3);
       const countdownSetting = (await db.select().from(platformSettings).where(eq(platformSettings.key, "exam_countdowns")).limit(1))[0];
       const countdownConfig = (countdownSetting?.value ?? {}) as { exam?: { name?: string; date?: string; enabled?: boolean }; gsat?: { name?: string; date?: string; enabled?: boolean } };
-      const countdowns = [countdownConfig.exam ? { type: "exam", name: countdownConfig.exam.name ?? "考試倒數", date: countdownConfig.exam.date ?? "", enabled: countdownConfig.exam.enabled !== false } : null, countdownConfig.gsat ? { type: "gsat", name: countdownConfig.gsat.name ?? "學測倒數", date: countdownConfig.gsat.date ?? "", enabled: countdownConfig.gsat.enabled !== false } : null].filter((item): item is { type: string; name: string; date: string; enabled: boolean } => Boolean(item?.enabled && item.date)).map((item) => ({ ...item, daysLeft: Math.max(0, Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000)), urgent: Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000) <= 5 }));
+      const countdowns = [countdownConfig.exam ? { type: "exam", name: countdownConfig.exam.name ?? "考試倒數", date: countdownConfig.exam.date ?? "", enabled: countdownConfig.exam.enabled !== false } : null, countdownConfig.gsat ? { type: "gsat", name: countdownConfig.gsat.name ?? "學測倒數", date: countdownConfig.gsat.date ?? "", enabled: countdownConfig.gsat.enabled !== false } : null].filter((item): item is { type: string; name: string; date: string; enabled: boolean } => Boolean(item?.enabled && item.date && item.date > today)).map((item) => ({ ...item, daysLeft: Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000), urgent: Math.ceil((new Date(`${item.date}T00:00:00`).getTime() - Date.now()) / 86400000) <= 5 }));
 
       const [dueWrong] = await db
         .select({ count: sql<number>`count(*)::int` })

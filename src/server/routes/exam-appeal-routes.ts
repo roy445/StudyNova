@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { examDateAppeals, examDatePolicies, exams, userSettings } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { adminLog } from "../economy";
-import { fail, forbidden, notFound } from "../core";
+import { daysBetween, fail, forbidden, notFound, todayStr } from "../core";
 
 const appealBody = z.object({ examId: z.string().uuid().nullable().optional(), examName: z.string().min(1).max(120), subject: z.string().max(30).default(""), currentExamDate: z.string().max(30).default(""), requestedExamDate: z.string().min(8).max(30), requestedDaysRemaining: z.number().int().min(0).max(1000).nullable().optional(), reason: z.string().min(5).max(1000) });
 
@@ -13,8 +13,12 @@ export const routes: RouteDef[] = [
     const user = ctx.requireUser();
     const settings = (await db.select().from(userSettings).where(eq(userSettings.userId, user.userId)).limit(1))[0];
     if (!settings) return { policies: [] };
+    const today = todayStr();
     const policies = await db.select().from(examDatePolicies).where(eq(examDatePolicies.enabled, true));
-    return { policies: policies.filter((policy) => policy.educationLevel === settings.schoolLevel && policy.grade === settings.grade && (!policy.schoolName || policy.schoolName === settings.schoolName)) };
+    const matched = policies
+      .filter((policy) => policy.examDate > today && policy.educationLevel === settings.schoolLevel && policy.grade === settings.grade && (!policy.schoolName || policy.schoolName === settings.schoolName))
+      .sort((a, b) => a.examDate.localeCompare(b.examDate));
+    return { policies: matched.slice(0, 1).map((policy) => ({ ...policy, daysLeft: daysBetween(today, policy.examDate) })) };
   }}),
   route({ method: "GET", path: "/exam-date-appeals", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
@@ -33,7 +37,7 @@ export const routes: RouteDef[] = [
   route({ method: "GET", path: "/admin/exam-date-appeals", auth: "admin", handler: async () => {
     return { appeals: await db.select().from(examDateAppeals).orderBy(desc(examDateAppeals.createdAt)).limit(200) };
   }}),
-  route({ method: "GET", path: "/admin/exam-date-policies", auth: "admin", handler: async () => ({ policies: await db.select().from(examDatePolicies).orderBy(desc(examDatePolicies.schoolName), desc(examDatePolicies.educationLevel), examDatePolicies.grade) }) }),
+  route({ method: "GET", path: "/admin/exam-date-policies", auth: "admin", handler: async () => ({ policies: await db.select().from(examDatePolicies).orderBy(examDatePolicies.examDate) }) }),
   route({ method: "POST", path: "/admin/exam-date-policies", auth: "admin", handler: async (ctx) => {
     const admin = ctx.requireUser();
     const body = await ctx.json(z.object({ schoolName: z.string().max(120).default(""), educationLevel: z.enum(["junior", "senior"]), grade: z.number().int().min(1).max(3), term: z.string().min(1).max(40), examName: z.string().min(1).max(120), examDate: z.string().min(8).max(30), enabled: z.boolean().default(true) }));

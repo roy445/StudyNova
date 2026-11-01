@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const examHubs = useApi<{ hubs: Array<{ id: string; name: string; examNumber: string; closeAt: string | null }> }>("/exam-hubs/available");
   const examPrep = useApi<{ activities: Array<{ id: string; name: string; closeAt: string | null; effectiveStatus: string; subjects: Array<{ subject: string }> }> }>("/exam-prep/available");
   const examVocabulary = useApi<{ enabled: boolean; totalItems: number }>("/exam-vocabulary/catalog");
-  const examPolicies = useApi<{ policies: Array<{ id: string; schoolName: string; educationLevel: string; grade: number; term: string; examName: string; examDate: string }> }>("/exam-date-policies");
+  const examPolicies = useApi<{ policies: Array<{ id: string; schoolName: string; educationLevel: string; grade: number; term: string; examName: string; examDate: string; daysLeft: number }> }>("/exam-date-policies");
   const [appealExam, setAppealExam] = useState<Dashboard["upcomingExams"][number] | null>(null);
   const [appealDate, setAppealDate] = useState("");
   const [appealReason, setAppealReason] = useState("");
@@ -264,7 +264,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card title="⌁ 個人段考倒數" subtitle="依你的學校、學制與年級匹配管理員設定的日期。" action={<Link href="/grades" className="text-xs underline text-muted">管理</Link>}>
-          {examPolicies.data?.policies.length ? <div className="space-y-2">{examPolicies.data.policies.map((policy) => <div key={policy.id} className="glass-soft flex items-center justify-between px-3 py-2.5"><div><p className="text-sm font-medium">{policy.examName}</p><p className="text-xs text-muted">{policy.schoolName || "學校通用"}・{policy.term}・{policy.examDate}</p></div><span className="text-xs text-[#7dd3fc]">已匹配</span></div>)}</div> : <EmptyState icon="⌁" title="尚未匹配到段考日期" hint="請確認個人資料的學校、學制與年級，或等待管理員設定。" />}
+          {examPolicies.data?.policies.length ? <div className="space-y-2">{examPolicies.data.policies.slice(0, 1).map((policy) => <div key={policy.id} className="glass-soft flex items-center justify-between px-3 py-2.5"><div><p className="text-sm font-medium">{policy.examName}</p><p className="text-xs text-muted">{policy.schoolName || "學校通用"}・{policy.term}・{policy.examDate}</p></div><span className="text-right text-xs text-[#7dd3fc]"><strong className="block text-base">{policy.daysLeft} 天</strong>最近一次</span></div>)}</div> : <EmptyState icon="⌁" title="尚未匹配到未到期段考" hint="請確認個人資料的學校、學制與年級，或等待管理員設定下一次段考日期。" />}
         </Card>
         <Card title="⌁ 成績趨勢" action={<Link href="/grades" className="text-xs underline text-muted">完整分析</Link>}>
           {data.stats.length ? (
