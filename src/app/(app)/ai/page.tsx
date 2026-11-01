@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { NoviAvatar, type NoviState } from "@/components/brand";
+import { NoviAvatar, NoviStyleToggle, type NoviState } from "@/components/brand";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/ui";
 import { ApiRequestError, apiDelete, apiGet, apiPatch, apiPost, errorMessage, useApi } from "@/lib/api";
 import { NovaCostNotice, confirmNovaSpend } from "@/components/NovaCostNotice";
@@ -82,6 +82,7 @@ export default function AiPage() {
   const [loadingMsg, setLoadingMsg] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noviState, setNoviState] = useState<NoviState>("idle");
+  const [noviStyle, setNoviStyle] = useState<"classic" | "stellar">("classic");
   const [showMemory, setShowMemory] = useState(false);
   const [mathNoticeDismissed, setMathNoticeDismissed] = useState(false);
   const [renaming, setRenaming] = useState<Conversation | null>(null);
@@ -97,6 +98,13 @@ export default function AiPage() {
   const bottom = useRef<HTMLDivElement>(null);
   const activeMode = MODES.find((mode) => mode.key === (conv?.mode ?? "teacher")) ?? MODES[0];
   const conversationLoadRef = useRef(0);
+  useEffect(() => {
+    const sync = () => setNoviStyle(window.localStorage.getItem("studynova-novi-style") === "stellar" ? "stellar" : "classic");
+    sync();
+    window.addEventListener("studynova:novi-style", sync);
+    return () => window.removeEventListener("studynova:novi-style", sync);
+  }, []);
+
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -296,6 +304,10 @@ async function resolveAction(messageId: string, confirm: boolean) {
           ))}
           {!convs.loading && !convs.data?.conversations.length && <EmptyState icon="◌" title="還沒有對話" hint="建立一個對話開始問 Novi。" />}
         </div>
+        <div className="mt-3 rounded-xl border border-[#526dff]/25 bg-[#526dff]/[.06] p-2.5">
+          <div className="mb-2 flex items-center gap-2"><NoviAvatar size={28} state="idle" variant={noviStyle} /><div><p className="text-xs font-semibold">Novi 外觀</p><p className="text-[10px] text-muted">可隨時切回舊版，不會影響對話</p></div></div>
+          <NoviStyleToggle compact />
+        </div>
         <Button size="sm" variant="ghost" className="mt-2" full onClick={() => setShowMemory(true)}>
           ✦ Novi 記憶（{memory.data?.memory.length ?? 0}）
         </Button>
@@ -304,7 +316,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
       <Card className="flex w-full min-w-0 max-w-full min-h-[70dvh] flex-col overflow-x-clip">
         {!activeId ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
-            <NoviAvatar size={100} state="idle" />
+            <NoviAvatar size={100} state="idle" variant={noviStyle} />
             <p className="text-sm font-medium">選擇左側對話，或建立新對話</p>
             <p className="max-w-sm text-xs text-muted">Novi 支援八種模式，並且只有在你授權後才會讀取成績、錯題、計畫等資料。任何要寫入資料的動作都需要你按下確認。</p>
             <Button onClick={createConversation}>開始新對話</Button>
@@ -312,7 +324,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
         ) : (
           <>
             <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-[var(--line)] pb-3">
-              <NoviAvatar size={44} state={sending ? "thinking" : noviState} />
+              <NoviAvatar size={44} state={sending ? "thinking" : noviState} variant={noviStyle} />
               <Select
                 value={conv?.mode ?? "teacher"}
                 onChange={async (e) => {
@@ -375,7 +387,8 @@ async function resolveAction(messageId: string, confirm: boolean) {
               </aside>}
               {loadingMsg && <Skeleton lines={4} />}
               {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div key={m.id} className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {m.role !== "user" && <NoviAvatar size={32} state={m.id === latestAssistantId ? noviState : "idle"} variant={noviStyle} />}
                   <div className={`min-w-0 max-w-[88%] rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed [overflow-wrap:anywhere] ${m.role === "user" ? "border-transparent bg-gradient-to-r from-[#7c5cff] to-[#37d3ff] text-white" : m.importance === "critical" ? "border-rose-300/60 bg-rose-400/15 text-rose-50 shadow-[0_0_24px_rgba(251,113,133,0.14)]" : m.importance === "important" ? "border-amber-300/50 bg-amber-400/12 text-amber-50" : "glass-soft border-transparent"}`}>
                     {m.attachment && <img src={m.attachment.previewUrl} alt={m.attachment.name} className="mb-2 max-h-64 max-w-full rounded-xl object-contain" />}
                     {m.role !== "user" && m.importance && m.importance !== "normal" && <p className={`mb-1 text-[10px] font-bold tracking-wide ${m.importance === "critical" ? "text-rose-200" : "text-amber-200"}`}>{m.importance === "critical" ? "⚠ 關鍵提醒" : "✦ 學習重點"}</p>}

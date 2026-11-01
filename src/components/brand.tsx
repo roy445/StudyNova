@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 
 export type NoviState = "idle" | "thinking" | "happy" | "cheer" | "analyze" | "speak" | "success" | "error" | "remind" | "levelup";
+export type NoviStyle = "classic" | "stellar";
 
 const STATE_COLOR: Record<NoviState, string> = {
   idle: "#37d3ff",
@@ -70,6 +71,7 @@ export function NoviAvatar({
   effect = "none",
   float = "none",
   level = 1,
+  variant,
 }: {
   size?: number;
   state?: NoviState;
@@ -79,6 +81,7 @@ export function NoviAvatar({
   effect?: string;
   float?: string;
   level?: number;
+  variant?: NoviStyle;
 }) {
   const [festive, setFestive] = useState(false);
   useEffect(() => {
@@ -87,6 +90,16 @@ export function NoviAvatar({
     window.addEventListener("studynova:theme", sync);
     return () => window.removeEventListener("studynova:theme", sync);
   }, []);
+  // Keep the legacy SVG as the global default. The new artwork is opt-in per AI surface.
+  const activeStyle = variant ?? "classic";
+  if (activeStyle === "stellar") {
+    return (
+      <div className={`relative select-none ${float === "float-hover" ? "anim-float" : ""}`} style={{ width: size, height: size, animationDuration: float === "float-hover" ? "2.6s" : undefined }} aria-label={`Novi 狀態：${state}，新版星旅外觀`}>
+        <div className="absolute inset-0 rounded-full bg-[#4d63ff]/35 blur-xl" />
+        <Image src="/brand/novi-stellar-avatar.png" width={size} height={size} alt="Novi AI" sizes={`${size}px`} className="relative h-full w-full rounded-full object-cover shadow-[0_0_24px_rgba(76,117,255,.58)] ring-1 ring-[#9cc7ff]/70" />
+      </div>
+    );
+  }
   const skinColor = skin === "skin-aurora" ? "#22d3ee" : skin === "skin-nebula" ? "#a78bfa" : skin === "skin-gold" ? "#fbbf24" : "#66e0ff";
   const color = aura ?? (skin !== "core-classic" ? skinColor : "#66e0ff");
   const bodyId = `novi-body-${state}-${skin.replace(/[^a-z0-9-]/gi, "")}`;
@@ -148,6 +161,23 @@ export function NoviAvatar({
       </svg>
     </div>
   );
+}
+
+export function NoviStyleToggle({ compact = false }: { compact?: boolean }) {
+  const [style, setStyle] = useState<NoviStyle>("classic");
+  useEffect(() => {
+    const current = window.localStorage.getItem("studynova-novi-style");
+    setStyle(current === "stellar" ? "stellar" : "classic");
+  }, []);
+  function choose(next: NoviStyle) {
+    setStyle(next);
+    window.localStorage.setItem("studynova-novi-style", next);
+    window.dispatchEvent(new Event("studynova:novi-style"));
+  }
+  return <div className={`flex ${compact ? "gap-1" : "flex-wrap gap-2"}`} aria-label="Novi 外觀切換">
+    <button type="button" onClick={() => choose("stellar")} className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] transition ${style === "stellar" ? "border-[#7da8ff]/70 bg-[#526dff]/20 text-[#d9e5ff]" : "border-[var(--line)] text-muted hover:bg-white/5"}`}><span className="h-5 w-5 overflow-hidden rounded-full"><Image src="/brand/novi-stellar-avatar.png" width={20} height={20} alt="" /></span>{compact ? "新版" : "新版星旅"}</button>
+    <button type="button" onClick={() => choose("classic")} className={`rounded-xl border px-2.5 py-1.5 text-[11px] transition ${style === "classic" ? "border-[#37d3ff]/70 bg-[#37d3ff]/10 text-[#b9f2ff]" : "border-[var(--line)] text-muted hover:bg-white/5"}`}>◉ {compact ? "舊版" : "舊版 SVG"}</button>
+  </div>;
 }
 
 /** Star-trail particle field used on the landing / loading screen. */
