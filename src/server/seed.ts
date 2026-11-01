@@ -14,12 +14,15 @@ import {
   questions,
   aiProviderHealth,
   platformSettings,
+  announcements,
 } from "@/db/schema";
 import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
 import vocabulary from "@/data/vocabulary.json";
 
-const SEED_VERSION = 11;
+const SEED_VERSION = 12;
+
+const ENGLISH_READER_ANNOUNCEMENT_TITLE = "📖 英文雜誌閱讀器正式開放";
 
 const LEVELS = [
   { level: 1, name: "初始助手", requiredXp: 0, upgradeCostNova: 0, ability: "基本問答與今日建議", aura: "#38bdf8" },
@@ -219,6 +222,36 @@ export async function runSeed(force = false) {
       .insert(legalDocuments)
       .values(d)
       .onConflictDoUpdate({ target: legalDocuments.slug, set: { title: d.title, body: d.body, version: d.version, updatedAt: new Date() } });
+  }
+
+  const existingEnglishReaderAnnouncement = await db.select({ id: announcements.id }).from(announcements).where(eq(announcements.title, ENGLISH_READER_ANNOUNCEMENT_TITLE)).limit(1);
+  if (!existingEnglishReaderAnnouncement[0]) {
+    await db.insert(announcements).values({
+      title: ENGLISH_READER_ANNOUNCEMENT_TITLE,
+      body: "StudyNova 全新英文雜誌閱讀器登場！上傳英文雜誌圖片、PDF 或文字內容，AI 會自動整理單字、繁體中文意思、詞性、音標、完整句子與中文翻譯；閱讀時還能逐句朗讀，並同步標示目前播放中的句子。立即開啟你的英文閱讀資料庫，讓每一篇文章都變成可複習的學習素材。",
+      link: "/english-reader",
+      targetFeature: "english-reader",
+      category: "feature",
+      announcementType: "feature",
+      importance: "high",
+      tags: ["英文", "閱讀器", "AI", "Nova Pro"],
+      audience: "all",
+      audienceIds: [],
+      pinned: true,
+      marquee: true,
+      sortOrder: 1,
+      notify: true,
+      push: false,
+      email: false,
+      showHome: true,
+      showPwa: true,
+      ctaLabel: "開啟英文閱讀器",
+      ctaUrl: "/english-reader",
+      status: "published",
+      startsAt: new Date(),
+      endsAt: null,
+      createdBy: null,
+    });
   }
 
 

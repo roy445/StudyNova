@@ -1286,10 +1286,10 @@ export const routes: RouteDef[] = [
       const resetAt = "每天 00:00（台灣時間）";
       if (!totalWords) return { words: [], level: track, track, count: 0, dailyTarget, appearedCount: 0, totalWords: 0, resetAt, appearanceDate: dateKey };
       const previousAppearances = await db.select({ wordId: dailyWordAppearances.wordId, appearanceDate: dailyWordAppearances.appearanceDate }).from(dailyWordAppearances).innerJoin(dailyWords, eq(dailyWords.id, dailyWordAppearances.wordId)).where(and(eq(dailyWordAppearances.userId, user.userId), eq(dailyWords.level, track)));
-      const previousWordIds = new Set(previousAppearances.map((row) => row.wordId));
       const todayWordIds = new Set(previousAppearances.filter((row) => row.appearanceDate === dateKey).map((row) => row.wordId));
-      const priorUniqueCount = previousWordIds.size - todayWordIds.size;
-      const offset = (priorUniqueCount % totalWords);
+      const priorWordIds = new Set(previousAppearances.filter((row) => row.appearanceDate < dateKey).map((row) => row.wordId));
+      const priorUniqueCount = priorWordIds.size;
+      const offset = priorUniqueCount % totalWords;
       const fetchWords = (limit: number, skip: number) => db
         .select({
           id: dailyWords.id,
@@ -1313,9 +1313,28 @@ export const routes: RouteDef[] = [
         .orderBy(asc(dailyWords.word))
         .limit(limit)
         .offset(skip);
-      const first = await fetchWords(dailyTarget, offset);
+      const fetchTodayWords = (ids: string[]) => ids.length
+        ? db.select({
+            id: dailyWords.id,
+            word: dailyWords.word,
+            meaning: dailyWords.meaning,
+            meanings: dailyWords.meanings,
+            phrases: dailyWords.phrases,
+            part_of_speech: dailyWords.partOfSpeech,
+            phonetic: dailyWords.usPhonetic,
+            example: dailyWords.example,
+            example_zh: dailyWords.exampleZh,
+            level: dailyWords.level,
+            familiarity: sql<number>`coalesce(${wordProgress.familiarity}, 0)`,
+            correct_count: sql<number>`coalesce(${wordProgress.correctCount}, 0)`,
+            wrong_count: sql<number>`coalesce(${wordProgress.wrongCount}, 0)`,
+            memory_tip: wordProgress.memoryTip,
+          }).from(dailyWords).leftJoin(wordProgress, and(eq(wordProgress.wordId, dailyWords.id), eq(wordProgress.userId, user.userId))).where(inArray(dailyWords.id, ids)).orderBy(asc(dailyWords.word))
+        : Promise.resolve([] as Awaited<ReturnType<typeof fetchWords>>);
+      const todayRows = await fetchTodayWords([...todayWordIds]);
+      const first = todayRows.length ? todayRows : await fetchWords(dailyTarget, offset);
       const remaining = dailyTarget - first.length;
-      const rows = remaining > 0 ? [...first, ...(await fetchWords(remaining, 0))] : first;
+      const rows = remaining > 0 ? [...first, ...(await fetchWords(remaining, (offset + first.length) % totalWords))] : first;
       if (rows.length) {
         await db.insert(dailyWordAppearances).values(rows.map((row) => ({ userId: user.userId, wordId: row.id, appearanceDate: dateKey }))).onConflictDoNothing();
       }
