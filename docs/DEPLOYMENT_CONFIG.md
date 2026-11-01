@@ -49,9 +49,16 @@ POST /api/v1/system/cron?task=<task>&uid=<unique-id>
 Header: x-cron-secret: <CRON_SECRET>
 ```
 
-需要在外部排程器設定呼叫，例如 GitHub Actions、Vercel Cron、Cloud Scheduler、crontab 或 VPS systemd timer。`CRON_SECRET` 必須與外部排程器使用的 secret 相同。實際任務清單可在管理後台 Cron 分頁查看。
+需要在外部排程器設定呼叫，例如 cron-job.org、GitHub Actions、Cloud Scheduler、crontab 或 VPS systemd timer。Hobby 方案請不要使用 Vercel Cron；`CRON_SECRET` 必須與外部排程器使用的 secret 相同。實際任務清單可在管理後台 Cron 分頁查看。
 
-**背景工作的必要設定：**若部署環境沒有常駐 worker（例如 Vercel serverless），請每分鐘呼叫 `GET /api/cron/queue-drain`，並傳送 `CRON_SECRET`（`x-cron-secret` header；Vercel Cron 會傳 `Authorization: Bearer ...`）。這會處理 PostgreSQL queue 工作，包括 PK Bot、AI 背景工作與排程發布；只呼叫低頻任務不能保證工作及時執行。不要把 secret 放在 URL query string 或 client bundle。瀏覽器朗讀不使用 queue，說明見 [裝置內建朗讀](./BROWSER_SPEECH.md)。
+**背景工作的必要設定：**若部署環境沒有常駐 worker（例如 Vercel serverless），請使用 cron-job.org 每分鐘呼叫：
+
+```text
+GET https://study-nova-psi.vercel.app/api/cron/queue-drain
+Header: x-cron-secret: <與 Vercel Production 相同的 CRON_SECRET>
+```
+
+cron-job.org 建立工作時，Method 選 `GET`、Execution interval 選每 1 分鐘，並在 Headers 加入 `x-cron-secret`。不要把 secret 放在 URL query string 或 client bundle。這會處理 PostgreSQL queue 工作，包括英文雜誌分析、PK Bot、AI 背景工作與排程發布；只呼叫低頻任務不能保證工作及時執行。瀏覽器朗讀不使用 queue，說明見 [裝置內建朗讀](./BROWSER_SPEECH.md)。
 
 `drizzle/0086_queue_worker_leases.sql` 為 queue 加上 `started_at` lease；部署 crash recovery 程式碼前先套用此 migration，逾時且仍標記 `running` 的工作才會被安全回收。
 
@@ -84,7 +91,7 @@ Header: x-cron-secret: <CRON_SECRET>
 |---|---|---|
 | `REDIS_URL` | 不需要 | 本版本背景工作使用 PostgreSQL `job_queue`；設定此變數不會啟用 Redis/BullMQ consumer |
 
-正式環境需設定每分鐘觸發的 `queue_drain` cron，否則 PostgreSQL queue 中的 PK Bot、AI 與排程發布工作不會及時執行。瀏覽器朗讀不需要背景工作。未來若部署獨立 Redis worker，需先部署實際 consumer 並確認 adapter/worker 協定後才設定 Redis。
+正式環境需使用外部排程器每分鐘觸發 `queue_drain`；StudyNova Hobby 部署請使用 cron-job.org，不要在 Vercel 設定每分鐘 Cron。否則 PostgreSQL queue 中的英文雜誌分析、PK Bot、AI 與排程發布工作不會及時執行。瀏覽器朗讀不需要背景工作。未來若部署獨立 Redis worker，需先部署實際 consumer 並確認 adapter/worker 協定後才設定 Redis。
 
 ### Text-to-Speech (TTS)
 
