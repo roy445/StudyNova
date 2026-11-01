@@ -29,7 +29,16 @@ export const routes: RouteDef[] = [
     const user = ctx.requireUser();
     await ensureEnglishReaderSchema();
     await requirePro(user.userId);
-    return { documents: await db.select().from(englishReadingDocuments).where(eq(englishReadingDocuments.userId, user.userId)).orderBy(desc(englishReadingDocuments.updatedAt)).limit(30) };
+    // 列表只需要摘要欄位；originalText 可能接近 36,000 字，完整內容由單筆 detail API 延遲載入。
+    const documents = await db.select({
+      id: englishReadingDocuments.id,
+      title: englishReadingDocuments.title,
+      sourceKind: englishReadingDocuments.sourceKind,
+      status: englishReadingDocuments.status,
+      createdAt: englishReadingDocuments.createdAt,
+      updatedAt: englishReadingDocuments.updatedAt,
+    }).from(englishReadingDocuments).where(eq(englishReadingDocuments.userId, user.userId)).orderBy(desc(englishReadingDocuments.updatedAt)).limit(30);
+    return { documents };
   }}),
   route({ method: "GET", path: "/english-reader/documents/:id", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
