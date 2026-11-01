@@ -22,7 +22,6 @@ import {
   aiConversations,
   aiMessages,
   fileContexts,
-  dailyKnowledgeItems,
   pkBotJobs,
   ttsJobs,
   aiQuestionConverterJobs,
@@ -36,7 +35,6 @@ import { analyzeQuestionWithAi } from "./question-analysis";
 import { checkDisplayName } from "./name-moderation";
 import { processAiBackgroundBatch } from "./ai-background";
 import { processPkBotJob } from "./pk-bot-engine";
-import { DAILY_KNOWLEDGE_SUBJECTS, generateDailyKnowledge, fingerprint } from "./daily-knowledge";
 import { publishScheduledRelease } from "./release-publisher";
 import { processExamPrepImport } from "./exam-prep-import";
 import { processExamPrepDraftAnalysis } from "./exam-prep-draft-analysis";
@@ -47,7 +45,6 @@ import { processEnglishReaderDocument, markEnglishReaderFailed } from "./english
 
 export type JobName =
   | "daily_tasks_refresh"
-  | "daily_knowledge_refresh"
   | "review_reminder"
   | "weekly_exam_open"
   | "weekly_report"
@@ -147,22 +144,6 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
     const rows = await db.select({ userId: users.userId }).from(users).where(eq(users.status, "active"));
     for (const r of rows) await ensureDailyTasks(r.userId);
     return `已為 ${rows.length} 位使用者建立今日任務`;
-  },
-
-  async daily_knowledge_refresh() {
-    const date = todayStr();
-    let published = 0; let skipped = 0;
-    for (const subject of DAILY_KNOWLEDGE_SUBJECTS) {
-      const existing = await db.select({ id: dailyKnowledgeItems.id }).from(dailyKnowledgeItems).where(and(eq(dailyKnowledgeItems.scheduledDate, date), eq(dailyKnowledgeItems.subject, subject))).limit(1);
-      if (existing.length) { skipped += 1; continue; }
-      try {
-        const result = await generateDailyKnowledge({ subject, date });
-        if (result.duplicate.duplicate || !result.source.verified) { skipped += 1; continue; }
-        const row = await db.insert(dailyKnowledgeItems).values({ ...result.draft, sourceUrl: result.draft.sourceUrl || "", sourceType: result.draft.sourceType ?? "unknown", sourceId: result.draft.sourceId ?? "", licenseInfo: result.draft.licenseInfo ?? "", originalTitle: result.draft.originalTitle ?? result.draft.title, fetchedAt: new Date(), status: "published", scheduledDate: date, verifiedAt: new Date(), publishedAt: new Date(), verificationNote: result.source.note, titleFingerprint: fingerprint(result.draft.title), contentFingerprint: fingerprint(result.draft.content), generationMetadata: { provider: result.meta.provider, model: result.meta.model, automation: "approved_by_automation", source: result.source } }).onConflictDoNothing().returning({ id: dailyKnowledgeItems.id });
-        if (row.length) published += 1; else skipped += 1;
-      } catch { skipped += 1; }
-    }
-    return `每日知識自動化完成：發布 ${published} 科，略過或等待重試 ${skipped} 科`;
   },
 
   async study_reminder() {
@@ -663,7 +644,6 @@ export function queue(): QueueAdapter {
 export const CRON_TASKS: Array<{ task: CronTask; label: string; schedule: string }> = [
   { task: "queue_drain", label: "背景工作佇列（AI／朗讀／PK Bot／版本排程）", schedule: "每分鐘" },
   { task: "daily_tasks_refresh", label: "重建每日任務", schedule: "每日 00:05" },
-  { task: "daily_knowledge_refresh", label: "每日知識生成與驗證", schedule: "每日 00:10" },
   { task: "review_reminder", label: "錯題複習提醒", schedule: "每日 19:00" },
   { task: "weekly_exam_open", label: "每週小考開放通知", schedule: "每 30 分鐘" },
   { task: "weekly_report", label: "每週學習報告", schedule: "每週一 09:00" },

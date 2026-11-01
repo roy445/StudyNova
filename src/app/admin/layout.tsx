@@ -43,7 +43,6 @@ const NAV_GROUPS: AdminNavGroup[] = [
     label: "學習與內容",
     items: [
       { href: "/admin/reference-materials", label: "AI 參考資料", icon: "admin" },
-      { href: "/admin/daily-knowledge", label: "每日知識", icon: "study" },
       { href: "/admin/content", label: "Content Studio", icon: "study" },
       { href: "/admin/online-learning", label: "📚 線上學習管理", icon: "study" },
       { href: "/admin/exam-vocabulary", label: "英文段考總單字", icon: "study" },

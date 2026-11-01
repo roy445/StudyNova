@@ -3954,54 +3954,6 @@ export const examQuestionGenerationItems = pgTable(
 );
 
 /* ------------------------------------------------ DAILY KNOWLEDGE */
-export const dailyKnowledgeItems = pgTable(
-  "daily_knowledge_items",
-  {
-    id: id(),
-    title: text("title").notNull(),
-    content: text("content").notNull(),
-    detail: text("detail").notNull().default(""),
-    subject: text("subject").notNull(),
-    topic: text("topic").notNull().default(""),
-    source: text("source").notNull().default(""),
-    sourceUrl: text("source_url").notNull().default(""),
-    sourceType: text("source_type").notNull().default("unknown"),
-    sourceId: text("source_id").notNull().default(""),
-    licenseInfo: text("license_info").notNull().default(""),
-    originalTitle: text("original_title").notNull().default(""),
-    fetchedAt: timestamp("fetched_at", { withTimezone: true }),
-    publishedAt: timestamp("published_at", { withTimezone: true }),
-    verifiedAt: timestamp("verified_at", { withTimezone: true }),
-    verificationNote: text("verification_note").notNull().default(""),
-    status: text("status").notNull().default("draft"),
-    scheduledDate: text("scheduled_date"),
-    immediateDisplay: boolean("immediate_display").notNull().default(false),
-    coreConcept: text("core_concept").notNull().default(""),
-    titleFingerprint: text("title_fingerprint").notNull().default(""),
-    contentFingerprint: text("content_fingerprint").notNull().default(""),
-    quiz: jsonb("quiz").$type<{ question: string; options: string[]; answer: number; explanation: string } | null>(),
-    generationMetadata: jsonb("generation_metadata").$type<Record<string, unknown>>().notNull().default({}),
-    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
-    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
-    createdAt: created(),
-    updatedAt: updated(),
-  },
-  (t) => [index("daily_knowledge_subject_status_idx").on(t.subject, t.status, t.publishedAt), uniqueIndex("daily_knowledge_schedule_uq").on(t.scheduledDate, t.subject), index("daily_knowledge_fingerprint_idx").on(t.titleFingerprint, t.contentFingerprint)],
-);
-
-export const dailyKnowledgeViews = pgTable(
-  "daily_knowledge_views",
-  {
-    id: id(),
-    itemId: uuid("item_id").notNull().references(() => dailyKnowledgeItems.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }),
-    subject: text("subject").notNull().default("其他"),
-    deliveryDate: text("delivery_date").notNull().default(""),
-    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex("daily_knowledge_view_uq").on(t.itemId, t.userId), index("daily_knowledge_view_user_idx").on(t.userId, t.viewedAt)],
-);
-
 export const customizationCategories = pgTable(
   "customization_categories",
   {

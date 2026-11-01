@@ -5,6 +5,7 @@ import { englishReadingDocuments, englishReadingItems } from "@/db/schema";
 import { sanitizeText } from "./core";
 import { readObject } from "./storage";
 import { runAiJson } from "./ai";
+import { consumeFeature } from "./economy";
 import { extractText } from "./routes/content-routes";
 
 async function setProgress(documentId: string, progress: number, status: string, progressStage: string) {
@@ -43,6 +44,7 @@ export async function processEnglishReaderDocument(documentId: string) {
     ...vocabulary.map((item, index) => ({ documentId: document.id, itemType: "vocabulary", orderIndex: index, word: item.word, meaning: item.meaning, partOfSpeech: item.partOfSpeech, phonetic: item.phonetic, sentence: "", sentenceZh: "" })),
     ...sentences.map((item, index) => ({ documentId: document.id, itemType: "sentence", orderIndex: vocabulary.length + index, word: "", meaning: "", partOfSpeech: "", phonetic: "", sentence: item.sentence, sentenceZh: item.meaning })),
   ]);
+  await consumeFeature(document.userId, "english_reader", 1, `english-reader:${document.id}`);
   await db.update(englishReadingDocuments).set({ originalText: sourceText, summary: analysis.summary, status: "ready", progress: 100, progressStage: "分析完成", errorMessage: "", updatedAt: new Date() }).where(eq(englishReadingDocuments.id, document.id));
   return { vocabulary: vocabulary.length, sentences: sentences.length };
 }

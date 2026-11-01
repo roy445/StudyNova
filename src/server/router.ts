@@ -132,7 +132,6 @@ async function loadRoutes(): Promise<Compiled[]> {
     import("./routes/previous-exam-routes"),
     import("./routes/ai-background-routes"),
     import("./routes/ai-governance-routes"),
-    import("./routes/daily-knowledge-routes"),
     import("./routes/pro-renewal-routes"),
     import("./routes/release-routes"),
     import("./routes/identity-group-routes"),

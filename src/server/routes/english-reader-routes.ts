@@ -1,3 +1,4 @@
+import { featureState, consumeFeature, isProUser } from "../economy";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -7,7 +8,6 @@ import { badRequest, fail, forbidden, notFound, sanitizeText } from "../core";
 import { putObject, deleteObject } from "../storage";
 import { runAiJson, aiConfigured } from "../ai";
 import { extractText } from "./content-routes";
-import { isProUser } from "../economy";
 import { ensureEnglishReaderSchema } from "../db-compat";
 import { queue } from "../queue";
 
@@ -16,20 +16,26 @@ const wordSchema = z.object({ word: z.string().trim().min(1).max(120), meaning: 
 const sentenceSchema = z.object({ sentence: z.string().trim().min(3).max(2000), meaning: z.string().max(1000).default("") });
 const analysisSchema = z.object({ summary: z.string().max(4000).default(""), vocabulary: z.array(wordSchema).max(120).default([]), sentences: z.array(sentenceSchema).max(80).default([]) });
 
-async function requirePro(userId: string) {
-  if (!(await isProUser(userId))) throw fail("QUOTA_PRO_REQUIRED", { message: "英文閱讀器目前為 Nova Pro 專屬功能。" });
-}
 async function ownDocument(id: string, userId: string) {
   const document = (await db.select().from(englishReadingDocuments).where(and(eq(englishReadingDocuments.id, id), eq(englishReadingDocuments.userId, userId))).limit(1))[0];
   if (!document) throw notFound("找不到英文閱讀內容");
   return document;
 }
 
+async function requireEnglishReaderAccess(userId: string) {
+  const state = await featureState(userId, "english_reader");
+  if (!state.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: "「英文雜誌閱讀器」目前已停用" });
+  const pro = await isProUser(userId);
+  if (state.proOnly && !pro) throw fail("QUOTA_PRO_REQUIRED", { message: "「英文雜誌閱讀器」是 Nova Pro 專屬功能" });
+  if (!state.unlimited && state.limit <= 0) throw fail("QUOTA_NOT_IN_PLAN", { message: "「英文雜誌閱讀器」目前未開放" });
+  return state;
+}
+
 export const routes: RouteDef[] = [
   route({ method: "GET", path: "/english-reader/documents", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
     await ensureEnglishReaderSchema();
-    await requirePro(user.userId);
+    await requireEnglishReaderAccess(user.userId);
     // 列表只需要摘要欄位；originalText 可能接近 36,000 字，完整內容由單筆 detail API 延遲載入。
     const documents = await db.select({
       id: englishReadingDocuments.id,
@@ -47,7 +53,7 @@ export const routes: RouteDef[] = [
   route({ method: "GET", path: "/english-reader/documents/:id", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
     await ensureEnglishReaderSchema();
-    await requirePro(user.userId);
+    await requireEnglishReaderAccess(user.userId);
     const document = await ownDocument(ctx.params.id, user.userId);
     const items = await db.select().from(englishReadingItems).where(eq(englishReadingItems.documentId, document.id)).orderBy(asc(englishReadingItems.orderIndex));
     return { document, items };
@@ -55,7 +61,7 @@ export const routes: RouteDef[] = [
   route({ method: "POST", path: "/english-reader/documents/from-blob", auth: "user", rate: { limit: 30, windowSec: 3600, key: "english-reader-blob" }, handler: async (ctx) => {
     const user = ctx.requireUser();
     await ensureEnglishReaderSchema();
-    await requirePro(user.userId);
+    await requireEnglishReaderAccess(user.userId);
     const body = await ctx.json(z.object({ title: z.string().trim().max(160).default("英文閱讀文章"), pathname: z.string().trim().min(1).max(500) }));
     const object = (await db.select().from(storageObjects).where(and(eq(storageObjects.userId, user.userId), eq(storageObjects.storageKey, body.pathname))).limit(1))[0];
     if (!object || object.driver !== "blob") throw notFound("找不到剛上傳的雲端檔案，請稍候再試");
@@ -67,7 +73,7 @@ export const routes: RouteDef[] = [
   route({ method: "POST", path: "/english-reader/documents", auth: "user", rate: { limit: 12, windowSec: 3600, key: "english-reader" }, handler: async (ctx) => {
     const user = ctx.requireUser();
     await ensureEnglishReaderSchema();
-    await requirePro(user.userId);
+    await requireEnglishReaderAccess(user.userId);
     if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
     const form = await ctx.formData();
     const file = form.get("file");
@@ -100,6 +106,7 @@ export const routes: RouteDef[] = [
         temperature: 0.1,
       }, { summary: "", vocabulary: [], sentences: [] });
       const analysis = analysisSchema.parse(data);
+      await consumeFeature(user.userId, "english_reader", 1, `english-reader:${created.id}`);
       const vocabulary = analysis.vocabulary.filter((item) => /[A-Za-z]/.test(item.word));
       const sentences = analysis.sentences.filter((item) => /[A-Za-z]/.test(item.sentence));
       await db.insert(englishReadingItems).values([
@@ -117,7 +124,7 @@ export const routes: RouteDef[] = [
   route({ method: "DELETE", path: "/english-reader/documents/:id", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
     await ensureEnglishReaderSchema();
-    await requirePro(user.userId);
+    await requireEnglishReaderAccess(user.userId);
     const document = await ownDocument(ctx.params.id, user.userId);
     if (document.sourceObjectId) await deleteObject(document.sourceObjectId, user.userId, false).catch(() => undefined);
     await db.delete(englishReadingDocuments).where(eq(englishReadingDocuments.id, document.id));

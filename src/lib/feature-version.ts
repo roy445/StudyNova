@@ -13,7 +13,7 @@ const API_FEATURE_ROUTE_PREFIXES: Array<readonly [string, readonly string[]]> = 
   ["ai", ["/ai"]],
   ["dashboard", ["/dashboard", "/learning/radar", "/learning/error-patterns", "/tasks/daily"]],
   ["profile", ["/account", "/achievements"]],
-  ["study", ["/study", "/learning/timeline", "/learning-packages", "/learning/one-page", "/review", "/focus", "/tasks", "/assignments", "/wrong-questions", "/adaptive", "/words", "/quizzes", "/wrong", "/sentences", "/materials", "/quick-memory", "/ocr", "/my-vocabulary", "/knowledge", "/notes", "/voice", "/visual-notes", "/daily-knowledge", "/exam-hubs", "/tts", "/textbooks", "/shares"]],
+  ["study", ["/study", "/learning/timeline", "/learning-packages", "/learning/one-page", "/review", "/focus", "/tasks", "/assignments", "/wrong-questions", "/adaptive", "/words", "/quizzes", "/wrong", "/sentences", "/materials", "/quick-memory", "/ocr", "/my-vocabulary", "/notes", "/voice", "/visual-notes", "/exam-hubs", "/tts", "/textbooks", "/shares"]],
 ];
 
 /** Infer the client-facing feature for an API path; explicit route gates override this mapping. */
