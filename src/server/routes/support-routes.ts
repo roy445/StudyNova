@@ -115,7 +115,10 @@ export const routes: RouteDef[] = [
     rate: { limit: 8, windowSec: 3600, key: "issue-create" },
     handler: async (ctx) => {
       let form: FormData | null = null;
-      try { form = await ctx.formData(); } catch { form = null; }
+      const contentType = ctx.req.headers.get("content-type") ?? "";
+      if (contentType.toLowerCase().includes("multipart/form-data")) {
+        try { form = await ctx.formData(); } catch { form = null; }
+      }
       let payload: Record<string, unknown>;
       let file: File | null = null;
 
