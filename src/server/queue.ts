@@ -574,6 +574,7 @@ class PostgresQueue implements QueueAdapter {
         const detail = await handler(job.payload ?? {});
         await db.update(jobQueue).set({ status: "done", finishedAt: new Date(), lastError: "" }).where(eq(jobQueue.id, job.id));
         results.push({ name: job.name, ok: true, detail });
+        console.info("[queue] job completed", { jobId: job.id, name: job.name, attempts: job.attempts + 1, detail });
         processed += 1;
       } catch (err) {
         const message = err instanceof Error ? err.message.slice(0, 300) : "unknown";
@@ -587,13 +588,16 @@ class PostgresQueue implements QueueAdapter {
           const delayMs = Math.min(15 * 60_000, 60_000 * 2 ** Math.min(attemptNumber - 1, 4));
           await db.update(jobQueue).set({ status: "pending", lastError: message, runAt: new Date(Date.now() + delayMs), startedAt: null, finishedAt: null }).where(eq(jobQueue.id, job.id));
           results.push({ name: job.name, ok: false, detail: `暫時忙碌，已排隊重試（${Math.ceil(delayMs / 60000)} 分鐘後）` });
+          console.warn("[queue] job retry scheduled", { jobId: job.id, name: job.name, attempts: attemptNumber, maxAttempts, retryableQueue: true, retryAt: new Date(Date.now() + delayMs).toISOString(), error: message });
         } else if (attemptNumber < maxAttempts) {
           const delayMs = Math.min(15 * 60_000, 30_000 * 2 ** (attemptNumber - 1));
           await db.update(jobQueue).set({ status: "pending", lastError: message, runAt: new Date(Date.now() + delayMs), startedAt: null, finishedAt: null }).where(eq(jobQueue.id, job.id));
           results.push({ name: job.name, ok: false, detail: `retry ${attemptNumber + 1}/${maxAttempts} scheduled in ${Math.ceil(delayMs / 1000)}s: ${message}` });
+          console.warn("[queue] job retry scheduled", { jobId: job.id, name: job.name, attempts: attemptNumber, maxAttempts, retryableQueue: false, retryAt: new Date(Date.now() + delayMs).toISOString(), error: message });
         } else {
           await db.update(jobQueue).set({ status: "failed", lastError: message, finishedAt: new Date() }).where(eq(jobQueue.id, job.id));
           results.push({ name: job.name, ok: false, detail: `failed after ${maxAttempts} attempts: ${message}` });
+          console.error("[queue] job failed permanently", { jobId: job.id, name: job.name, attempts: attemptNumber, maxAttempts, error: message });
           failed += 1;
         }
       }

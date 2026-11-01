@@ -591,6 +591,15 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
       } catch (error) {
         console.error("[ai] provider telemetry write failed after successful completion", { provider: cfg.name, error: error instanceof Error ? error.message : "unknown" });
       }
+      if (fallbackFrom) {
+        console.warn("[ai] provider fallback succeeded", {
+          feature: req.feature,
+          fallbackFrom,
+          provider: cfg.name,
+          model: cfg.model,
+          latencyMs: out.latencyMs,
+        });
+      }
       return { ...out, fallbackFrom };
     } catch (err) {
       const category: FailureCategory = err instanceof ProviderError ? err.category : "unknown";
@@ -660,6 +669,12 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
         : lastCategory === "invalid_request"
           ? "圖片格式或內容不符合目前 AI 模型要求，請改用清晰的 JPG、PNG 或 WebP 圖片後重試。"
           : "AI 圖片分析暫時無法使用，請稍後再試。";
+  console.error("[ai] all providers unavailable", {
+    feature: req.feature,
+    category: lastCategory,
+    reason: lastReason,
+    skippedProviders,
+  });
   throw fail("AI_ALL_UNAVAILABLE", { message, details: { category: lastCategory, reason: lastReason, skippedProviders } });
 }
 
