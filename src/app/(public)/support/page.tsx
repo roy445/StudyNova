@@ -87,10 +87,16 @@ function SupportInner() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const title = form.title.trim();
+    const description = form.description.trim();
+    if (title.length < 4 || description.length < 10) {
+      toast.push("error", "請填寫至少 4 個字的標題，以及至少 10 個字的問題描述");
+      return;
+    }
     setPending(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Object.entries({ ...form, title, description }).forEach(([k, v]) => fd.append(k, v));
       fd.append("pageUrl", typeof window !== "undefined" ? window.location.href : "");
       if (file) fd.append("attachment", file);
       const res = await apiSend<{ ticketNo: string }>("/support/issues", "POST", fd);

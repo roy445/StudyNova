@@ -129,6 +129,16 @@ export const routes: RouteDef[] = [
         payload = (await ctx.req.json().catch(() => ({}))) as Record<string, unknown>;
       }
 
+      // Accept legacy names used by older deployed support/reset forms.
+      if (typeof payload.title !== "string" || !payload.title.trim()) {
+        const subject = payload.subject ?? payload.topic;
+        if (typeof subject === "string" && subject.trim()) payload.title = subject.trim();
+      }
+      if (typeof payload.description !== "string" || !payload.description.trim()) {
+        const legacyDescription = payload.reason ?? payload.message ?? payload.details;
+        if (typeof legacyDescription === "string" && legacyDescription.trim()) payload.description = legacyDescription.trim();
+      }
+
       const parsed = z
         .object({
           category: z.enum(CATEGORIES).default("bug"),

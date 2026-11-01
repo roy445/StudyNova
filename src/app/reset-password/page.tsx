@@ -23,9 +23,22 @@ function ResetInner() {
   async function requestReset(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedReason = reason.trim();
+    if (!normalizedEmail || normalizedReason.length < 10) {
+      setError("請填寫有效 Email，以及至少 10 個字的申請原因");
+      return;
+    }
     setPending(true);
     try {
-      const res = await apiPost<{ ticketNo: string }>("/support/issues", { category: "account", severity: "normal", title: "密碼重設申請", description: reason, contactEmail: email, pageUrl: window.location.href });
+      const res = await apiPost<{ ticketNo: string }>("/support/issues", {
+        category: "account",
+        severity: "normal",
+        title: "密碼重設申請",
+        description: normalizedReason,
+        contactEmail: normalizedEmail,
+        pageUrl: window.location.href,
+      });
       setSent(`申請已送出，回報單號：${res.ticketNo}。管理員確認後會為你建立限時重設連結，請留意 Email 或客服回覆。`);
     } catch (err) {
       setError(errorMessage(err));
