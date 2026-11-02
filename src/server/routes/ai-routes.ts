@@ -1,3 +1,4 @@
+import { head } from "@vercel/blob";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -50,6 +51,8 @@ const MODES = {
 } as const;
 
 const CONTEXT_KEYS = ["grades", "wrong", "materials", "plan", "tasks", "settings"] as const;
+const AI_SOLUTION_MAX_FILE_BYTES = 18 * 1024 * 1024;
+const AI_SOLUTION_CONTENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/avif", "image/heic", "application/pdf"]);
 
 /** The database query is ordered newest-first; restore chronological order after limiting. */
 export function latestConversationMessages<T>(newestFirstRows: T[], limit = 16): T[] {
@@ -893,12 +896,44 @@ export const routes: RouteDef[] = [
       const processPath = async (pathname: string) => {
         try {
           if (!pathname.startsWith("ai-solution/")) throw fail("PERM_FILE_DENIED");
-          const object = (await db.select().from(storageObjects).where(and(
+          let object = (await db.select().from(storageObjects).where(and(
             eq(storageObjects.userId, user.userId),
             eq(storageObjects.driver, "blob"),
             eq(storageObjects.storageKey, pathname),
           )).limit(1))[0];
-          if (!object) throw fail("FILE_UPLOAD_INCOMPLETE", { message: "雲端檔案尚未完成登記，請稍候重試。" });
+          if (!object) {
+            // Vercel Blob invokes onUploadCompleted asynchronously. The browser
+            // can reach this endpoint before that callback inserts storage_objects.
+            // Reconcile the already-uploaded Blob here so users do not get stuck
+            // retrying an upload that has actually succeeded.
+            const metadata = await head(pathname).catch(() => null);
+            const mimeType = String(metadata?.contentType ?? "").split(";")[0].trim().toLowerCase();
+            const sizeBytes = Number(metadata?.size ?? 0);
+            if (!metadata || !sizeBytes || sizeBytes > AI_SOLUTION_MAX_FILE_BYTES || !AI_SOLUTION_CONTENT_TYPES.has(mimeType)) {
+              throw fail("FILE_UPLOAD_INCOMPLETE", { message: "雲端檔案尚未完成登記，請稍候重試。" });
+            }
+            const filename = pathname.split("/").pop()?.slice(-180) || "ai-solution-upload";
+            const inserted = await db.insert(storageObjects).values({
+              userId: user.userId,
+              driver: "blob",
+              storageKey: pathname,
+              bucket: "vercel-blob",
+              mimeType,
+              sizeBytes,
+              filename,
+              visibility: "private",
+              data: null,
+            }).onConflictDoNothing({ target: storageObjects.storageKey }).returning();
+            object = inserted[0] ?? (await db.select().from(storageObjects).where(and(
+              eq(storageObjects.userId, user.userId),
+              eq(storageObjects.driver, "blob"),
+              eq(storageObjects.storageKey, pathname),
+            )).limit(1))[0];
+            if (!object) throw fail("FILE_UPLOAD_INCOMPLETE", { message: "雲端檔案尚未完成登記，請稍候重試。" });
+            // The normal callback and this reconciliation use the same idempotency
+            // key, so only one quota charge is recorded for the uploaded Blob.
+            await consumeFeature(user.userId, AI_SOLUTION_UPLOAD_FEATURE, 1, `ai-solution-upload:${pathname}`);
+          }
           const existing = (await db.select().from(fileContexts).where(and(
             eq(fileContexts.userId, user.userId),
             eq(fileContexts.objectId, object.id),
