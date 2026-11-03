@@ -62,6 +62,7 @@ const RETRYABLE: FailureCategory[] = ["rate_limited", "quota_exhausted", "server
 const TRANSIENT_PROVIDER_COOLDOWN_MS = 2 * 60_000;
 const DEFAULT_PROVIDER_TIMEOUT_MS = 15_000;
 const EXAM_PROVIDER_TIMEOUT_MS = 12_000;
+const NVIDIA_PROVIDER_TIMEOUT_MS = 30_000;
 
 function cleanEnv(value?: string) {
   return value?.trim().replace(/^([\"']).*\1$/, (quoted) => quoted.slice(1, -1)).trim() || undefined;
@@ -209,8 +210,12 @@ export function providerRetryDelayMs(attempt: number, random = Math.random) {
   return Math.round(base * (0.75 + random() * 0.5));
 }
 
-function providerTimeoutMs(request: AiRequest) {
+function providerTimeoutMs(request: AiRequest, provider?: ProviderName) {
   if (request.timeoutMs) return request.timeoutMs;
+  if (provider === "nvidia") {
+    const configured = Number(process.env.NVIDIA_TIMEOUT_MS);
+    return Number.isFinite(configured) ? Math.min(120_000, Math.max(10_000, configured)) : NVIDIA_PROVIDER_TIMEOUT_MS;
+  }
   return request.feature === "exam_prep_draft_analysis" || request.feature === "exam_prep_draft_analysis_quality_repair"
     ? EXAM_PROVIDER_TIMEOUT_MS
     : DEFAULT_PROVIDER_TIMEOUT_MS;
@@ -332,7 +337,7 @@ async function callGemini(cfg: ProviderConfig, req: AiRequest): Promise<Omit<AiR
   const json = (await fetchJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent`,
     { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": cfg.apiKey! }, body: JSON.stringify(body) },
-    providerTimeoutMs(req),
+    providerTimeoutMs(req, cfg.name),
   )) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
@@ -352,6 +357,11 @@ async function callGemini(cfg: ProviderConfig, req: AiRequest): Promise<Omit<AiR
 
 async function callOpenAiCompatible(cfg: ProviderConfig, req: AiRequest, endpoint: string): Promise<Omit<AiResult, "fallbackFrom">> {
   const started = Date.now();
+  const requestedMaxTokens = req.maxOutputTokens ?? 2048;
+  const nvidiaChatLimit = Number(process.env.NVIDIA_CHAT_MAX_OUTPUT_TOKENS || 768);
+  const maxOutputTokens = cfg.name === "nvidia" && req.feature === "ai_chat" && Number.isFinite(nvidiaChatLimit)
+    ? Math.min(requestedMaxTokens, Math.max(256, Math.min(2048, nvidiaChatLimit)))
+    : requestedMaxTokens;
   const content = req.parts.map((p) => {
     if (p.kind === "text") return { type: "text", text: p.text };
     if (p.kind === "image") return { type: "image_url", image_url: { url: `data:${p.mimeType};base64,${p.base64}` } };
@@ -378,10 +388,10 @@ async function callOpenAiCompatible(cfg: ProviderConfig, req: AiRequest, endpoin
       model: cfg.model,
       messages,
       temperature: req.temperature ?? 0.6,
-      max_tokens: req.maxOutputTokens ?? 2048,
+      max_tokens: maxOutputTokens,
       ...(req.json ? { response_format: { type: "json_object" } } : {}),
     }),
-  }, providerTimeoutMs(req))) as {
+  }, providerTimeoutMs(req, cfg.name))) as {
     choices?: Array<{ message?: { content?: string } }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
@@ -706,6 +716,8 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
   await notifyIfAllProvidersQuotaCooled(configs, req.feature);
   const message = lastCategory === "quota_exhausted"
     ? "目前可用的 AI Provider 配額都已用完，請管理員檢查 AI Health 或切換 API Key。"
+    : lastCategory === "timeout"
+      ? "NVIDIA AI 回應時間過長，請稍後重試；若持續發生，管理員可在 AI 模型控制台關閉全域 NVIDIA 模式或調高 NVIDIA_TIMEOUT_MS。"
     : lastCategory === "cooldown"
       ? "目前 AI Provider 都在冷卻中，請管理員到 AI Health 清除冷卻或確認配額。"
       : lastCategory === "disabled"
