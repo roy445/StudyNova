@@ -1,8 +1,8 @@
 import { featureState, consumeFeature, isProUser } from "../economy";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { englishReadingDocuments, englishReadingItems, storageObjects } from "@/db/schema";
+import { englishReadingDocuments, englishReadingItems, jobQueue, storageObjects } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, forbidden, notFound, sanitizeText } from "../core";
 import { putObject, deleteObject } from "../storage";
@@ -31,6 +31,11 @@ async function requireEnglishReaderAccess(userId: string) {
   return state;
 }
 
+async function pendingEnglishReaderJobs() {
+  const rows = await db.select({ count: sql<number>`count(*)::int` }).from(jobQueue).where(and(eq(jobQueue.name, "english_reader_analyze"), sql`${jobQueue.status} in ('pending', 'running')`));
+  return Number(rows[0]?.count ?? 0);
+}
+
 export const routes: RouteDef[] = [
   route({ method: "GET", path: "/english-reader/documents", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
@@ -48,7 +53,8 @@ export const routes: RouteDef[] = [
       createdAt: englishReadingDocuments.createdAt,
       updatedAt: englishReadingDocuments.updatedAt,
     }).from(englishReadingDocuments).where(eq(englishReadingDocuments.userId, user.userId)).orderBy(desc(englishReadingDocuments.updatedAt)).limit(30);
-    return { documents };
+    const queueSize = await pendingEnglishReaderJobs();
+    return { documents: documents.map((document) => ({ ...document, queueSize })) };
   }}),
   route({ method: "GET", path: "/english-reader/documents/:id", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
@@ -67,8 +73,21 @@ export const routes: RouteDef[] = [
     if (!object || object.driver !== "blob") throw notFound("找不到剛上傳的雲端檔案，請稍候再試");
     const sourceKind = object.mimeType === "application/pdf" ? "pdf" : object.mimeType.startsWith("image/") ? "image" : "text";
     const document = (await db.insert(englishReadingDocuments).values({ userId: user.userId, title: body.title || "英文閱讀文章", sourceKind, sourceObjectId: object.id, originalText: "", status: "queued", progress: 0, progressStage: "等待背景工作", errorMessage: "" }).returning())[0];
-    await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id }, uniqueKey: `english-reader:${document.id}` });
-    return { document, queued: true, message: "已上傳，背景分析中；你可以繼續上傳其他檔案。" };
+    const pro = await isProUser(user.userId);
+    await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id, priority: pro ? "pro" : "standard" }, uniqueKey: `english-reader:${document.id}`, runAt: new Date(Date.now() - (pro ? 60_000 : 0)) });
+    return { document: { ...document, queueSize: (await pendingEnglishReaderJobs()) }, queued: true, priority: pro ? "pro" : "standard", message: pro ? "已加入 Pro 優先分析佇列。" : "已上傳，背景分析中；目前會依序排隊處理。" };
+  }}),
+  route({ method: "POST", path: "/english-reader/documents/:id/retry", auth: "user", rate: { limit: 10, windowSec: 3600, key: "english-reader-retry" }, handler: async (ctx) => {
+    const user = ctx.requireUser();
+    await ensureEnglishReaderSchema();
+    await requireEnglishReaderAccess(user.userId);
+    const document = await ownDocument(ctx.params.id, user.userId);
+    if (!document.sourceObjectId) throw badRequest("這份內容沒有可重新分析的原始檔案，請重新上傳。");
+    if (["queued", "extracting", "analyzing", "saving"].includes(document.status)) return { document, queued: true, alreadyQueued: true };
+    const pro = await isProUser(user.userId);
+    const updated = (await db.update(englishReadingDocuments).set({ status: "queued", progress: 0, progressStage: pro ? "Pro 優先佇列" : "等待背景工作", errorMessage: "", updatedAt: new Date() }).where(eq(englishReadingDocuments.id, document.id)).returning())[0];
+    await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id, priority: pro ? "pro" : "standard", retry: true }, uniqueKey: `english-reader:${document.id}:retry:${Date.now()}`, runAt: new Date(Date.now() - (pro ? 60_000 : 0)) });
+    return { document: { ...updated, queueSize: await pendingEnglishReaderJobs() }, queued: true, priority: pro ? "pro" : "standard" };
   }}),
   route({ method: "POST", path: "/english-reader/documents", auth: "user", rate: { limit: 12, windowSec: 3600, key: "english-reader" }, handler: async (ctx) => {
     const user = ctx.requireUser();
