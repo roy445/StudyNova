@@ -72,8 +72,8 @@ export const routes: RouteDef[] = [
     const object = (await db.select().from(storageObjects).where(and(eq(storageObjects.userId, user.userId), eq(storageObjects.storageKey, body.pathname))).limit(1))[0];
     if (!object || object.driver !== "blob") throw notFound("找不到剛上傳的雲端檔案，請稍候再試");
     const sourceKind = object.mimeType === "application/pdf" ? "pdf" : object.mimeType.startsWith("image/") ? "image" : "text";
-    const document = (await db.insert(englishReadingDocuments).values({ userId: user.userId, title: body.title || "英文閱讀文章", sourceKind, sourceObjectId: object.id, originalText: "", status: "queued", progress: 0, progressStage: "等待背景工作", errorMessage: "" }).returning())[0];
     const pro = await isProUser(user.userId);
+    const document = (await db.insert(englishReadingDocuments).values({ userId: user.userId, title: body.title || "英文閱讀文章", sourceKind, sourceObjectId: object.id, originalText: "", status: "queued", progress: 0, progressStage: pro ? "Pro 優先佇列" : "等待背景工作", errorMessage: "" }).returning())[0];
     await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id, priority: pro ? "pro" : "standard" }, uniqueKey: `english-reader:${document.id}`, runAt: new Date(Date.now() - (pro ? 60_000 : 0)) });
     return { document: { ...document, queueSize: (await pendingEnglishReaderJobs()) }, queued: true, priority: pro ? "pro" : "standard", message: pro ? "已加入 Pro 優先分析佇列。" : "已上傳，背景分析中；目前會依序排隊處理。" };
   }}),

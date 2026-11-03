@@ -31,12 +31,15 @@ export default function EnglishReaderPage() {
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [retryBusy, setRetryBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSentence, setActiveSentence] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(0.9);
   const sentences = useMemo(() => detail?.items.filter((item) => item.itemType === "sentence") ?? [], [detail]);
   const vocabulary = useMemo(() => detail?.items.filter((item) => item.itemType === "vocabulary") ?? [], [detail]);
+  const activeQueued = useMemo(() => documents.filter((row) => ["queued", "extracting", "analyzing", "saving"].includes(row.status)).length, [documents]);
+  const queueTotal = useMemo(() => Math.max(0, ...documents.map((row) => Number.isFinite(row.queueSize) ? Math.max(0, row.queueSize ?? 0) : 0)), [documents]);
 
   async function loadDocuments(options: { silent?: boolean } = {}) {
     if (!options.silent) setLoading(true);
@@ -60,6 +63,7 @@ export default function EnglishReaderPage() {
     catch (error) { toast.push("error", errorMessage(error)); }
   }
   async function analyze() {
+    if (busy) return;
     if (!file && content.trim().length < 20) { toast.push("info", "請上傳檔案或貼上至少 20 個英文單字。"); return; }
     setBusy(true);
     try {
@@ -102,12 +106,15 @@ export default function EnglishReaderPage() {
     catch (error) { toast.push("error", errorMessage(error)); }
   }
   async function retry(id: string) {
+    if (retryBusy) return;
+    setRetryBusy(id);
     try {
       const result = await apiPost<{ document: DocumentRow; queued: boolean; alreadyQueued?: boolean; priority?: string }>(`/english-reader/documents/${id}/retry`, {});
       setDocuments((rows) => rows.map((row) => row.id === id ? { ...row, ...result.document, status: "queued", progress: 0, progressStage: result.priority === "pro" ? "Pro 優先佇列" : "等待背景工作" } : row));
       if (detail?.document.id === id) setDetail((previous) => previous ? { ...previous, document: { ...previous.document, ...result.document, status: "queued", progress: 0, progressStage: result.priority === "pro" ? "Pro 優先佇列" : "等待背景工作" } } : previous);
       toast.push("success", result.alreadyQueued ? "這份內容已在排隊中" : result.priority === "pro" ? "已重新加入 Pro 優先佇列" : "已重新加入分析佇列");
     } catch (error) { toast.push("error", errorMessage(error)); }
+    finally { setRetryBusy(null); }
   }
 
   return <main className="space-y-5">
@@ -115,12 +122,13 @@ export default function EnglishReaderPage() {
       <div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Badge tone="gold">NOVA PRO</Badge><Badge tone="cyan">ENGLISH READER</Badge></div><h1 className="mt-3 text-3xl font-black text-white sm:text-4xl">英文閱讀分析室</h1><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200">上傳英文雜誌圖片、PDF 或文字檔，AI 會整理單字、中文意思與值得朗讀的完整句子。閱讀時可逐句播放，播放中的句子會自動反白。</p></div><span className="select-none text-7xl opacity-30">🔊</span></div>
       <div className="mt-4 grid gap-2 text-xs text-slate-200 sm:grid-cols-3"><div className="rounded-xl bg-white/[.06] p-3">① 上傳英文內容</div><div className="rounded-xl bg-white/[.06] p-3">② AI 條列分析</div><div className="rounded-xl bg-white/[.06] p-3">③ 逐句朗讀高亮</div></div>
     </header>
+    {activeQueued > 0 && <section className="english-reader-queue-banner rounded-2xl border border-cyan-300/25 bg-cyan-300/[.06] p-4 shadow-[0_0_28px_rgba(55,211,255,.08)]" aria-live="polite"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-300/15 text-xl english-reader-queue-orb">⌛</span><div><p className="font-bold text-cyan-100">AI 分析佇列運作中</p><p className="mt-1 text-xs text-cyan-100/75">目前有 {activeQueued} 份內容處理中{queueTotal > activeQueued ? `，全站約 ${queueTotal} 份工作排隊` : ""}。畫面會靜默更新，不會打斷你的閱讀。</p></div></div><Badge tone="gold">Nova Pro 優先插隊</Badge></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="english-reader-queue-flow h-full w-2/5 rounded-full bg-gradient-to-r from-cyan-300 via-violet-400 to-fuchsia-400" /></div></section>}
     <div className="grid gap-5 lg:grid-cols-[minmax(300px,.78fr)_minmax(0,1.5fr)]">
       <Card title="新增英文內容" subtitle="限定英文科目；圖片與 PDF 會先進行文字擷取。">
         <div className="space-y-3"><Field label="文章名稱"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：The future of clean energy" /></Field><Field label="上傳檔案" hint="Vercel Blob 直傳，最大 100MB；上傳後背景分析，可連續處理多份"><Input id="english-reader-file" type="file" accept=".pdf,.txt,.md,.json,image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field><Field label="或直接貼上英文"><Textarea rows={8} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Paste an English article, dialogue, or study passage here…" /></Field><p className="rounded-xl border border-amber-300/25 bg-amber-300/[.06] p-3 text-xs leading-5 text-amber-100">這是 Nova Pro 專屬功能。檔案會先直接上傳到雲端，再由背景工作分析；你可以同時建立多份閱讀工作。</p><Button full loading={busy} onClick={analyze}>{file ? "上傳並開始背景分析" : "分析英文內容"}</Button></div>
       </Card>
       <Card title="我的英文閱讀紀錄" subtitle="點選左側紀錄即可重新開啟分析結果。">
-        {loading ? <Skeleton lines={5} /> : !documents.length ? <EmptyState icon="▤" title="還沒有英文閱讀內容" hint="上傳一份英文文章開始建立你的閱讀資料庫。" /> : <div className="space-y-2">{documents.map((row) => <div key={row.id} className={`flex items-center gap-3 rounded-2xl border p-3 transition ${detail?.document.id === row.id ? "border-cyan-300/60 bg-cyan-300/10" : "border-[var(--line)] bg-white/[.03]"}`}><button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openDocument(row.id)}><p className="truncate font-semibold text-cyan-100">{row.title}</p><p className="mt-1 text-xs text-muted">{row.sourceKind.toUpperCase()}・{["queued", "extracting", "analyzing", "saving"].includes(row.status) ? `背景分析中${row.queueSize && row.queueSize > 1 ? `・目前約 ${row.queueSize - 1} 份工作排隊` : ""}…` : row.status === "failed" ? "分析失敗" : "已完成"}・{new Date(row.updatedAt).toLocaleString("zh-TW")}</p>{["queued", "extracting", "analyzing", "saving"].includes(row.status) ? <div className="mt-2 space-y-1.5"><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-violet-400 to-fuchsia-400 transition-[width] duration-500" style={{ width: `${Math.max(2, Math.min(100, row.progress ?? 0))}%` }} /></div><p className="text-[11px] font-semibold text-cyan-200">{row.progress ?? 0}%・{row.progressStage || "處理中"}{row.progressStage?.includes("Pro") ? "・Pro 優先" : ""}</p></div> : row.status === "failed" ? <p className="mt-2 rounded-lg border border-rose-300/25 bg-rose-300/10 p-2 text-xs leading-5 text-rose-200">失敗原因：{row.errorMessage || row.summary || "分析工作未完成"}</p> : null}</button>{row.status === "failed" && <Button size="sm" variant="outline" onClick={() => void retry(row.id)}>重試</Button>}<Button size="sm" variant="ghost" onClick={() => void remove(row.id)}>刪除</Button></div>)}</div>}
+        {loading ? <Skeleton lines={5} /> : !documents.length ? <EmptyState icon="▤" title="還沒有英文閱讀內容" hint="上傳一份英文文章開始建立你的閱讀資料庫。" /> : <div className="space-y-2">{documents.map((row) => <div key={row.id} className={`flex items-center gap-3 rounded-2xl border p-3 transition ${detail?.document.id === row.id ? "border-cyan-300/60 bg-cyan-300/10" : "border-[var(--line)] bg-white/[.03]"}`}><button type="button" className="min-w-0 flex-1 text-left" onClick={() => void openDocument(row.id)}><p className="truncate font-semibold text-cyan-100">{row.title}</p><p className="mt-1 text-xs text-muted">{row.sourceKind.toUpperCase()}・{["queued", "extracting", "analyzing", "saving"].includes(row.status) ? `背景分析中${row.queueSize && row.queueSize > 1 ? `・目前約 ${row.queueSize - 1} 份工作排隊` : ""}…` : row.status === "failed" ? "分析失敗" : "已完成"}・{new Date(row.updatedAt).toLocaleString("zh-TW")}</p>{["queued", "extracting", "analyzing", "saving"].includes(row.status) ? <div className="mt-2 space-y-1.5"><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-violet-400 to-fuchsia-400 transition-[width] duration-500" style={{ width: `${Math.max(2, Math.min(100, row.progress ?? 0))}%` }} /></div><p className="text-[11px] font-semibold text-cyan-200">{row.progress ?? 0}%・{row.progressStage || "處理中"}{row.progressStage?.includes("Pro") ? "・Pro 優先" : ""}</p></div> : row.status === "failed" ? <p className="mt-2 rounded-lg border border-rose-300/25 bg-rose-300/10 p-2 text-xs leading-5 text-rose-200">失敗原因：{row.errorMessage || row.summary || "分析工作未完成"}</p> : null}</button>{row.status === "failed" && <Button size="sm" variant="outline" loading={retryBusy === row.id} disabled={Boolean(retryBusy)} onClick={() => void retry(row.id)}>重試</Button>}<Button size="sm" variant="ghost" onClick={() => void remove(row.id)}>刪除</Button></div>)}</div>}
       </Card>
     </div>
     {detail && <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,.8fr)]">
