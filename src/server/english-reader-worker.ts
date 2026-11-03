@@ -12,8 +12,8 @@ async function setProgress(documentId: string, progress: number, status: string,
   await db.update(englishReadingDocuments).set({ progress, status, progressStage, errorMessage: "", updatedAt: new Date() }).where(eq(englishReadingDocuments.id, documentId));
 }
 
-const wordSchema = z.object({ word: z.string().trim().min(1).max(120), meaning: z.string().max(500).default(""), partOfSpeech: z.string().max(80).default(""), phonetic: z.string().max(120).default("") });
-const sentenceSchema = z.object({ sentence: z.string().trim().min(3).max(2000), meaning: z.string().max(1000).default("") });
+const wordSchema = z.object({ word: z.preprocess((value) => typeof value === "string" ? value : "", z.string().trim().max(120).default("")), meaning: z.preprocess((value) => typeof value === "string" ? value : "", z.string().max(500).default("")), partOfSpeech: z.preprocess((value) => typeof value === "string" ? value : "", z.string().max(80).default("")), phonetic: z.preprocess((value) => typeof value === "string" ? value : "", z.string().max(120).default("")) });
+const sentenceSchema = z.object({ sentence: z.preprocess((value) => typeof value === "string" ? value : "", z.string().trim().max(2000).default("")), meaning: z.preprocess((value) => typeof value === "string" ? value : "", z.string().max(1000).default("")) });
 const analysisSchema = z.object({ summary: z.string().max(4000).default(""), vocabulary: z.array(wordSchema).max(120).default([]), sentences: z.array(sentenceSchema).max(80).default([]) });
 
 export async function processEnglishReaderDocument(documentId: string) {
