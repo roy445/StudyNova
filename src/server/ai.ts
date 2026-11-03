@@ -1,7 +1,7 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db } from "@/db";
-import { aiProviderHealth, aiUsageLogs, memberships, users } from "@/db/schema";
+import { aiProviderHealth, aiUsageLogs, memberships, platformSettings, users } from "@/db/schema";
 import { fail, monthStart, nextUtcMonthStart, todayStr } from "./core";
 import { notify } from "./notify";
 import { nvidiaModelForFeature } from "./nvidia-ai";
@@ -30,6 +30,9 @@ export type AiRequest = {
   userId?: string | null;
   timeoutMs?: number;
   parallelProviders?: boolean;
+  /** Server-side admin controls; never accept these values directly from a public client. */
+  providerOverride?: ProviderName;
+  bypassProviderHealth?: boolean;
 };
 
 export type AiResult = {
@@ -151,6 +154,17 @@ export function providerConfigs(): ProviderConfig[] {
 
 export function aiConfigured(): boolean {
   return providerConfigs().some((p) => Boolean(p.apiKey));
+}
+
+export async function getAiProviderControl(): Promise<{ forceProvider: ProviderName | null }> {
+  try {
+    const row = (await db.select({ value: platformSettings.value }).from(platformSettings).where(eq(platformSettings.key, "ai_provider_control")).limit(1))[0];
+    const value = row?.value;
+    return { forceProvider: value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).forceProvider === "nvidia" ? "nvidia" : null };
+  } catch (error) {
+    console.error("[ai] provider control unavailable; using normal routing", error instanceof Error ? error.message : "unknown");
+    return { forceProvider: null };
+  }
 }
 
 class ProviderError extends Error {
@@ -453,6 +467,8 @@ async function logUsage(entry: {
 
 export async function runAi(req: AiRequest): Promise<AiResult> {
   const normalizedReq = await normalizeAiRequest(req);
+  const control = await getAiProviderControl();
+  const forcedProvider = req.providerOverride ?? control.forceProvider;
   const nvidiaModel = process.env.NVIDIA_API_KEY ? await nvidiaModelForFeature(req.feature, isImageTask(normalizedReq)) : null;
   // OCR must not inherit GEMINI_FAST_MODEL: production logs showed that the
   // general 3.6 model was quota-limited and intermittently overloaded. Use a
@@ -465,17 +481,17 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     // Use the same known-good model for every Gemini feature so a text request
     // generated from an uploaded image does not silently fall back to 3.6.
     .map((config) => config.name.startsWith("gemini_") ? { ...config, model: imageModel } : config)
-    .filter((c) => Boolean(c.apiKey) && !(c.name === "nvidia" && !nvidiaModel))
+    .filter((c) => Boolean(c.apiKey) && !(c.name === "nvidia" && !nvidiaModel) && (!forcedProvider || c.name === forcedProvider))
     .sort((a, b) => a.priority - b.priority);
 
   if (!configs.length) {
-    throw fail("AI_NOT_CONFIGURED");
+    throw fail("AI_NOT_CONFIGURED", { message: forcedProvider === "nvidia" ? "NVIDIA API 尚未設定，請先在 Vercel 設定 NVIDIA_API_KEY。" : undefined });
   }
 
   if (req.parallelProviders) {
     const eligible = (await Promise.all(configs.map(async (cfg) => ({ cfg, health: await healthRow(cfg.name, cfg.model) })))).filter(({ health }) => {
-      if (health?.enabled === false) return false;
-      return !health?.cooldownUntil || new Date(health.cooldownUntil) <= new Date();
+      if (!req.bypassProviderHealth && health?.enabled === false) return false;
+      return req.bypassProviderHealth || !health?.cooldownUntil || new Date(health.cooldownUntil) <= new Date();
     });
     if (!eligible.length) {
       await notifyIfAllProvidersQuotaCooled(configs, req.feature);
@@ -568,14 +584,14 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     } catch (error) {
       console.error("[ai] provider health table unavailable; continuing without health state", { provider: cfg.name, error: error instanceof Error ? error.message : "unknown" });
     }
-    if (health && health.enabled === false) {
+    if (!req.bypassProviderHealth && health && health.enabled === false) {
       skippedProviders = skippedProviders ? `${skippedProviders},${cfg.name}:disabled` : `${cfg.name}:disabled`;
       lastCategory = "disabled";
       lastReason = `provider ${cfg.name} is disabled`;
       console.warn("[ai] provider skipped because it is disabled", { provider: cfg.name, model: cfg.model, feature: req.feature });
       continue;
     }
-    if (!forceProbeCooldown && health?.cooldownUntil && new Date(health.cooldownUntil) > new Date()) {
+    if (!req.bypassProviderHealth && !forceProbeCooldown && health?.cooldownUntil && new Date(health.cooldownUntil) > new Date()) {
       fallbackFrom = fallbackFrom || cfg.name;
       skippedProviders = skippedProviders ? `${skippedProviders},${cfg.name}:cooldown` : `${cfg.name}:cooldown`;
       lastCategory = "cooldown";

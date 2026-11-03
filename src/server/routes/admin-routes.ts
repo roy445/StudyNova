@@ -73,7 +73,7 @@ import { badRequest, conflict, fail, fingerprint, notFound, toCsv, monthStart, r
 import { adminLog, adjustNovaByAdmin, grantMembership, grantNova, grantXp } from "../economy";
 import { notify, resolveAudience, sendPush, pushConfigured } from "../notify";
 import { queue } from "../queue";
-import { providerMetrics, recentAiFailures, aiConfigured, runAiJson } from "../ai";
+import { providerMetrics, recentAiFailures, aiConfigured, getAiProviderControl, runAi, runAiJson } from "../ai";
 import { accountEmailTemplate, accountLinkCopy, sendAccountEmail, smtpConfigured, systemAnnouncementEmailTemplate } from "../email";
 import { analysisPrompt, qualityGate } from "../question-analysis";
 import { getAiPolicy, policyInstructions } from "../ai-policy";
@@ -1180,6 +1180,37 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/ai/control",
+    auth: "admin",
+    handler: async () => ({ control: await getAiProviderControl(), nvidiaConfigured: Boolean(process.env.NVIDIA_API_KEY), endpoint: "https://integrate.api.nvidia.com/v1/chat/completions" }),
+  }),
+  route({
+    method: "PATCH",
+    path: "/admin/ai/control",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ forceProvider: z.enum(["none", "nvidia"]) }));
+      const value = { forceProvider: body.forceProvider === "nvidia" ? "nvidia" : null, updatedBy: admin.userId, updatedAt: new Date().toISOString() };
+      await db.insert(platformSettings).values({ key: "ai_provider_control", value }).onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedAt: new Date() } });
+      await adminLog({ actorId: admin.userId, action: "ai.provider-control.update", targetType: "ai_provider_control", targetId: "ai_provider_control", after: value, ip: ctx.ip });
+      return { control: await getAiProviderControl() };
+    },
+  }),
+  route({
+    method: "POST",
+    path: "/admin/ai/provider-test",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ provider: z.enum(["nvidia"]).default("nvidia") }).default({ provider: "nvidia" }));
+      const result = await runAi({ feature: "admin_provider_test", userId: admin.userId, providerOverride: body.provider, bypassProviderHealth: true, system: "你是 StudyNova API 連線測試助手。只回覆簡短確認。", parts: [{ kind: "text", text: "請只回覆：NVIDIA API 測試成功。" }], maxOutputTokens: 40, temperature: 0 });
+      await adminLog({ actorId: admin.userId, action: "ai.provider-test", targetType: "provider", targetId: body.provider, after: { provider: result.provider, model: result.model, latencyMs: result.latencyMs }, ip: ctx.ip });
+      return { ok: true, provider: result.provider, model: result.model, latencyMs: result.latencyMs, preview: result.text.slice(0, 240) };
+    },
+  }),
   route({
     method: "GET",
     path: "/admin/ai/policies",
