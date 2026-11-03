@@ -63,6 +63,7 @@ const TRANSIENT_PROVIDER_COOLDOWN_MS = 2 * 60_000;
 const DEFAULT_PROVIDER_TIMEOUT_MS = 15_000;
 const EXAM_PROVIDER_TIMEOUT_MS = 12_000;
 const NVIDIA_PROVIDER_TIMEOUT_MS = 30_000;
+const NVIDIA_CHAT_TIMEOUT_MS = 8_000;
 
 function cleanEnv(value?: string) {
   return value?.trim().replace(/^([\"']).*\1$/, (quoted) => quoted.slice(1, -1)).trim() || undefined;
@@ -213,8 +214,9 @@ export function providerRetryDelayMs(attempt: number, random = Math.random) {
 function providerTimeoutMs(request: AiRequest, provider?: ProviderName) {
   if (request.timeoutMs) return request.timeoutMs;
   if (provider === "nvidia") {
-    const configured = Number(process.env.NVIDIA_TIMEOUT_MS);
-    return Number.isFinite(configured) ? Math.min(120_000, Math.max(10_000, configured)) : NVIDIA_PROVIDER_TIMEOUT_MS;
+    const configured = Number(request.feature === "ai_chat" ? process.env.NVIDIA_CHAT_TIMEOUT_MS : process.env.NVIDIA_TIMEOUT_MS);
+    const fallback = request.feature === "ai_chat" ? NVIDIA_CHAT_TIMEOUT_MS : NVIDIA_PROVIDER_TIMEOUT_MS;
+    return Number.isFinite(configured) ? Math.min(120_000, Math.max(3_000, configured)) : fallback;
   }
   return request.feature === "exam_prep_draft_analysis" || request.feature === "exam_prep_draft_analysis_quality_repair"
     ? EXAM_PROVIDER_TIMEOUT_MS
@@ -491,8 +493,12 @@ export async function runAi(req: AiRequest): Promise<AiResult> {
     // Use the same known-good model for every Gemini feature so a text request
     // generated from an uploaded image does not silently fall back to 3.6.
     .map((config) => config.name.startsWith("gemini_") ? { ...config, model: imageModel } : config)
-    .filter((c) => Boolean(c.apiKey) && !(c.name === "nvidia" && !nvidiaModel) && (!forcedProvider || c.name === forcedProvider))
-    .sort((a, b) => a.priority - b.priority);
+    .filter((c) => Boolean(c.apiKey) && !(c.name === "nvidia" && !nvidiaModel) && (!req.providerOverride || c.name === req.providerOverride))
+    .sort((a, b) => {
+      if (forcedProvider && a.name === forcedProvider) return -1;
+      if (forcedProvider && b.name === forcedProvider) return 1;
+      return a.priority - b.priority;
+    });
 
   if (!configs.length) {
     throw fail("AI_NOT_CONFIGURED", { message: forcedProvider === "nvidia" ? "NVIDIA API 尚未設定，請先在 Vercel 設定 NVIDIA_API_KEY。" : undefined });
