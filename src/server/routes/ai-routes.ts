@@ -33,6 +33,7 @@ import { deleteObject, putObject } from "../storage";
 import { analysisScopes, fileContexts, solutionSessions } from "@/db/schema";
 import { analyzeSolution, createFileContext } from "../unified-ai-engine";
 import { AppError } from "../errors";
+import { moderationFooter, moderateUserContent } from "../content-moderation";
 import { readObject } from "../storage";
 import { SUBJECTS } from "../subject-strategies";
 import { normalizeMathMarkup } from "../math-markup";
@@ -394,6 +395,7 @@ export const routes: RouteDef[] = [
       if (!conv) throw notFound("找不到對話");
       if (conv.userId !== user.userId) throw forbidden();
       if (!aiConfigured()) throw fail("AI_NOT_CONFIGURED");
+      await moderateUserContent({ userId: user.userId, content: body.content, channel: "ai_chat", sourceId: conv.id, ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
       await consumeFeature(user.userId, body.featureKey);
 
       await db.insert(aiMessages).values({ conversationId: conv.id, role: "user", content: body.content });
@@ -468,7 +470,7 @@ export const routes: RouteDef[] = [
         .values({
           conversationId: conv.id,
           role: "assistant",
-          content: reply,
+          content: `${reply}${moderationFooter()}`,
           importance: ["normal", "important", "critical"].includes(String(data.importance)) ? String(data.importance) : "normal",
           provider: meta.provider,
           model: meta.model,

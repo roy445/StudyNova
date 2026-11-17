@@ -47,6 +47,7 @@ import {
   challengeParticipants,
   achievements,
   accountAppeals,
+  moderationEvents,
   sessions,
   linkGenerationLogs,
   testerDecisionLinks,
@@ -1845,6 +1846,32 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       await db.delete(questions).where(eq(questions.id, ctx.params.id));
       return { deleted: true };
+    },
+  }),
+
+  route({
+    method: "GET",
+    path: "/admin/moderation/events",
+    auth: "admin",
+    handler: async (ctx) => {
+      const status = ctx.query.get("status");
+      const rows = await db.select({ event: moderationEvents, user: { userId: users.userId, novaId: users.novaId, displayName: users.displayName, email: users.email, status: users.status, contentWarningCount: users.contentWarningCount } }).from(moderationEvents).leftJoin(users, eq(users.userId, moderationEvents.userId)).where(status ? eq(moderationEvents.reviewStatus, status) : sql`true`).orderBy(desc(moderationEvents.createdAt)).limit(200);
+      return { events: rows.map((row) => ({ ...row.event, user: row.user })) };
+    },
+  }),
+
+  route({
+    method: "PATCH",
+    path: "/admin/moderation/events/:id",
+    auth: "admin",
+    handler: async (ctx) => {
+      const admin = ctx.requireUser();
+      const body = await ctx.json(z.object({ reviewStatus: z.enum(["pending", "reviewed"]), action: z.enum(["warning", "blocked", "dismissed", "upheld"]).optional(), reviewNote: z.string().max(3000).default("") }));
+      const event = (await db.select().from(moderationEvents).where(eq(moderationEvents.id, ctx.params.id)).limit(1))[0];
+      if (!event) throw notFound("找不到內容審查紀錄");
+      const updated = (await db.update(moderationEvents).set({ reviewStatus: body.reviewStatus, action: body.action ?? event.action, reviewNote: body.reviewNote, reviewedBy: admin.userId, reviewedAt: new Date() }).where(eq(moderationEvents.id, event.id)).returning())[0];
+      await adminLog({ actorId: admin.userId, action: "moderation.event_review", targetType: "moderation_event", targetId: event.id, reason: body.reviewNote || "內容審查複核", before: { reviewStatus: event.reviewStatus, action: event.action }, after: { reviewStatus: updated.reviewStatus, action: updated.action }, ip: ctx.ip });
+      return { event: updated };
     },
   }),
 

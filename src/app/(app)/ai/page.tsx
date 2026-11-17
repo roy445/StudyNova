@@ -463,6 +463,7 @@ async function resolveAction(messageId: string, confirm: boolean) {
                 送出
               </Button>
               </div>
+              <p className="mt-2 text-center text-[11px] leading-5 text-muted">AI 回覆請雙重確認；請遵守 <a href="/terms" className="text-[#8be9fd] underline">StudyNova 服務條款</a>。聊天室內容會經過安全審查。</p>
             </div>
           </>
         )}

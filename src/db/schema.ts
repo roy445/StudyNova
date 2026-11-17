@@ -43,6 +43,8 @@ export const users = pgTable(
     status: text("status").notNull().default("active"), // active | blocked
     isSystem: boolean("is_system").notNull().default(false),
     blockedReason: text("blocked_reason").notNull().default(""),
+    contentWarningCount: integer("content_warning_count").notNull().default(0),
+    contentLastWarningAt: timestamp("content_last_warning_at", { withTimezone: true }),
     deletedReason: text("deleted_reason").notNull().default(""),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     blockedAt: timestamp("blocked_at", { withTimezone: true }),
@@ -2853,6 +2855,51 @@ export const accountAppeals = pgTable(
     updatedAt: updated(),
   },
   (t) => [uniqueIndex("appeal_ticket_uq").on(t.ticketNo), index("appeal_status_idx").on(t.status, t.createdAt), index("appeal_user_idx").on(t.userId)],
+);
+
+/* ------------------------------------------------ AI TEACHING ROOM */
+export const teachingSessions = pgTable("teaching_sessions", {
+  id: id(), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), title: text("title").notNull().default("新的教學課堂"), subject: text("subject").notNull().default("綜合"), topic: text("topic").notNull().default(""), teachingMode: text("teaching_mode").notNull().default("free"), createdAt: created(), updatedAt: updated(),
+}, (t) => [index("teaching_sessions_user_idx").on(t.userId, t.updatedAt)]);
+export const teachingMessages = pgTable("teaching_messages", {
+  id: id(), sessionId: uuid("session_id").notNull().references(() => teachingSessions.id, { onDelete: "cascade" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), role: text("role").notNull(), content: text("content").notNull(), boardCommands: jsonb("board_commands").$type<Array<Record<string, unknown>>>().notNull().default([]), sourceRefs: jsonb("source_refs").$type<string[]>().notNull().default([]), createdAt: created(),
+}, (t) => [index("teaching_messages_session_idx").on(t.sessionId, t.createdAt)]);
+export const teachingMaterials = pgTable("teaching_materials", {
+  id: id(), sessionId: uuid("session_id").notNull().references(() => teachingSessions.id, { onDelete: "cascade" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), fileName: text("file_name").notNull(), mimeType: text("mime_type").notNull(), extractedText: text("extracted_text").notNull().default(""), status: text("status").notNull().default("ready"), createdAt: created(),
+}, (t) => [index("teaching_materials_user_idx").on(t.userId, t.createdAt)]);
+export const teachingBoardStates = pgTable("teaching_board_states", {
+  id: id(), sessionId: uuid("session_id").notNull().references(() => teachingSessions.id, { onDelete: "cascade" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), theme: text("theme").notNull().default("dark"), state: jsonb("state").$type<{ elements: Array<Record<string, unknown>> }>().notNull().default({ elements: [] }), updatedAt: updated(),
+}, (t) => [uniqueIndex("teaching_board_session_uq").on(t.sessionId), index("teaching_board_user_idx").on(t.userId)]);
+export const teachingPreferences = pgTable("teaching_preferences", {
+  userId: uuid("user_id").primaryKey().references(() => users.userId, { onDelete: "cascade" }), personality: text("personality").notNull().default("normal"), answerLength: text("answer_length").notNull().default("normal"), detailLevel: text("detail_level").notNull().default("normal"), proactiveQuestions: boolean("proactive_questions").notNull().default(true), hintFirst: boolean("hint_first").notNull().default(false), updatedAt: updated(),
+});
+export const teachingLearningSummaries = pgTable("teaching_learning_summaries", {
+  id: id(), sessionId: uuid("session_id").notNull().references(() => teachingSessions.id, { onDelete: "cascade" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), summary: text("summary").notNull().default(""), misconceptions: jsonb("misconceptions").$type<string[]>().notNull().default([]), createdAt: created(), updatedAt: updated(),
+}, (t) => [uniqueIndex("teaching_summary_session_uq").on(t.sessionId)]);
+export const moderationEvents = pgTable(
+  "moderation_events",
+  {
+    id: id(),
+    userId: uuid("user_id").references(() => users.userId, { onDelete: "set null" }),
+    channel: text("channel").notNull(),
+    sourceId: uuid("source_id"),
+    content: text("content").notNull(),
+    category: text("category").notNull().default("other"),
+    severity: text("severity").notNull().default("medium"),
+    detector: text("detector").notNull().default(""),
+    reason: text("reason").notNull().default(""),
+    warningNumber: integer("warning_number").notNull().default(1),
+    action: text("action").notNull().default("warning"),
+    reviewStatus: text("review_status").notNull().default("pending"),
+    ip: text("ip").notNull().default(""),
+    userAgent: text("user_agent").notNull().default(""),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    reviewedBy: uuid("reviewed_by").references(() => users.userId, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note").notNull().default(""),
+    createdAt: created(),
+  },
+  (t) => [index("moderation_user_idx").on(t.userId, t.createdAt), index("moderation_status_idx").on(t.reviewStatus, t.createdAt), index("moderation_channel_idx").on(t.channel, t.createdAt)],
 );
 
 export const faqEntries = pgTable(

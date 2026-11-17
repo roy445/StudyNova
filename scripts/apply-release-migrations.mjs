@@ -39,6 +39,12 @@ const releaseMigrations = [
   "0130_exam_prep_subject_windows.sql",
   "0131_exam_prep_default_deadline.sql",
   "0133_remove_daily_knowledge_add_english_reader_permission.sql",
+  "0107_ai_learning_labs.sql",
+  "0134_schema_alignment_repairs.sql",
+  "0135_ecpay_payment_fields.sql",
+  "0136_quota_usage_indexes.sql",
+  "0137_exam_hub_feature_flags.sql",
+  "0138_content_moderation.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
@@ -51,6 +57,23 @@ const lockKey = "studynova-release-migrations-v1";
 
 try {
   await client.connect();
+
+  const requiredTables = await client.query(`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name IN ('users', 'legal_documents')
+  `);
+  const existingTables = new Set(requiredTables.rows.map(({ table_name }) => table_name));
+  const missingTables = ['users', 'legal_documents'].filter((name) => !existingTables.has(name));
+  if (missingTables.length > 0) {
+    throw new Error(
+      `Base schema is incomplete; missing public table(s): ${missingTables.join(', ')}. ` +
+      `Initialize the target database with database/neon-init.sql (fresh database only), ` +
+      `then run this release migration runner again. No release migration was executed.`,
+    );
+  }
+
   await client.query("SELECT pg_advisory_lock(hashtext($1))", [lockKey]);
   await client.query(`
     CREATE TABLE IF NOT EXISTS studynova_release_migrations (

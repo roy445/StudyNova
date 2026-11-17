@@ -79,6 +79,8 @@ export const ERROR_CATALOG = {
   REQ_UNSUPPORTED_ACTION: def("SN-REQ-2007", 400, "REQ", "不支援的操作類型", "請重新整理頁面後再試一次。"),
   REQ_NOTHING_TO_REVIEW: def("SN-REQ-2008", 400, "REQ", "目前沒有需要複習的錯題", "先完成一份測驗，答錯的題目會自動進入錯題本。"),
   REQ_NO_GRADE_DATA: def("SN-REQ-2009", 400, "REQ", "目前還沒有任何成績資料", "請先在「成績」頁新增至少一筆成績。"),
+  REQ_CSRF_ORIGIN: def("SN-REQ-2010", 403, "REQ", "請求來源未通過安全驗證", "請從 StudyNova 官方網站重新開啟頁面後再試。"),
+  REQ_CONTENT_POLICY_VIOLATION: def("SN-REQ-2011", 422, "REQ", "內容違反 StudyNova 社群規範", "請修改訊息後再送出；累計三次警告將停權，若有誤判可提出申訴。"),
 
   /* ---------------------------------------------------------- PERM 3xxx */
   PERM_DENIED: def("SN-PERM-3001", 403, "PERM", "沒有權限執行此操作", "這筆資料不屬於你，或你的角色沒有這個權限。"),
