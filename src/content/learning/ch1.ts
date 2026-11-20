@@ -1,3 +1,4 @@
+import { biologyCurriculum } from "./biology";
 import { historyChapter, historyLessons } from "./history";
 import { physicsChapter, physicsLessons, physicsTracks } from "./physics";
 import { physicsExtraLessons } from "./physics-extra";
@@ -17,7 +18,7 @@ export type Lesson = {
   comparisons: Array<{ label: string; left: string; right: string }>;
   commonErrors: string[];
   sourcePages: string;
-  interactive: "classification" | "states" | "atoms" | "bonds" | "logarithm" | "history" | "heat";
+  interactive: "classification" | "states" | "atoms" | "bonds" | "logarithm" | "history" | "heat" | "biology-cell" | "biology-transport" | "biology-energy" | "biology-division";
   quiz: { question: string; options: string[]; answer: number; explanation: string };
 };
 
@@ -25,7 +26,7 @@ export const learningSubjects = [
   { slug: "chemistry", icon: "🧪", title: "高中化學", subtitle: "從基礎概念開始，一步一步建立完整化學觀念。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
   { slug: "history", icon: "▥", title: "高中歷史", subtitle: "從原住民族、外力治理到移民社會，建立台灣歷史的長時段脈絡。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
   { slug: "physics", icon: "⚛️", title: "高中物理", subtitle: "高一基礎物理第 1～4 章：物理學與人類生活、運動與力、熱、聲音。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放", gradeLabel: "高一", tracks: physicsTracks },
-  { slug: "biology", icon: "🧬", title: "高中生物", subtitle: "細胞、遺傳與生態的完整學習路徑準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
+  { slug: "biology", icon: "🧬", title: "基礎生物", subtitle: "高一基礎生物：生命現象、細胞構造與生理、能量代謝、染色體與細胞分裂。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放", gradeLabel: "高一" },
   { slug: "math", icon: "📐", title: "高中數學", subtitle: "從科學記號與常用對數開始，建立高一數學的解題基礎。", status: "PUBLISHED" as LearningStatus, statusLabel: "已開放" },
   { slug: "english", icon: "🇬🇧", title: "高中英文", subtitle: "字彙、文法與閱讀的學習路徑準備中。", status: "DEVELOPING" as LearningStatus, statusLabel: "🚧 開發中" },
 ];
@@ -235,6 +236,7 @@ export const mathLessons: Lesson[] = [
 ];
 
 export const learningCurriculum = {
+  biology: biologyCurriculum,
   chemistry: { chapter: chemistryChapter, lessons: chemistryLessons },
   math: { chapter: mathChapter, lessons: mathLessons },
   history: { chapter: historyChapter, lessons: historyLessons },

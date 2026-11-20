@@ -17,6 +17,8 @@ type ReviewItem = { questionId: string; stem: string; options: string[]; answer:
 export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) {
   const toast = useToast();
   const list = useApi<{ quizzes: Quiz[]; attempts: Attempt[] }>("/quizzes");
+  const examPrepStatus = useApi<{ activities: Array<{ id: string; effectiveStatus: string }> }>("/exam-prep/available");
+  const isExamPrepOpen = examPrepStatus.data?.activities.some((a) => a.effectiveStatus === "open") ?? false;
   const materials = useApi<{ materials: Array<{ id: string; title: string }> }>("/materials");
   const quotas = useApi<{ quotas: Array<{ feature: string; novaCost: number }> }>("/quotas");
   const quizGenerateCost = quotas.data?.quotas.find((item) => item.feature === "ai_practice")?.novaCost ?? null;
@@ -254,7 +256,9 @@ export function QuizPanel({ autoGenerate = false }: { autoGenerate?: boolean }) 
         {list.error && <ErrorState message={list.error} onRetry={list.reload} />}
         {!list.loading && !list.data?.quizzes.length && <EmptyState icon="🧪" title="還沒有測驗" hint="用教材或錯題產生第一份 AI 測驗吧！" />}
         <div className="grid gap-2 sm:grid-cols-2">
-          {list.data?.quizzes.map((q) => {
+          {list.data?.quizzes
+            .filter((q) => isExamPrepOpen || (q.difficulty !== "exam" && !q.title.includes("段考衝刺")))
+            .map((q) => {
             const attempt = list.data?.attempts.find((a) => a.quizId === q.id && a.status === "submitted");
             return (
               <div key={q.id} className="glass-soft p-3">

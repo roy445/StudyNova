@@ -533,7 +533,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       {usageRules?.required && usageRules.document && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#060915]/95 p-3 backdrop-blur-md sm:p-5"><div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-[#37d3ff]/30 bg-[#0b1226] shadow-[0_0_60px_rgba(55,211,255,.18)] sm:max-h-[calc(100dvh-2.5rem)]"><div className="shrink-0 border-b border-white/10 p-5 pb-4"><p className="text-xs tracking-widest text-[#37d3ff]">StudyNova 使用規章 · v{usageRules.document.version}</p><h2 className="mt-2 text-xl font-bold sm:text-2xl">{usageRules.document.title}</h2><p className="mt-1 text-xs leading-5 text-muted">請在上方內容區滑動閱讀至最底部，閱讀完成後即可勾選同意。</p></div><div ref={usageRulesRef} onScroll={markUsageRulesRead} tabIndex={0} className="min-h-[220px] flex-1 touch-pan-y overflow-y-auto overscroll-contain whitespace-pre-wrap px-5 py-4 text-sm leading-8 text-slate-200 outline-none sm:px-7 sm:text-base">{usageRules.document.body}</div><div className="shrink-0 border-t border-white/10 bg-[#0b1226] p-5 pt-4"><label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><input type="checkbox" disabled={!usageRulesRead} checked={usageRulesAccepted} onChange={(event) => setUsageRulesAccepted(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#7c5cff]" /><span>{usageRulesRead ? "我已完整閱讀並同意遵守 StudyNova 使用規章" : "請先將上方規章滑動閱讀到底部"}</span></label><Button full className="mt-4" disabled={!usageRulesRead || !usageRulesAccepted} onClick={async () => { await apiPost("/auth/usage-rules/consent", { version: usageRules.document?.version, readComplete: usageRulesRead, accepted: usageRulesAccepted }); setUsageRules({ ...usageRules, required: false }); window.location.reload(); }}>開始使用 StudyNova</Button></div></div></div>}
       {maintenance?.enabled && <MaintenanceNotice state={maintenance} />}
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-[var(--line)] bg-black/20 px-3 py-4 lg:flex">
+      <aside className="print:hidden sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-[var(--line)] bg-black/20 px-3 py-4 lg:flex">
         <Link href="/dashboard" className="focus-ring mb-4 rounded-xl px-2 py-1">
           <Wordmark size={42} />
         </Link>
@@ -584,7 +584,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
 
       <div className="min-w-0 flex-1">
         {/* Header */}
-        <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/85 backdrop-blur-xl">
+        <header className="print:hidden sticky top-0 z-40 border-b border-[var(--line)] bg-[color:var(--bg)]/85 backdrop-blur-xl">
           <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5 sm:px-5">
             <Link href="/dashboard" className="focus-ring flex min-w-0 items-center gap-2 lg:hidden">
               <LogoMark size={62} />
@@ -681,11 +681,11 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
           </div>
         </header>
 
-        <main className="app-main mx-auto min-w-0 max-w-6xl overflow-x-clip px-3 py-4 sm:px-5 sm:py-6">
-          {featureNotices.length > 0 && <section aria-label="功能公告" className="mb-3 space-y-2">{featureNotices.map((notice) => <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p>{notice.image ? <img src={notice.image} alt="英文雜誌閱讀器主視覺" className="mt-3 max-h-72 w-full rounded-2xl border border-cyan-200/30 object-cover object-top shadow-[0_0_28px_rgba(55,211,255,.22)]" /> : null}<p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>)}</section>}
-          {FEATURE_GUIDANCE[featureKey] && <div className="mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
+        <main className="app-main mx-auto min-w-0 max-w-6xl overflow-x-clip px-3 py-4 sm:px-5 sm:py-6 print:p-0 print:m-0 print:max-w-none">
+          {featureNotices.length > 0 && <section aria-label="功能公告" className="print:hidden mb-3 space-y-2">{featureNotices.map((notice) => <div key={notice.id} className="rounded-2xl border-2 border-[#ffc857]/70 bg-gradient-to-r from-[#ffc857]/20 via-[#7c5cff]/10 to-[#37d3ff]/10 p-4 shadow-[0_0_24px_rgba(255,200,87,0.12)]"><div className="flex items-start gap-3"><span className="mt-0.5 text-lg text-[#ffd98a]" aria-hidden="true">⚠</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-[#ffe7ad]">{notice.title}</p>{notice.image ? <img src={notice.image} alt="英文雜誌閱讀器主視覺" className="mt-3 max-h-72 w-full rounded-2xl border border-cyan-200/30 object-cover object-top shadow-[0_0_28px_rgba(55,211,255,.22)]" /> : null}<p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-[var(--text)]">{notice.body}</p>{notice.link ? <Link href={notice.link} className="mt-2 inline-block text-xs font-bold text-[#7dd3fc] underline">查看詳細說明 →</Link> : null}</div></div></div>)}</section>}
+          {FEATURE_GUIDANCE[featureKey] && <div className="print:hidden mb-4 rounded-xl border border-[#37d3ff]/35 bg-[#37d3ff]/8 px-3 py-2.5 text-xs leading-5"><span className="font-black text-[#7dd3fc]">{FEATURE_GUIDANCE[featureKey].title}：</span><span className="text-muted"> {FEATURE_GUIDANCE[featureKey].text}</span></div>}
           {children}
-          <footer aria-label="網站資訊" className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
+          <footer aria-label="網站資訊" className="print:hidden mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--line)] pt-4 text-[11px] text-muted">
             <Link href="/faq" className="underline">常見問題</Link>
             <Link href="/support" className="underline">回報問題</Link>
             <Link href="/privacy" className="underline">隱私條款</Link>
@@ -696,7 +696,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       </div>
 
       {/* Mobile bottom nav */}
-      <nav aria-label="手機主要導覽" className="bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
+      <nav aria-label="手機主要導覽" className="print:hidden bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[var(--line)] bg-[color:var(--bg)]/95 backdrop-blur-xl lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1.5 py-1.5 sm:px-2">
           {([...NAV, ...(examPrep.data?.activities.some((activity) => activity.effectiveStatus === "open") ? [{ href: "/exam-prep", label: "段考衝刺中心", icon: "weekly" as SymbolName, special: true, closeAt: examPrep.data.activities.find((activity) => activity.effectiveStatus === "open")?.closeAt }] : []), ...(examVocabulary.data?.enabled ? [{ href: "/exam-vocabulary", label: "段考總單字", icon: "study" as SymbolName }] : [])]).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -726,7 +726,7 @@ export function AppShell({ user, children, maintenance }: { user: ShellUser; chi
       </nav>
 
       {/* Novi dock */}
-      <div className="novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5">
+      <div className="print:hidden novi-dock fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5">
         {noviOpen && (
           <div className="glass novi-mobile-panel anim-pop w-[min(92vw,340px)] p-3">
             <div className="flex items-start gap-2">
