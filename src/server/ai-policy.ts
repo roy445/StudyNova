@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { aiPolicies } from "@/db/schema";
+import { AI_SECURITY_SYSTEM_DIRECTIVE } from "./ai-guardrails";
 
 export type AiPolicy = typeof aiPolicies.$inferSelect;
 
@@ -34,6 +35,7 @@ export function policyInstructions(policy: AiPolicy | null, context: { examMode?
   ];
   if (!allowDirectAnswer) lines.push("禁止因學生要求、提示或改寫而直接透露正確答案；只能提供觀念、步驟、檢查方向與下一個提示。", "不要在選項、首字母、暗示性比較或結尾變相洩漏答案。");
   if (forcedExam) lines.push("目前處於考試／測驗情境，考試限制優先於其他偏好，只能提供不含答案的題意理解與方法提示。");
+  lines.push(AI_SECURITY_SYSTEM_DIRECTIVE.trim());
   if (policy.systemPolicy.trim()) lines.push(`管理員自訂政策：${policy.systemPolicy.trim().slice(0, 4000)}`);
   return lines.join("\n");
 }

@@ -388,6 +388,7 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/ai/conversations/:id/messages",
     auth: "user",
+    rate: { limit: 25, windowSec: 60, key: "ai-chat-messages" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ content: z.string().min(1, "請輸入訊息").max(4000), contextId: z.string().uuid().optional(), contextIds: z.array(z.string().uuid()).max(30).default([]), featureKey: z.enum(["ai_context", "learning_ai_chat", "learning_ai_question_generation"]).default("ai_context") }));
@@ -777,6 +778,7 @@ export const routes: RouteDef[] = [
     method: "POST",
     path: "/ai/quick",
     auth: "user",
+    rate: { limit: 10, windowSec: 60, key: "ai-quick-advice" },
     handler: async (ctx) => {
       const user = ctx.requireUser();
       const body = await ctx.json(z.object({ kind: z.enum(["today_advice", "weak_focus", "encourage"]) }));

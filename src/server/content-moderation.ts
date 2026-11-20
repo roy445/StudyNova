@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { moderationEvents, sessions, users } from "@/db/schema";
 import { fail } from "./core";
 import { runAiJson } from "./ai";
+import { inspectSecurityGuardrails } from "./ai-guardrails";
 
 export type ModerationChannel = "ai_chat" | "teaching_room" | "community_chat";
 
@@ -35,6 +36,15 @@ export async function moderateUserContent(params: {
   ip?: string;
   userAgent?: string;
 }) {
+  // 0. AI 資安與防代寫程式 Guardrail 先行快速檢查
+  const guard = inspectSecurityGuardrails(params.content);
+  if (!guard.safe) {
+    throw fail("REQ_CONTENT_POLICY_VIOLATION", {
+      message: `【StudyNova 安全防護】${guard.reason}`,
+      details: { category: guard.category },
+    });
+  }
+
   let local = detectLocal(params.content);
   let detector = "local-multilingual-high-confidence";
   if (!local) {
