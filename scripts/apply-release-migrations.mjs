@@ -45,6 +45,7 @@ const releaseMigrations = [
   "0136_quota_usage_indexes.sql",
   "0137_exam_hub_feature_flags.sql",
   "0138_content_moderation.sql",
+  "0140_feature_permissions_bootstrap_and_essay_quota.sql",
 ];
 
 if (!process.env.DATABASE_URL) {
