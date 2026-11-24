@@ -102,7 +102,8 @@ export function NoviAvatar({
     window.addEventListener("studynova:theme", sync);
     return () => window.removeEventListener("studynova:theme", sync);
   }, []);
-  const activeStyle = variant ?? globalStyle;
+  // 聖誕限定版保留真正可回應狀態的 SVG Novi，不以靜態圖取代助手。
+  const activeStyle = festive ? "classic" : (variant ?? globalStyle);
   if (activeStyle === "stellar") {
     return (
       <div className={`relative select-none ${float === "float-hover" ? "anim-float" : ""}`} style={{ width: size, height: size, animationDuration: float === "float-hover" ? "2.6s" : undefined }} aria-label={`Novi 狀態：${state}，新版星旅外觀`}>

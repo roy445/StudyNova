@@ -22,16 +22,16 @@ type ChristmasTheme = {
 };
 
 const DEFAULT_THEME: ChristmasTheme = {
-  enabled: false,
-  snow: false,
-  decorations: false,
-  novi: false,
-  particles: false,
+  enabled: true,
+  snow: true,
+  decorations: true,
+  novi: true,
+  particles: true,
   sound: false,
   intensity: "balanced",
   title: "StudyNova Winter Festival",
   subtitle: "今年冬天，一起把知識裝進聖誕禮物裡。",
-  reindeer: false,
+  reindeer: true,
   reindeerNova: 8,
   reindeerXp: 12,
   primary: "#66e0ff",
