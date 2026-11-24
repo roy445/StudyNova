@@ -7,6 +7,17 @@ import { useEffect, useState } from "react";
 export type NoviState = "idle" | "thinking" | "happy" | "cheer" | "analyze" | "speak" | "success" | "error" | "remind" | "levelup";
 export type NoviStyle = "classic" | "stellar";
 
+function useNoviStyle() {
+  const [style, setStyle] = useState<NoviStyle>("stellar");
+  useEffect(() => {
+    const sync = () => setStyle(window.localStorage.getItem("studynova-novi-style") === "classic" ? "classic" : "stellar");
+    sync();
+    window.addEventListener("studynova:novi-style", sync);
+    return () => window.removeEventListener("studynova:novi-style", sync);
+  }, []);
+  return style;
+}
+
 const STATE_COLOR: Record<NoviState, string> = {
   idle: "#37d3ff",
   thinking: "#7c5cff",
@@ -84,14 +95,14 @@ export function NoviAvatar({
   variant?: NoviStyle;
 }) {
   const [festive, setFestive] = useState(false);
+  const globalStyle = useNoviStyle();
   useEffect(() => {
     const sync = () => setFestive(document.documentElement.dataset.christmasNovi === "on");
     sync();
     window.addEventListener("studynova:theme", sync);
     return () => window.removeEventListener("studynova:theme", sync);
   }, []);
-  // Keep the legacy SVG as the global default. The new artwork is opt-in per AI surface.
-  const activeStyle = variant ?? "classic";
+  const activeStyle = variant ?? globalStyle;
   if (activeStyle === "stellar") {
     return (
       <div className={`relative select-none ${float === "float-hover" ? "anim-float" : ""}`} style={{ width: size, height: size, animationDuration: float === "float-hover" ? "2.6s" : undefined }} aria-label={`Novi 狀態：${state}，新版星旅外觀`}>
@@ -164,13 +175,8 @@ export function NoviAvatar({
 }
 
 export function NoviStyleToggle({ compact = false }: { compact?: boolean }) {
-  const [style, setStyle] = useState<NoviStyle>("classic");
-  useEffect(() => {
-    const current = window.localStorage.getItem("studynova-novi-style");
-    setStyle(current === "stellar" ? "stellar" : "classic");
-  }, []);
+  const style = useNoviStyle();
   function choose(next: NoviStyle) {
-    setStyle(next);
     window.localStorage.setItem("studynova-novi-style", next);
     window.dispatchEvent(new Event("studynova:novi-style"));
   }

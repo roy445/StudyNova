@@ -29,7 +29,7 @@ import {
 } from "@/db/schema";
 import { ensureDailyTasks } from "./economy";
 import { notify } from "./notify";
-import { sendAccountEmail, systemAnnouncementEmailTemplate } from "./email";
+import { accountEmailTemplate, sendAccountEmail, systemAnnouncementEmailTemplate } from "./email";
 import { addDaysStr, isoWeekCode, todayStr, localWeekday, localHm } from "./core";
 import { analyzeQuestionWithAi } from "./question-analysis";
 import { checkDisplayName } from "./name-moderation";
@@ -306,46 +306,31 @@ const handlers: Record<JobName, (payload: JobPayload) => Promise<string>> = {
   },
 
   async inactive_reminder() {
-    const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60_000);
-    const rows = await db.select({ userId: users.userId, displayName: users.displayName }).from(users).where(and(eq(users.status, "active"), eq(users.role, "student")));
-    const messages = [
-      { title: "🐦 Novi 的小提醒", body: "你再不來複習，我就要拿望遠鏡找你啦 🔭", link: "/dashboard" },
-      { title: "🪶 小鳥飛來報到", body: "今天還沒看到你，來做 10 個單字，讓記憶不要飛走吧！", link: "/study" },
-      { title: "😴 Novi 正在等你", body: "只要 5 分鐘也很棒，先從一題錯題開始吧。", link: "/study?tab=wrong" },
-      { title: "🎒 書包空位提醒", body: "今天的學習進度還在等你簽到，完成一小步就算勝利！", link: "/dashboard" },
-      { title: "✨ 你的連續學習在呼喚你", body: "別讓昨天的努力斷線，Novi 幫你把今天安排得剛剛好。", link: "/report" },
-    ];
-    let sent = 0;
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60_000);
+    const now = new Date();
+    const rows = await db.select({ userId: users.userId, email: users.email, novaId: users.novaId, displayName: users.displayName, lastLogin: users.lastLoginAt, lastSeen: users.lastSeenAt, created: users.createdAt, scheduledAt: users.deletionScheduledAt }).from(users).where(and(eq(users.status, "active"), eq(users.role, "student")));
+    let warned = 0;
+    let deleted = 0;
     for (const row of rows) {
-      const current = (await db.select({ count: users.inactiveReminderCount, first: users.inactiveFirstNotifiedAt, second: users.inactiveSecondNotifiedAt, lastLogin: users.lastLoginAt, created: users.createdAt }).from(users).where(eq(users.userId, row.userId)).limit(1))[0];
-      const inactiveSince = current?.lastLogin ?? current?.created ?? new Date(0);
+      const inactiveSince = [row.lastLogin, row.lastSeen, row.created].filter(Boolean).sort((a, b) => (b?.getTime() ?? 0) - (a?.getTime() ?? 0))[0] ?? row.created;
       if (inactiveSince > cutoff) continue;
-      const now = new Date();
-      if ((current?.count ?? 0) === 0) {
-        await db.update(users).set({ inactiveReminderCount: 1, inactiveFirstNotifiedAt: now, updatedAt: now }).where(eq(users.userId, row.userId));
-      } else if ((current?.count ?? 0) === 1 && current?.first && now.getTime() - current.first.getTime() >= 30 * 86400000) {
-        await db.update(users).set({ inactiveReminderCount: 2, inactiveSecondNotifiedAt: now, updatedAt: now }).where(eq(users.userId, row.userId));
-      } else if ((current?.count ?? 0) >= 2 && current?.second && now.getTime() - current.second.getTime() >= 30 * 86400000) {
-        const reason = "帳號超過一年未使用，經兩次通知後依 StudyNova 非活躍帳號政策刪除。";
-        const account = await db.select({ email: users.email, novaId: users.novaId }).from(users).where(eq(users.userId, row.userId)).limit(1);
-        if (account[0]) await db.insert(deletedAccounts).values([{ identifierType: "email", identifier: account[0].email.toLowerCase(), reason }, { identifierType: "nova_id", identifier: account[0].novaId.toUpperCase(), reason }]).onConflictDoUpdate({ target: [deletedAccounts.identifierType, deletedAccounts.identifier], set: { reason, deletedAt: now } });
+      if (row.scheduledAt && row.scheduledAt <= now) {
+        const reason = "長期未登入；寄出 7 天帳號刪除警告後仍未重新登入。";
+        await db.insert(deletedAccounts).values([{ identifierType: "email", identifier: row.email.toLowerCase(), reason }, { identifierType: "nova_id", identifier: row.novaId.toUpperCase(), reason }]).onConflictDoUpdate({ target: [deletedAccounts.identifierType, deletedAccounts.identifier], set: { reason, deletedAt: now } });
         await db.delete(users).where(eq(users.userId, row.userId));
-        sent += 1;
+        deleted += 1;
         continue;
-      } else continue;
-      const message = messages[Math.abs(row.userId.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % messages.length];
-      const created = await notify({
-        userId: row.userId,
-        kind: "reminder",
-        title: message.title,
-        body: `${row.displayName}，${message.body}`,
-        link: message.link,
-        dedupeKey: `inactive:${row.userId}:${todayStr()}`,
-        push: true,
-      });
-      if (created) sent += 1;
+      }
+      if (row.scheduledAt) continue;
+      const scheduledAt = new Date(now.getTime() + 7 * 86400000);
+      await db.update(users).set({ inactiveReminderCount: 1, inactiveFirstNotifiedAt: now, deletionScheduledAt: scheduledAt, updatedAt: now }).where(eq(users.userId, row.userId));
+      const link = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://study-nova-psi.vercel.app"}/login`;
+      const email = accountEmailTemplate({ kind: "inactivity_warning", displayName: row.displayName, link, expiresText: "7 天" });
+      await sendAccountEmail(row.email, email, { kind: "inactivity_warning", displayName: row.displayName, metadata: { userId: row.userId, deletionScheduledAt: scheduledAt.toISOString() } });
+      await notify({ userId: row.userId, kind: "account_warning", title: "⚠️ 帳號即將永久刪除", body: "你已久未登入，請在 7 天內重新登入；逾期帳號與資料將永久刪除。", link: "/login", dedupeKey: `inactive-delete-warning:${row.userId}:${scheduledAt.toISOString()}`, push: true });
+      warned += 1;
     }
-    return `寄出 ${sent} 則久未登入關懷提醒`;
+    return `非活躍帳號處理完成：寄出 ${warned} 封 7 天警告信，永久刪除 ${deleted} 個帳號`;
   },
 
   async data_retention() {
@@ -556,7 +541,9 @@ class PostgresQueue implements QueueAdapter {
       .select()
       .from(jobQueue)
       .where(and(eq(jobQueue.status, "pending"), lte(jobQueue.runAt, new Date())))
-      .orderBy(jobQueue.runAt)
+      // Priority is stored in the job payload so existing queue rows remain
+      // compatible. Pro jobs go first; within the same tier FIFO is preserved.
+      .orderBy(sql`case when ${jobQueue.payload}->>'priority' = 'pro' then 0 else 1 end`, jobQueue.runAt, jobQueue.createdAt)
       .limit(limit);
     const results: Array<{ name: string; ok: boolean; detail: string }> = [];
     let processed = 0;

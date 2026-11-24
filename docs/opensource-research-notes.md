@@ -1,6 +1,7 @@
 # StudyNova Open Source Research Notes
 
 > Scope exclusion: this research intentionally excludes exam-generation, question-bank, mock-exam, AI grading, and AI oral-exam repositories.
+> Status: research notes aligned to the v1.2.0 workspace on 2026-11-24. This grafted shallow repository does not provide a complete, independently verifiable Git history.
 
 ## Verified candidates
 
@@ -17,7 +18,7 @@ The project is a Next.js 16 / React 19 application using PostgreSQL + Drizzle, p
 
 Existing AI and privacy foundations are comparatively strong: user ownership checks, private material/OCR/recording/chat handling, session cookies, zod validation, rate limits, Nova transaction idempotency, error codes, storage signing, and an existing Novi context permission model. Existing search is currently a route-backed search modal and should be extended incrementally rather than replaced immediately.
 
-The latest requested UI change is complete: Novi no longer has drag state, pointermove/pointerup handlers, transform-based position state, or a drag cursor. Its dock stays at the fixed responsive bottom-right position and retains open/minimize/chat interactions. This was committed as `605f7ed fix Novi assistant fixed position` and pushed to `main`.
+The latest requested UI change is present in the current workspace: Novi no longer has drag state, pointermove/pointerup handlers, transform-based position state, or a drag cursor. Its dock stays at the fixed responsive bottom-right position and retains open/minimize/chat interactions. Do not infer from this note that a specific commit was pushed or deployed; verify the current diff and deployment separately.
 
 ## Cautions
 
@@ -53,4 +54,4 @@ Do not let an LLM directly decide a hidden learning path. Store explicit mastery
 | [OpenFGA](https://openfga.dev/) / [openfga/openfga](https://github.com/openfga/openfga) | Open-source fine-grained authorization using a readable modeling language and APIs; combines relationship-based access control with RBAC/ABAC ideas and is intended for millisecond checks. | Do not replace existing auth immediately. Borrow the relation model for `owner`, `viewer`, `editor`, `group_member`, `teacher`, `admin` on materials, notes, groups and shared challenges. Start with typed policy functions in the current route layer; only deploy a separate authorization service if sharing rules become difficult to audit. |
 | [Auth.js](https://github.com/nextauthjs/next-auth) | Current repository describes standard-Web-API authentication, CSRF-protected POST routes, restrictive cookies, encrypted JWT defaults, session polling and TypeScript safety. It also states Auth.js is now part of Better Auth and recommends Better Auth for new projects unless stateless sessions are a specific gap. | StudyNova should not migrate the established login/session system for this research. Borrow security checklist items: CSRF, cookie flags, session revocation, revalidation, audit events and provider isolation. |
 
-The fixed Novi implementation was verified through `npm run typecheck`, `npm run lint`, 30 Vitest tests, production build and `git diff --check`, then pushed as commit `605f7ed`.
+The fixed Novi implementation should be re-verified with the repository's current typecheck, lint, test, build and diff checks. A previous note claimed a specific commit and push, but that history is not reliable in the current grafted shallow workspace and has intentionally been removed from the product record.

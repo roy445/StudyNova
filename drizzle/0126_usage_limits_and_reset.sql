@@ -15,4 +15,4 @@ UPDATE feature_permissions SET enabled = true, pro_only = false, free_daily_limi
 UPDATE feature_permissions SET enabled = true, pro_only = false, free_daily_limit = 2, pro_daily_limit = 6 WHERE feature = 'multi_image_ocr';
 UPDATE feature_permissions SET enabled = true, pro_only = false, free_daily_limit = 3, pro_daily_limit = 15 WHERE feature = 'ai_solution';
 UPDATE feature_permissions SET enabled = true, pro_only = false, free_daily_limit = 8, pro_daily_limit = 25 WHERE feature = 'ai_solution_upload';
-UPDATE feature_permissions SET enabled = true, pro_only = false, free_daily_limit = 1, pro_daily_limit = 5, monthly_limit = 20 WHERE feature = 'essay_grading';
+UPDATE feature_permissions SET enabled = true, pro_only = false, free_daily_limit = 1, pro_daily_limit = 5, monthly_limit = -1, nova_cost = 50 WHERE feature = 'essay_grading';

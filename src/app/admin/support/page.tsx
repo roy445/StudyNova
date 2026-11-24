@@ -111,11 +111,11 @@ export default function AdminSupportPage() {
         {linkResult && <div className="mt-3 space-y-2 rounded-xl border border-[#7dd3fc]/30 bg-[#7dd3fc]/5 p-3"><p className="text-sm font-semibold text-[#b8edff]">{linkResult.label}</p><Input readOnly value={linkResult.link} /><div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.link)}>複製連結</Button>{linkResult.code && <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.code ?? "")}>複製兌換碼</Button>}<Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(linkResult.customerMessage)}>複製客服文字</Button></div>{linkResult.expiresAt && <p className="text-xs text-muted">有效期限：{formatTaipeiDateTime(linkResult.expiresAt)}</p>}<pre className="whitespace-pre-wrap rounded-lg bg-black/20 p-3 text-xs leading-6 text-muted">{linkResult.customerMessage}</pre></div>}
       </Card>
 
-      <Card title="✉ StudyNova 帳號通知信" subtitle="使用統一品牌排版寄送重啟、密碼重設、Pro 或獎勵連結。需先設定 Gmail SMTP 與 16 位應用程式密碼才會實際寄出。">
+      <Card title="✉ StudyNova 帳號通知信" subtitle="可指定任意 Email 測試帳號通知與非活躍刪除警告信。需先設定 Gmail SMTP 與 16 位應用程式密碼才會實際寄出。">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="收件 Email"><Input type="email" value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} /></Field>
           <Field label="使用者名稱"><Input value={emailForm.displayName} onChange={(e) => setEmailForm({ ...emailForm, displayName: e.target.value })} /></Field>
-          <Field label="信件類型"><Select value={emailForm.kind} onChange={(e) => setEmailForm({ ...emailForm, kind: e.target.value })}><option value="reactivate">帳號重新啟動</option><option value="password_reset">密碼重設</option><option value="pro_reward">Pro／獎勵資格</option></Select></Field>
+          <Field label="信件類型"><Select value={emailForm.kind} onChange={(e) => setEmailForm({ ...emailForm, kind: e.target.value })}><option value="reactivate">帳號重新啟動</option><option value="password_reset">密碼重設</option><option value="pro_reward">Pro／獎勵資格</option><option value="inactivity_warning">非活躍帳號：7 天後永久刪除警告</option></Select></Field>
           <Field label="連結"><Input type="url" value={emailForm.link} onChange={(e) => setEmailForm({ ...emailForm, link: e.target.value })} placeholder="https://study-nova-psi.vercel.app/..." /></Field>
         </div>
         <Field label="補充內容（選填）"><Textarea value={emailForm.note} onChange={(e) => setEmailForm({ ...emailForm, note: e.target.value })} className="!min-h-[80px]" /></Field>

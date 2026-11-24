@@ -112,6 +112,20 @@ async function recordGeneratedLink(values: typeof linkGenerationLogs.$inferInser
     console.error("[support] link log unavailable", error);
   }
 }
+async function notifyQuotaReset(userIds: string[], feature: string | undefined, reason: string, operationId: string) {
+  const results = await Promise.allSettled(userIds.map((userId) => notify({
+    userId,
+    kind: "quota_reset",
+    title: "額度已由管理員重置",
+    body: `重置範圍：${feature || "全部功能"}。原因：${reason}`,
+    link: "/profile",
+    push: true,
+    dedupeKey: `quota-reset:${operationId}:${userId}`,
+  })));
+  const failed = results.filter((result) => result.status === "rejected").length;
+  if (failed) console.error("[quota] reset notification failures", { operationId, failed, total: userIds.length });
+  return { attempted: userIds.length, notified: userIds.length - failed, failed, pushAttempted: userIds.length, pushFailed: failed };
+}
 
 const EXPERT_SETTINGS_SCHEMA = z.object({
   sourceStrictness: z.enum(["strict", "guided", "creative"]).default("strict"),
@@ -364,9 +378,12 @@ export const routes: RouteDef[] = [
     handler: async (ctx) => {
       const admin = ctx.requireUser();
       const body = await ctx.json(z.object({ reason: z.string().min(1).max(300), feature: z.string().max(60).optional() }));
+      const operationId = randomToken(12);
+      const targets = await db.select({ userId: users.userId }).from(users).where(eq(users.isSystem, false));
       const deleted = await db.delete(featureUsage).where(body.feature ? eq(featureUsage.feature, body.feature) : sql`true`).returning({ id: featureUsage.id });
+      const notifications = await notifyQuotaReset(targets.map((target) => target.userId), body.feature, body.reason, operationId);
       await adminLog({ actorId: admin.userId, action: "usage.reset_all", targetType: "system", targetId: "feature_usage", reason: body.reason, ip: ctx.ip });
-      return { ok: true, deletedCount: deleted.length, feature: body.feature ?? "all" };
+      return { ok: true, operationId, deletedCount: deleted.length, affectedUsers: targets.length, feature: body.feature ?? "all", notifications };
     },
   }),
 
@@ -390,7 +407,9 @@ export const routes: RouteDef[] = [
           link: z.string().max(240).optional(),
         }),
       );
+      const operationId = randomToken(12);
       const results: Array<{ userId: string; ok: boolean; detail: string }> = [];
+      let notificationSummary = { attempted: 0, notified: 0, failed: 0, pushAttempted: 0, pushFailed: 0 };
       for (const userId of body.userIds) {
         try {
           const before = (await db.select().from(users).where(eq(users.userId, userId)).limit(1))[0];
@@ -448,6 +467,14 @@ export const routes: RouteDef[] = [
             }
             case "reset_quota": {
               await db.delete(featureUsage).where(and(eq(featureUsage.userId, userId), body.feature ? eq(featureUsage.feature, body.feature) : sql`true`));
+              const sent = await notifyQuotaReset([userId], body.feature, body.reason, operationId);
+              notificationSummary = {
+                attempted: notificationSummary.attempted + sent.attempted,
+                notified: notificationSummary.notified + sent.notified,
+                failed: notificationSummary.failed + sent.failed,
+                pushAttempted: notificationSummary.pushAttempted + sent.pushAttempted,
+                pushFailed: notificationSummary.pushFailed + sent.pushFailed,
+              };
               break;
             }
             case "logout": {
@@ -488,7 +515,7 @@ export const routes: RouteDef[] = [
           results.push({ userId, ok: false, detail: err instanceof Error ? err.message : "失敗" });
         }
       }
-      return { results };
+      return { operationId, results, notifications: notificationSummary };
     },
   }),
 
@@ -1915,8 +1942,9 @@ export const routes: RouteDef[] = [
     path: "/admin/account-emails",
     auth: "admin",
     handler: async (ctx) => {
-      const body = await ctx.json(z.object({ to: z.string().email(), displayName: z.string().min(1).max(80), kind: z.enum(["reactivate", "password_reset", "pro_reward"]), link: z.string().url(), expiresText: z.string().max(120).optional(), note: z.string().max(1000).optional() }));
-      const message = accountEmailTemplate(body);
+      const body = await ctx.json(z.object({ to: z.string().email(), displayName: z.string().min(1).max(80), kind: z.enum(["reactivate", "password_reset", "pro_reward", "inactivity_warning"]), link: z.string().url().optional(), expiresText: z.string().max(120).optional(), note: z.string().max(1000).optional() }));
+      if (!body.link && body.kind !== "inactivity_warning") throw badRequest("此類型通知信需要登入或操作連結");
+      const message = accountEmailTemplate({ ...body, link: body.link ?? `${new URL(ctx.req.url).origin}/login` });
       const result = await sendAccountEmail(body.to, message, { actorId: ctx.requireUser().userId, kind: body.kind, displayName: body.displayName, metadata: { source: "account-emails", link: body.link, note: body.note ?? "" } });
       return { ...result, subject: message.subject, customerMessage: message.text };
     },

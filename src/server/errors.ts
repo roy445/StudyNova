@@ -93,6 +93,8 @@ export const ERROR_CATALOG = {
   QUOTA_FEATURE_DISABLED: def("SN-QUOTA-4002", 403, "QUOTA", "此功能目前已停用", "管理員暫時關閉了這個功能，請稍後再試。"),
   QUOTA_PRO_REQUIRED: def("SN-QUOTA-4003", 403, "QUOTA", "這是 Nova Pro 專屬功能", "Nova Pro 由管理員授予，可透過「回報問題」向管理員申請。"),
   QUOTA_NOT_IN_PLAN: def("SN-QUOTA-4004", 403, "QUOTA", "你的方案未開放此功能", "升級 Nova Pro 即可使用。"),
+  COMMERCE_SHOP_DISABLED: def("SN-COMMERCE-4101", 403, "QUOTA", "Novi 商店目前暫停開放", "商店正在更新中，請稍後再試。"),
+  COMMERCE_PRO_DISABLED: def("SN-COMMERCE-4102", 403, "QUOTA", "Nova Pro 自行購買目前暫停開放", "目前仍可使用管理員授予或優惠碼取得 Nova Pro。"),
 
   /* ---------------------------------------------------------- NOVA 5xxx */
   NOVA_INSUFFICIENT: def("SN-NOVA-5001", 400, "NOVA", "Nova 餘額不足", "完成每日任務、專注學習或測驗都能獲得 Nova。"),

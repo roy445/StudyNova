@@ -12,7 +12,7 @@ type ReleaseForm = { version: string; releaseType: string; title: string; subtit
 type FeatureForm = { featureKey: string; featureName: string; requiredVersion: string; minimumVersion: string; enabled: boolean; releaseStatus: ReleaseStatus; releaseDate: string };
 
 const EMPTY_RELEASE: ReleaseForm = { version: "", releaseType: "PATCH", title: "", subtitle: "", description: "", releaseNotes: "", newFeatures: "", improvements: "", bugFixes: "", breakingChanges: "", migrationRequired: false, minimumSupportedVersion: "1.0.0" };
-const EMPTY_FEATURE: FeatureForm = { featureKey: "", featureName: "", requiredVersion: "1.1.0", minimumVersion: "1.1.0", enabled: true, releaseStatus: "DRAFT", releaseDate: "" };
+const EMPTY_FEATURE: FeatureForm = { featureKey: "", featureName: "", requiredVersion: "1.2.0", minimumVersion: "1.2.0", enabled: true, releaseStatus: "DRAFT", releaseDate: "" };
 const lines = (value: string) => value.split("\n").map((item) => item.trim()).filter(Boolean);
 
 export default function AdminReleasesPage() {

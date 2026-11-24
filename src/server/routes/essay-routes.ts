@@ -1,19 +1,19 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { essayGradingJobs, featurePermissions, featureUsage, platformSettings } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, fail, notFound, randomToken } from "../core";
 import { runAiJson, aiConfigured } from "../ai";
-import { consumeFeature, featureState, isProUser } from "../economy";
+import { consumeFeature, featureState, isProUser, novaBalance } from "../economy";
 import { putObject, readObject } from "../storage";
 
 const DEFAULT_SERVICE = {
   status: "ENABLED" as "ENABLED" | "PAUSED" | "DISABLED",
   proOnly: false,
-  novaCost: 10,
+  novaCost: 50,
   dailyLimit: 1,
-  monthlyLimit: 30,
+  monthlyLimit: -1,
   maintenanceNotice: "",
   showScores: true,
 };
@@ -63,19 +63,6 @@ function normalizeResult(value: EssayResult): EssayResult {
   };
 }
 
-function dayStart() {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-function monthStart() {
-  const d = new Date();
-  d.setUTCDate(1);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
 export const routes: RouteDef[] = [
   route({
     method: "GET",
@@ -123,11 +110,8 @@ export const routes: RouteDef[] = [
       const gate = await featureState(user.userId, "essay_grading");
       if (!gate.enabled) throw fail("QUOTA_FEATURE_DISABLED", { message: "英文作文批改服務目前已停用" });
       if (gate.proOnly && !pro) throw fail("QUOTA_PRO_REQUIRED", { message: "此功能目前為 Nova Pro 專屬功能" });
-      if (!gate.unlimited && gate.remaining <= 0) throw fail("QUOTA_EXHAUSTED", { message: "今日英文作文批改次數已達上限" });
-      const [daily] = await db.select({ count: sql<number>`count(*)::int` }).from(essayGradingJobs).where(and(eq(essayGradingJobs.userId, user.userId), gte(essayGradingJobs.createdAt, dayStart()), eq(essayGradingJobs.status, "completed")));
-      const [monthly] = await db.select({ count: sql<number>`count(*)::int` }).from(essayGradingJobs).where(and(eq(essayGradingJobs.userId, user.userId), gte(essayGradingJobs.createdAt, monthStart()), eq(essayGradingJobs.status, "completed")));
-      if (service.dailyLimit >= 0 && Number(daily?.count ?? 0) >= service.dailyLimit) throw fail("QUOTA_EXHAUSTED", { message: `今日英文作文批改已達上限（${service.dailyLimit} 次）` });
-      if (service.monthlyLimit >= 0 && Number(monthly?.count ?? 0) >= service.monthlyLimit) throw fail("QUOTA_EXHAUSTED", { message: `本月英文作文批改已達上限（${service.monthlyLimit} 次）` });
+      const overage = !gate.unlimited && gate.remaining <= 0;
+      if (overage && (await novaBalance(user.userId)) < service.novaCost) throw fail("NOVA_INSUFFICIENT", { message: `作文免費額度已用完，本次需要 ${service.novaCost} Nova` });
 
       let objectId: string | null = null;
       let imagePart: { kind: "image"; mimeType: string; base64: string } | null = null;
@@ -150,9 +134,9 @@ export const routes: RouteDef[] = [
           parts,
         }, { corrections: [], spelling: [], overallFeedback: "", ocrText: originalText, scores: {} });
         const result = normalizeResult(data);
-        const charged = await consumeFeature(user.userId, "essay_grading");
+        await consumeFeature(user.userId, "essay_grading", 1, `essay:${created.id}`, { allowOverage: overage, chargeNova: overage });
         await db.update(essayGradingJobs).set({ status: "completed", ocrText: result.ocrText || originalText, result: { ...result, meta: { provider: meta.provider, model: meta.model, latencyMs: meta.latencyMs, inputTokens: meta.inputTokens, outputTokens: meta.outputTokens, fallbackFrom: meta.fallbackFrom }, aiDisclaimer: "AI 評估，僅供學習參考" }, updatedAt: new Date(), completedAt: new Date(), errorMessage: "" }).where(eq(essayGradingJobs.id, created.id));
-        return { grading: { ...(await db.select().from(essayGradingJobs).where(eq(essayGradingJobs.id, created.id)).limit(1))[0], balance: charged.remaining }, reused: false };
+        return { grading: { ...(await db.select().from(essayGradingJobs).where(eq(essayGradingJobs.id, created.id)).limit(1))[0], balance: await novaBalance(user.userId) }, reused: false };
       } catch (error) {
         await db.update(essayGradingJobs).set({ status: "failed", errorMessage: String(error instanceof Error ? error.message : error).slice(0, 500), updatedAt: new Date() }).where(eq(essayGradingJobs.id, created.id));
         throw error;

@@ -1,5 +1,7 @@
 # StudyNova 部署設定清單
 
+> 文件版本：v1.2.0｜更新日期：2026-11-24。以下以目前工作區程式為準；本次變更尚未部署、尚未執行 Production migration、尚未 push Git。
+
 ## 一、結論
 
 StudyNova 的前端與後端 API 已內建於 Next.js，不需要另外新增一組獨立的 REST API 伺服器。你的部署方案使用 Neon 作為遠端 PostgreSQL；不需要在 Windows 或部署平台上另外執行本機 PostgreSQL。Redis、S3 相容物件儲存、AI Provider、Web Push 與 SMTP 都是依功能選用的外部服務。
@@ -60,7 +62,9 @@ Header: x-cron-secret: <與 Vercel Production 相同的 CRON_SECRET>
 
 cron-job.org 建立工作時，Method 選 `GET`、Execution interval 選每 1 分鐘，並在 Headers 加入 `x-cron-secret`。不要把 secret 放在 URL query string 或 client bundle。這會處理 PostgreSQL queue 工作，包括英文雜誌分析、PK Bot、AI 背景工作與排程發布；只呼叫低頻任務不能保證工作及時執行。瀏覽器朗讀不使用 queue，說明見 [裝置內建朗讀](./BROWSER_SPEECH.md)。
 
-`drizzle/0086_queue_worker_leases.sql` 為 queue 加上 `started_at` lease；部署 crash recovery 程式碼前先套用此 migration，逾時且仍標記 `running` 的工作才會被安全回收。
+`drizzle/0086_queue_worker_leases.sql` 為 queue 加上 `started_at` lease；部署 crash recovery 程式碼前先套用此 migration，逾時且仍標記 `running` 的工作才會被安全回收。英文閱讀工作會在 `job_queue.payload.priority` 寫入 `pro` 或 `standard`；drain 會先處理 Pro，再依 `runAt`、`createdAt` FIFO。每個工作目前以約 45 秒估算等待時間，API 會回傳前方人數與預估秒數。
+
+非活躍帳號提醒與刪除也必須由外部排程器定期呼叫對應的 system cron task。排程器只應使用 `x-cron-secret`，不可把 secret 放在 URL；任務會先寄出提醒並設定 7 天倒數，只有倒數期間仍未登入才永久刪除。
 
 ## 三、環境變數
 
@@ -71,6 +75,7 @@ cron-job.org 建立工作時，Method 選 `GET`、Execution interval 選每 1 �
 | `DATABASE_URL` | PostgreSQL 連線字串；啟動時必須存在 | `postgresql://user:password@host:5432/studynova` |
 | `SESSION_SECRET` | HttpOnly session、簽名與部分私有資源所需的長隨機密鑰 | PowerShell RNG 指令（見下方） |
 | `APP_URL` | 公開網站 URL；AI provider referer、重設密碼與分享連結使用 | `https://studynova.example.com` |
+| `NEXT_PUBLIC_APP_VERSION`／`APP_VERSION` | 選填；網站版本顯示 | `1.2.0`（不要加 `v`） |
 | `NODE_ENV` | 正式環境設為 `production` | `production` |
 
 ### AI（Gemini-only 建議設定 1～3 組）
@@ -175,7 +180,7 @@ DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:migrate:ai-soluti
 DATABASE_URL="你的 production Neon DATABASE_URL" pnpm run db:check:ai-solution
 ```
 
-`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。此檢查和專用 migration 不會代替基礎 schema 建置；production 不可盲目執行全量 `drizzle-kit push/migrate`。已完成 schema baseline 盤點的環境，依前述 release procedure 套用 0083–0090，再執行本節的 AI solution 專用檢查／migration（若其 migration 尚未套用）。部署啟動後呼叫 `/api/health` 會觸發 seed version 11；seed 失敗時 readiness 會回 HTTP 503。
+`db:check:ai-solution` 只輸出表格、欄位與 `ai_solution` permission 狀態，不會輸出 connection string、API key 或其他 secret。此檢查和專用 migration 不會代替基礎 schema 建置；production 不可盲目執行全量 `drizzle-kit push/migrate`。已完成 schema baseline 盤點的環境，依前述 release procedure 套用 0083–0090，再執行本節的 AI solution 專用檢查／migration（若其 migration 尚未套用）。部署啟動後呼叫 `/api/health` 會觸發 seed version 11；seed 失敗時 readiness 會回 HTTP 503。上述 migration 與 seed 在本次工作區尚未替使用者執行。
 
 預期的成功 log 應包含 `feature_permissions` 查詢成功、`ai_solution` permission 已解析，且 `/api/v1/ai/solution/analyze` 的 external provider request 會在 quota preflight 之後出現。若 schema／連線／資料庫權限錯誤，log 會以 `[quota] database failure` 並標示 `schema_migration`、`connection`、`permission_denied` 或 `query_error`，不會偽裝成 permission 缺失。
 

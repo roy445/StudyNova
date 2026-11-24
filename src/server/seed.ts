@@ -77,6 +77,7 @@ const FEATURES = [
   { feature: "ai_solution", label: "AI 解題初次分析", freeDailyLimit: 3, proDailyLimit: 15 },
   { feature: "ai_solution_upload", label: "AI 解題圖片／檔案上傳", freeDailyLimit: 8, proDailyLimit: 25 },
   { feature: "english_reader", label: "英文雜誌閱讀器", freeDailyLimit: 0, proDailyLimit: -1, proOnly: true },
+  { feature: "essay_grading", label: "英文作文批改", freeDailyLimit: 1, proDailyLimit: 5, monthlyLimit: -1, novaCost: 50 },
 ];
 
 const WORDS = [
@@ -162,7 +163,7 @@ export async function runSeed(force = false) {
   for (const f of FEATURES) {
     await db
       .insert(featurePermissions)
-      .values({ ...f, enabled: true, proOnly: f.proOnly ?? false, monthlyLimit: 0, novaCost: 0 })
+      .values({ ...f, enabled: true, proOnly: f.proOnly ?? false, monthlyLimit: ("monthlyLimit" in f ? f.monthlyLimit : undefined) ?? 0, novaCost: ("novaCost" in f ? f.novaCost : undefined) ?? 0 })
       .onConflictDoUpdate({ target: featurePermissions.feature, set: { label: f.label } });
   }
   for (const [word, meaning, pos, example, exampleZh, level] of WORDS) {

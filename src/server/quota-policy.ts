@@ -30,9 +30,9 @@ export const SERVER_FEATURE_DEFAULTS: readonly FeaturePermissionPolicy[] = [
   { feature: "learning_chapter_pdf", label: "線上學習章節 PDF", enabled: true, proOnly: false, freeDailyLimit: -1, proDailyLimit: -1, monthlyLimit: 0, novaCost: 0 },
   { feature: "image_ocr", label: "圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 5, proDailyLimit: 20, monthlyLimit: 0, novaCost: 0 },
   { feature: "multi_image_ocr", label: "多圖片辨識", enabled: true, proOnly: false, freeDailyLimit: 2, proDailyLimit: 6, monthlyLimit: 0, novaCost: 0 },
-  { feature: AI_SOLUTION_FEATURE, label: "AI 解題初次分析", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 15, monthlyLimit: 0, novaCost: 10 },
-  { feature: AI_SOLUTION_UPLOAD_FEATURE, label: "AI 解題圖片／檔案上傳", enabled: true, proOnly: false, freeDailyLimit: 8, proDailyLimit: 25, monthlyLimit: 0, novaCost: 0 },
-  { feature: "essay_grading", label: "英文作文批改", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 5, monthlyLimit: 20, novaCost: 10 },
+  { feature: AI_SOLUTION_FEATURE, label: "AI 解題初次分析", enabled: true, proOnly: false, freeDailyLimit: 3, proDailyLimit: 30, monthlyLimit: 0, novaCost: 10 },
+  { feature: AI_SOLUTION_UPLOAD_FEATURE, label: "AI 解題圖片／檔案上傳", enabled: true, proOnly: false, freeDailyLimit: 8, proDailyLimit: 50, monthlyLimit: 0, novaCost: 0 },
+  { feature: "essay_grading", label: "英文作文批改", enabled: true, proOnly: false, freeDailyLimit: 1, proDailyLimit: 5, monthlyLimit: -1, novaCost: 50 },
 ];
 
 export function serverDefaultForFeature(feature: string) {
@@ -62,7 +62,7 @@ export function evaluateQuota(policy: FeaturePermissionPolicy, params: { isPro: 
   const units = Math.max(1, params.units ?? 1);
   const limit = params.isPro ? policy.proDailyLimit : policy.freeDailyLimit;
   const unlimited = limit < 0;
-  const monthlyLimit = policy.monthlyLimit > 0 ? policy.monthlyLimit : limit > 0 ? limit * 30 : 0;
+  const monthlyLimit = policy.monthlyLimit < 0 ? -1 : policy.monthlyLimit > 0 ? policy.monthlyLimit : limit > 0 ? limit * 30 : 0;
   const monthlyRemaining = monthlyLimit <= 0 ? Number.MAX_SAFE_INTEGER : Math.max(0, monthlyLimit - params.monthlyUsed);
   const remaining = unlimited ? Number.MAX_SAFE_INTEGER : Math.max(0, limit - params.used);
   if (!policy.enabled) return { allowed: false, limit, monthlyLimit, remaining, monthlyRemaining, reason: "disabled" };

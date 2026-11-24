@@ -19,11 +19,28 @@ import {
   activities,
   activityParticipants,
   users,
+  platformSettings,
 } from "@/db/schema";
 import { fail, todayStr } from "./core";
 import { classifyQuotaDatabaseError, type FeaturePermissionPolicy, serverDefaultForFeature } from "./quota-policy";
 
 /* ------------------------------------------------------------ helpers */
+
+export type CommerceAccess = { shopEnabled: boolean; proPurchaseEnabled: boolean };
+
+/** Commerce is opt-in while the owner is updating the store. Every purchase route must call this. */
+export async function getCommerceAccess(): Promise<CommerceAccess> {
+  const row = (await db.select({ value: platformSettings.value }).from(platformSettings).where(eq(platformSettings.key, "commerce_access")).limit(1))[0];
+  const value = row?.value ?? {};
+  return { shopEnabled: value.shopEnabled === true, proPurchaseEnabled: value.proPurchaseEnabled === true };
+}
+
+export async function requireCommerceAccess(kind: "shop" | "pro_purchase") {
+  const access = await getCommerceAccess();
+  if (kind === "shop" && !access.shopEnabled) throw fail("COMMERCE_SHOP_DISABLED", { message: "Novi 商店目前暫停開放，請稍後再試。" });
+  if (kind === "pro_purchase" && !access.proPurchaseEnabled) throw fail("COMMERCE_PRO_DISABLED", { message: "Nova Pro 自行購買目前暫停開放；管理員授予與優惠碼仍可正常使用。" });
+  return access;
+}
 
 export async function ensureUserEconomy(userId: string) {
   await db.insert(novaAccounts).values({ userId }).onConflictDoNothing();
@@ -267,7 +284,7 @@ export async function featureState(userId: string, feature: string): Promise<Quo
   const limit = pro ? Number(perm.proDailyLimit ?? 0) : Number(perm.freeDailyLimit ?? 0);
   // 舊資料可能尚未填 monthly_limit；對已有每日配額的功能採用 30 天預設，
   // 管理員若填入明確月度上限則以後台設定為準。
-  const monthlyLimit = perm.monthlyLimit > 0 ? perm.monthlyLimit : limit > 0 ? limit * 30 : 0;
+  const monthlyLimit = perm.monthlyLimit < 0 ? -1 : perm.monthlyLimit > 0 ? perm.monthlyLimit : limit > 0 ? limit * 30 : 0;
   const unlimited = Boolean(usage?.unlimited) || limit < 0;
   const used = usage?.count ?? 0;
   return {
@@ -287,10 +304,12 @@ export async function featureState(userId: string, feature: string): Promise<Quo
 }
 
 /** Atomically consume one unit of a gated feature. Throws when unavailable. */
-export async function consumeFeature(userId: string, feature: string, units = 1, idempotencyKey?: string): Promise<QuotaState> {
+export async function consumeFeature(userId: string, feature: string, units = 1, idempotencyKey?: string, options?: { allowOverage?: boolean; chargeNova?: boolean }): Promise<QuotaState> {
   const state = await featureState(userId, feature);
   const chargeKey = idempotencyKey ?? `feat:${userId}:${feature}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-  if (idempotencyKey && state.novaCost > 0) {
+  const overage = Boolean(options?.allowOverage && !state.unlimited && state.limit > 0 && state.remaining < units);
+  const shouldChargeNova = options?.chargeNova ?? state.novaCost > 0;
+  if (idempotencyKey && shouldChargeNova && state.novaCost > 0) {
     const priorCharge = await db.select({ id: novaTransactions.id }).from(novaTransactions).where(eq(novaTransactions.idempotencyKey, chargeKey)).limit(1);
     if (priorCharge[0]) return state;
   }
@@ -300,7 +319,7 @@ export async function consumeFeature(userId: string, feature: string, units = 1,
   if (!state.unlimited && state.limit <= 0) {
     throw fail("QUOTA_NOT_IN_PLAN", { message: `「${state.label}」在你目前的方案中未開放` });
   }
-  if (state.monthlyLimit > 0 && state.monthlyUsed + units > state.monthlyLimit) {
+  if (!overage && state.monthlyLimit > 0 && state.monthlyUsed + units > state.monthlyLimit) {
     throw fail("QUOTA_EXHAUSTED", { message: `本月「${state.label}」已達上限（${state.monthlyLimit} 次）`, details: { feature, limit: state.monthlyLimit, period: "monthly" } });
   }
   const today = todayStr();
@@ -310,7 +329,7 @@ export async function consumeFeature(userId: string, feature: string, units = 1,
     .onConflictDoNothing();
 
   let usageId: string | undefined;
-  if (!state.unlimited) {
+  if (!state.unlimited && !overage) {
     const updated = await db
       .update(featureUsage)
       .set({ count: sql`${featureUsage.count} + ${units}` })
@@ -336,7 +355,7 @@ export async function consumeFeature(userId: string, feature: string, units = 1,
     usageId = updated[0]?.id;
   }
 
-  if (state.novaCost > 0) {
+  if (shouldChargeNova && state.novaCost > 0) {
     try {
       await grantNova({
         userId,

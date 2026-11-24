@@ -36,6 +36,16 @@ async function pendingEnglishReaderJobs() {
   return Number(rows[0]?.count ?? 0);
 }
 
+async function queueMetrics(priority: "pro" | "standard") {
+  const condition = priority === "pro"
+    ? sql`(${jobQueue.payload}->>'priority' = 'pro')`
+    : sql`(${jobQueue.payload}->>'priority' <> 'pro' or ${jobQueue.payload}->>'priority' is null)`;
+  const rows = await db.select({ count: sql<number>`count(*)::int` }).from(jobQueue).where(and(eq(jobQueue.name, "english_reader_analyze"), sql`${jobQueue.status} in ('pending', 'running')`, condition));
+  const aheadCount = Number(rows[0]?.count ?? 0);
+  const averageSeconds = 45;
+  return { position: aheadCount + 1, aheadCount, estimatedSeconds: aheadCount * averageSeconds, priority };
+}
+
 export const routes: RouteDef[] = [
   route({ method: "GET", path: "/english-reader/documents", auth: "user", handler: async (ctx) => {
     const user = ctx.requireUser();
@@ -62,7 +72,8 @@ export const routes: RouteDef[] = [
     await requireEnglishReaderAccess(user.userId);
     const document = await ownDocument(ctx.params.id, user.userId);
     const items = await db.select().from(englishReadingItems).where(eq(englishReadingItems.documentId, document.id)).orderBy(asc(englishReadingItems.orderIndex));
-    return { document, items };
+    const priority = await isProUser(user.userId) ? "pro" : "standard";
+    return { document, items, queue: document.status === "queued" ? await queueMetrics(priority) : null };
   }}),
   route({ method: "POST", path: "/english-reader/documents/from-blob", auth: "user", rate: { limit: 30, windowSec: 3600, key: "english-reader-blob" }, handler: async (ctx) => {
     const user = ctx.requireUser();
@@ -75,7 +86,7 @@ export const routes: RouteDef[] = [
     const pro = await isProUser(user.userId);
     const document = (await db.insert(englishReadingDocuments).values({ userId: user.userId, title: body.title || "英文閱讀文章", sourceKind, sourceObjectId: object.id, originalText: "", status: "queued", progress: 0, progressStage: pro ? "Pro 優先佇列" : "等待背景工作", errorMessage: "" }).returning())[0];
     await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id, priority: pro ? "pro" : "standard" }, uniqueKey: `english-reader:${document.id}`, runAt: new Date(Date.now() - (pro ? 60_000 : 0)) });
-    return { document: { ...document, queueSize: (await pendingEnglishReaderJobs()) }, queued: true, priority: pro ? "pro" : "standard", message: pro ? "已加入 Pro 優先分析佇列。" : "已上傳，背景分析中；目前會依序排隊處理。" };
+    return { document: { ...document, queueSize: (await pendingEnglishReaderJobs()) }, queued: true, queue: await queueMetrics(pro ? "pro" : "standard"), priority: pro ? "pro" : "standard", message: pro ? "已加入 Pro 優先分析佇列。" : "已上傳，背景分析中；目前會依序排隊處理。" };
   }}),
   route({ method: "POST", path: "/english-reader/documents/:id/retry", auth: "user", rate: { limit: 10, windowSec: 3600, key: "english-reader-retry" }, handler: async (ctx) => {
     const user = ctx.requireUser();
@@ -87,7 +98,7 @@ export const routes: RouteDef[] = [
     const pro = await isProUser(user.userId);
     const updated = (await db.update(englishReadingDocuments).set({ status: "queued", progress: 0, progressStage: pro ? "Pro 優先佇列" : "等待背景工作", errorMessage: "", updatedAt: new Date() }).where(eq(englishReadingDocuments.id, document.id)).returning())[0];
     await queue().enqueue({ name: "english_reader_analyze", payload: { documentId: document.id, priority: pro ? "pro" : "standard", retry: true }, uniqueKey: `english-reader:${document.id}:retry:${Date.now()}`, runAt: new Date(Date.now() - (pro ? 60_000 : 0)) });
-    return { document: { ...updated, queueSize: await pendingEnglishReaderJobs() }, queued: true, priority: pro ? "pro" : "standard" };
+    return { document: { ...updated, queueSize: await pendingEnglishReaderJobs() }, queued: true, queue: await queueMetrics(pro ? "pro" : "standard"), priority: pro ? "pro" : "standard" };
   }}),
   route({ method: "POST", path: "/english-reader/documents", auth: "user", rate: { limit: 12, windowSec: 3600, key: "english-reader" }, handler: async (ctx) => {
     const user = ctx.requireUser();

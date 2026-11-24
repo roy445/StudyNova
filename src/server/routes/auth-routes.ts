@@ -172,7 +172,7 @@ export const routes: RouteDef[] = [
 
       await ensureUserEconomy(user.userId);
       const firstLogin = !user.lastLoginAt;
-      await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.userId, user.userId));
+      await db.update(users).set({ lastLoginAt: new Date(), inactiveReminderCount: 0, inactiveFirstNotifiedAt: null, inactiveSecondNotifiedAt: null, deletionScheduledAt: null, updatedAt: new Date() }).where(eq(users.userId, user.userId));
       await createSession(user.userId, { ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
       return { userId: user.userId, novaId: user.novaId, displayName: user.displayName, role: user.role, onboarded: user.onboarded, firstLogin };
     },
@@ -202,7 +202,7 @@ export const routes: RouteDef[] = [
       if (!user || !verifyPassword(body.password, user.passwordHash)) throw generic;
       if (!isAdminRole(user.role)) throw forbidden("此入口只允許管理員使用");
       if (user.status !== "active") throw fail("AUTH_ACCOUNT_BLOCKED", { message: "此管理員帳號目前無法登入。" });
-      await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.userId, user.userId));
+      await db.update(users).set({ lastLoginAt: new Date(), inactiveReminderCount: 0, inactiveFirstNotifiedAt: null, inactiveSecondNotifiedAt: null, deletionScheduledAt: null, updatedAt: new Date() }).where(eq(users.userId, user.userId));
       await createSession(user.userId, { ip: ctx.ip, userAgent: ctx.req.headers.get("user-agent") ?? "" });
       return { displayName: user.displayName, role: user.role, redirectTo: "/admin" };
     },

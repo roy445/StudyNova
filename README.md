@@ -2,6 +2,8 @@
 
 > 讓學習更聰明，讓進步看得見。
 
+> **目前版本：v1.2.0**（本工作區版本；正式環境仍須設定相同的 `NEXT_PUBLIC_APP_VERSION` 後再部署）
+
 StudyNova AI 是專為 **台灣國中／高中學生** 打造的正式全端學習平台：
 **AI 學習平台 + 個人學習管理 + 成績分析 + 教材分析 + OCR + 錯題 + 測驗 + 錄音分析 + 每週小考 + 社交分享 + Novi AI 助理 + Nova 養成 + 管理後台**。
 
@@ -25,10 +27,10 @@ StudyNova AI 是專為 **台灣國中／高中學生** 打造的正式全端學�
 | 每週小考 | 週次管理、考卷／答案分開上傳、螢光筆語意設定、AI OCR + 題答配對草稿、管理員人工確認才發布、10 分鐘快速複習、模擬測驗、統計與排名、歷史週次永久保存與重新開放 |
 | 社交 | NOVA ID 好友邀請／接受／拒絕／封鎖、QR Code 分享、好友挑戰與排行、讀書房（私人／好友／班級）共同計時、分享卡（Web Share API） |
 | 經濟 | Nova 點數 Ledger（Atomic + Idempotency + Audit）、XP、成就、Novi 五級養成、Novi 商店（外觀／核心／特效／漂浮／聲音／稱號／徽章／通行證） |
-| 會員 | Nova Pro（僅管理員授予／延長／回收）、雙倍 Nova 與 XP、我的通行證、優惠碼（Server 驗證、每帳號一次、總量限制） |
+| 會員 | Nova Pro（目前關閉自行購買／商店交易通路；既有會員、管理員授予與優惠碼不受影響）、雙倍 Nova 與 XP、我的通行證 |
 | AI | Gemini 2.5 Flash → GPT-4.1-mini → OpenRouter 三層 Fallback、只有 429/5xx/Timeout/Network/Quota 才降級、Quota 用盡持久化冷卻至下個 UTC 月初、完整 AI Log 與 Health 儀表板 |
 | 通知 | 站內通知、Web Push（VAPID + Service Worker）、Idempotency 去重 |
-| 排程 | Queue Adapter（Redis/BullMQ ↔ PostgreSQL）、7 個 Cron 任務、Secret 驗證 + Task UID 冪等 |
+| 排程 | Queue Adapter（目前以 PostgreSQL 為權威佇列）、Pro 優先、前方人數／預估等待時間、有限重試、Secret 驗證 + Task UID 冪等 |
 | 後台 | 總覽、使用者批次管理、Nova/XP 贈送、會員授予、功能權限與額度、全站服務總開關、教材 Content Studio、封面上傳、教材 OCR、公告、活動、優惠碼、題庫匯入、AI Health、系統健康、Cron、CSV 匯出、Audit Log、System Test Center |
 
 ---
@@ -145,7 +147,18 @@ NODE_ENV=production node_modules/.bin/next start -p 3000
 - **Cron**：`POST /api/v1/system/cron?task=<task>&uid=<unique>`，Header `x-cron-secret: $CRON_SECRET`。任務清單見後台 Cron 分頁。
 - **Push**：`npx web-push generate-vapid-keys` 產生金鑰填入 `VAPID_*`，學生於「我的 → 安全與通知」開啟。
 
-## 13. Backup / Restore
+## 13. v1.2.0 重要使用者政策
+
+- 全站 Novi 預設使用最新版「星旅」外觀；一般使用者不能切換樣式，只有 Nova Pro 可在「個人中心 → Novi 養成」調整。
+- 英文作文批改使用獨立的作文服務限制，不應消耗一般 AI 額度；免費版每日 1 次、Nova Pro 每日 5 次，超過免費次數後每次 50 Nova，且不設額外每日／每月上限。成功完成批改後才可結算，失敗不應扣除資源。
+- Nova 取得管道包含完成學習任務／專注／測驗、成就與挑戰獎勵、有效分享邀請獎勵、管理員贈送與管理員發放的 Nova 兌換碼；目前不提供商店或刷卡購買 Nova。
+- AI 背景工作會顯示排隊狀態、前方人數與預估等待時間；Nova Pro 工作具有優先權。工作失敗不扣額度、不扣 Nova。
+- 長期未登入或使用的學生帳號，超過 30 天會收到 Email、站內通知與 Web Push；警告後 7 天仍未重新登入才會永久刪除。期限內重新登入會取消刪除倒數。
+- 目前商店與使用者自行購買 Nova Pro 已全域關閉；管理員授予、既有會員權益與既有優惠碼流程不受影響。
+
+更多公開更新內容請見 [`docs/RELEASE_NOTES_1.2.0.md`](./docs/RELEASE_NOTES_1.2.0.md)。
+
+## 14. Backup / Restore
 
 ```bash
 DATABASE_URL=... ./scripts/backup.sh backup
@@ -154,7 +167,7 @@ S3_BUCKET=... S3_ENDPOINT=... ./scripts/backup.sh storage
 ```
 Migration 一律採 additive 策略，禁止直接刪除生產資料表／欄位。
 
-## 14. 文件與支援
+## 15. 文件與支援
 
 | 文件 | 內容 |
 | --- | --- |
@@ -175,12 +188,12 @@ Migration 一律採 additive 策略，禁止直接刪除生產資料表／欄位
 
 同時附上 `x-studynova-error` 與 `x-request-id` 標頭。未收錄的動態錯誤會由訊息推導出穩定唯一的代碼（例如 `SN-REQ-A1B2`），因此**沒有任何錯誤是沒有代碼的**。
 
-## 15. Testing
+## 16. Testing
 
 - `npx vitest run`：密碼雜湊、NOVA ID 唯一性、題目指紋去重、CSV BOM、日期／週次、趨勢演算法、錯誤遮蔽、AI JSON 解析、每週小考開放規則。
 - `/admin/system` → **System Test Center**：對「真實執行中的系統」跑整合測試（DB、Auth、RBAC、Nova 冪等性與餘額保護、額度、每日任務、題庫去重、Storage 往返、Queue/Cron、Push、AI 連線與 Fallback 鏈、每週小考、CSV、Ledger 對帳）。
 
-## 16. Security
+## 17. Security
 
 - scrypt（N=32768, r=8, p=2）密碼雜湊；登入失敗一律回傳一般化訊息，不透露帳號是否存在
 - HttpOnly / SameSite / Secure Cookie、Session 自動輪替、可自行撤銷裝置

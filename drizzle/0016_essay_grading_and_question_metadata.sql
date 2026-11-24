@@ -18,9 +18,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS "essay_grading_idem_uq" ON "essay_grading_jobs
 CREATE INDEX IF NOT EXISTS "essay_grading_user_idx" ON "essay_grading_jobs" ("user_id", "created_at");
 
 INSERT INTO "feature_permissions" ("feature", "label", "enabled", "pro_only", "free_daily_limit", "pro_daily_limit", "monthly_limit", "nova_cost")
-VALUES ('essay_grading', '英文作文批改', true, false, 1, 10, 30, 10)
+VALUES ('essay_grading', '英文作文批改', true, false, 1, 5, -1, 50)
 ON CONFLICT ("feature") DO NOTHING;
 
 INSERT INTO "platform_settings" ("key", "value")
-VALUES ('essay_grading_service', '{"status":"ENABLED","proOnly":false,"novaCost":10,"dailyLimit":1,"monthlyLimit":30,"maintenanceNotice":""}'::jsonb)
+VALUES ('essay_grading_service', '{"status":"ENABLED","proOnly":false,"novaCost":50,"dailyLimit":1,"monthlyLimit":-1,"maintenanceNotice":""}'::jsonb)
 ON CONFLICT ("key") DO NOTHING;

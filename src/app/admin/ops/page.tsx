@@ -137,6 +137,7 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
   const [aiGenForm, setAiGenForm] = useState({ subject: "數學", educationLevel: "junior", grade: "", chapter: "", topic: "", types: "single", count: 10, difficulty: "normal", prompt: "", referenceText: "" });
   const [expertSettings, setExpertSettings] = useState({ sourceStrictness: "strict", requireAnswerVerification: true, requireExplanation: true, avoidDuplicates: true, avoidSensitiveContent: true, bloomLevel: "understand", cognitiveSkills: ["concept", "application"], distractorStrategy: "plausible", scenarioStyle: "balanced", language: "zh-TW", temperature: 0.2, qualityThreshold: 80, maxRetries: 1, outputFormat: "structured", referencePriority: "reference_only" });
   const [logoWatermark, setLogoWatermark] = useState({ enabled: true, freeMembers: true, proMembers: true, scope: ["ai-images", "pdf-exports", "docx-exports", "xlsx-exports"] });
+  const [commerceAccess, setCommerceAccess] = useState({ shopEnabled: false, proPurchaseEnabled: false });
   const [aiGenFile, setAiGenFile] = useState<File | null>(null);
   const [aiGenResult, setAiGenResult] = useState<{ drafts: Array<Record<string, unknown>>; summary: Record<string, number> } | null>(null);
   const [bankUploadBusy, setBankUploadBusy] = useState(false);
@@ -155,6 +156,11 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
     // This effect hydrates local form state from the persisted admin setting.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (value && typeof value.enabled === "boolean") setLogoWatermark({ enabled: value.enabled, freeMembers: value.freeMembers !== false, proMembers: value.proMembers !== false, scope: Array.isArray(value.scope) ? value.scope.filter((item): item is string => typeof item === "string") : ["ai-images", "pdf-exports", "docx-exports", "xlsx-exports"] });
+  }, [platformSettings.data]);
+  useEffect(() => {
+    const value = platformSettings.data?.settings.find((item) => item.key === "commerce_access")?.value;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (value) setCommerceAccess({ shopEnabled: value.shopEnabled === true, proPurchaseEnabled: value.proPurchaseEnabled === true });
   }, [platformSettings.data]);
   async function patchImportItem(indexes: number[], payload: Record<string, unknown>) {
     if (!importJob) return;
@@ -524,6 +530,11 @@ export function AdminOpsPage({ initialTab = "ai" }: { initialTab?: string }) {
 
       {tab === "shop" && (
         <Card title="▧ Novi 商城管理" subtitle="調整 Nova 價格與上架狀態；下架或重新上架時會自動建立公告並通知使用者。">
+          <div className="mb-4 rounded-2xl border border-rose-300/25 bg-rose-300/5 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold text-rose-100">全域商業化存取</p><p className="mt-1 text-xs leading-5 text-muted">關閉後 Backend 會拒絕購買 API，不只是隱藏按鈕；管理員授予 Pro、優惠碼與既有會員不受影響。</p></div><Badge tone={commerceAccess.shopEnabled || commerceAccess.proPurchaseEnabled ? "gold" : "muted"}>{commerceAccess.shopEnabled || commerceAccess.proPurchaseEnabled ? "部分開放" : "目前關閉"}</Badge></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2"><label className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><input type="checkbox" checked={commerceAccess.shopEnabled} onChange={(event) => setCommerceAccess({ ...commerceAccess, shopEnabled: event.target.checked })} className="accent-[#37d3ff]" />開放 Novi 商店</label><label className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"><input type="checkbox" checked={commerceAccess.proPurchaseEnabled} onChange={(event) => setCommerceAccess({ ...commerceAccess, proPurchaseEnabled: event.target.checked })} className="accent-[#ffc857]" />開放 Nova Pro 自行購買／兌換</label></div>
+            <Button size="sm" className="mt-3" onClick={async () => { try { await apiPut("/admin/settings/commerce_access", { value: commerceAccess }); await platformSettings.reload(); toast.push("success", "商業化存取設定已儲存，Backend 立即生效"); } catch (err) { toast.push("error", errorMessage(err)); } }}>儲存全域設定</Button>
+          </div>
           {shop.loading && <Skeleton lines={5} />}
           {shop.error && <ErrorState message={shop.error} onRetry={shop.reload} />}
           <div className="overflow-x-auto scroll-thin">

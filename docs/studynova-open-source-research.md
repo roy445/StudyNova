@@ -1,7 +1,8 @@
 # StudyNova 開源借鑒研究與產品演進藍圖
 
-**作者：Manus AI**  
-**研究範圍：StudyNova 既有 GitHub 專案，以及考試出題系統以外的開源能力**  
+**作者：Manus AI**
+**文件狀態：研究／設計參考，非目前產品承諾；v1.2.0，更新日期：2026-11-24**
+**研究範圍：StudyNova 既有 GitHub 專案，以及考試出題系統以外的開源能力**
 **明確排除：考試出題、題庫、模擬考、AI 閱卷與 AI 口試 Repository**
 
 ## 摘要與結論
@@ -51,7 +52,7 @@ API 路徑已經很多，但「有 route」不等於「產品級完成」。目�
 
 第六，**PWA／Offline-first** 已有安裝引導、service worker／push 相關線索，但目前尚未看到完整的 IndexedDB local cache、sync queue、idempotency key 與 conflict resolution。這是下一階段的基礎工程，不應只加一個離線 banner。
 
-第七，**固定 AI 助理** 已完成。Novi 已移除拖曳 state、pointermove／pointerup handler、transform 定位與 drag cursor，保留開啟、收合、縮小與聊天互動，固定於 responsive bottom-right 位置。此次修改已通過 typecheck、lint、30 個測試、production build 與 `git diff --check`，commit 為 `605f7ed fix Novi assistant fixed position`。
+第七，**固定 AI 助理** 已完成。Novi 已移除拖曳 state、pointermove／pointerup handler、transform 定位與 drag cursor，保留開啟、收合、縮小與聊天互動，固定於 responsive bottom-right 位置。這是依目前工作區程式碼整理的狀態；本 repository 為 grafted shallow 工作區，本報告不主張存在可完整驗證的 commit、push、部署或完整測試歷史。
 
 ## 二、最值得借鑒的開源專案排行榜
 

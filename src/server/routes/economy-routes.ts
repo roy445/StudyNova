@@ -22,7 +22,7 @@ import {
 } from "@/db/schema";
 import { route, type RouteDef } from "../router";
 import { badRequest, conflict, fail, notFound, randomToken } from "../core";
-import { allFeatureStates, exchangeNovaForPro, grantLearningReward, grantMembership, grantNova, grantXp, isProUser } from "../economy";
+import { allFeatureStates, exchangeNovaForPro, getCommerceAccess, grantLearningReward, grantMembership, grantNova, grantXp, isProUser, requireCommerceAccess } from "../economy";
 import { notify } from "../notify";
 
 function reindeerSignature(payload: string) {
@@ -119,9 +119,10 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      const access = await getCommerceAccess();
       const profile = (await db.select().from(assistantProfiles).where(eq(assistantProfiles.userId, user.userId)).limit(1))[0];
       const levels = await db.select().from(assistantLevels).orderBy(asc(assistantLevels.level));
-      const items = await db.select().from(assistantItems).where(and(eq(assistantItems.enabled, true), inArray(assistantItems.category, ["badge", "title", "frame"]))).orderBy(asc(assistantItems.category), asc(assistantItems.priceNova));
+      const items = access.shopEnabled ? await db.select().from(assistantItems).where(and(eq(assistantItems.enabled, true), inArray(assistantItems.category, ["badge", "title", "frame"]))).orderBy(asc(assistantItems.category), asc(assistantItems.priceNova)) : [];
       const inventory = await db.select().from(assistantInventory).where(eq(assistantInventory.userId, user.userId));
       const balance = (await db.select().from(novaAccounts).where(eq(novaAccounts.userId, user.userId)).limit(1))[0]?.balance ?? 0;
       const next = levels.find((l) => l.level === (profile?.level ?? 1) + 1) ?? null;
@@ -133,6 +134,7 @@ export const routes: RouteDef[] = [
         inventory,
         balance,
         isPro: user.isPro,
+        shopEnabled: access.shopEnabled,
       };
     },
   }),
@@ -204,6 +206,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      await requireCommerceAccess("shop");
       const item = (await db.select().from(assistantItems).where(eq(assistantItems.id, ctx.params.itemId)).limit(1))[0];
       if (!item || !item.enabled) throw fail("SYS_NOT_FOUND", { message: "找不到商品" });
       const profile = (await db.select().from(assistantProfiles).where(eq(assistantProfiles.userId, user.userId)).limit(1))[0];
@@ -232,7 +235,10 @@ export const routes: RouteDef[] = [
     method: "GET",
     path: "/membership/pro-exchange-plans",
     auth: "user",
-    handler: async () => ({ plans: await db.select().from(novaProExchangePlans).where(eq(novaProExchangePlans.enabled, true)).orderBy(asc(novaProExchangePlans.days)) }),
+    handler: async () => {
+      const access = await getCommerceAccess();
+      return { enabled: access.proPurchaseEnabled, plans: access.proPurchaseEnabled ? await db.select().from(novaProExchangePlans).where(eq(novaProExchangePlans.enabled, true)).orderBy(asc(novaProExchangePlans.days)) : [] };
+    },
   }),
 
   route({
@@ -241,6 +247,7 @@ export const routes: RouteDef[] = [
     auth: "user",
     handler: async (ctx) => {
       const user = ctx.requireUser();
+      await requireCommerceAccess("pro_purchase");
       const body = await ctx.json(z.object({ planId: z.string().uuid(), requestId: z.string().uuid().optional() }));
       const plan = (await db.select().from(novaProExchangePlans).where(and(eq(novaProExchangePlans.id, body.planId), eq(novaProExchangePlans.enabled, true))).limit(1))[0];
       if (!plan) throw notFound("找不到可用的 Nova Pro 方案");

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { NoviAvatar } from "@/components/brand";
+import { NoviAvatar, NoviStyleToggle } from "@/components/brand";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Progress, Select, Skeleton, Stat, Tabs, Textarea, useToast } from "@/components/ui";
 import { apiDelete, apiGet, apiPatch, apiPost, errorMessage, shareContent, useApi } from "@/lib/api";
@@ -14,6 +14,7 @@ type Novi = {
   levels: Array<{ level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string; aura: string }>;
   nextLevel: { level: number; name: string; requiredXp: number; upgradeCostNova: number; ability: string } | null;
   items: Array<{ id: string; code: string; name: string; category: string; priceNova: number; description: string; requiredLevel: number; proOnly: boolean; owned: boolean; enabled?: boolean }>;
+  shopEnabled: boolean;
   balance: number;
   isPro: boolean;
 };
@@ -49,7 +50,7 @@ function ProfileInner() {
   const membership = useApi<{ membership: { tier: string; expiresAt: string | null } | null; isPro: boolean; quotas: Array<{ feature: string; label: string; used: number; limit: number; unlimited: boolean; proOnly: boolean }>; comparison: Array<{ feature: string; label: string; free: number; pro: number; proOnly: boolean }>; history: Array<{ id: string; action: string; days: number; reason: string; createdAt: string }> }>("/membership");
   const aiUsage = useApi<AiUsage>("/ai/usage");
   const renewal = useApi<{ membership: { expiresAt: string | null } | null; isPro: boolean; daysRemaining: number | null; request: { wantsRenewal: boolean; reason: string; requestedFeatures: string[]; otherFeedback: string } | null }>("/membership/renewal");
-  const proPlans = useApi<{ plans: Array<{ id: string; days: number; priceNova: number }> }>("/membership/pro-exchange-plans");
+  const proPlans = useApi<{ enabled: boolean; plans: Array<{ id: string; days: number; priceNova: number }> }>("/membership/pro-exchange-plans");
   const push = useApi<{ configured: boolean; publicKey: string; subscriptions: number }>("/push/config");
   const settings = useApi<{ settings: Record<string, unknown> }>("/account/settings");
   const timeline = useApi<{ items: Array<{ id: string; type: string; kind: string; subject: string; title: string; detail: Record<string, unknown>; minutes: number; occurredAt: string; source: string }>; filter: string }>("/learning/timeline?limit=60");
@@ -72,6 +73,12 @@ function ProfileInner() {
   const [pwd, setPwd] = useState({ current: "", next: "" });
 
   const profile = novi.data?.profile;
+
+  useEffect(() => {
+    // URL tab state must be corrected after the commerce setting loads.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (tab === "shop" && novi.data && !novi.data.shopEnabled) setTab("profile");
+  }, [tab, novi.data]);
 
   useEffect(() => {
     const linkedCoupon = params.get("coupon");
@@ -178,7 +185,7 @@ function ProfileInner() {
           { key: "profile", label: "個人資料", icon: "◎" },
           { key: "footprint", label: "學習足跡", icon: "◷" },
           { key: "novi", label: "Novi 養成", icon: "✦" },
-          { key: "shop", label: "商店", icon: "▧" },
+          ...(novi.data?.shopEnabled ? [{ key: "shop", label: "商店", icon: "▧" }] : []),
           { key: "nova", label: "Nova 紀錄", icon: "✦" },
           { key: "achievements", label: "成就", icon: "◇" },
           { key: "pass", label: "我的通行證", icon: "▤" },
@@ -429,6 +436,18 @@ function ProfileInner() {
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-[#526dff]/25 bg-[#526dff]/[.06] p-3">
+                <p className="text-sm font-semibold">Novi 外觀</p>
+                {novi.data.isPro ? (
+                  <>
+                    <p className="mt-1 text-xs text-muted">Nova Pro 專屬設定。變更後會同步套用到全站 Novi。</p>
+                    <div className="mt-2"><NoviStyleToggle /></div>
+                  </>
+                ) : (
+                  <p className="mt-1 text-xs text-muted">目前使用最新版星旅外觀；升級 Nova Pro 後可在這裡調整。</p>
+                )}
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 {(["frame", "title", "badge"] as const).map((cat) => (
                     <Field key={cat} label={{ frame: "頭像框", title: "稱號", badge: "徽章" }[cat]}>
@@ -472,7 +491,7 @@ function ProfileInner() {
         </Card>
       )}
 
-      {tab === "shop" && (
+      {tab === "shop" && novi.data?.shopEnabled && (
         <Card title="▧ Novi 商店" subtitle={`目前 Nova 餘額：${novi.data?.balance ?? 0}`} action={<Button size="sm" variant="ghost" onClick={() => void novi.reload()}>重新整理商品</Button>}>
           <div className="mb-3 rounded-xl border border-[#37d3ff]/20 bg-[#37d3ff]/5 px-3 py-2 text-xs text-muted">商品下架後會立即從這裡消失；PRO 商品會先顯示資格要求，購買時後端也會再次驗證。每件商品的 Nova 價格會在購買前再次確認。</div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -613,14 +632,14 @@ function ProfileInner() {
                   </ul>
               )}
             </div>
-            <div className="mt-4 rounded-2xl border border-[#ffc857]/25 bg-[#ffc857]/5 p-3">
+            {proPlans.data?.enabled ? <div className="mt-4 rounded-2xl border border-[#ffc857]/25 bg-[#ffc857]/5 p-3">
               <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-[#ffd98a]">用 Nova 點數兌換 Nova Pro</p><Badge tone="gold">可累加</Badge></div>
               <p className="mt-1 text-xs text-muted">天數越長總價越高；如果目前仍是 Pro，兌換天數會接續到現有到期日，不會覆蓋原本期限。按下兌換前會先顯示扣除的 Nova。</p>
               <p className="mt-2 rounded-xl border border-[#ffc857]/25 bg-[#ffc857]/8 px-3 py-2 text-xs text-[#ffe4a3]">每個方案按鈕都會先顯示本次實際扣除的 Nova，確認後才會兌換。</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {proPlans.data?.plans.map((plan) => <Button key={plan.id} variant={plan.days >= 30 ? "gold" : "ghost"} onClick={async () => { if (!confirmNovaSpend(`兌換 Nova Pro ${plan.days} 天`, plan.priceNova, nova.data?.account.balance ?? null)) return; try { const res = await apiPost<{ plan: { days: number; priceNova: number }; balance: number }>("/membership/pro-exchange", { planId: plan.id, requestId: crypto.randomUUID() }); toast.push("success", `已累加 Nova Pro ${res.plan.days} 天，剩餘 ${res.balance} Nova`); await Promise.all([nova.reload(), membership.reload(), me.reload()]); } catch (err) { toast.push("error", errorMessage(err)); } }}>{membership.data?.isPro ? `再加 ${plan.days} 天・✦ ${plan.priceNova} Nova` : `${plan.days} 天・✦ ${plan.priceNova} Nova`}</Button>)}
               </div>
-            </div>
+            </div> : <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/5 p-3 text-sm"><p className="font-semibold text-amber-100">Nova Pro 自行購買目前暫停</p><p className="mt-1 text-xs leading-6 text-muted">管理員正在更新會員購買方案；既有會員資格、管理員授予與優惠碼兌換不受影響。</p></div>}
             <div className="mt-3">
               <Field label="優惠碼">
                 <div className="flex gap-2">
@@ -656,6 +675,15 @@ function ProfileInner() {
                   {h.days ? ` ${h.days} 天` : ""}｜{h.reason}
                 </p>
               ))}
+            </div>
+          </Card>
+
+          <Card title="✦ 取得 Nova 點數">
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <div className="rounded-xl border border-[var(--line)] bg-white/[.03] p-3"><p className="font-semibold text-[#ffe4a3]">學習與任務</p><p className="mt-1 text-xs leading-5 text-muted">完成每日任務、專注學習與測驗，依活動規則領取 Nova。</p></div>
+              <div className="rounded-xl border border-[var(--line)] bg-white/[.03] p-3"><p className="font-semibold text-[#ffe4a3]">成就與挑戰</p><p className="mt-1 text-xs leading-5 text-muted">完成成就、活動或好友挑戰；同一獎勵不會重複發放。</p></div>
+              <div className="rounded-xl border border-[var(--line)] bg-white/[.03] p-3"><p className="font-semibold text-[#ffe4a3]">分享邀請</p><p className="mt-1 text-xs leading-5 text-muted">使用有效邀請連結完成註冊，依活動規則讓邀請雙方取得獎勵。</p></div>
+              <div className="rounded-xl border border-[var(--line)] bg-white/[.03] p-3"><p className="font-semibold text-[#ffe4a3]">兌換碼與管理員獎勵</p><p className="mt-1 text-xs leading-5 text-muted">輸入管理員發放的 Nova 兌換碼，或由管理員直接贈送；商店與刷卡目前關閉。</p></div>
             </div>
           </Card>
 
