@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Badge, Button, Card, ErrorState, Skeleton } from "@/components/ui";
+import { Wordmark } from "@/components/brand";
 import { useApi } from "@/lib/api";
 
 type Announcement = { id: string; title: string; body: string; link: string; ctaLabel: string; importance: string; category: string; tags: string[]; image: string; startsAt: string };
@@ -17,7 +18,7 @@ export default function AnnouncementDetailPage() {
     <Link href="/dashboard" className="text-sm text-cyan-200 underline">← 回首頁</Link>
     <Card className="overflow-hidden !p-0">
       {item.image && <img src={item.image} alt="" className="h-44 w-full object-cover sm:h-60" />}
-      <div className="p-5 sm:p-8">
+      <div className="p-5 sm:p-8"><div className="mb-5 flex items-center gap-3"><Wordmark size={28} /><span className="text-xs font-semibold tracking-[.18em] text-cyan-200">VERSION UPDATE</span></div>
         <div className="flex flex-wrap items-center gap-2"><Badge tone="cyan">重要公告</Badge><Badge tone={item.importance === "critical" ? "rose" : "violet"}>{item.category || "更新"}</Badge></div>
         <h1 className="mt-3 text-2xl font-black text-white sm:text-4xl">{item.title}</h1>
         <p className="mt-2 text-xs text-muted">發布時間：{new Date(item.startsAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}</p>

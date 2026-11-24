@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Badge, Button, Card } from "@/components/ui";
+import { Wordmark } from "@/components/brand";
 import { useApi } from "@/lib/api";
 import { APP_VERSION } from "@/lib/app-version";
 import { formatTaipeiDateTime } from "@/lib/date-time";
@@ -19,7 +20,7 @@ export default function UpdatesPage() {
   const releases = history.data?.releases ?? [];
 
   return <main className="mx-auto min-h-dvh w-full max-w-5xl space-y-5 px-3 py-6 sm:px-6 sm:py-10">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.18em] text-[#7dd3fc]">StudyNova</p><h1 className="mt-1 text-2xl font-bold sm:text-3xl">更新紀錄</h1><p className="mt-2 text-sm text-muted">查看目前版本、最新版本與每次更新內容。</p></div><Link href="/dashboard" className="inline-flex min-h-10 items-center rounded-xl border border-[var(--line)] px-3 text-sm hover:bg-white/5">回首頁</Link></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-start gap-4"><Wordmark size={38} /><div><p className="text-xs uppercase tracking-[0.18em] text-[#7dd3fc]">StudyNova</p><h1 className="mt-1 text-2xl font-bold sm:text-3xl">更新紀錄</h1><p className="mt-2 text-sm text-muted">看看這次新增了什麼、改善了什麼，以及哪些問題已經修正。</p></div></div><Link href="/dashboard" className="inline-flex min-h-10 items-center rounded-xl border border-[var(--line)] px-3 text-sm hover:bg-white/5">回首頁</Link></header>
     <Card title="版本狀態" subtitle="版本資訊以正式部署版本與資料庫已發布 release 為準。">
       <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl border border-[var(--line)] bg-white/[0.03] p-3"><p className="text-xs text-muted">目前客戶端</p><p className="mt-1 font-mono text-lg">v{latest.data?.currentVersion ?? APP_VERSION}</p></div><div className="rounded-xl border border-[var(--line)] bg-white/[0.03] p-3"><p className="text-xs text-muted">最新已發布</p><p className="mt-1 font-mono text-lg">v{latest.data?.latestVersion ?? "—"}</p></div><div className="rounded-xl border border-[var(--line)] bg-white/[0.03] p-3"><p className="text-xs text-muted">最低支援</p><p className="mt-1 font-mono text-lg">v{latest.data?.minimumSupportedVersion ?? "—"}</p></div></div>
       {latest.data?.forceUpdate && <div className="mt-4 rounded-xl border border-rose-300/30 bg-rose-300/5 p-3 text-sm text-rose-100">目前版本已停止支援，請更新至 v{latest.data.minimumSupportedVersion} 或更新版本後繼續使用。</div>}

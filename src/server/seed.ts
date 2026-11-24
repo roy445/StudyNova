@@ -261,6 +261,7 @@ export async function runSeed(force = false) {
 
 
   const releaseAnnouncements = [
+    { title: "StudyNova v1.2.0｜更完整的 AI 學習體驗", body: "本次更新帶來每日任務與每週任務、AI 作文批改額度、排隊進度與 Pro 優先處理，並修正 AI 分析、OCR、額度顯示與手機版操作問題。全站也同步推出聖誕限定視覺與 Novi 冬日造型。\n\n重點更新：\n・首頁公告與新功能通知\n・每日任務與每週任務\n・AI 作文批改額度與 Nova 點數使用\n・AI 任務排隊與預估等待時間\n・AI 失敗不扣額度、不扣 Nova\n・修正 AI 分析、OCR 與手機版顯示問題\n・聖誕限定 Novi、雪花與馴鹿驚喜事件", link: "/updates", targetFeature: "all", tags: ["v1.2.0", "重要更新", "聖誕限定"], sortOrder: 1 },
     { title: "✨ v1.2.0・新版 Novi 星旅正式登場", body: "Novi 全站助手更新為固定、清楚且更容易使用的星旅體驗；首頁也會依你的真實學習紀錄提供下一步建議。", link: "/ai", targetFeature: "nova", tags: ["v1.2.0", "Novi", "個人化"], sortOrder: 2 },
     { title: "⏳ AI 排隊透明化：等待不再猜", body: "AI 任務現在會顯示排隊狀態、前方人數與預估等待時間；Nova Pro 享有優先處理。任務失敗不扣額度，也不扣 Nova。", link: "/ai", targetFeature: "ai_queue", tags: ["AI", "排隊", "透明等待"], sortOrder: 3 },
     { title: "✍️ 英文作文批改規則更新", body: "英文作文批改正式支援免費版每日 1 次、Nova Pro 每日 5 次；超過免費額度後可用 50 Nova 兌換一次，AI 失敗不會扣除任何資源。", link: "/essay", targetFeature: "essay_grading", tags: ["英文作文", "Nova", "學測"], sortOrder: 4 },
