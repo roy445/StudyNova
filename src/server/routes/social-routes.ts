@@ -891,6 +891,17 @@ export const routes: RouteDef[] = [
 
   route({
     method: "GET",
+    path: "/announcements/:id",
+    auth: "optional",
+    handler: async (ctx) => {
+      const now = new Date();
+      const row = (await db.select().from(announcements).where(and(eq(announcements.id, ctx.params.id), eq(announcements.status, "published"), lte(announcements.startsAt, now), sql`(${announcements.endsAt} is null or ${announcements.endsAt} >= now())`)).limit(1))[0];
+      if (!row) throw notFound("找不到這則公告，或公告已結束");
+      return { announcement: row };
+    },
+  }),
+  route({
+    method: "GET",
     path: "/pwa/announcements",
     auth: "optional",
     handler: async () => {

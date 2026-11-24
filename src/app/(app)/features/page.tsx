@@ -20,6 +20,10 @@ const FEATURES: Feature[] = [
   { href: "/pk", icon: "duel", title: "線上 PK", description: "真人配對即時作答競賽", tone: "rose" },
   { href: "/grades", icon: "grades", title: "成績分析", description: "查看成績、弱科與趨勢", tone: "blue" },
   { href: "/essay", icon: "pen", title: "作文批改", description: "取得文章結構與表達建議", tone: "emerald" },
+  { href: "/announcements", icon: "bell", title: "重要更新公告", description: "查看 v1.2.0 新功能、使用規則與詳細說明", tone: "violet" },
+  { href: "/ai", icon: "spark", title: "新版 Novi 星旅", description: "固定式 AI 助教、個人化學習建議與透明等待", tone: "violet" },
+  { href: "/dashboard", icon: "badge", title: "Nova 任務與獎勵", description: "完成簡單每日／每週任務，直接領取 Nova 與 XP", tone: "gold" },
+  { href: "/introduce", icon: "home", title: "v1.2.0 更新介紹", description: "了解 StudyNova 的新功能與學習體驗", tone: "cyan" },
   { href: "/compress", icon: "archive", title: "智慧壓縮", description: "整理與壓縮學習檔案", tone: "cyan" },
 ];
 

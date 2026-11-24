@@ -365,6 +365,15 @@ export const routes: RouteDef[] = [
         .from(dailyTasks)
         .where(and(eq(dailyTasks.userId, user.userId), eq(dailyTasks.taskDate, today)));
 
+      const [weeklyTaskProgress] = await db
+        .select({ completed: sql<number>`count(*)::int` })
+        .from(dailyTasks)
+        .where(and(
+          eq(dailyTasks.userId, user.userId),
+          gte(dailyTasks.taskDate, sql`to_char(date_trunc('week', current_date), 'YYYY-MM-DD')`),
+          sql`${dailyTasks.claimedAt} is not null`,
+        ));
+
       const stats = await subjectStats(user.userId);
       const weakest = [...stats].sort((a, b) => a.average - b.average)[0] ?? null;
       const recentGrades = await db
@@ -448,6 +457,7 @@ export const routes: RouteDef[] = [
         goal,
         streak,
         tasks: tasksToday,
+        weeklyTask: { title: "本週完成 5 個簡單任務", progress: Math.min(weeklyTaskProgress?.completed ?? 0, 5), target: 5, rewardNova: 30, rewardXp: 60 },
         plan,
         stats,
         weakest,
@@ -468,7 +478,7 @@ export const routes: RouteDef[] = [
       };
       } catch (error) {
         console.error("[dashboard] read failed; returning safe shell", error);
-        return { today: todayStr(), greeting: `嗨，${user.displayName}！`, minutes: 0, focusMinutes: 0, goal: 45, streak: 0, tasks: [], plan: { totalMinutes: 0, rationale: "資料暫時載入中，稍後可重新整理。", blocks: [] }, stats: [], weakest: null, recentGrades: [], upcomingExams: [], countdowns: [], dueWrong: 0, wordsDue: 0, nova: 0, novi: null, activities: [], announcements: [], marquee: [], openWeek: null, unread: 0, isPro: user.isPro, aiEnabled: aiConfigured(), degraded: true };
+        return { today: todayStr(), greeting: `嗨，${user.displayName}！`, minutes: 0, focusMinutes: 0, goal: 45, streak: 0, tasks: [], weeklyTask: { title: "本週完成 5 個簡單任務", progress: 0, target: 5, rewardNova: 30, rewardXp: 60 }, plan: { totalMinutes: 0, rationale: "資料暫時載入中，稍後可重新整理。", blocks: [] }, stats: [], weakest: null, recentGrades: [], upcomingExams: [], countdowns: [], dueWrong: 0, wordsDue: 0, nova: 0, novi: null, activities: [], announcements: [], marquee: [], openWeek: null, unread: 0, isPro: user.isPro, aiEnabled: aiConfigured(), degraded: true };
       }
     },
   }),

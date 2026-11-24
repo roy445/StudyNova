@@ -329,6 +329,35 @@ export const routes: RouteDef[] = [
     },
   }),
 
+  route({
+    method: "GET",
+    path: "/admin/database-usage",
+    auth: "admin",
+    handler: async () => {
+      const result = await db.execute(sql`
+        select
+          pg_database_size(current_database())::bigint as database_bytes,
+          coalesce((select sum(pg_total_relation_size(c.oid)) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r','m')), 0)::bigint as public_tables_bytes,
+          (select count(*)::int from pg_stat_activity where datname = current_database()) as active_connections,
+          (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r','m')) as public_table_count
+      `);
+      const row = (result.rows[0] ?? {}) as Record<string, unknown>;
+      const databaseBytes = Number(row.database_bytes ?? 0);
+      const tablesBytes = Number(row.public_tables_bytes ?? 0);
+      return {
+        provider: "Neon PostgreSQL",
+        database: "current_database",
+        databaseBytes,
+        publicTablesBytes: tablesBytes,
+        freeBytes: Math.max(0, databaseBytes - tablesBytes),
+        activeConnections: Number(row.active_connections ?? 0),
+        publicTableCount: Number(row.public_table_count ?? 0),
+        collectedAt: new Date().toISOString(),
+        note: "這裡顯示連線中的 Neon PostgreSQL 真實資料；Neon 帳單 CU／網路流量需由 Neon Console 或受限的管理 API 查閱。",
+      };
+    },
+  }),
+
   /* --------------------------------------------------------- users */
   route({
     method: "GET",

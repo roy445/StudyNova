@@ -69,6 +69,8 @@ type ServiceControl = { enabled: boolean; category: "maintenance" | "repair" | "
 type PkAdminConfig = { enabled: boolean; quickMatchEnabled: boolean; friendMatchEnabled: boolean; customRoomEnabled: boolean; publicArenaEnabled: boolean; botEnabled: boolean; botFillQuickMatch: boolean; botSkill: "easy" | "normal" | "hard"; allowedModes: string[]; allowedBankIds: string[]; maxPlayers: number; minQuestions: number; maxQuestions: number; minTimeSec: number; maxTimeSec: number; defaultRewardNova: number; defaultRewardXp: number; activityId: string | null };
 type PkAdminOverview = { config: PkAdminConfig; stats: { online: number; pkOnline: number; waitingRooms: number; liveMatches: number; matching: number }; matches: Array<{ id: string; status: string; subject: string; mode: string; difficulty: string; questionCount: number; createdAt: string; roomName: string | null; playerCount: number; botCount: number }>; anomalies: Array<{ id: string; matchId: string; eventType: string; payload: Record<string, unknown>; createdAt: string }> };
 type PkActivity = { id: string; name: string; cover: string; subject: string; scope: string; description: string; startsAt: string; endsAt: string; questionCount: number; difficulty: string; rewardNova: number; rewardXp: number; status: string };
+type DatabaseUsage = { provider: string; database: string; databaseBytes: number; publicTablesBytes: number; freeBytes: number; activeConnections: number; publicTableCount: number; collectedAt: string; note: string };
+const formatBytes = (bytes: number) => { if (!bytes) return "0 B"; const units = ["B", "KB", "MB", "GB", "TB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); return `${(bytes / 1024 ** index).toFixed(index ? 2 : 0)} ${units[index]}`; };
 
 const ACTIONS = [
   { key: "gift_nova", label: "調整 Nova（可負數）", needAmount: true },
@@ -93,6 +95,7 @@ export default function AdminOverviewPage() {
   const [q, setQ] = useState("");
   const [userPage, setUserPage] = useState(1);
   const overview = useApi<{ users: number; pro: number; novaCirculating: number; aiCallsThisMonth: number; totalMinutes: number; weeks: number; newUsers: Array<{ day: string; c: number }> }>("/admin/overview");
+  const databaseUsage = useApi<DatabaseUsage>("/admin/database-usage");
   const users = useApi<{ users: AdminUser[]; total: number; page: number; pageSize: number }>(`/admin/users?q=${encodeURIComponent(q)}&page=${userPage}&pageSize=25`, [q, userPage]);
   const logs = useApi<{ logs: Array<{ id: string; action: string; targetType: string; targetId: string; reason: string; createdAt: string; actor: string | null }> }>("/admin/logs?kind=admin");
   const features = useApi<{ features: Array<{ id: string; feature: string; label: string }> }>("/admin/features");
@@ -242,6 +245,11 @@ export default function AdminOverviewPage() {
                 <div className="flex flex-wrap items-center gap-2"><Button size="sm" onClick={() => void restoreService()} disabled={serviceControl.data?.enabled !== false}>🚀 立即恢復網站</Button><a href="/admin/features" className="rounded-xl border border-[var(--line)] px-3 py-2 text-xs text-white/85 hover:bg-white/10">開啟完整維護設定</a></div>
                 {serviceControl.data?.enabled === false && <p className="mt-3 text-xs text-amber-100/80">目前顯示：{serviceControl.data.message || serviceControl.data.description}</p>}
               </Card>
+              <Card title="▣ Neon 資料庫使用量（真實資料）" subtitle={databaseUsage.data?.note ?? "讀取 Neon PostgreSQL 目前連線中的資料庫統計。"} action={<Button size="sm" variant="ghost" onClick={() => void databaseUsage.reload()}>重新整理</Button>}>
+                {databaseUsage.loading && <Skeleton lines={2} />}
+                {databaseUsage.error && <ErrorState message={databaseUsage.error} onRetry={databaseUsage.reload} />}
+                {databaseUsage.data && <div className="grid grid-cols-2 gap-2 sm:grid-cols-5"><Stat label="資料庫總大小" value={formatBytes(databaseUsage.data.databaseBytes)} tone="cyan" /><Stat label="公開資料表" value={formatBytes(databaseUsage.data.publicTablesBytes)} /><Stat label="其他／索引" value={formatBytes(databaseUsage.data.freeBytes)} /><Stat label="目前連線" value={databaseUsage.data.activeConnections} tone="violet" /><Stat label="資料表數" value={databaseUsage.data.publicTableCount} /></div>}
+              </Card>
               <Card title="近 14 天新註冊">
                 {overview.data.newUsers.length ? (
                   <BarChart series={overview.data.newUsers.map((d) => ({ label: d.day.slice(5), value: d.c }))} suffix=" 人" />
@@ -255,6 +263,10 @@ export default function AdminOverviewPage() {
       )}
 
       {tab === "users" && (
+        <>
+        <Card title="▣ 使用者分類・Neon 使用量" subtitle="這是同一個 Neon PostgreSQL 的即時資料庫大小與連線統計，不是估算值。" action={<Button size="sm" variant="ghost" onClick={() => void databaseUsage.reload()}>重新整理</Button>}>
+          {databaseUsage.data ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Stat label="資料庫" value={formatBytes(databaseUsage.data.databaseBytes)} tone="cyan" /><Stat label="公開資料表" value={formatBytes(databaseUsage.data.publicTablesBytes)} /><Stat label="目前連線" value={databaseUsage.data.activeConnections} tone="violet" /><Stat label="資料表" value={databaseUsage.data.publicTableCount} /></div> : <p className="text-sm text-muted">{databaseUsage.loading ? "讀取中…" : databaseUsage.error ?? "尚無資料"}</p>}
+        </Card>
         <Card
           title="◎ 使用者管理"
           subtitle={`已選取 ${selected.length} 位・所有操作都會記錄 Audit Log`}
@@ -340,6 +352,7 @@ export default function AdminOverviewPage() {
           </div>
           {users.data && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] pt-3 text-xs text-muted"><span>共 {users.data.total} 位會員 · 第 {users.data.page} / {Math.max(1, Math.ceil(users.data.total / users.data.pageSize))} 頁</span><div className="flex gap-2"><Button size="sm" variant="ghost" disabled={userPage <= 1} onClick={() => setUserPage((page) => Math.max(1, page - 1))}>上一頁</Button><Button size="sm" variant="ghost" disabled={userPage >= Math.max(1, Math.ceil(users.data.total / users.data.pageSize))} onClick={() => setUserPage((page) => page + 1)}>下一頁</Button></div></div>}
         </Card>
+        </>
       )}
 
       {tab === "logs" && (

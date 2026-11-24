@@ -20,7 +20,7 @@ import { fingerprint } from "./core";
 import { providerConfigs } from "./ai";
 import vocabulary from "@/data/vocabulary.json";
 
-const SEED_VERSION = 13;
+const SEED_VERSION = 14;
 
 const ENGLISH_READER_ANNOUNCEMENT_TITLE = "📖 英文雜誌閱讀器正式開放";
 
@@ -259,6 +259,17 @@ export async function runSeed(force = false) {
     });
   }
 
+
+  const releaseAnnouncements = [
+    { title: "✨ v1.2.0・新版 Novi 星旅正式登場", body: "Novi 全站助手更新為固定、清楚且更容易使用的星旅體驗；首頁也會依你的真實學習紀錄提供下一步建議。", link: "/ai", targetFeature: "nova", tags: ["v1.2.0", "Novi", "個人化"], sortOrder: 2 },
+    { title: "⏳ AI 排隊透明化：等待不再猜", body: "AI 任務現在會顯示排隊狀態、前方人數與預估等待時間；Nova Pro 享有優先處理。任務失敗不扣額度，也不扣 Nova。", link: "/ai", targetFeature: "ai_queue", tags: ["AI", "排隊", "透明等待"], sortOrder: 3 },
+    { title: "✍️ 英文作文批改規則更新", body: "英文作文批改正式支援免費版每日 1 次、Nova Pro 每日 5 次；超過免費額度後可用 50 Nova 兌換一次，AI 失敗不會扣除任何資源。", link: "/essay", targetFeature: "essay_grading", tags: ["英文作文", "Nova", "學測"], sortOrder: 4 },
+    { title: "💎 Nova 取得管道與每日任務", body: "現在可以透過每日任務、每週任務與學習活動累積 Nova 與 XP；每項任務都維持簡單，完成後可直接在首頁領取獎勵。", link: "/dashboard", targetFeature: "daily_tasks", tags: ["Nova", "每日任務", "每週任務"], sortOrder: 6 },
+  ];
+  for (const item of releaseAnnouncements) {
+    const exists = await db.select({ id: announcements.id }).from(announcements).where(eq(announcements.title, item.title)).limit(1);
+    if (!exists[0]) await db.insert(announcements).values({ ...item, category: "feature", announcementType: "release", importance: "high", audience: "all", audienceIds: [], pinned: true, marquee: true, notify: true, push: false, email: false, showHome: true, showPwa: true, ctaLabel: "查看詳情", ctaUrl: item.link, status: "published", startsAt: new Date(), endsAt: null, createdBy: null });
+  }
 
   await db
     .insert(platformSettings)
