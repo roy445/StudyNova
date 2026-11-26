@@ -3056,6 +3056,44 @@ export const textbookContents = pgTable("textbook_contents", {
   updatedAt: updated(),
 }, (t) => [index("textbook_content_lesson_idx").on(t.lessonId, t.enabled, t.sortOrder), index("textbook_content_type_idx").on(t.type)]);
 
+/* --------------------------------------------------------- VIDEO LEARNING */
+export const learningVideos = pgTable("learning_videos", {
+  id: id(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  subject: text("subject").notNull().default("英文"),
+  chapter: text("chapter").notNull().default(""),
+  coverObjectId: uuid("cover_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+  videoObjectId: uuid("video_object_id").references(() => storageObjects.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("draft"),
+  proOnly: boolean("pro_only").notNull().default(true),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [index("learning_videos_status_idx").on(t.status, t.publishedAt), index("learning_videos_subject_idx").on(t.subject, t.chapter)]);
+
+export const learningVideoTrialCodes = pgTable("learning_video_trial_codes", {
+  id: id(), videoId: uuid("video_id").notNull().references(() => learningVideos.id, { onDelete: "cascade" }),
+  codeHash: text("code_hash").notNull(), codeLast4: text("code_last4").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }), maxUses: integer("max_uses").notNull().default(1),
+  usedCount: integer("used_count").notNull().default(0), enabled: boolean("enabled").notNull().default(true),
+  createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }), createdAt: created(),
+}, (t) => [uniqueIndex("learning_video_trial_code_hash_uq").on(t.codeHash), index("learning_video_trial_code_video_idx").on(t.videoId, t.enabled)]);
+
+export const learningVideoRedemptions = pgTable("learning_video_redemptions", {
+  id: id(), codeId: uuid("code_id").notNull().references(() => learningVideoTrialCodes.id, { onDelete: "cascade" }),
+  videoId: uuid("video_id").notNull().references(() => learningVideos.id, { onDelete: "cascade" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), redeemedAt: created(),
+}, (t) => [uniqueIndex("learning_video_redemption_user_video_uq").on(t.userId, t.videoId), index("learning_video_redemption_code_idx").on(t.codeId, t.redeemedAt)]);
+
+export const learningVideoAuthorizations = pgTable("learning_video_authorizations", {
+  id: id(), videoId: uuid("video_id").notNull().references(() => learningVideos.id, { onDelete: "cascade" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), source: text("source").notNull(), lastAuthorizedAt: timestamp("last_authorized_at", { withTimezone: true }).notNull().defaultNow(), createdAt: created(),
+}, (t) => [uniqueIndex("learning_video_authorization_user_video_uq").on(t.userId, t.videoId), index("learning_video_authorization_user_idx").on(t.userId, t.lastAuthorizedAt)]);
+
+export const learningVideoWatchLogs = pgTable("learning_video_watch_logs", {
+  id: id(), videoId: uuid("video_id").notNull().references(() => learningVideos.id, { onDelete: "cascade" }), userId: uuid("user_id").notNull().references(() => users.userId, { onDelete: "cascade" }), startedAt: created(), lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).notNull().defaultNow(), watchedSeconds: integer("watched_seconds").notNull().default(0), completed: boolean("completed").notNull().default(false),
+}, (t) => [index("learning_video_watch_user_idx").on(t.userId, t.startedAt), index("learning_video_watch_video_idx").on(t.videoId, t.startedAt)]);
+
 export const contentThemes = pgTable("content_themes", {
   id: id(),
   key: text("key").notNull(),
